@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: betterreads
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:betterreads}
+    username: ${DB_USERNAME:betterreads}
+    password: ${DB_PASSWORD:betterreads}
+    hikari:
+      maximum-pool-size: 10
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  flyway:
+    enabled: true
+
+server:
+  port: 8080
+
+openlibrary:
+  base-url: https://openlibrary.org
+  search-limit: 20
+  connect-timeout: 5000
+  read-timeout: 10000
+
+logging:
+  level:
+    com.betterreads: INFO
+    org.springframework.security: WARN

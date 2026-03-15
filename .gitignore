@@ -1,0 +1,19 @@
+.DS_Store
+
+# Environment files
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Gradle
+.gradle/
+build/
+out/
+
+# IDEs
+.idea/
+.settings/
+.vscode/
+*.iml
+.project

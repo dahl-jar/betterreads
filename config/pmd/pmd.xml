@@ -1,0 +1,88 @@
+<?xml version="1.0"?>
+<ruleset name="BetterReads Strict PMD Rules"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0
+                             https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+    <description>Strict PMD ruleset for BetterReads — catches magic strings, duplication, complexity, and bad practices.</description>
+
+    <!-- ===================== Best Practices ===================== -->
+    <rule ref="category/java/bestpractices.xml">
+        <!-- Too noisy for Spring Boot with Lombok -->
+        <exclude name="GuardLogStatement"/>
+    </rule>
+
+    <!-- ===================== Code Style ===================== -->
+    <rule ref="category/java/codestyle.xml">
+        <exclude name="AtLeastOneConstructor"/>
+        <exclude name="OnlyOneReturn"/>
+        <exclude name="CommentDefaultAccessModifier"/>
+        <!-- Long variable names are fine for readability -->
+        <exclude name="LongVariable"/>
+    </rule>
+
+    <!-- ===================== Design ===================== -->
+    <rule ref="category/java/design.xml">
+        <!-- Tuned thresholds -->
+        <exclude name="LawOfDemeter"/>
+        <exclude name="LoosePackageCoupling"/>
+    </rule>
+    <rule ref="category/java/design.xml/CyclomaticComplexity">
+        <properties>
+            <property name="methodReportLevel" value="8"/>
+            <property name="classReportLevel" value="40"/>
+        </properties>
+    </rule>
+    <rule ref="category/java/design.xml/CognitiveComplexity">
+        <properties>
+            <property name="reportLevel" value="12"/>
+        </properties>
+    </rule>
+    <rule ref="category/java/design.xml/NPathComplexity">
+        <properties>
+            <property name="reportLevel" value="120"/>
+        </properties>
+    </rule>
+    <rule ref="category/java/design.xml/TooManyMethods">
+        <properties>
+            <property name="maxmethods" value="12"/>
+        </properties>
+    </rule>
+    <rule ref="category/java/design.xml/ExcessiveParameterList">
+        <properties>
+            <property name="minimum" value="5"/>
+        </properties>
+    </rule>
+    <rule ref="category/java/design.xml/ExcessivePublicCount">
+        <properties>
+            <property name="minimum" value="20"/>
+        </properties>
+    </rule>
+
+    <!-- ===================== Error Prone ===================== -->
+    <rule ref="category/java/errorprone.xml"/>
+
+    <!-- ===================== Magic Strings / Duplicate Literals ===================== -->
+    <rule ref="category/java/errorprone.xml/AvoidDuplicateLiterals">
+        <properties>
+            <property name="maxDuplicateLiterals" value="2"/>
+            <property name="skipAnnotations" value="true"/>
+        </properties>
+    </rule>
+    <rule ref="category/java/errorprone.xml/AvoidLiteralsInIfCondition">
+        <properties>
+            <property name="ignoreMagicNumbers" value="-1,0,1"/>
+        </properties>
+    </rule>
+
+    <!-- ===================== Multithreading ===================== -->
+    <rule ref="category/java/multithreading.xml"/>
+
+    <!-- ===================== Performance ===================== -->
+    <rule ref="category/java/performance.xml"/>
+
+    <!-- ===================== Security ===================== -->
+    <rule ref="category/java/security.xml"/>
+
+</ruleset>
