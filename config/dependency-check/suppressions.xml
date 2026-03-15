@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+    <!--
+      BetterReads dependency-check suppression policy:
+      - Keep this file empty unless a finding is confirmed as a false positive or temporarily accepted risk.
+      - Prefer the narrowest matcher possible: sha1 or gav first, packageUrl next, broad file regex last.
+      - Every suppression must include notes that explain why it exists and who verified it.
+      - Temporary suppressions must use the `until` attribute and point to a tracking issue.
+      - Remove suppressions as soon as the dependency is upgraded or the false positive is fixed upstream.
+    -->
+</suppressions>
