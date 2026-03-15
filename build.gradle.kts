@@ -213,7 +213,8 @@ tasks.withType<Test> {
 // Wire coverage verification into check
 tasks.named("check") {
 	dependsOn(tasks.jacocoTestCoverageVerification)
-	if (providers.environmentVariable("NVD_API_KEY").isPresent) {
+	val nvdApiKey = providers.environmentVariable("NVD_API_KEY").orNull
+	if (!nvdApiKey.isNullOrBlank()) {
 		dependsOn(tasks.named("dependencyCheckAnalyze"))
 	}
 }
