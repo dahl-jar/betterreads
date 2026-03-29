@@ -40,7 +40,7 @@ Recommended stack:
 - Spring Web
 - Spring Data JPA
 - PostgreSQL
-- Spring Security
+- Spring Security with OAuth2 client and resource server
 - Caffeine cache
 - WebClient instead of plain RestTemplate
 - Flyway for migrations
@@ -73,9 +73,35 @@ Recommended stack:
 - Fetch rich metadata only here
 - Cache work details and author details
 - Add local persistence for viewed/used books
+- Seed genre table from BISAC categories via Flyway
+- Build subject-to-genre mapping pipeline (exact match, then keyword match)
+- Add admin endpoint for reviewing unmapped subjects
+- ML-assisted genre classification later if the manual queue stays large
 
-### Phase 4 - User features
-- Add auth with Spring Security
+### Phase 4 - User features and security
+Authentication:
+- Local registration with email and password — hash with BCrypt, require email verification before activation
+- OAuth2 login with Google and GitHub using Spring Security OAuth2 client
+- Link OAuth2 accounts to existing local accounts when the email matches
+- Issue JWTs from the backend for both login paths
+- JWT expiry and refresh token flow
+- Password reset via email token
+- No Auth0 or external auth service — Spring Security handles the full flow
+
+Authorization:
+- Role-based access with USER and ADMIN roles
+- Data ownership checks in the service layer — users can only access their own data
+- ADMIN role for moderation (reviews, duplicate books, user management)
+- Public data (book metadata, public reviews) stays accessible without auth
+
+Security headers and API protection:
+- Configure CORS for the frontend origin
+- Add CSP header
+- HSTS, X-Content-Type-Options, X-Frame-Options come from Spring Security defaults
+- Add rate limiting to prevent brute force and abuse
+- Add request size limits
+
+User features:
 - Add reviews
 - Add collections / reading status
 - Add ownership checks and validation
@@ -86,6 +112,13 @@ Recommended stack:
 - Add circuit breaker and fallback responses
 - Tune indexes and queries
 
+### Phase 6 - Event infrastructure with Kafka
+- Add Spring Kafka producer and consumer setup
+- Publish domain events: review created, book added to collection, reading status changed, book detail viewed
+- Build consumers for activity feed writes and recommendation input updates
+- Add dead letter topic for failed events
+- Terraform the broker infrastructure on AWS (MSK or single-broker EC2)
+
 ## Good learning goals for you
 This rebuild will help you practice:
 - API design
@@ -93,8 +126,11 @@ This rebuild will help you practice:
 - caching
 - external API integration
 - database modeling
-- authentication and authorization
+- OAuth2, JWT, and role-based access control
+- API security (CORS, CSP, rate limiting)
 - testing and performance thinking
+- event-driven architecture with Kafka
+- infrastructure as code with Terraform and AWS
 
 ## Background jobs and async work
 Background jobs are allowed to be slow. User-facing API requests should not be.
@@ -134,11 +170,4 @@ Possible Apache technologies for BetterReads:
 - `Apache ActiveMQ` if you want a simpler queue later
 - `Apache Kafka` only when event flow becomes large enough to justify it
 
-Kafka can make sense later for:
-- recommendation events
-- search indexing updates
-- activity feed fan-out
-- analytics
-- notifications
-
-But Kafka is probably not needed at the very start of the rebuild.
+Kafka is planned for Phase 6, after user features and quality work are in place. See the phased rebuild plan above for specifics. The use cases are activity feed fan-out, recommendation event processing, and decoupling features that currently call each other directly.
