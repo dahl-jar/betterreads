@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:17
+    container_name: betterreads-db
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: betterreads
+      POSTGRES_USER: betterreads
+      POSTGRES_PASSWORD: betterreads
+    volumes:
+      - betterreads-data:/var/lib/postgresql/data
+
+volumes:
+  betterreads-data:

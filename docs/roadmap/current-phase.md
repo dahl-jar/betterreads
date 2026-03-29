@@ -2,21 +2,21 @@
 
 ## What exists
 
-- Spring Boot project with quality gate tooling already configured
+- Spring Boot project with quality gate tooling configured
 - Flyway migrations V1 through V6 covering users, books, authors, reviews, collections, interactions, recommendations, and activity events
-- Feature package folders already created under `src/main/java/com/betterreads/`
+- Feature package folders under `src/main/java/com/betterreads/`
 - ArchUnit rules for layered architecture
 - No Java classes beyond `BetterReadsApplication.java`
 
 ## What this phase delivers
 
-Phase 1 is the setup phase that makes the backend real. By the end of it, the application should boot against PostgreSQL, Flyway should own the schema, shared configuration should be in place, shared API error handling should exist, and the first catalog and auth persistence classes should be ready for Phase 2.
+Phase 1 makes the backend real. By the end, the application boots against PostgreSQL, Flyway owns the schema, shared configuration is in place, shared API error handling works, and the first catalog and auth persistence classes are ready for Phase 2.
 
-This is a walkthrough guide. Each section below tells you which file to create or update, what type it should be, what must go inside it, and what to leave out.
+Each section below says which file to create, what goes inside it, and what to leave out. It also explains the concepts behind each piece so you can write the code with an understanding of what it does and why.
 
-## Scope of this phase
+## Scope
 
-Build these pieces now:
+Build now:
 
 - shared Spring configuration
 - shared API error handling
@@ -24,323 +24,221 @@ Build these pieces now:
 - auth user entity and repository
 - application YAML configuration
 
-Do not build these pieces yet:
+Don't build yet:
 
 - search controllers or services
 - OpenLibrary client implementation
 - book detail enrichment
-- review Java code
-- collection Java code
+- review, collection, recommendation, or activity-feed Java code
 - authentication flows, JWT handling, or endpoint authorization rules
-- recommendation or activity-feed Java code
 
-The database already has tables for later phases. That does not mean the Java code for those phases belongs here.
+The database already has tables for later phases. That doesn't mean the Java code for those phases belongs here.
 
 ## Design rules for every file in this phase
 
-- Match the Flyway schema exactly. Hibernate validates in this phase; it does not design the schema.
-- Keep layering clean: `controller -> service -> repository`. This phase stops before controllers and services, so do not invent shortcuts around that later structure.
-- Keep each class small and single-purpose. If a file starts mixing unrelated responsibilities, split it.
-- Use constructor injection only where dependencies exist.
-- Do not expose entities directly to future API responses.
-- Do not add speculative methods just because they might be useful later.
+- Match the Flyway schema exactly. Hibernate validates in this phase; it does not generate the schema.
+- Keep layering clean: `controller -> service -> repository`. This phase stops before controllers and services, so don't invent shortcuts around that later structure.
+- Keep each class small and single-purpose.
+- Constructor injection only where dependencies exist.
+- Don't expose entities directly to future API responses.
+- Don't add speculative methods just because they might be useful later.
 
 ### SOLID focus
 
-- SRP: each config class should own one area of framework setup, and each entity should map one table cleanly.
+- SRP: each config class owns one area of framework setup, each entity maps one table.
 - OCP: configure shared infrastructure so later phases can extend it without replacing the baseline.
-- ISP: repository interfaces should expose only the queries needed now and in the immediate next phase.
+- ISP: repository interfaces expose only the queries needed now and in the immediate next phase.
 - DIP: later features should consume Spring-managed beans and repository interfaces, not concrete hacks.
 
 ---
 
-## Step 1: shared Spring configuration
+## Step 1: shared Spring configuration [DONE]
 
 Create four files in `src/main/java/com/betterreads/config/`.
 
-### 1. `src/main/java/com/betterreads/config/SecurityConfig.java`
+### 1. SecurityConfig.java
 
-Type:
+`src/main/java/com/betterreads/config/SecurityConfig.java`
 
-- class
+A `@Configuration` class with `@EnableWebSecurity`. Two `@Bean` methods.
 
-Annotations:
+#### How Spring Security configuration works
 
-- `@Configuration`
-- `@EnableWebSecurity`
+Spring Security has its own filter machinery built in. You don't write filters yourself. Instead, you write a configuration class that hands Spring a `SecurityFilterChain` bean. Spring calls your bean method at startup, passes you an `HttpSecurity` builder, and you configure your rules on that builder. When you're done, you call `http.build()` and return the result. Spring takes that object and wires it into its internal filter pipeline.
 
-This file should contain exactly two bean methods:
+`@EnableWebSecurity` turns on the filter infrastructure. `@Configuration` tells Spring "this class contains beans." The combination means Spring will find your `SecurityFilterChain` bean method and use it to configure security.
 
-1. `securityFilterChain(...)`
-2. `passwordEncoder()`
+#### securityFilterChain bean method
 
-What `securityFilterChain(...)` must do:
+This method takes `HttpSecurity` as a parameter (Spring injects it) and returns `SecurityFilterChain`.
 
-- build the application security filter chain
-- allow every request for now
-- disable CSRF
-- set session creation policy to stateless
-- include a short TODO noting that Phase 4 replaces permit-all with real endpoint rules
+The `HttpSecurity` builder uses a lambda DSL. Each concern (CSRF, session management, authorization rules) gets configured through a separate chained method call with a lambda. For example, to disable CSRF you call the csrf configuration method and pass a lambda that disables it. Same pattern for session management and authorization.
 
-What `passwordEncoder()` must do:
+What to configure:
 
-- return a BCrypt password encoder
-- use the default strength unless there is a project-wide reason to change it later
+- **Authorization rules:** permit all requests for now. The builder has an `authorizeHttpRequests` method where you set matchers. For this phase, just let everything through. Add a TODO comment that Phase 4 replaces permit-all with real endpoint rules.
+- **CSRF:** disable it. CSRF protection is for browser-based session cookies. Since this API will use stateless JWT auth, CSRF doesn't apply. The builder has a csrf configuration method.
+- **Session management:** set the session creation policy to `STATELESS`. This tells Spring not to create HTTP sessions. Spring Security's `SessionCreationPolicy` enum has this value. You set it through the session management configuration on the builder.
 
-What this file must not do:
+#### passwordEncoder bean method
 
-- no JWT parsing
-- no custom auth provider
-- no user lookup logic
-- no controller or repository access
+Returns a `PasswordEncoder`. Use Spring Security's `BCryptPasswordEncoder` with default strength. This bean exists now so that when the auth service is built later, it can inject the encoder directly instead of having to create one inline. BCrypt is the standard choice for password hashing in Spring Security apps.
 
-Why it exists:
+#### What this file must not do
 
-- the project needs an explicit security baseline now, even though real auth is later
+- No JWT parsing, custom auth providers, user lookup logic, or controller/repository access
 
-### 2. `src/main/java/com/betterreads/config/WebClientConfig.java`
+---
 
-Type:
+### 2. WebClientConfig.java
 
-- class
+`src/main/java/com/betterreads/config/WebClientConfig.java`
 
-Annotations:
+A `@Configuration` class. One `@Bean` method.
 
-- `@Configuration`
+#### How WebClient beans work
 
-This file should contain one bean method:
+`WebClient` is Spring's non-blocking HTTP client. You can create one with `WebClient.builder()`, configure it with a base URL, default headers, and timeouts, then call `.build()`. When you expose that as a `@Bean`, any other class in the application can inject it.
 
-1. `openLibraryWebClient(...)`
+Since this project might eventually have multiple HTTP clients (for different external APIs), the bean should be clearly identifiable as the OpenLibrary client. You can do this with a `@Qualifier` annotation or a specific bean name, so later code can inject exactly this client and not some other one.
 
-What `openLibraryWebClient(...)` must do:
+#### openLibraryWebClient bean method
 
-- create the WebClient used for OpenLibrary traffic
-- expose it with a bean name or qualifier that makes it clearly OpenLibrary-specific
-- read the base URL from `openlibrary.base-url`
-- configure a connect timeout of 5000 ms
-- configure a read timeout of 10000 ms
-- send a real `User-Agent` header on requests
+What to configure:
 
-What should be inside this file besides the bean method:
+- **Base URL:** read from `openlibrary.base-url` in application config. Inject it with `@Value` on a constructor parameter or use `@ConfigurationProperties`.
+- **Connect timeout:** 5000 ms. This is how long the client waits to establish a TCP connection. Configure this through the underlying `HttpClient` that backs the WebClient. You create a `HttpClient` with a connection timeout, then build a `ClientHttpConnector` from it, then pass that connector to the WebClient builder.
+- **Read timeout:** 10000 ms. This is how long the client waits for data after the connection is open. Configure this as a response timeout on the `HttpClient`.
+- **User-Agent header:** set a default header. OpenLibrary's API guidelines ask callers to identify themselves. Don't hardcode contact info; make it configuration-driven if needed. The WebClient builder has a `defaultHeader` method.
 
-- any private constants needed for timeout values or header names
-- any private helper code needed to keep the bean method readable
+Use private constants for the timeout values instead of magic numbers.
 
-What this file must not do:
+#### What this file must not do
 
-- no HTTP request methods for specific endpoints
-- no DTO mapping
-- no retry logic
-- no caching logic
+- No HTTP request methods for specific endpoints, no DTO mapping, no retry logic, no caching logic. Those belong in the integration layer, not the config.
 
-Important note:
+---
 
-- do not leave a fake contact placeholder in the `User-Agent`. If contact information is needed, make it configuration-driven.
+### 3. CacheConfig.java
 
-### 3. `src/main/java/com/betterreads/config/CacheConfig.java`
+`src/main/java/com/betterreads/config/CacheConfig.java`
 
-Type:
+A `@Configuration` class with `@EnableCaching`. One `@Bean` method.
 
-- class
+#### How Spring caching works
 
-Annotations:
+Spring's `@EnableCaching` turns on annotation-driven caching. Once enabled, you can put `@Cacheable("cacheName")` on a service method, and Spring intercepts calls to that method, checks the named cache, and returns the cached value if there's a hit. The cache manager bean you define here decides what backing implementation those caches use and how they behave.
 
-- `@Configuration`
-- `@EnableCaching`
+Caffeine is the cache library already in the project's dependencies. It's an in-memory cache. You configure it by creating `CaffeineCacheManager` or by building individual `Cache` instances with Caffeine's builder and registering them with a `SimpleCacheManager`.
 
-This file should contain one bean method:
+#### cacheManager bean method
 
-1. `cacheManager()`
-
-It may also contain private helper methods if that keeps the class small.
-
-What `cacheManager()` must do:
-
-- create the cache manager used by Spring caching
-- register three named caches
-- give each cache its own TTL and max size
-
-The caches must be:
+Register three named caches, each with its own TTL (time-to-live) and maximum entry count:
 
 - `searchResults`: 15 minutes, max 500 entries
 - `bookDetails`: 60 minutes, max 1000 entries
 - `authorDetails`: 60 minutes, max 500 entries
 
-What this file must not do:
+Caffeine's builder lets you set `expireAfterWrite(duration)` for TTL and `maximumSize(count)` for the entry cap. Create one Caffeine-backed cache per name, put them in a list, and give that list to a `SimpleCacheManager`.
 
-- no YAML-driven cache specs for this phase
-- no manual eviction logic
-- no business-specific cache invalidation rules
+You could also use `CaffeineCacheManager`, but `SimpleCacheManager` gives you per-cache control without any extra setup.
 
-Why it exists:
+#### What this file must not do
 
-- Phase 2 search and book detail work needs caching ready before the service layer is built
-
-### 4. `src/main/java/com/betterreads/config/JacksonConfig.java`
-
-Type:
-
-- class
-
-Annotations:
-
-- `@Configuration`
-
-This file should contain one bean method. Use one of these approaches, not both:
-
-- `objectMapper()`
-- or a Jackson builder/customizer bean that applies the same settings
-
-What the bean must configure:
-
-- unknown JSON properties do not fail deserialization
-- Java time types are supported
-- dates serialize as ISO-8601 strings, not timestamps
-- null fields are omitted from serialized JSON
-
-What this file must not do:
-
-- no feature-specific serializers
-- no OpenLibrary DTO logic
-- no controller response shaping
-
-Why it exists:
-
-- OpenLibrary payloads change over time, and the project also needs predictable JSON defaults for internal APIs later
+- No YAML-driven cache specs, no manual eviction logic, no business-specific invalidation rules
 
 ---
 
-## Step 2: shared error handling
+### 4. JacksonConfig.java
+
+`src/main/java/com/betterreads/config/JacksonConfig.java`
+
+A `@Configuration` class. One `@Bean` method.
+
+#### How Jackson configuration works
+
+Jackson is the JSON library Spring Boot uses to serialize and deserialize request/response bodies. Spring Boot auto-configures an `ObjectMapper`, but you can customize it by providing your own bean or by providing a `Jackson2ObjectMapperBuilderCustomizer` bean that adjusts the auto-configured one.
+
+Either approach works. The customizer approach is slightly cleaner because it layers on top of Spring Boot's defaults instead of replacing them entirely, but providing your own `ObjectMapper` bean is simpler to reason about.
+
+#### What the bean must configure
+
+- **Unknown properties:** don't fail when JSON has fields the Java class doesn't have. This matters because OpenLibrary payloads change and include fields we don't map. Jackson's `DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES` controls this.
+- **Java time support:** register the `JavaTimeModule` so `Instant`, `LocalDateTime`, etc. serialize properly. Without this module, Jackson doesn't know how to handle `java.time` types.
+- **Date format:** serialize dates as ISO-8601 strings, not Unix timestamps. Jackson's `SerializationFeature.WRITE_DATES_AS_TIMESTAMPS` controls this (disable it).
+- **Null handling:** omit null fields from JSON output. Jackson's `JsonInclude.Include.NON_NULL` does this, set through the serialization inclusion setting.
+
+#### What this file must not do
+
+- No feature-specific serializers, no OpenLibrary DTO logic, no controller response shaping
+
+---
+
+## Step 2: shared error handling [DONE]
 
 Create four files under `src/main/java/com/betterreads/common/`.
 
-### 5. `src/main/java/com/betterreads/common/dto/ApiErrorResponse.java`
+### 5. ApiErrorResponse.java
 
-Type:
+`src/main/java/com/betterreads/common/dto/ApiErrorResponse.java`
 
-- record
+#### What a Java record is
 
-This file should contain:
+A `record` is a compact class that holds immutable data. You declare the fields in the header, and Java generates the constructor, getters, `equals`, `hashCode`, and `toString` for you. Records are ideal for DTOs because they're just data with no behavior.
 
-- the top-level `ApiErrorResponse` record
-- one static inner record for field-level validation errors
+#### What to build
 
-Fields for `ApiErrorResponse`:
+A top-level `ApiErrorResponse` record with fields: `status` (int), `message` (String), `timestamp` (Instant), and `fieldErrors` (a List of field-error records).
 
-- `status`
-- `message`
-- `timestamp`
-- `fieldErrors`
+Inside `ApiErrorResponse`, define a `static` inner record for individual field-level validation errors, with `field` (String) and `message` (String).
 
-Fields for the inner field-error record:
+`fieldErrors` should be absent (null or empty list) for non-validation failures. Since we configured Jackson to omit nulls, passing null here means the field just won't appear in the JSON for 404s, 409s, and 500s.
 
-- `field`
-- `message`
+---
 
-What this file must do:
+### 6. ResourceNotFoundException.java
 
-- define the single error response shape used across the application
-- allow `fieldErrors` to be absent for non-validation failures
+`src/main/java/com/betterreads/common/exception/ResourceNotFoundException.java`
 
-What this file must not do:
+A class extending `RuntimeException`. One constructor that takes a resource name (like "Book") and an identifier description (like "workKey: /works/OL123W"), and passes a formatted message to the `super()` constructor. The message reads something like "Book not found with workKey: /works/OL123W".
 
-- no business logic
-- no mapping logic beyond what the record shape naturally provides
+The exception itself has no HTTP awareness. It's just a domain exception. The exception handler (below) decides the HTTP status.
 
-### 6. `src/main/java/com/betterreads/common/exception/ResourceNotFoundException.java`
+---
 
-Type:
+### 7. BusinessRuleException.java
 
-- class extending `RuntimeException`
+`src/main/java/com/betterreads/common/exception/BusinessRuleException.java`
 
-This file should contain one constructor.
+A class extending `RuntimeException`. One constructor that takes a message string and passes it to `super()`. Used for things like "user already reviewed this book" or "book already in collection" in later phases.
 
-What the constructor must accept:
+Same pattern: no HTTP status inside the exception. The handler decides.
 
-- a resource name
-- an identifier label or identifier value needed to build a useful message
+---
 
-What the constructor must do:
+### 8. GlobalExceptionHandler.java
 
-- build a message like `Book not found with workKey: /works/OL123W`
+`src/main/java/com/betterreads/common/exception/GlobalExceptionHandler.java`
 
-What this file must not do:
+A `@RestControllerAdvice` class with four handler methods.
 
-- no extra fields unless they are genuinely needed for later handling
-- no HTTP concerns inside the exception itself
+#### How @RestControllerAdvice works
 
-### 7. `src/main/java/com/betterreads/common/exception/BusinessRuleException.java`
+`@RestControllerAdvice` is a class-level annotation that tells Spring "this class handles exceptions thrown by any controller." Each method in the class is annotated with `@ExceptionHandler(SomeException.class)` and handles that specific exception type. The method returns a response body (in our case, an `ApiErrorResponse`), and you annotate the method with `@ResponseStatus` or return a `ResponseEntity` to set the HTTP status code.
 
-Type:
+Spring matches thrown exceptions to the most specific handler it can find. If a controller throws `ResourceNotFoundException`, it lands in the not-found handler. If nothing specific matches, it falls through to the generic `Exception` handler.
 
-- class extending `RuntimeException`
+#### The four handlers
 
-This file should contain one constructor.
+**Validation errors** (`MethodArgumentNotValidException`): return HTTP 400. This exception is thrown automatically by Spring when a `@Valid` request body fails Bean Validation. The exception object contains a `BindingResult` with all the field errors. Loop through them, build a list of field-error inner records, and return an `ApiErrorResponse` with that list populated. Log at WARN.
 
-What the constructor must accept:
+**Not found** (`ResourceNotFoundException`): return HTTP 404. Build an `ApiErrorResponse` using the exception's message. No field errors. Log at WARN.
 
-- a message string
+**Business rule violation** (`BusinessRuleException`): return HTTP 409. Same pattern as not-found but with a different status. Log at WARN.
 
-What this file is for:
+**Catch-all** (`Exception`): return HTTP 500. Return the message "An unexpected error occurred" -- never expose the actual exception message in the response body, because it could contain internal details. Log at ERROR with the full stack trace.
 
-- business-rule failures such as duplicate review attempts or duplicate collection entries in later phases
-
-What this file must not do:
-
-- no status code logic inside the exception
-- no feature-specific subclasses in this phase
-
-### 8. `src/main/java/com/betterreads/common/exception/GlobalExceptionHandler.java`
-
-Type:
-
-- class
-
-Annotations:
-
-- `@RestControllerAdvice`
-
-This file should contain four handler methods:
-
-1. one for `MethodArgumentNotValidException`
-2. one for `ResourceNotFoundException`
-3. one for `BusinessRuleException`
-4. one for generic `Exception`
-
-It may also contain private helper methods if needed to keep the handlers readable.
-
-What the validation handler must do:
-
-- return HTTP 400
-- collect every field validation error, not just the first one
-- build an `ApiErrorResponse` with populated `fieldErrors`
-
-What the not-found handler must do:
-
-- return HTTP 404
-- build an `ApiErrorResponse` without field errors
-
-What the business-rule handler must do:
-
-- return HTTP 409 in this phase
-- build an `ApiErrorResponse` without field errors
-
-What the generic handler must do:
-
-- return HTTP 500
-- return the message `An unexpected error occurred`
-- never expose the original exception message in the response body
-
-Logging rules inside this file:
-
-- log 4xx problems at WARN with concise messages
-- log 500 failures at ERROR with stack traces
-- never log passwords, tokens, API keys, or other secrets
-
-What this file must not do:
-
-- no controller-specific branching
-- no custom response format per feature
+Logging rules: 4xx at WARN with concise messages, 500 at ERROR with stack traces. Never log passwords, tokens, or API keys.
 
 ---
 
@@ -348,162 +246,120 @@ What this file must not do:
 
 Create six files under `src/main/java/com/betterreads/catalog/`.
 
-### 9. `src/main/java/com/betterreads/catalog/entity/Author.java`
+### How JPA entities work
 
-Type:
+A JPA entity is a Java class that maps to a database table. You annotate the class with `@Entity` and `@Table(name = "table_name")`. Each field maps to a column. JPA uses the field name by default, converting camelCase to snake_case (Spring Boot's default naming strategy handles this), but you can override with `@Column(name = "column_name")` when needed.
 
-- JPA entity class
+The primary key field gets `@Id`. For auto-incrementing keys (like `BIGSERIAL` in Postgres), you add `@GeneratedValue(strategy = GenerationType.IDENTITY)`, which tells JPA to let the database generate the value.
 
-Annotations and mapping needs:
+`@PrePersist` and `@PreUpdate` are lifecycle callbacks. A method annotated with `@PrePersist` runs just before the entity is first inserted. `@PreUpdate` runs before every update. We use these to set `createdAt` and `updatedAt` timestamps.
 
-- map to the `author` table
-- mark the primary key field correctly
-- map `open_library_key` as unique and nullable
+Since `ddl-auto` is set to `validate`, Hibernate checks at startup that every entity field matches a real column in the database. If the entity has a field that doesn't exist in the table, or the types don't match, the application refuses to start. This is a safety net: the Flyway migrations are the source of truth for the schema, and the entities must match.
 
-Fields this entity must have:
+### How Spring Data repositories work
 
-- `authorId`
-- `openLibraryKey`
-- `name`
-- `bio`
-- `birthDate`
-- `photoId`
-- `createdAt`
-- `updatedAt`
+A repository interface extends `JpaRepository<EntityType, IdType>`. You don't write an implementation. Spring generates one at startup. You get standard CRUD methods for free (`save`, `findById`, `findAll`, `delete`, etc.).
 
-Methods this entity must have:
+For custom lookups, you write "derived query methods" -- method signatures that Spring parses to generate SQL. `findByOpenLibraryWorkKey(String workKey)` becomes a `SELECT ... WHERE open_library_work_key = ?` query. `existsByEmail(String email)` becomes a `SELECT EXISTS(... WHERE email = ?)` query. Spring handles the naming convention: it splits the method name by camelCase, maps each part to entity fields, and builds the query.
 
-1. `prePersist()`
-2. `preUpdate()`
+These methods return `Optional<Entity>` for single-result lookups, `List<Entity>` for multi-result queries, and `boolean` for existence checks.
 
-What the lifecycle methods must do:
+---
 
-- set timestamps before insert and update
+### 9. Author.java
 
-Important constraints:
+`src/main/java/com/betterreads/catalog/entity/Author.java`
 
-- keep `birthDate` as a string because OpenLibrary date formats are inconsistent
-- do not add relationships the schema does not require in this file beyond what the app actually needs
+Map to the `author` table. The table definition from V2 migration:
 
-### 10. `src/main/java/com/betterreads/catalog/entity/Book.java`
+- `author_id BIGSERIAL PRIMARY KEY`
+- `open_library_key VARCHAR(100) UNIQUE` -- nullable
+- `name VARCHAR(255) NOT NULL`
+- `bio TEXT`
+- `birth_date VARCHAR(50)` -- string, not a date type, because OpenLibrary formats are inconsistent
+- `photo_id INTEGER`
+- `created_at TIMESTAMPTZ NOT NULL`
+- `updated_at TIMESTAMPTZ NOT NULL`
 
-Type:
+Fields: `authorId`, `openLibraryKey`, `name`, `bio`, `birthDate`, `photoId`, `createdAt`, `updatedAt`.
 
-- JPA entity class
+Mark `openLibraryKey` with a unique constraint annotation. Keep `birthDate` as a String.
 
-Annotations and mapping needs:
+Add `prePersist()` and `preUpdate()` lifecycle methods for timestamps.
 
-- map to the `book` table
-- map the many-to-many relationship to `Author` through `book_author`
-- map the one-to-many relationship to `BookSubject`
+Don't add relationship mappings here. The `book_author` join table is mapped from the `Book` side.
 
-Fields this entity must have:
+---
 
-- `bookId`
-- `openLibraryWorkKey`
-- `title`
-- `subtitle`
-- `description`
-- `coverId`
-- `coverUrl`
-- `firstPublishYear`
-- `isbn`
-- `pageCount`
-- `language`
-- `averageRating`
-- `ratingCount`
-- `createdAt`
-- `updatedAt`
-- `authors`
-- `subjects`
+### 10. Book.java
 
-Methods this entity must have:
+`src/main/java/com/betterreads/catalog/entity/Book.java`
 
-1. `prePersist()`
-2. `preUpdate()`
+Map to the `book` table. The table definition from V2 migration:
 
-What the lifecycle methods must do:
+- `book_id BIGSERIAL PRIMARY KEY`
+- `open_library_work_key VARCHAR(100) UNIQUE` -- nullable
+- `title VARCHAR(500) NOT NULL`
+- `subtitle VARCHAR(500)`
+- `description TEXT`
+- `cover_id INTEGER`
+- `cover_url VARCHAR(500)`
+- `first_publish_year INTEGER`
+- `isbn VARCHAR(20)`
+- `page_count INTEGER`
+- `language VARCHAR(10)`
+- `average_rating NUMERIC(3,2) DEFAULT 0.0`
+- `rating_count INTEGER DEFAULT 0`
+- `created_at TIMESTAMPTZ NOT NULL`
+- `updated_at TIMESTAMPTZ NOT NULL`
 
-- set timestamps before insert and update
+Fields: `bookId`, `openLibraryWorkKey`, `title`, `subtitle`, `description`, `coverId`, `coverUrl`, `firstPublishYear`, `isbn`, `pageCount`, `language`, `averageRating`, `ratingCount`, `createdAt`, `updatedAt`, plus `authors` and `subjects`.
 
-Important constraints:
+Map `averageRating` as `BigDecimal` to match `NUMERIC(3,2)`.
 
-- `openLibraryWorkKey` is unique and nullable
-- map `averageRating` as `BigDecimal`
-- keep `authors` lazy
-- allow books with zero authors
-- map long descriptions cleanly to the text column
+#### Relationship: authors (many-to-many)
 
-What this file must not do:
+The `book_author` join table has `book_id` and `author_id` as a composite primary key. To map this in JPA, use `@ManyToMany` with a `@JoinTable` annotation on the `authors` field. The `@JoinTable` specifies the join table name (`book_author`), the join column (`book_id`), and the inverse join column (`author_id`).
 
-- no derived business logic about ratings
-- no search logic
+Set fetch type to `LAZY`. Lazy means JPA doesn't load the authors from the database until you actually access the `authors` field. This avoids unnecessary queries when you only need the book's own fields.
 
-### 11. `src/main/java/com/betterreads/catalog/entity/BookSubject.java`
+Books can have zero authors, so the collection should be initialized to an empty list.
 
-Type:
+#### Relationship: subjects (one-to-many)
 
-- JPA entity class
+`BookSubject` has a `book_id` foreign key. Map this with `@OneToMany(mappedBy = "book")` on the `subjects` field. The `mappedBy` value is the field name in `BookSubject` that owns the relationship.
 
-Annotations and mapping needs:
+Add `prePersist()` and `preUpdate()` lifecycle methods for timestamps.
 
-- map to the `book_subject` table
-- map a many-to-one relationship back to `Book`
+---
 
-Fields this entity must have:
+### 11. BookSubject.java
 
-- `bookSubjectId`
-- `book`
-- `subject`
+`src/main/java/com/betterreads/catalog/entity/BookSubject.java`
 
-Methods this entity must have:
+Map to the `book_subject` table. Fields: `bookSubjectId`, `book`, `subject`.
 
-- no lifecycle methods are required in this phase
+Map the `book` field with `@ManyToOne` and `@JoinColumn(name = "book_id")`. This is the owning side of the one-to-many relationship declared in `Book.java`.
 
-Important constraints:
+Don't enforce subject uniqueness in Java. The database doesn't enforce it, and subject cleanup is a later concern.
 
-- do not enforce subject uniqueness in Java because the database does not enforce it
-- subject cleanup and deduplication are later concerns
+No lifecycle methods needed.
 
-### 12. `src/main/java/com/betterreads/catalog/repository/BookRepository.java`
+---
 
-Type:
+### 12-14. Repositories
 
-- interface extending `JpaRepository<Book, Long>`
+**BookRepository** -- `JpaRepository<Book, Long>`:
+- `findByOpenLibraryWorkKey(String workKey)`
+- `findByIsbn(String isbn)`
 
-This file should contain exactly two derived query methods:
+**AuthorRepository** -- `JpaRepository<Author, Long>`:
+- `findByOpenLibraryKey(String key)`
 
-1. `findByOpenLibraryWorkKey(String workKey)`
-2. `findByIsbn(String isbn)`
+**BookSubjectRepository** -- `JpaRepository<BookSubject, Long>`:
+- `findByBookBookId(Long bookId)` -- note the double "Book": Spring parses this as "navigate to the `book` field, then to `bookId`"
 
-What this file must not do:
-
-- no custom query methods for future recommendation or reporting work
-- no business logic
-
-### 13. `src/main/java/com/betterreads/catalog/repository/AuthorRepository.java`
-
-Type:
-
-- interface extending `JpaRepository<Author, Long>`
-
-This file should contain exactly one derived query method:
-
-1. `findByOpenLibraryKey(String key)`
-
-### 14. `src/main/java/com/betterreads/catalog/repository/BookSubjectRepository.java`
-
-Type:
-
-- interface extending `JpaRepository<BookSubject, Long>`
-
-This file should contain exactly one derived query method:
-
-1. `findByBookBookId(Long bookId)`
-
-Why the catalog repository layer exists in Phase 1:
-
-- Phase 2 needs these lookups immediately for search persistence and catalog hydration work
+No custom queries, no business logic. Just these lookup methods.
 
 ---
 
@@ -511,61 +367,42 @@ Why the catalog repository layer exists in Phase 1:
 
 Create two files under `src/main/java/com/betterreads/auth/`.
 
-### 15. `src/main/java/com/betterreads/auth/entity/AppUser.java`
+### 15. AppUser.java
 
-Type:
+`src/main/java/com/betterreads/auth/entity/AppUser.java`
 
-- JPA entity class
+Map to the `app_user` table. The V1 migration:
 
-Annotations and mapping needs:
+- `user_id BIGSERIAL PRIMARY KEY`
+- `username VARCHAR(50) NOT NULL UNIQUE`
+- `email VARCHAR(255) NOT NULL UNIQUE`
+- `password_hash VARCHAR(255) NOT NULL`
+- `display_name VARCHAR(100)`
+- `avatar_url VARCHAR(500)`
+- `bio TEXT`
+- `created_at TIMESTAMPTZ NOT NULL`
+- `updated_at TIMESTAMPTZ NOT NULL`
 
-- map to the `app_user` table
-- keep unique constraints visible for username and email
+Fields: `userId`, `username`, `email`, `passwordHash`, `displayName`, `avatarUrl`, `bio`, `createdAt`, `updatedAt`.
 
-Fields this entity must have:
+Add unique constraint annotations on `username` and `email`.
 
-- `userId`
-- `username`
-- `email`
-- `passwordHash`
-- `displayName`
-- `avatarUrl`
-- `bio`
-- `createdAt`
-- `updatedAt`
+Add `prePersist()` and `preUpdate()` lifecycle methods for timestamps.
 
-Methods this entity must have:
+`passwordHash` is internal only. Don't expose it in DTOs later, don't log it. Don't implement Spring Security's `UserDetails` interface yet -- that belongs in Phase 4 when the auth flow is built.
 
-1. `prePersist()`
-2. `preUpdate()`
+### 16. AppUserRepository.java
 
-What the lifecycle methods must do:
+`src/main/java/com/betterreads/auth/repository/AppUserRepository.java`
 
-- set timestamps before insert and update
+`JpaRepository<AppUser, Long>` with four derived methods:
 
-Important constraints:
+- `findByUsername(String username)`
+- `findByEmail(String email)`
+- `existsByUsername(String username)`
+- `existsByEmail(String email)`
 
-- `passwordHash` is internal only
-- do not expose `passwordHash` in DTOs later
-- do not log `passwordHash`
-- do not implement `UserDetails` yet
-
-### 16. `src/main/java/com/betterreads/auth/repository/AppUserRepository.java`
-
-Type:
-
-- interface extending `JpaRepository<AppUser, Long>`
-
-This file should contain exactly four derived query methods:
-
-1. `findByUsername(String username)`
-2. `findByEmail(String email)`
-3. `existsByUsername(String username)`
-4. `existsByEmail(String email)`
-
-Why this repository exists now:
-
-- later auth flows need existence checks and lookup methods, but the behavior itself belongs to Phase 4
+The auth service will need existence checks for registration (is this username taken?) and lookup methods for login. The methods exist now; the actual auth behavior is Phase 4.
 
 ---
 
@@ -573,35 +410,30 @@ Why this repository exists now:
 
 Update `src/main/resources/application.yml`.
 
-This file should contain these configuration sections and values:
+#### How Spring Boot configuration works
 
-- datasource URL using `DB_HOST`, `DB_PORT`, and `DB_NAME` with local defaults for PostgreSQL
-- datasource username using `DB_USERNAME` with a local default
-- datasource password using `DB_PASSWORD` with a local default
-- `spring.flyway.enabled` set to true
-- `spring.flyway.locations` pointing to `classpath:db/migration`
-- `spring.jpa.hibernate.ddl-auto` set to `validate`
-- `openlibrary.base-url` set to `https://openlibrary.org`
-- a configurable server port using `SERVER_PORT` with a local default
-- conservative logging defaults, with `INFO` as the shared baseline
+`application.yml` is the central config file. Spring Boot reads it at startup and binds values to framework settings and custom properties. You can reference environment variables with `${ENV_VAR:default}` syntax, where the part after the colon is the fallback value used when the env var isn't set.
 
-If the OpenLibrary `User-Agent` needs multiple properties, define them here with clear names rather than hardcoding environment-specific values in Java.
+What to configure:
 
-What this file must not contain:
+- **Datasource:** `spring.datasource.url` using `${DB_HOST:localhost}`, `${DB_PORT:5432}`, and `${DB_NAME:betterreads}` interpolated into a JDBC URL. Username and password from `${DB_USERNAME:postgres}` and `${DB_PASSWORD:postgres}`.
+- **Flyway:** `spring.flyway.enabled: true`, `spring.flyway.locations: classpath:db/migration`
+- **JPA:** `spring.jpa.hibernate.ddl-auto: validate` -- Hibernate checks entity-to-table mappings at startup but doesn't create or modify tables. Flyway owns the schema.
+- **OpenLibrary:** `openlibrary.base-url: https://openlibrary.org` (custom property, read by `WebClientConfig`)
+- **Server port:** `server.port: ${SERVER_PORT:8080}`
+- **Logging:** INFO as the baseline. Don't go more granular unless debugging a specific area.
 
-- real secrets
-- hardcoded production credentials
-- cache TTL settings for this phase
+If the OpenLibrary `User-Agent` needs configuration properties (app name, contact), define them here with clear names.
 
-Why `ddl-auto` must be `validate`:
+Don't put real secrets, hardcoded production credentials, or cache TTL settings in this file.
 
-- the project needs startup to fail fast when entity mappings drift away from Flyway migrations
+`ddl-auto: validate` is deliberate. If an entity field doesn't match the Flyway schema, the app fails to start. You find out immediately instead of discovering drift later.
 
 ---
 
 ## Step 6: what you should have when this phase is complete
 
-New files created in this phase:
+New files:
 
 1. `src/main/java/com/betterreads/config/SecurityConfig.java`
 2. `src/main/java/com/betterreads/config/WebClientConfig.java`
@@ -620,33 +452,33 @@ New files created in this phase:
 15. `src/main/java/com/betterreads/auth/entity/AppUser.java`
 16. `src/main/java/com/betterreads/auth/repository/AppUserRepository.java`
 
-Existing file updated in this phase:
+Updated:
 
 17. `src/main/resources/application.yml`
 
-Minimum method and member surface you should expect:
+Expected surface:
 
 - 5 bean methods across config classes
 - 4 exception handler methods
 - 2 exception constructors
 - 6 entity lifecycle methods
 - 8 repository methods
-- entity fields that match the existing schema exactly
-- one shared error-response record plus one inner field-error record
+- entity fields matching the existing schema exactly
+- one shared error-response record with one inner field-error record
 
 ---
 
 ## Step 7: verification checklist
 
-Before Phase 1 is done, verify all of this:
+Before Phase 1 is done:
 
 1. The project compiles.
 2. `export JAVA_HOME="/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home" && ./gradlew check` passes.
-3. Flyway applies the migrations against a real PostgreSQL instance.
-4. Hibernate validate mode confirms the entities match the schema.
+3. Flyway applies migrations against a real PostgreSQL instance.
+4. Hibernate validate mode confirms entities match the schema.
 5. Architecture rules still pass.
 6. The application starts with the new config beans wired correctly.
-7. No entity or configuration class includes logic that really belongs in a service, controller, or integration client.
+7. No entity or configuration class includes logic that belongs in a service, controller, or integration client.
 
 ---
 
