@@ -2,8 +2,6 @@
 
 A book tracking and recommendation app. Spring Boot backend on Java 25, Postgres, deployed (eventually) to OCI Ampere on the free tier. OpenLibrary supplies the catalog data.
 
-Status: scaffolded, no features implemented yet.
-
 ## Stack
 
 Java 25 · Spring Boot 3.5 · Postgres 17 · Flyway · Caffeine · WebClient · Gradle 9 (Kotlin DSL).
@@ -26,15 +24,9 @@ Flyway applies migrations on first startup. API at `http://localhost:8080`. Swag
 
 ## Commands
 
-| Command | What it does |
-|---|---|
-| `./gradlew bootRun` | Run locally |
-| `./gradlew check` | Full quality gate (Checkstyle, PMD, SpotBugs, ErrorProne, NullAway, JaCoCo, JUnit) |
-| `./gradlew test` | Just tests |
-| `./gradlew bootJar` | Build the JVM jar |
-| `./gradlew nativeCompile` | Build a native-image binary, GraalVM only |
-| `docker compose up -d` | Start Postgres |
-| `docker compose down -v` | Stop and wipe Postgres |
+Run the app with `./gradlew bootRun`. Tests with `./gradlew test`, full quality gate (Checkstyle, PMD, SpotBugs, ErrorProne, NullAway, JaCoCo, JUnit) with `./gradlew check`. Build the jar with `./gradlew bootJar`, or a native binary with `./gradlew nativeCompile` (GraalVM only).
+
+For the local Postgres, `docker compose up -d` to start, `docker compose down -v` to stop and wipe.
 
 ## Layout
 
@@ -78,4 +70,4 @@ Nothing's actually deployed yet. The infra is ready when there's something worth
 
 ## License
 
-Apache 2.0 — see [LICENSE](LICENSE). Copyright 2026 Nanthawat Dahl.
+Apache 2.0. See [LICENSE](LICENSE). Copyright 2026 Nanthawat Dahl.
