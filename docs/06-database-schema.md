@@ -122,7 +122,7 @@ This can power:
 - fallback recommendations for new users
 
 ### Activity feed table
-If you later want a feed, keep event storage separate from rendered feed items.
+When the feed becomes a feature, keep event storage separate from rendered feed items.
 
 ```sql
 create table activity_event (

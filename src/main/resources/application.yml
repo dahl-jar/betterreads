@@ -23,6 +23,22 @@ spring:
 server:
   port: 8080
 
+jwt:
+  secret: ${JWT_SECRET}
+  issuer: ${JWT_ISSUER:betterreads}
+  expiration-minutes: ${JWT_EXPIRATION_MINUTES:60}
+
+auth:
+  rate-limit:
+    login-capacity: 10
+    login-refill-tokens: 1
+    login-refill-seconds: 6
+    register-capacity: 5
+    register-refill-tokens: 1
+    register-refill-seconds: 60
+    max-buckets: 10000
+    trusted-proxies: ${AUTH_TRUSTED_PROXIES:}
+
 openlibrary:
   base-url: https://openlibrary.org
   search-limit: 20

@@ -117,20 +117,7 @@ User features:
 - Publish domain events: review created, book added to collection, reading status changed, book detail viewed
 - Build consumers for activity feed writes and recommendation input updates
 - Add dead letter topic for failed events
-- Terraform the broker infrastructure on AWS (MSK or single-broker EC2)
-
-## Good learning goals for you
-This rebuild will help you practice:
-- API design
-- service layering
-- caching
-- external API integration
-- database modeling
-- OAuth2, JWT, and role-based access control
-- API security (CORS, CSP, rate limiting)
-- testing and performance thinking
-- event-driven architecture with Kafka
-- infrastructure as code with Terraform and AWS
+- Terraform the broker infrastructure on the OCI VM or a managed Kafka service
 
 ## Background jobs and async work
 Background jobs are allowed to be slow. User-facing API requests should not be.
@@ -167,7 +154,7 @@ Do not start with Spark for this project.
 Possible Apache technologies for BetterReads:
 - `Apache HttpClient` for robust OpenLibrary calls
 - `Apache Solr` if search becomes a first-class indexed feature
-- `Apache ActiveMQ` if you want a simpler queue later
+- `Apache ActiveMQ` as a simpler queue alternative
 - `Apache Kafka` only when event flow becomes large enough to justify it
 
 Kafka is planned for Phase 6, after user features and quality work are in place. See the phased rebuild plan above for specifics. The use cases are activity feed fan-out, recommendation event processing, and decoupling features that currently call each other directly.
