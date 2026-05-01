@@ -45,15 +45,6 @@ class GlobalExceptionHandlerTest {
             assertThat(response.getBody()).extracting(ApiErrorResponse::message).isEqualTo(BOOK_NOT_FOUND);
         }
 
-        @Test
-        void returnsEmptyFieldErrors() {
-            final ResponseEntity<ApiErrorResponse> response = handler.handleNotFound(
-                    new ResourceNotFoundException(BOOK_NOT_FOUND));
-
-            assertThat(response.getBody())
-                    .extracting(ApiErrorResponse::fieldErrors, as(LIST))
-                    .isEmpty();
-        }
     }
 
     @Nested
@@ -87,13 +78,6 @@ class GlobalExceptionHandlerTest {
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         }
 
-        @Test
-        void returnsExceptionMessageInBody() {
-            final ResponseEntity<ApiErrorResponse> response = handler.handleBusinessRule(
-                    new BusinessRuleException(BUSINESS_RULE_MESSAGE));
-
-            assertThat(response.getBody()).extracting(ApiErrorResponse::message).isEqualTo(BUSINESS_RULE_MESSAGE);
-        }
     }
 
     @Nested

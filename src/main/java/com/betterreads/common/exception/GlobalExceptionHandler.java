@@ -2,8 +2,11 @@ package com.betterreads.common.exception;
 
 import com.betterreads.common.dto.ApiErrorResponse;
 import com.betterreads.common.dto.ApiErrorResponse.FieldError;
+import com.betterreads.common.util.LogSanitizer;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -25,7 +28,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleNotFound(final ResourceNotFoundException exception) {
-        LOG.warn("Resource not found: {}", sanitize(Objects.requireNonNullElse(exception.getMessage(), "")));
+        LOG.warn("Resource not found: {}", LogSanitizer.forLog(Objects.requireNonNullElse(exception.getMessage(), "")));
 
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
                 new ApiErrorResponse(
@@ -67,12 +70,48 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(BusinessRuleException.class)
     public ResponseEntity<ApiErrorResponse> handleBusinessRule(final BusinessRuleException exception) {
-        LOG.warn("Business rule violation: {}", sanitize(Objects.requireNonNullElse(exception.getMessage(), "")));
+        LOG.warn("Business rule violation: {}",
+                LogSanitizer.forLog(Objects.requireNonNullElse(exception.getMessage(), "")));
 
         return ResponseEntity.status(HttpStatus.CONFLICT).body(
                 new ApiErrorResponse(
                         HttpStatus.CONFLICT.value(),
                         Objects.requireNonNullElse(exception.getMessage(), "Business rule violation"),
+                        Instant.now(),
+                        List.of()
+                )
+        );
+    }
+
+    /**
+     * Handle malformed or missing JSON request bodies
+     * Response Status: 400
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiErrorResponse> handleUnreadableMessage(final HttpMessageNotReadableException exception) {
+        final String message = "Malformed request body";
+        LOG.warn(message);
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                new ApiErrorResponse(
+                        HttpStatus.BAD_REQUEST.value(),
+                        message,
+                        Instant.now(),
+                        List.of()
+                )
+        );
+    }
+
+    /**
+     * Handle Bad Credentials Exception
+     * Response Status: 401
+     */
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<ApiErrorResponse> handleBadCredentials(final BadCredentialsException exception) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                new ApiErrorResponse(
+                        HttpStatus.UNAUTHORIZED.value(),
+                        "Invalid credentials",
                         Instant.now(),
                         List.of()
                 )
@@ -97,10 +136,4 @@ public class GlobalExceptionHandler {
         );
     }
 
-    private static String sanitize(final String message) {
-        if (message == null) {
-            return "";
-        }
-        return message.replace("\n", "").replace("\r", "");
-    }
 }

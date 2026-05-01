@@ -36,7 +36,7 @@ Do not fetch these during the search request:
 ### 2. Reduce payload size from OpenLibrary
 Current search should stop requesting large responses.
 
-Instead of requesting everything, only request the fields you need and use a much smaller limit.
+Instead of requesting everything, request only the fields needed for the use case and use a much smaller limit.
 
 Recommended rules:
 - use `limit=10` or `limit=20`

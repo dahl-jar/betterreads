@@ -1,62 +1,53 @@
 # Deployment and frontend
 
-## Deployment strategy for hobby budget
-Recommended low-cost architecture:
-- Spring Boot backend deployed as one public app
-- PostgreSQL hosted database
-- Python recommender runs as a scheduled job, not a full-time service
-- recommendations are written back to the database
-- Java API serves precomputed recommendations
+## Architecture
 
-Current plan:
-- Java app on AWS EC2 (t2.micro free tier, 12-month limit)
-- PostgreSQL on AWS RDS (db.t3.micro free tier, 12-month limit)
-- Infrastructure managed with Terraform (learning goal)
-- Training job on GitHub Actions schedule
-- Migrate to Oracle Cloud Always Free tier when the AWS free period runs out
+Single Ampere VM on OCI runs the backend and Postgres. Cloudflare sits in front for DNS, TLS, and CDN. The frontend lives in a separate repo on Cloudflare Pages.
 
-## Frontend direction
-For BetterReads v2, Next.js is the better default choice over Thymeleaf.
+```
+client -> Cloudflare (DNS, CDN, TLS) -> OCI Ampere VM
+                                           |- Spring Boot backend (Docker)
+                                           |- PostgreSQL 17 (Docker)
+```
 
-Recommended split:
-- Next.js frontend on Vercel
-- Spring Boot backend on AWS EC2
-- PostgreSQL on AWS RDS
+## Backend host: OCI Always Free Ampere
 
-Why this is the better fit:
-- cleaner separation between UI and backend logic
-- better user experience for search, filtering, and book pages
-- easier path to richer features like recommendations and saved state
-- stronger portfolio value because the project shows a modern full-stack architecture
+`VM.Standard.A1.Flex` (aarch64). Local dev is Apple Silicon, also aarch64, so the architecture matches.
 
-Thymeleaf is still a reasonable option for a simpler Java-only MVP.
-But for BetterReads v2, Next.js is the preferred direction.
+The Terraform template under `infra/terraform/` provisions one VM, one VCN with a public subnet, and one Object Storage bucket. Variable validation rejects values that fall outside Free Tier caps — a typo can't push the bill above zero. The budget alert in the OCI console catches anything that slips through.
 
-## PostgreSQL and Supabase
-Supabase is not a different database engine from PostgreSQL.
-It is managed PostgreSQL plus extra platform features.
+Native-image is the upgrade path when JVM-mode RAM gets tight on the 6 GB Ampere shape. The build runs fine in JVM mode for now.
 
-Design for PostgreSQL.
-If Supabase makes hosting easier, it can still be a good provider choice.
+## Database host: Postgres in Docker on the same VM
 
-## AWS free tier direction
-AWS is the primary deployment target for learning Terraform and cloud infrastructure. The free tier gives 12 months of EC2 and RDS, which is enough time to build and deploy the app.
+Same `docker-compose.yml` runs locally and on the VM. The Compose file binds Postgres to `127.0.0.1:5433` so the VM doesn't accidentally expose the database publicly.
 
-Important safety rules:
-- stay within free-tier resource types (t2.micro EC2, db.t3.micro RDS)
-- set up billing alerts early
-- do not accidentally provision paid services
-- treat the card as verification, not permission to spend freely
+No managed Postgres provider. Free, simple, matches local dev exactly. Vendor lock-in is zero.
 
-After the 12-month window, migrate compute to Oracle Cloud Always Free tier (ARM instances, no expiry). The migration itself is a useful exercise.
+## Frontend host: Cloudflare Pages, separate repo
 
-## Terraform
-All AWS infrastructure should be defined in Terraform. This covers VPC, subnets, security groups, EC2, RDS, and IAM roles. Keep the Terraform code in a separate directory or repo from the application code.
+Vite + React + TypeScript. JWT in `Authorization: Bearer` header. Separate repo (`betterreads-frontend`) because deployment paths differ from the backend.
 
-When Phase 6 adds Kafka, the broker infrastructure (MSK or self-managed) gets added to the same Terraform setup.
+Cloudflare Pages is free, no card on file, account already authenticated via Wrangler.
 
-## Tomcat note
-Apache Tomcat is the server that runs Java web applications.
-Spring Boot usually already includes embedded Tomcat, so you often do not need to install Tomcat separately.
+## Edge: Cloudflare Free
 
-For BetterReads, deploying the Spring Boot app directly is usually simpler than managing external Tomcat.
+Cloudflare Free Tier provides DNS, TLS, CDN, and basic DDoS protection. Custom rate-limiting rules require a paid Cloudflare plan, so per-endpoint rate limiting lives in the backend (Bucket4j) instead.
+
+Cloudflare Tunnel (`cloudflared`) on the VM exposes the backend without opening firewall ports. Avoids the OCI Flexible Load Balancer (which would consume the single Always Free LB allocation).
+
+## Deploy flow
+
+When the VM exists:
+
+1. Generate `DB_PASSWORD` and `JWT_SECRET` locally with `openssl rand -base64 32` and `openssl rand -base64 64`.
+2. Build a populated `.env.vm` (gitignored, never committed).
+3. `scp docker-compose.yml .env.vm <user>@<vm-ip>:~/.env`.
+4. SSH in, `docker compose up -d`. Flyway applies migrations on first Spring Boot startup.
+5. Point Cloudflare DNS at the VM IP (or run `cloudflared tunnel` for a tunnel-only setup).
+
+Subsequent deploys ship a new jar or a new image and restart the container. No re-provisioning.
+
+## Terraform scope
+
+Terraform owns infrastructure: VCN, subnet, internet gateway, A1.Flex instance, Object Storage bucket. It does not own runtime config or secrets. Container orchestration is `docker-compose.yml` on the VM, not Terraform.

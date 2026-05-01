@@ -4,7 +4,7 @@ A book tracking and recommendation app. Spring Boot backend on Java 25, Postgres
 
 ## Stack
 
-Java 25 · Spring Boot 3.5 · Postgres 17 · Flyway · Caffeine · WebClient · Gradle 9 (Kotlin DSL).
+Java 25 · Spring Boot 3.5 · Postgres 17 · Flyway · Caffeine · WebClient · JJWT · Bucket4j · Gradle 9 (Kotlin DSL).
 
 ## Prerequisites
 
@@ -18,7 +18,7 @@ Java 25 · Spring Boot 3.5 · Postgres 17 · Flyway · Caffeine · WebClient · 
 # start local Postgres
 docker compose up -d
 
-# copy the env template
+# copy the env template, then set JWT_SECRET to a 32+ byte random value
 cp .env.example .env
 
 # run the app, Flyway migrates on first startup
@@ -66,7 +66,6 @@ Production target is OCI Always Free Ampere (aarch64). Local dev is Apple Silico
 - [Deployment and frontend](docs/04-deployment-and-frontend.md)
 - [Project structure](docs/05-project-structure.md)
 - [Database schema](docs/06-database-schema.md)
-- [Current phase](docs/roadmap/current-phase.md)
 
 ## License
 

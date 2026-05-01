@@ -10,7 +10,7 @@ plugins {
 	jacoco
 	checkstyle
 	pmd
-	id("org.springframework.boot") version "3.5.11"
+	id("org.springframework.boot") version "3.5.14"
 	id("io.spring.dependency-management") version "1.1.7"
 	id("com.github.spotbugs") version "6.4.8"
 	id("net.ltgt.errorprone") version "5.1.0"
@@ -62,6 +62,17 @@ dependencies {
 
 	// JSON
 	implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
+
+	// JWT (HS256 signing for stateless auth)
+	implementation("io.jsonwebtoken:jjwt-api:0.12.6")
+	runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
+	runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
+
+	// Rate limiting (token bucket per IP)
+	implementation("com.bucket4j:bucket4j_jdk17-core:8.14.0")
+
+	// Spring Boot @ConfigurationProperties metadata generator
+	annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
 
 	// Null safety annotations (JSpecify)
 	implementation("org.jspecify:jspecify:1.0.0")
@@ -126,6 +137,7 @@ spotbugs {
 	effort.set(Effort.MAX)
 	reportLevel.set(Confidence.LOW)
 	maxHeapSize.set("1g")
+	excludeFilter.set(file("config/spotbugs/exclude.xml"))
 }
 
 tasks.withType<SpotBugsTask>().configureEach {

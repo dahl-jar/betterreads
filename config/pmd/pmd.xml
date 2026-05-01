@@ -11,6 +11,15 @@
     <rule ref="category/java/bestpractices.xml">
         <!-- Too noisy for Spring Boot with Lombok -->
         <exclude name="GuardLogStatement"/>
+        <!-- Re-included below with MockMvc-aware config -->
+        <exclude name="UnitTestShouldIncludeAssert"/>
+    </rule>
+
+    <!-- MockMvc's andExpect chain is a real assertion; PMD doesn't recognize it by default. -->
+    <rule ref="category/java/bestpractices.xml/UnitTestShouldIncludeAssert">
+        <properties>
+            <property name="extraAssertMethodNames" value="andExpect,andExpectAll,satisfies"/>
+        </properties>
     </rule>
 
     <!-- ===================== Code Style ===================== -->
@@ -20,6 +29,22 @@
         <exclude name="CommentDefaultAccessModifier"/>
         <!-- Long variable names are fine for readability -->
         <exclude name="LongVariable"/>
+        <!-- Re-included below to allow nested @Nested grouper classes (Me, Login, Register) -->
+        <exclude name="ShortClassName"/>
+    </rule>
+
+    <!-- Allow short names like Me, Login, Register, User; flag only single-letter classes. -->
+    <rule ref="category/java/codestyle.xml/ShortClassName">
+        <properties>
+            <property name="minimum" value="2"/>
+        </properties>
+    </rule>
+
+    <!-- Allow REST shorthand methods like me(); flag truly cryptic ones. -->
+    <rule ref="category/java/codestyle.xml/ShortMethodName">
+        <properties>
+            <property name="minimum" value="2"/>
+        </properties>
     </rule>
 
     <!-- ===================== Design ===================== -->
@@ -57,6 +82,12 @@
     <rule ref="category/java/design.xml/ExcessivePublicCount">
         <properties>
             <property name="minimum" value="20"/>
+        </properties>
+    </rule>
+    <!-- Spring tests with MockMvc + AssertJ + Jackson + Testcontainers easily reach 20+ imports. -->
+    <rule ref="category/java/design.xml/ExcessiveImports">
+        <properties>
+            <property name="minimum" value="40"/>
         </properties>
     </rule>
 
