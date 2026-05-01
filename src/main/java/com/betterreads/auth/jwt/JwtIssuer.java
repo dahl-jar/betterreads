@@ -50,6 +50,7 @@ public final class JwtIssuer {
     /**
      * Signs a token whose {@code sub} claim is the given user id.
      */
+    // TODO(when-real-users): add refresh-token flow. 60-min single-token kicks users out hourly.
     public String issue(final long userId) {
         final Instant now = Instant.now();
         return Jwts.builder()

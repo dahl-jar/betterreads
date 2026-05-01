@@ -34,6 +34,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtIssuer jwtIssuer;
 
+    /**
+     * Builds the filter with the {@link JwtIssuer} used to validate incoming bearer tokens.
+     */
     public JwtAuthenticationFilter(final JwtIssuer jwtIssuer) {
         super();
         this.jwtIssuer = jwtIssuer;
