@@ -3,13 +3,19 @@ services:
     image: postgres:17
     container_name: betterreads-db
     ports:
-      - "5433:5432"
+      - "127.0.0.1:${DB_PORT:-5433}:5432"
     environment:
-      POSTGRES_DB: betterreads
-      POSTGRES_USER: betterreads
-      POSTGRES_PASSWORD: betterreads
+      POSTGRES_DB: ${DB_NAME:-betterreads}
+      POSTGRES_USER: ${DB_USERNAME:-betterreads}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-betterreads}
     volumes:
       - betterreads-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-betterreads} -d ${DB_NAME:-betterreads}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
 
 volumes:
   betterreads-data:

@@ -29,6 +29,16 @@ openlibrary:
   connect-timeout: 5000
   read-timeout: 10000
 
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
+    display-request-duration: true
+  show-actuator: false
+
 logging:
   level:
     com.betterreads: INFO

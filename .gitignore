@@ -1,4 +1,5 @@
 .DS_Store
+Thumbs.db
 
 # Environment files
 .env
@@ -15,8 +16,17 @@ out/
 .idea/
 .settings/
 .vscode/
+.fleet/
 *.iml
 .project
 .classpath
 .factorypath
 bin/
+
+# Native-image build artifacts
+*.dylib
+*.so
+
+# Logs
+*.log
+logs/

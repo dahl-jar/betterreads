@@ -1,0 +1,40 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
+#
+# Find OCIDs in the OCI Console:
+#   tenancy_ocid:        Top-right avatar -> Tenancy
+#   user_ocid:           Top-right avatar -> My Profile
+#   api_key_fingerprint: My Profile -> API Keys (after upload)
+#   compartment_ocid:    Identity & Security -> Compartments. Use tenancy_ocid for root.
+
+tenancy_ocid         = "ocid1.tenancy.oc1..xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+user_ocid            = "ocid1.user.oc1..xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+api_key_fingerprint  = "aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99"
+api_private_key_path = "~/.oci/oci_api_key.pem"
+compartment_ocid     = "ocid1.tenancy.oc1..xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+region               = "eu-amsterdam-1"
+
+project_name = "myapp"
+
+# Paste the contents of your public key, not the path.
+# Get it with: cat ~/.ssh/id_ed25519.pub
+ssh_public_key = "ssh-ed25519 AAAAC3Nz... user@host"
+
+# Compute sizing — defaults stay inside Always Free limits.
+# Free Tier cap on A1.Flex: 4 OCPU + 24 GB RAM total across all instances.
+instance_shape     = "VM.Standard.A1.Flex"
+instance_ocpus     = 2
+instance_memory_gb = 12
+
+# Boot volume — Free Tier cap on block storage: 200 GB total.
+boot_volume_size_gb = 50
+
+# OS
+instance_os         = "Canonical Ubuntu"
+instance_os_version = "22.04"
+
+# Object Storage bucket — Free Tier cap: 20 GB Standard.
+object_storage_bucket_name = "myapp-artifacts"
+
+# SSH ingress — narrow this to your IP for production. Default is open internet.
+# Find your IP: curl ifconfig.me
+ssh_ingress_cidr = "0.0.0.0/0"
