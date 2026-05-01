@@ -28,29 +28,9 @@ Run the app with `./gradlew bootRun`. Tests with `./gradlew test`, full quality 
 
 For the local Postgres, `docker compose up -d` to start, `docker compose down -v` to stop and wipe.
 
-## Layout
-
-```text
-src/main/java/com/betterreads/
-  <feature>/                 controller, service, repository, entity, dto, mapper
-  common/                    shared exceptions and error DTOs
-  config/                    Spring config beans
-
-src/main/resources/
-  application.yml
-  db/migration/              Flyway migrations
-
-src/test/java/com/betterreads/
-  Tests, plus ArchUnit boundaries
-
-config/                      Checkstyle, PMD, OWASP rule files
-docs/                        Planning notes
-infra/terraform/             Always Free OCI template
-```
-
 ## Architecture
 
-Controller calls service, service calls repository. Controllers never reach into repositories directly, ArchUnit fails the build if they try. DTOs at the API are records, JPA entities never leave the service layer. OpenLibrary code is isolated under `integration/openlibrary/`.
+Controller calls service, service calls repository. Each feature package has its own controller, service, repository, entity, dto, and mapper subpackages. Controllers never reach into repositories directly, ArchUnit fails the build if they try. DTOs at the API are records, JPA entities never leave the service layer. OpenLibrary code is isolated under `integration/openlibrary/`.
 
 ## Deployment
 
