@@ -63,6 +63,10 @@ public final class RateLimitFilter extends OncePerRequestFilter {
 
     private final List<CidrRange> trustedProxies;
 
+    /**
+     * Builds the filter from {@link RateLimitProperties}. Trusted-proxy CIDRs are parsed once at
+     * construction; entries that don't parse are dropped with a warning log.
+     */
     public RateLimitFilter(final RateLimitProperties properties) {
         super();
         this.loginBandwidth = () -> Bandwidth.builder()
@@ -73,6 +77,7 @@ public final class RateLimitFilter extends OncePerRequestFilter {
             .capacity(properties.registerCapacity())
             .refillGreedy(properties.registerRefillTokens(), Duration.ofSeconds(properties.registerRefillSeconds()))
             .build();
+        // HACK: in-memory bucket map. Restart wipes state and multi-instance breaks. Move to Redis when scaling out.
         this.loginBuckets = Caffeine.newBuilder()
             .expireAfterAccess(BUCKET_TTL)
             .maximumSize(properties.maxBuckets())

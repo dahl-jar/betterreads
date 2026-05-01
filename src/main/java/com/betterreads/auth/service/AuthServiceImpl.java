@@ -50,6 +50,9 @@ public class AuthServiceImpl implements AuthService {
 
     private final UserMapper userMapper;
 
+    /**
+     * Constructor injection of the four collaborators the auth flow needs.
+     */
     public AuthServiceImpl(
         final UserRepository userRepository,
         final PasswordEncoder passwordEncoder,
@@ -62,6 +65,15 @@ public class AuthServiceImpl implements AuthService {
         this.userMapper = userMapper;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The {@code existsBy*} pre-checks return per-field errors on the normal path. The
+     * {@code DataIntegrityViolationException} catch covers the race window between pre-check
+     * and insert when two concurrent requests both pass and one loses the unique constraint
+     * at commit time. Without the pre-checks, every duplicate register surfaces the same
+     * combined-field message.
+     */
     @Override
     @Transactional
     public AuthResponse register(final RegisterRequest request) {
