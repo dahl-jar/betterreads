@@ -10,7 +10,9 @@ import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 
+import static org.assertj.core.api.Assertions.as;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.InstanceOfAssertFactories.LIST;
 
 class GlobalExceptionHandlerTest {
 
@@ -48,9 +50,9 @@ class GlobalExceptionHandlerTest {
             final ResponseEntity<ApiErrorResponse> response = handler.handleNotFound(
                     new ResourceNotFoundException(BOOK_NOT_FOUND));
 
-            final ApiErrorResponse body = response.getBody();
-            assertThat(body).isNotNull();
-            assertThat(body.fieldErrors()).isEmpty();
+            assertThat(response.getBody())
+                    .extracting(ApiErrorResponse::fieldErrors, as(LIST))
+                    .isEmpty();
         }
     }
 
@@ -68,9 +70,9 @@ class GlobalExceptionHandlerTest {
         void returnsAllFieldErrors() throws NoSuchMethodException {
             final ResponseEntity<ApiErrorResponse> response = handler.handleValidation(buildValidationException());
 
-            final ApiErrorResponse body = response.getBody();
-            assertThat(body).isNotNull();
-            assertThat(body.fieldErrors()).hasSize(2);
+            assertThat(response.getBody())
+                    .extracting(ApiErrorResponse::fieldErrors, as(LIST))
+                    .hasSize(2);
         }
     }
 
