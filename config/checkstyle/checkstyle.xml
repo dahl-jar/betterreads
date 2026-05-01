@@ -111,9 +111,7 @@
         </module>
 
         <!-- ===================== Whitespace ===================== -->
-        <module name="EmptyLineSeparator">
-            <property name="allowMultipleEmptyLines" value="false"/>
-        </module>
+
         <module name="GenericWhitespace"/>
         <module name="MethodParamPad"/>
         <module name="NoWhitespaceAfter"/>

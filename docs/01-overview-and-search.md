@@ -121,6 +121,57 @@ Returns richer metadata for one selected book:
 
 This should come from cache or a scheduled sync job, not rebuilt live per request.
 
+## Search deduplication and filtering
+
+OpenLibrary returns duplicate and near-duplicate results — same book with different work keys, same title with extra co-authors (translators, editors), and multiple editions mixed together.
+
+Deduplication strategy:
+- Use the OpenLibrary work key as the primary grouping key. This handles most duplicates.
+- For books that share an ISBN but have different work keys, treat them as the same book.
+- When persisting locally, match incoming records against existing ones using `pg_trgm` for fuzzy title/author similarity. A threshold like `similarity(title_a, title_b) > 0.8 AND similarity(author_a, author_b) > 0.7` catches most remaining duplicates.
+- Compare against the primary author only. Translators, illustrators, and editors inflate author lists without changing which book it is.
+
+User-facing filters:
+- Language — cuts out translations that clutter results
+- Year range — separates reprints from originals
+- Best match sort — score results by metadata completeness (has cover, has description, has ISBN) to push low-quality records down
+
+What to defer:
+- Full duplicate merging and cleanup belongs in background jobs, not in the search request path.
+- Elasticsearch or similar is not needed at this scale. Postgres with `pg_trgm` and full-text search handles it.
+
+## Genre classification
+
+OpenLibrary subjects are noisy. A single book can have 40+ subjects mixing real genres with metadata junk like "Protected DAISY," "Accessible book," "Large type books," and reading level tags. Raw subjects should never be exposed to users directly.
+
+Data model:
+- `genre` table — curated list of real genres, seeded from BISAC (Book Industry Standards and Communications) categories via Flyway. Around 100-150 rows covering top-level and common sub-genres.
+- `subject_genre_map` table — maps raw OpenLibrary subject strings to a genre ID. Null genre ID means "reviewed and rejected" or "not yet mapped."
+- `book_genre` table — links books to their resolved genres. Expect 3-8 genres per book after cleanup.
+
+How it works:
+- Book gets persisted with raw subjects from OpenLibrary.
+- Each subject gets looked up in `subject_genre_map` by exact string match.
+- Matched subjects link the book to those genres.
+- Unmatched subjects get inserted into the map with null genre ID for later review.
+- An admin endpoint shows unmapped subjects sorted by frequency. Most common ones get mapped first.
+
+Keyword matching as a first automation pass:
+- If a raw subject contains a known genre keyword (e.g. "science fiction" anywhere in the string), auto-map it without manual review.
+- This catches obvious cases and reduces the manual queue significantly.
+
+ML-assisted classification (add later if the unmapped queue stays large):
+- Embed genre names and incoming subjects using a small embedding model.
+- Find the closest genre by cosine similarity.
+- Propose mappings for admin review instead of auto-applying — ML assists, admin decides.
+- No training data needed. The embedding model handles unseen subjects out of the box.
+- This is a good starter ML task before building the recommendation engine.
+
+What not to do:
+- Do not expose raw OpenLibrary subjects to users.
+- Do not use fuzzy matching with similarity thresholds as the primary classification method — too unpredictable.
+- Do not try to pre-map every subject OpenLibrary has. Let the map build organically from actual user searches.
+
 ## Search performance rules
 For every search request:
 - make one OpenLibrary call if cache misses

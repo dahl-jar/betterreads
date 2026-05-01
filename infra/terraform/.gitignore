@@ -1,0 +1,20 @@
+# Terraform working directory and providers
+.terraform/
+.terraform.lock.hcl
+
+# State files — never commit. May contain secrets.
+terraform.tfstate
+terraform.tfstate.backup
+terraform.tfstate.*.backup
+
+# Crash log
+crash.log
+crash.*.log
+
+# Real values — copy from terraform.tfvars.example
+terraform.tfvars
+*.auto.tfvars
+*.auto.tfvars.json
+
+# Plan output
+*.tfplan
