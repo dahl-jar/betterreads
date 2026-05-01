@@ -15,18 +15,40 @@ Java 25 · Spring Boot 3.5 · Postgres 17 · Flyway · Caffeine · WebClient · 
 ## Quickstart
 
 ```bash
+# start local Postgres
 docker compose up -d
+
+# copy the env template
 cp .env.example .env
+
+# run the app, Flyway migrates on first startup
 ./gradlew bootRun
 ```
 
-Flyway applies migrations on first startup. API at `http://localhost:8080`. Swagger UI at `http://localhost:8080/swagger-ui.html`.
+API at `http://localhost:8080`, Swagger UI at `http://localhost:8080/swagger-ui.html`.
 
 ## Commands
 
-Run the app with `./gradlew bootRun`. Tests with `./gradlew test`, full quality gate (Checkstyle, PMD, SpotBugs, ErrorProne, NullAway, JaCoCo, JUnit) with `./gradlew check`. Build the jar with `./gradlew bootJar`, or a native binary with `./gradlew nativeCompile` (GraalVM only).
+```bash
+# run the app
+./gradlew bootRun
 
-For the local Postgres, `docker compose up -d` to start, `docker compose down -v` to stop and wipe.
+# tests only
+./gradlew test
+
+# full quality gate: Checkstyle, PMD, SpotBugs, ErrorProne, NullAway, JaCoCo, JUnit
+./gradlew check
+
+# build the JVM jar
+./gradlew bootJar
+
+# build a native binary, GraalVM only
+./gradlew nativeCompile
+
+# Postgres lifecycle
+docker compose up -d        # start
+docker compose down -v      # stop and wipe
+```
 
 ## Architecture
 
