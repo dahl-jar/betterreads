@@ -1,92 +1,80 @@
 # BetterReads
 
-Book tracking and recommendation platform built with Spring Boot 3.5 on Java 25. Uses OpenLibrary as an external data source with local caching and persistence.
+A book tracking and recommendation app. Spring Boot backend on Java 25, Postgres, deployed (eventually) to OCI Ampere on the free tier. OpenLibrary supplies the catalog data.
+
+Status: scaffolded, no features implemented yet.
 
 ## Stack
 
-Java 25 (Oracle GraalVM) · Spring Boot 3.5 · PostgreSQL 17 · Flyway · Caffeine · WebClient · Gradle 9 (Kotlin DSL)
+Java 25 · Spring Boot 3.5 · Postgres 17 · Flyway · Caffeine · WebClient · Gradle 9 (Kotlin DSL).
 
 ## Prerequisites
 
-- JDK 25 (Oracle GraalVM recommended, includes native-image): `brew install --cask graalvm-jdk`
-- Docker Desktop or compatible runtime (for local Postgres)
-- `JAVA_HOME` exported to the JDK install root
+- JDK 25. Oracle GraalVM is what I use locally: `brew install --cask graalvm-jdk`. Temurin works too.
+- Docker for the local Postgres.
+- `JAVA_HOME` set.
 
 ## Quickstart
 
 ```bash
-# 1. Start local Postgres
 docker compose up -d
-
-# 2. Copy environment template (optional; defaults work for local dev)
 cp .env.example .env
-
-# 3. Run the application — Flyway applies migrations on first startup
 ./gradlew bootRun
 ```
 
-The API will be available at `http://localhost:8080`.
+Flyway applies migrations on first startup. API at `http://localhost:8080`. Swagger UI at `http://localhost:8080/swagger-ui.html`.
 
-## Common Commands
+## Commands
 
-| Command | Purpose |
+| Command | What it does |
 |---|---|
-| `./gradlew bootRun` | Run locally with Flyway auto-migration |
-| `./gradlew check` | Full quality gate: Checkstyle, PMD, SpotBugs, ErrorProne+NullAway, JaCoCo, JUnit |
-| `./gradlew test` | Tests only (faster iteration) |
-| `./gradlew bootJar` | Build the deployable JVM jar |
-| `./gradlew nativeCompile` | Build native-image binary (slow, GraalVM only) |
-| `docker compose up -d` | Start local Postgres |
-| `docker compose down -v` | Stop and reset local Postgres data |
+| `./gradlew bootRun` | Run locally |
+| `./gradlew check` | Full quality gate (Checkstyle, PMD, SpotBugs, ErrorProne, NullAway, JaCoCo, JUnit) |
+| `./gradlew test` | Just tests |
+| `./gradlew bootJar` | Build the JVM jar |
+| `./gradlew nativeCompile` | Build a native-image binary, GraalVM only |
+| `docker compose up -d` | Start Postgres |
+| `docker compose down -v` | Stop and wipe Postgres |
 
-## Project Structure
+## Layout
 
 ```text
 src/main/java/com/betterreads/
-  <feature>/
-    controller/   REST endpoints, thin
-    service/      Business logic
-    repository/   Spring Data JPA interfaces
-    entity/       JPA entities (internal to persistence)
-    dto/          Record-based request and response types
-    mapper/       Entity <-> DTO conversion
-  common/         Shared exceptions, error response DTOs
-  config/         Spring configuration (Security, Cache, WebClient, Jackson)
+  <feature>/                 controller, service, repository, entity, dto, mapper
+  common/                    shared exceptions and error DTOs
+  config/                    Spring config beans
 
 src/main/resources/
   application.yml
-  db/migration/   Flyway SQL migrations (V1__, V2__, ...)
+  db/migration/              Flyway migrations
 
 src/test/java/com/betterreads/
-  Architecture and unit tests, JUnit 5 + AssertJ
+  Tests, plus ArchUnit boundaries
 
-config/           Quality-tool rule sets (Checkstyle, PMD, OWASP suppressions)
-docs/             Planning and architecture notes
+config/                      Checkstyle, PMD, OWASP rule files
+docs/                        Planning notes
+infra/terraform/             Always Free OCI template
 ```
 
 ## Architecture
 
-Layered: `controller -> service -> repository`. Enforced by ArchUnit tests in `src/test/java/com/betterreads/ArchitectureRules.java`.
+Controller calls service, service calls repository. Controllers never reach into repositories directly, ArchUnit fails the build if they try. DTOs at the API are records, JPA entities never leave the service layer. OpenLibrary code is isolated under `integration/openlibrary/`.
 
-- Controllers are thin: validate, delegate, map.
-- Services own business logic. Constructor injection only — no field injection.
-- Repositories are Spring Data JPA interfaces. No business rules in queries.
-- DTOs at API boundaries are records. JPA entities never leave the service layer.
-- OpenLibrary integration is isolated under `integration/openlibrary/` and exposed only through service calls.
+## Deployment
 
-## Deployment Target
+Production target is OCI Always Free Ampere (aarch64). Local dev is Apple Silicon, also aarch64, so the architecture matches. The Terraform template under `infra/terraform/` provisions the VM and validates the inputs against Free Tier caps so a typo can't push the bill above zero. Native-image is there for when the 6 GB RAM ceiling gets tight, but the build runs fine in JVM mode for now.
 
-Production runs on OCI Always Free Ampere `A1.Flex` (aarch64). Local development on Apple Silicon (also aarch64), so no cross-arch surprises. When memory pressure becomes real on the constrained Ampere shape, switch from JVM-mode to native-image (`./gradlew nativeCompile`) for ~5-10x lower memory footprint.
+Nothing's actually deployed yet. The infra is ready when there's something worth shipping.
 
-## Documentation
+## Docs
 
-- [Overview and Search](docs/01-overview-and-search.md)
-- [Backend Architecture and Roadmap](docs/02-backend-architecture-and-roadmap.md)
+- [Overview and search](docs/01-overview-and-search.md)
+- [Backend architecture](docs/02-backend-architecture-and-roadmap.md)
 - [Recommendations and ML](docs/03-recommendations-and-ml.md)
-- [Deployment and Frontend](docs/04-deployment-and-frontend.md)
-- [Project Structure](docs/05-project-structure.md)
-- [Database Schema](docs/06-database-schema.md)
-- [Current Phase](docs/roadmap/current-phase.md)
+- [Deployment and frontend](docs/04-deployment-and-frontend.md)
+- [Project structure](docs/05-project-structure.md)
+- [Database schema](docs/06-database-schema.md)
+- [Current phase](docs/roadmap/current-phase.md)
 
 ## License
 
