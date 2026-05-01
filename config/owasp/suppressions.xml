@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  OWASP dependency-check suppressions.
+
+  Policy:
+  - Every entry references the specific CVE ID and a short reason.
+  - Use the narrowest matcher possible. Never suppress a whole package.
+  - Temporary suppressions include a target date for removal as a comment.
+  - Revisit on every dependency bump.
+
+  Example entry:
+
+  <suppress>
+    <notes><![CDATA[Reason: not exploitable in our usage. Review by 2026-12-31.]]></notes>
+    <packageUrl regex="true">^pkg:maven/com\.example/library@.*$</packageUrl>
+    <cve>CVE-2024-XXXXX</cve>
+  </suppress>
+-->
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+</suppressions>

@@ -8,18 +8,20 @@ Recommended low-cost architecture:
 - recommendations are written back to the database
 - Java API serves precomputed recommendations
 
-Good free-friendly setup:
-- Java app on Oracle Cloud free compute or another hobby host
-- PostgreSQL on Supabase or Neon
-- training job on GitHub Actions schedule
+Current plan:
+- Java app on AWS EC2 (t2.micro free tier, 12-month limit)
+- PostgreSQL on AWS RDS (db.t3.micro free tier, 12-month limit)
+- Infrastructure managed with Terraform (learning goal)
+- Training job on GitHub Actions schedule
+- Migrate to Oracle Cloud Always Free tier when the AWS free period runs out
 
 ## Frontend direction
 For BetterReads v2, Next.js is the better default choice over Thymeleaf.
 
 Recommended split:
 - Next.js frontend on Vercel
-- Spring Boot backend on Oracle Cloud
-- PostgreSQL on Supabase or Neon
+- Spring Boot backend on AWS EC2
+- PostgreSQL on AWS RDS
 
 Why this is the better fit:
 - cleaner separation between UI and backend logic
@@ -37,18 +39,21 @@ It is managed PostgreSQL plus extra platform features.
 Design for PostgreSQL.
 If Supabase makes hosting easier, it can still be a good provider choice.
 
-## Oracle Cloud direction
-For free hobby deployment, Oracle Cloud is generally a stronger long-term free option than AWS for a small Java app.
+## AWS free tier direction
+AWS is the primary deployment target for learning Terraform and cloud infrastructure. The free tier gives 12 months of EC2 and RDS, which is enough time to build and deploy the app.
 
 Important safety rules:
-- stay on the free-tier account
-- use only resources clearly marked `Always Free`
+- stay within free-tier resource types (t2.micro EC2, db.t3.micro RDS)
+- set up billing alerts early
 - do not accidentally provision paid services
-- monitor billing after setup
 - treat the card as verification, not permission to spend freely
 
-Oracle is a reasonable place to run the Java app.
-For the database, hosted PostgreSQL like Supabase or Neon may still be simpler.
+After the 12-month window, migrate compute to Oracle Cloud Always Free tier (ARM instances, no expiry). The migration itself is a useful exercise.
+
+## Terraform
+All AWS infrastructure should be defined in Terraform. This covers VPC, subnets, security groups, EC2, RDS, and IAM roles. Keep the Terraform code in a separate directory or repo from the application code.
+
+When Phase 6 adds Kafka, the broker infrastructure (MSK or self-managed) gets added to the same Terraform setup.
 
 ## Tomcat note
 Apache Tomcat is the server that runs Java web applications.

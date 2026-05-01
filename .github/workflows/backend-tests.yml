@@ -1,4 +1,4 @@
-name: Backend Quality
+name: Backend Tests
 
 on:
   pull_request:
@@ -7,8 +7,7 @@ on:
       - "build.gradle.kts"
       - "settings.gradle.kts"
       - "gradle/**"
-      - "config/**"
-      - ".github/workflows/backend-quality.yml"
+      - ".github/workflows/backend-tests.yml"
   push:
     branches:
       - main
@@ -19,12 +18,11 @@ on:
       - "build.gradle.kts"
       - "settings.gradle.kts"
       - "gradle/**"
-      - "config/**"
-      - ".github/workflows/backend-quality.yml"
+      - ".github/workflows/backend-tests.yml"
 
 jobs:
-  static-checks:
-    name: Lint and static analysis
+  test:
+    name: JUnit and coverage
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -42,25 +40,26 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
-      - name: Compile (runs ErrorProne and NullAway)
-        run: ./gradlew compileJava compileTestJava
+      - name: Run tests
+        run: ./gradlew test
 
-      - name: Checkstyle
-        run: ./gradlew checkstyleMain checkstyleTest
+      - name: Verify coverage thresholds
+        run: ./gradlew jacocoTestCoverageVerification
 
-      - name: PMD
-        run: ./gradlew pmdMain pmdTest
-
-      - name: SpotBugs
-        run: ./gradlew spotbugsMain spotbugsTest
-
-      - name: Upload static analysis reports
+      - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: static-analysis-reports
+          name: test-reports
           path: |
-            build/reports/checkstyle/
-            build/reports/pmd/
-            build/reports/spotbugs/
+            build/reports/tests/test/
+            build/reports/jacoco/test/html/
+          retention-days: 14
+
+      - name: Upload JaCoCo XML for coverage tools
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-coverage
+          path: build/reports/jacoco/test/jacocoTestReport.xml
           retention-days: 14
