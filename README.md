@@ -58,8 +58,6 @@ Controller calls service, service calls repository. Each feature package has its
 
 Production target is OCI Always Free Ampere (aarch64). Local dev is Apple Silicon, also aarch64, so the architecture matches. The Terraform template under `infra/terraform/` provisions the VM and validates the inputs against Free Tier caps so a typo can't push the bill above zero. Native-image is there for when the 6 GB RAM ceiling gets tight, but the build runs fine in JVM mode for now.
 
-Nothing's actually deployed yet. The infra is ready when there's something worth shipping.
-
 ## Docs
 
 - [Overview and search](docs/01-overview-and-search.md)
