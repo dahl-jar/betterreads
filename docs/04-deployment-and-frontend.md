@@ -4,12 +4,6 @@
 
 Single Ampere VM on OCI runs the backend and Postgres. Cloudflare sits in front for DNS, TLS, and CDN. The frontend lives in a separate repo on Cloudflare Pages.
 
-```
-client -> Cloudflare (DNS, CDN, TLS) -> OCI Ampere VM
-                                           |- Spring Boot backend (Docker)
-                                           |- PostgreSQL 17 (Docker)
-```
-
 ## Backend host: OCI Always Free Ampere
 
 `VM.Standard.A1.Flex` (aarch64). Local dev is Apple Silicon, also aarch64, so the architecture matches.

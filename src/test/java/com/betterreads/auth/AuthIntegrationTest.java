@@ -42,7 +42,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @TestPropertySource(properties = {
     "jwt.secret=integration-test-secret-must-be-at-least-256-bits-long-padding-padding",
     "jwt.issuer=betterreads-it",
-    "jwt.expiration-minutes=60"
+    "jwt.expiration-minutes=60",
+    "app.cors.allowed-origins=https://app.betterreads.example.com"
 })
 @SuppressWarnings("PMD.TooManyStaticImports")
 class AuthIntegrationTest {
@@ -95,6 +96,20 @@ class AuthIntegrationTest {
     private static final String CSP_HEADER = "Content-Security-Policy";
 
     private static final String SWAGGER_INDEX = "/swagger-ui/index.html";
+
+    private static final String ALLOWED_ORIGIN = "https://app.betterreads.example.com";
+
+    private static final String DISALLOWED_ORIGIN = "https://evil.example.com";
+
+    private static final String ORIGIN_HEADER = "Origin";
+
+    private static final String ALLOW_ORIGIN_HEADER = "Access-Control-Allow-Origin";
+
+    private static final String ALLOW_METHODS_HEADER = "Access-Control-Allow-Methods";
+
+    private static final String REQUEST_METHOD_HEADER = "Access-Control-Request-Method";
+
+    private static final String METHOD_POST = "POST";
 
     private static final String NOT_MATCHING_PASSWORD = "anything-not-matching";
 
@@ -469,6 +484,34 @@ class AuthIntegrationTest {
             mockMvc.perform(get(SWAGGER_INDEX))
                 .andExpect(header().string(CSP_HEADER,
                     org.hamcrest.Matchers.containsString("'self'")));
+        }
+    }
+
+    @Nested
+    @DisplayName("CORS")
+    class Cors {
+
+        @Test
+        void echoesAllowOriginForConfiguredOrigin() throws Exception {
+            mockMvc.perform(get(ME_URL).header(ORIGIN_HEADER, ALLOWED_ORIGIN))
+                .andExpect(header().string(ALLOW_ORIGIN_HEADER, ALLOWED_ORIGIN));
+        }
+
+        @Test
+        void omitsAllowOriginForDisallowedOrigin() throws Exception {
+            mockMvc.perform(get(ME_URL).header(ORIGIN_HEADER, DISALLOWED_ORIGIN))
+                .andExpect(header().doesNotExist(ALLOW_ORIGIN_HEADER));
+        }
+
+        @Test
+        void preflightForAllowedOriginReturnsAllowMethodsIncludingPost() throws Exception {
+            mockMvc.perform(options(LOGIN_URL)
+                    .header(ORIGIN_HEADER, ALLOWED_ORIGIN)
+                    .header(REQUEST_METHOD_HEADER, METHOD_POST))
+                .andExpect(status().isOk())
+                .andExpect(header().string(ALLOW_ORIGIN_HEADER, ALLOWED_ORIGIN))
+                .andExpect(header().string(ALLOW_METHODS_HEADER,
+                    org.hamcrest.Matchers.containsString(METHOD_POST)));
         }
     }
 
