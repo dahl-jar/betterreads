@@ -24,4 +24,7 @@ usermod -aG docker ubuntu
 apt-get install -y unattended-upgrades
 dpkg-reconfigure -f noninteractive unattended-upgrades
 
-echo "cloud-init bootstrap complete: docker $(docker --version), compose $(docker compose version --short)"
+apt-get install -y python3-pip gnupg
+pip3 install --break-system-packages oci-cli
+
+echo "cloud-init bootstrap complete: docker $(docker --version), compose $(docker compose version --short), oci $(oci --version 2>&1 | head -1)"

@@ -2,13 +2,18 @@ package com.betterreads.config;
 
 import com.betterreads.auth.jwt.JwtAuthenticationFilter;
 import com.betterreads.auth.ratelimit.RateLimitFilter;
+import com.betterreads.common.web.RequestIdFilter;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.actuate.autoconfigure.security.servlet.EndpointRequest;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -17,12 +22,17 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 
 /**
- * Two security filter chains. The first matches docs paths and uses a relaxed CSP that lets
- * Swagger UI's inline scripts and styles run. The second matches everything else and uses a
- * locked-down CSP suitable for a JSON API.
+ * Three security filter chains, ordered most-specific first.
+ *
+ * <p>{@code managementSecurityFilterChain} matches actuator paths but only when the request
+ * arrived on the management port (bound to {@code 127.0.0.1:8081}); requests reach it through
+ * Cloudflare Tunnel and Access in production, so the chain itself permits all. The docs chain
+ * relaxes CSP for Swagger UI. The api chain is the catch-all for everything else and runs JWT
+ * + rate limiting + the strict JSON-API CSP.
  */
 @Configuration
 @EnableWebSecurity
@@ -46,15 +56,59 @@ public class SecurityConfig {
 
     private static final String[] PUBLIC_PATHS = {
         "/api/v1/auth/register",
-        "/api/v1/auth/login"
+        "/api/v1/auth/login",
+        "/healthz"
     };
+
+    private final int managementPort;
+
+    public SecurityConfig(@Value("${management.server.port}") final int managementPort) {
+        this.managementPort = managementPort;
+    }
+
+    /**
+     * Owns actuator paths, but only when the request arrives on the management port. The
+     * management connector is bound to {@code 127.0.0.1:8081} so external traffic cannot
+     * reach it directly; production access goes through Cloudflare Tunnel and Access. The
+     * port-match guard means a curl to {@code :8080/actuator/health} still falls through
+     * to the api chain and 401s, even if Spring routing tried to serve it.
+     *
+     * <p>TODO(deploy-day): once Cloudflare Tunnel is live, validate the
+     * {@code Cf-Access-Jwt-Assertion} header here so a request that bypasses Cloudflare
+     * cannot reach the actuator even if it reaches the management port.
+     */
+    @Bean
+    @Order(0)
+    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
+    SecurityFilterChain managementSecurityFilterChain(
+        final HttpSecurity http,
+        final RequestIdFilter requestIdFilter
+    ) throws Exception {
+        http
+            .securityMatcher(request ->
+                request.getLocalPort() == managementPort
+                    && EndpointRequest.toAnyEndpoint().matches(request))
+            .csrf(AbstractHttpConfigurer::disable)
+            .formLogin(AbstractHttpConfigurer::disable)
+            .httpBasic(AbstractHttpConfigurer::disable)
+            .logout(AbstractHttpConfigurer::disable)
+            .sessionManagement(session ->
+                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .addFilterBefore(requestIdFilter, SecurityContextHolderFilter.class)
+            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+        return http.build();
+    }
 
     @Bean
     @Order(1)
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
-    SecurityFilterChain docsSecurityFilterChain(final HttpSecurity http) throws Exception {
+    SecurityFilterChain docsSecurityFilterChain(
+        final HttpSecurity http,
+        final RequestIdFilter requestIdFilter
+    ) throws Exception {
         http
             .securityMatcher(DOCS_PATHS)
+            .cors(Customizer.withDefaults())
             .csrf(AbstractHttpConfigurer::disable)
             .formLogin(AbstractHttpConfigurer::disable)
             .httpBasic(AbstractHttpConfigurer::disable)
@@ -63,6 +117,7 @@ public class SecurityConfig {
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .headers(headers -> commonHeaders(headers)
                 .contentSecurityPolicy(csp -> csp.policyDirectives(DOCS_CSP)))
+            .addFilterBefore(requestIdFilter, SecurityContextHolderFilter.class)
             .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
         return http.build();
     }
@@ -73,9 +128,11 @@ public class SecurityConfig {
     SecurityFilterChain apiSecurityFilterChain(
         final HttpSecurity http,
         final JwtAuthenticationFilter jwtAuthenticationFilter,
-        final RateLimitFilter rateLimitFilter
+        final RateLimitFilter rateLimitFilter,
+        final RequestIdFilter requestIdFilter
     ) throws Exception {
         http
+            .cors(Customizer.withDefaults())
             .csrf(AbstractHttpConfigurer::disable)
             .formLogin(AbstractHttpConfigurer::disable)
             .httpBasic(AbstractHttpConfigurer::disable)
@@ -89,6 +146,7 @@ public class SecurityConfig {
                 .anyRequest().authenticated())
             .exceptionHandling(handling -> handling
                 .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
+            .addFilterBefore(requestIdFilter, SecurityContextHolderFilter.class)
             .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
@@ -109,5 +167,20 @@ public class SecurityConfig {
     @Bean
     PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    /**
+     * Stops Spring Boot from registering {@link RequestIdFilter} as a servlet-level filter.
+     * Without this, the {@code @Component} gets picked up by both the servlet container and
+     * the {@code addFilterBefore} call below, and the filter runs twice per request. We want
+     * it on the security chain only.
+     */
+    @Bean
+    FilterRegistrationBean<RequestIdFilter> requestIdFilterRegistration(
+        final RequestIdFilter requestIdFilter
+    ) {
+        final FilterRegistrationBean<RequestIdFilter> registration = new FilterRegistrationBean<>(requestIdFilter);
+        registration.setEnabled(false);
+        return registration;
     }
 }

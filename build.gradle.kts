@@ -42,12 +42,16 @@ repositories {
 // ---------------------------------------------------------------------------
 dependencies {
 	// Spring Boot
+	implementation("org.springframework.boot:spring-boot-starter-actuator")
 	implementation("org.springframework.boot:spring-boot-starter-cache")
 	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 	implementation("org.springframework.boot:spring-boot-starter-security")
 	implementation("org.springframework.boot:spring-boot-starter-validation")
 	implementation("org.springframework.boot:spring-boot-starter-web")
 	implementation("org.springframework.boot:spring-boot-starter-webflux")
+
+	// Prometheus metrics for /actuator/prometheus
+	implementation("io.micrometer:micrometer-registry-prometheus")
 
 	// OpenAPI / Swagger UI — auto-generates /v3/api-docs and /swagger-ui.html
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6")

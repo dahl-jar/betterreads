@@ -1,0 +1,16 @@
+#
+# Postgres backup cron line for the OCI VM. Goes on the host crontab, not inside
+# the postgres container.
+#
+# Install with: sudo crontab -u ubuntu -e
+# then paste the line below.
+#
+# Fires at 03:00 UTC every day. The script handles the daily-vs-weekly logic
+# itself; Sundays produce both. stdout and stderr go to syslog tagged
+# "betterreads-backup", and cron mails MAILTO if the script exits non-zero.
+
+MAILTO=ops@example.com
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+
+0 3 * * * source /etc/default/betterreads-backup && /opt/betterreads/infra/backup/pg-backup.sh 2>&1 | logger -t betterreads-backup
