@@ -3,8 +3,8 @@ package com.betterreads.common.util;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Strips CR/LF from values before they enter log messages. Prevents an attacker from injecting
- * fake log lines via user-controlled input (CWE-117).
+ * Strips CR/LF from values before they reach log messages. Defends against log-forgery via
+ * user-controlled input (CWE-117).
  */
 public final class LogSanitizer {
 
@@ -12,7 +12,7 @@ public final class LogSanitizer {
     }
 
     /**
-     * Returns the input with any carriage return or line feed removed. Null in, null out.
+     * Returns the input with carriage returns and line feeds removed. Null in, null out.
      */
     @Nullable
     public static String forLog(@Nullable final String value) {

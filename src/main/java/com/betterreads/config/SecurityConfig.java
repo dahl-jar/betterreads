@@ -29,13 +29,8 @@ import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 
 /**
- * Three security filter chains, ordered most-specific first.
- *
- * <p>{@code managementSecurityFilterChain} matches actuator paths but only when the request
- * arrived on the management port (bound to {@code 127.0.0.1:8081}); requests reach it through
- * Cloudflare Tunnel and Access in production, so the chain itself permits all. The docs chain
- * relaxes CSP for Swagger UI. The api chain is the catch-all for everything else and runs JWT
- * + rate limiting + the strict JSON-API CSP.
+ * Three filter chains, ordered most-specific first: management (actuator on the internal port),
+ * docs (Swagger UI with relaxed CSP), and api (JWT, rate limit, strict CSP).
  */
 @Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
@@ -70,13 +65,9 @@ public final class SecurityConfig {
     private final ObjectProvider<JwtDecoder> cloudflareAccessJwtDecoderProvider;
 
     /**
-     * Builds the config with the management port and a provider for the optional Cloudflare
-     * Access JWT decoder. The decoder bean only exists when {@code cloudflare.access.aud} and
-     * {@code cloudflare.access.team-domain} are configured (see {@code CloudflareAccessConfig}).
-     * When absent, the management chain stays at {@code permitAll}, which is correct for local dev.
-     *
-     * <p>The provider is resolved lazily inside {@link #managementSecurityFilterChain} so the
-     * decoder bean has time to be created before lookup.
+     * The Cloudflare Access JWT decoder is optional. When absent, the management chain stays
+     * at {@code permitAll}. Resolved lazily inside the chain bean to avoid bean-creation order
+     * issues.
      */
     @Autowired
     public SecurityConfig(
@@ -88,14 +79,9 @@ public final class SecurityConfig {
     }
 
     /**
-     * Owns actuator paths, but only when the request arrives on the management port. The
-     * management connector is bound to {@code 127.0.0.1:8081} so external traffic cannot
-     * reach it directly; production access goes through Cloudflare Tunnel and Access.
-     *
-     * <p>When the Cloudflare Access JWT decoder is configured (production), this chain
-     * requires a valid {@code Cf-Access-Jwt-Assertion} header signed by Cloudflare and
-     * carrying the configured AUD. When the decoder is absent (local dev), the chain stays
-     * at {@code permitAll} so Prometheus and curl-against-localhost still work.
+     * Matches actuator paths only when the request arrives on the management port. With a
+     * Cloudflare Access JWT decoder configured, requires a valid {@code Cf-Access-Jwt-Assertion}
+     * header. Without one, falls back to {@code permitAll}.
      */
     @Bean
     @Order(0)
@@ -130,6 +116,11 @@ public final class SecurityConfig {
         return http.build();
     }
 
+    /**
+     * Matches Swagger UI and OpenAPI doc paths. Relaxes CSP enough for the bundled UI to load
+     * its own scripts and styles. Authentication is permitted by default; gate at the network
+     * edge if docs should not be public.
+     */
     @Bean
     @Order(1)
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
@@ -153,6 +144,10 @@ public final class SecurityConfig {
         return http.build();
     }
 
+    /**
+     * Catch-all chain for application traffic. Stateless, JWT-authenticated, rate-limited at
+     * the public endpoints, and locked down with a strict JSON-API CSP.
+     */
     @Bean
     @Order(2)
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
@@ -201,10 +196,8 @@ public final class SecurityConfig {
     }
 
     /**
-     * Stops Spring Boot from registering {@link RequestIdFilter} as a servlet-level filter.
-     * Without this, the {@code @Component} gets picked up by both the servlet container and
-     * the {@code addFilterBefore} call below, and the filter runs twice per request. We want
-     * it on the security chain only.
+     * Disables the auto-registration that would run {@link RequestIdFilter} twice. The filter
+     * is wired into the security chain via {@code addFilterBefore} instead.
      */
     @Bean
     FilterRegistrationBean<RequestIdFilter> requestIdFilterRegistration(

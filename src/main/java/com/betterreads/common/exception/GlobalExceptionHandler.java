@@ -17,15 +17,15 @@ import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Maps exceptions to {@link ApiErrorResponse}. 4xx outcomes log at WARN; the catch-all 500 logs
+ * at ERROR with stack trace.
+ */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    /**
-     * Handle Resource Not Found Exception
-     * Response Status: 404
-     */
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleNotFound(final ResourceNotFoundException exception) {
         LOG.warn("Resource not found: {}", LogSanitizer.forLog(Objects.requireNonNullElse(exception.getMessage(), "")));
@@ -40,10 +40,6 @@ public class GlobalExceptionHandler {
         );
     }
 
-    /**
-     * Handle Validation Exception
-     * Response Status: 400
-     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiErrorResponse> handleValidation(final MethodArgumentNotValidException exception) {
         final List<FieldError> fieldErrors = exception.getBindingResult()
@@ -64,10 +60,6 @@ public class GlobalExceptionHandler {
         );
     }
 
-    /**
-     * Handle Business Rule Exception
-     * Response Status: 409
-     */
     @ExceptionHandler(BusinessRuleException.class)
     public ResponseEntity<ApiErrorResponse> handleBusinessRule(final BusinessRuleException exception) {
         LOG.warn("Business rule violation: {}",
@@ -83,10 +75,6 @@ public class GlobalExceptionHandler {
         );
     }
 
-    /**
-     * Handle malformed or missing JSON request bodies
-     * Response Status: 400
-     */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiErrorResponse> handleUnreadableMessage(final HttpMessageNotReadableException exception) {
         final String message = "Malformed request body";
@@ -102,10 +90,6 @@ public class GlobalExceptionHandler {
         );
     }
 
-    /**
-     * Handle Bad Credentials Exception
-     * Response Status: 401
-     */
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ApiErrorResponse> handleBadCredentials(final BadCredentialsException exception) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
@@ -118,10 +102,6 @@ public class GlobalExceptionHandler {
         );
     }
 
-    /**
-     * Handle unexpected exceptions
-     * Response Status: 500
-     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleUnexpected(final Exception exception) {
         LOG.error("Unexpected error", exception);

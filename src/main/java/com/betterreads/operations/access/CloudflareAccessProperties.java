@@ -4,16 +4,13 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Cloudflare Access JWT validation configuration. Bound from {@code cloudflare.access.*} keys.
+ * Cloudflare Access JWT validation config bound from {@code cloudflare.access.*}. Both fields
+ * are optional; blank either side disables validation and the management chain falls back to
+ * {@code permitAll}.
  *
- * <p>Both fields are optional. When either is blank, the management chain skips JWT validation
- * and falls back to the {@code permitAll} default — appropriate for local dev where Cloudflare
- * Access isn't in front of the management port. Production sets both to enforce validation.
- *
- * @param aud the Application Audience tag from the Cloudflare Access app, blank to disable
- * @param teamDomain the Cloudflare Zero Trust team domain (e.g. {@code mydomain.cloudflareaccess.com}),
- *                   blank to disable; the JWKS URL is derived as
- *                   {@code https://<teamDomain>/cdn-cgi/access/certs}
+ * @param aud Application Audience tag, blank to disable
+ * @param teamDomain Zero Trust team domain (e.g. {@code mydomain.cloudflareaccess.com}); JWKS
+ *     resolves to {@code https://<teamDomain>/cdn-cgi/access/certs}
  */
 @ConfigurationProperties(prefix = "cloudflare.access")
 public record CloudflareAccessProperties(
@@ -22,8 +19,8 @@ public record CloudflareAccessProperties(
 ) {
 
     /**
-     * Returns true when both {@code aud} and {@code teamDomain} are non-blank, meaning JWT
-     * validation should be enforced.
+     * Returns true when both {@code aud} and {@code teamDomain} are set, enabling JWT
+     * validation on the management chain.
      */
     public boolean isEnabled() {
         return aud != null && !aud.isBlank()
@@ -31,8 +28,8 @@ public record CloudflareAccessProperties(
     }
 
     /**
-     * Returns the JWKS URL Cloudflare publishes for this team domain. Only call when
-     * {@link #isEnabled()} returns true.
+     * Returns the JWKS URL Cloudflare publishes for this team domain. Only valid when
+     * {@link #isEnabled()}.
      */
     public String jwkSetUri() {
         return "https://" + teamDomain + "/cdn-cgi/access/certs";

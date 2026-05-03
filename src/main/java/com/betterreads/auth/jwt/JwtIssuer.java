@@ -17,7 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
- * Issues and parses HS256-signed JWTs. The user id is stored as the {@code sub} claim.
+ * Issues and parses HS256-signed JWTs. Subject claim carries the user id.
  */
 @Component
 public final class JwtIssuer {
@@ -28,18 +28,14 @@ public final class JwtIssuer {
 
     private final Duration expiration;
 
-    /**
-     * Spring-injected constructor. Resolves the signing key, issuer, and expiration from
-     * {@link JwtProperties}.
-     */
     @Autowired
     public JwtIssuer(final JwtProperties properties) {
         this(properties.secret(), properties.issuer(), Duration.ofMinutes(properties.expirationMinutes()));
     }
 
     /**
-     * Direct constructor for tests that need to issue tokens with a custom secret, issuer, or
-     * expiration (for example, an already-expired token to verify rejection).
+     * Test-friendly constructor that takes a raw secret, issuer, and lifetime so tests can
+     * issue already-expired or wrong-issuer tokens without bringing up a Spring context.
      */
     public JwtIssuer(final String secret, final String issuer, final Duration expiration) {
         this.signingKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
@@ -48,9 +44,8 @@ public final class JwtIssuer {
     }
 
     /**
-     * Signs a token whose {@code sub} claim is the given user id.
+     * Returns a signed access JWT whose subject is the given user id.
      */
-    // TODO(when-real-users): add refresh-token flow. 60-min single-token kicks users out hourly.
     public String issue(final long userId) {
         final Instant now = Instant.now();
         return Jwts.builder()
@@ -63,10 +58,9 @@ public final class JwtIssuer {
     }
 
     /**
-     * Parses and validates a token, returning the user id from its {@code sub} claim.
+     * Returns the user id parsed from the subject claim.
      *
-     * @throws InvalidJwtException if the token is malformed, has a bad signature, has expired,
-     *     or carries a non-numeric subject
+     * @throws InvalidJwtException malformed, bad signature, expired, or non-numeric subject
      */
     public long parseUserId(final String token) {
         try {

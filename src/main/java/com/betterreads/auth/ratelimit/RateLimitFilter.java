@@ -32,11 +32,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
  * Token-bucket rate limiter for {@code POST /auth/login} and {@code POST /auth/register}.
- *
- * <p>Buckets are keyed by client IP. The IP comes from the direct {@code remoteAddr} unless
- * the request arrived via a configured trusted proxy CIDR, in which case the first valid IP
- * from {@code X-Forwarded-For} is used. This prevents a direct attacker from bypassing the
- * limit by spoofing the header. Empty bucket returns {@code 429} with {@code Retry-After}.
+ * Buckets are keyed by client IP; trusted-proxy CIDRs unlock {@code X-Forwarded-For} parsing
+ * so direct callers cannot spoof the limit. Empty bucket returns 429 with {@code Retry-After}.
  */
 @Component
 public final class RateLimitFilter extends OncePerRequestFilter {
@@ -64,8 +61,8 @@ public final class RateLimitFilter extends OncePerRequestFilter {
     private final List<CidrRange> trustedProxies;
 
     /**
-     * Builds the filter from {@link RateLimitProperties}. Trusted-proxy CIDRs are parsed once at
-     * construction; entries that don't parse are dropped with a warning log.
+     * Trusted-proxy CIDRs are parsed once at construction. Malformed entries are dropped with
+     * a warning log so a single bad config line cannot break filter startup.
      */
     public RateLimitFilter(final RateLimitProperties properties) {
         super();
@@ -90,7 +87,7 @@ public final class RateLimitFilter extends OncePerRequestFilter {
     }
 
     /**
-     * Drops all in-memory buckets. Used by tests to isolate rate-limit state between scenarios.
+     * Drops all in-memory buckets. Used by tests to isolate state between scenarios.
      */
     public void reset() {
         loginBuckets.invalidateAll();

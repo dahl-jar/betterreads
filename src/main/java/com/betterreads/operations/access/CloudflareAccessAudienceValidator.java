@@ -9,21 +9,14 @@ import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
- * Verifies the {@code aud} claim of a Cloudflare Access JWT contains the expected
- * Application Audience tag.
- *
- * <p>Cloudflare assigns an AUD tag per Access application. A JWT signed for one application
- * carries that tag in the {@code aud} claim. Without this check, any JWT signed by Cloudflare
- * for any application in the team would pass signature validation and reach the actuator.
+ * Verifies the {@code aud} claim contains the expected Cloudflare Access Application Audience
+ * tag. Without this check, any JWT signed by Cloudflare for any application in the same team
+ * would pass signature validation.
  */
 public final class CloudflareAccessAudienceValidator implements OAuth2TokenValidator<Jwt> {
 
     private final String expectedAudience;
 
-    /**
-     * Creates a validator that requires the JWT's {@code aud} claim to contain
-     * {@code expectedAudience} exactly (case-sensitive).
-     */
     public CloudflareAccessAudienceValidator(final String expectedAudience) {
         this.expectedAudience = expectedAudience;
     }

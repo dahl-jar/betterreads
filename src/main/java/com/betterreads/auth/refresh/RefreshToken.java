@@ -13,12 +13,9 @@ import java.time.Instant;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Persistent refresh token record. Maps to the {@code refresh_token} table from Flyway V11.
- *
- * <p>The plaintext token is never stored. {@code tokenHash} holds an HMAC-SHA256 of the
- * client-side token. Lookups go via the hash. {@code revokedAt} flips when the token is
- * rotated, logged out, or revoked as part of a chain compromise. {@code replacedBy} chains
- * rotated tokens together so a replay of an already-replaced token can be detected.
+ * Maps to {@code refresh_token} (Flyway V11). Plaintext is never stored; lookups go via
+ * {@code tokenHash} (HMAC-SHA256). {@code replacedBy} chains rotated tokens so a replay of an
+ * already-rotated token is detectable.
  */
 @Entity
 @Table(name = "refresh_token")

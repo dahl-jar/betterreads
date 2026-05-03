@@ -26,9 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Default {@link AuthService}. Delegates persistence to {@link UserRepository}, password hashing
- * to {@link PasswordEncoder}, JWT signing to {@link JwtIssuer}, and refresh-token issuance and
- * rotation to {@link RefreshTokenService}. Login accepts either a username or an email.
+ * Default {@link AuthService}. Login accepts a username or email; lookup tries username first.
  */
 @Service
 public class AuthServiceImpl implements AuthService {
@@ -57,9 +55,6 @@ public class AuthServiceImpl implements AuthService {
 
     private final RefreshTokenService refreshTokenService;
 
-    /**
-     * Constructor injection of the five collaborators the auth flow needs.
-     */
     public AuthServiceImpl(
         final UserRepository userRepository,
         final PasswordEncoder passwordEncoder,

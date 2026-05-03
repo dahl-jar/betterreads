@@ -9,12 +9,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Allowed browser origins for cross-origin requests against this API.
- *
- * <p>Origins are matched exactly. {@code "*"} is rejected at startup because it would let any
- * site script the API on a logged-in user's behalf. An empty list means CORS is effectively off:
- * no browser origin is allowed, so the frontend has to be served from the same origin as the API
- * (which never happens in the deployed setup, so the empty default deliberately fails closed).
+ * Allowed browser origins for cross-origin requests. Exact match, wildcards rejected at startup,
+ * empty list closes CORS entirely.
  *
  * @param allowedOrigins exact origin strings, e.g. {@code https://app.betterreads.example.com}
  */

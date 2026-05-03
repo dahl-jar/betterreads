@@ -21,9 +21,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Reads {@code Authorization: Bearer <token>}, validates the JWT, and sets the Spring Security
- * context with the user id as principal. Invalid tokens leave the context empty and let the
- * downstream entry point decide the response (typically 401).
+ * Reads {@code Authorization: Bearer} tokens and populates the security context. Invalid tokens
+ * leave the context empty so the downstream entry point returns 401.
  */
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -34,9 +33,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtIssuer jwtIssuer;
 
-    /**
-     * Builds the filter with the {@link JwtIssuer} used to validate incoming bearer tokens.
-     */
     public JwtAuthenticationFilter(final JwtIssuer jwtIssuer) {
         super();
         this.jwtIssuer = jwtIssuer;

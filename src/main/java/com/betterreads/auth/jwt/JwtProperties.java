@@ -8,15 +8,13 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * JWT signing configuration. Bound from {@code jwt.*} keys in {@code application.yml}.
- *
- * <p>{@code secret} requires at least 32 UTF-8 bytes for HS256 — JJWT rejects shorter keys.
- * Validating at config bind time gives a clearer failure than the deeper JJWT exception.
+ * JWT signing configuration bound from {@code jwt.*}. The 32-byte minimum on {@code secret}
+ * matches HS256's lower bound; validating at bind time fails earlier than JJWT does.
  *
  * @param secret HS256 signing secret, at least 32 bytes UTF-8
  * @param issuer issuer claim written into every token
- * @param expirationMinutes access token lifetime in minutes, must be positive
- * @param refreshExpirationDays refresh token lifetime in days, must be positive
+ * @param expirationMinutes access token lifetime in minutes
+ * @param refreshExpirationDays refresh token lifetime in days
  */
 @Validated
 @ConfigurationProperties(prefix = "jwt")
