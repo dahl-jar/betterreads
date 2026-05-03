@@ -1,16 +1,16 @@
 # BetterReads
 
-A book tracking and recommendation app. Spring Boot backend on Java 25, Postgres, deployed at [betterreadsapp.com](https://api.betterreadsapp.com). OpenLibrary supplies the catalog data.
+A book tracking and recommendation app. Spring Boot backend on Java 25, Postgres, deployed at [api.betterreadsapp.com](https://api.betterreadsapp.com). OpenLibrary supplies the catalog data.
 
 ## Stack
 
-Java 25 · Spring Boot 3.5 · Postgres 17 · Flyway · Caffeine · WebClient · JJWT · Bucket4j · Gradle 9 (Kotlin DSL).
+Java 25 · Spring Boot 3.5 · Postgres 17 · Flyway · Caffeine · WebClient · JJWT · Bucket4j · Gradle 9 (Kotlin DSL)
 
 ## Prerequisites
 
-- JDK 25. Oracle GraalVM is what I use locally: `brew install --cask graalvm-jdk`. Temurin works too.
-- Docker for the local Postgres.
-- `JAVA_HOME` set.
+- JDK 25 (Oracle GraalVM or Temurin)
+- Docker
+- `JAVA_HOME` set
 
 ## Quickstart
 
@@ -60,13 +60,22 @@ Production runs on a Hetzner Cloud CX23 VM in Helsinki. Spring Boot via systemd,
 
 ## Docs
 
-- [Overview and search](docs/01-overview-and-search.md)
-- [Backend architecture](docs/02-backend-architecture-and-roadmap.md)
-- [Recommendations and ML](docs/03-recommendations-and-ml.md)
-- [Deployment and frontend](docs/04-deployment-and-frontend.md)
-- [Project structure](docs/05-project-structure.md)
-- [Database schema](docs/06-database-schema.md)
+Reference:
+- [API](docs/reference/api.md)
+- [Database schema](docs/reference/database-schema.md)
+- [Project structure](docs/reference/project-structure.md)
+
+Explanation:
+- [Backend architecture](docs/explanation/architecture.md)
+- [Search design](docs/explanation/search-design.md)
+- [Recommendations and ML](docs/explanation/recommendations-and-ml.md)
+- [Deployment and frontend](docs/explanation/deployment-and-frontend.md)
+
+How-to:
+- [Deploy](docs/how-to/deploy.md)
+- [Back up and restore Postgres](docs/how-to/backup-postgres.md)
+- [Set up the Cloudflare Tunnel](docs/how-to/cloudflare-tunnel.md)
 
 ## License
 
-Apache 2.0. See [LICENSE](LICENSE). Copyright 2026 Nanthawat Dahl.
+Apache 2.0. See [LICENSE](LICENSE).
