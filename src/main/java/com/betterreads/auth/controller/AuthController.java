@@ -1,20 +1,28 @@
 package com.betterreads.auth.controller;
 
+import com.betterreads.auth.cookie.RefreshCookieProperties;
 import com.betterreads.auth.dto.AuthResponse;
 import com.betterreads.auth.dto.LoginRequest;
-import com.betterreads.auth.dto.RefreshRequest;
 import com.betterreads.auth.dto.RegisterRequest;
 import com.betterreads.auth.dto.UserResponse;
+import com.betterreads.auth.jwt.JwtProperties;
 import com.betterreads.auth.service.AuthService;
+import com.betterreads.auth.service.TokenPair;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import jakarta.validation.Valid;
 
+import java.time.Duration;
+
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -23,37 +31,62 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Authentication endpoints. {@code register}, {@code login}, {@code refresh}, and {@code logout}
- * are public; {@code me} requires a valid access JWT.
+ * are public; {@code me} requires a valid access JWT. The refresh token is carried in the
+ * {@value #COOKIE_NAME} {@code HttpOnly} cookie scoped to {@value #COOKIE_PATH} so JavaScript
+ * on the frontend cannot read it and {@code SameSite=Strict} blocks cross-site POSTs from
+ * carrying it.
  */
 @RestController
-@RequestMapping("/api/v1/auth")
+@RequestMapping(AuthController.COOKIE_PATH)
 @Tag(name = "Authentication", description = "Register, log in, and look up the current user")
 public class AuthController {
 
+    static final String COOKIE_NAME = "br_refresh";
+
+    static final String COOKIE_PATH = "/api/v1/auth";
+
+    private static final String SAME_SITE_STRICT = "Strict";
+
     private final AuthService authService;
 
-    public AuthController(final AuthService authService) {
+    private final RefreshCookieProperties cookieProperties;
+
+    private final Duration refreshLifetime;
+
+    public AuthController(
+        final AuthService authService,
+        final RefreshCookieProperties cookieProperties,
+        final JwtProperties jwtProperties
+    ) {
         this.authService = authService;
+        this.cookieProperties = cookieProperties;
+        this.refreshLifetime = Duration.ofDays(jwtProperties.refreshExpirationDays());
     }
 
     /**
-     * Creates a new user account and returns a fresh access and refresh token pair.
+     * Creates a new user account, issues an access JWT, and writes the refresh token to the
+     * {@value #COOKIE_NAME} cookie.
      */
     @PostMapping("/register")
     @Operation(summary = "Register a new user")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody final RegisterRequest request) {
-        final AuthResponse response = authService.register(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        final TokenPair pair = authService.register(request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .header(HttpHeaders.SET_COOKIE, issueCookie(pair.refreshToken()).toString())
+            .body(pair.body());
     }
 
     /**
-     * Authenticates the credentials and returns a fresh access and refresh token pair. The
-     * identifier is matched against username first, then email.
+     * Authenticates the credentials, issues an access JWT, and writes the refresh token to the
+     * {@value #COOKIE_NAME} cookie. The identifier is matched against username first, then email.
      */
     @PostMapping("/login")
     @Operation(summary = "Log in with username or email")
-    public AuthResponse login(@Valid @RequestBody final LoginRequest request) {
-        return authService.login(request);
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody final LoginRequest request) {
+        final TokenPair pair = authService.login(request);
+        return ResponseEntity.ok()
+            .header(HttpHeaders.SET_COOKIE, issueCookie(pair.refreshToken()).toString())
+            .body(pair.body());
     }
 
     /**
@@ -66,25 +99,62 @@ public class AuthController {
     }
 
     /**
-     * Rotates the presented refresh token and returns a fresh access and refresh token pair.
+     * Rotates the refresh token presented in the {@value #COOKIE_NAME} cookie and returns a
+     * fresh access JWT. The successor refresh token replaces the cookie value.
      *
-     * <p>Authenticated solely by the refresh token in the request body.
+     * <p>Authenticated solely by the refresh token cookie. A missing cookie is rejected with 401.
      */
     @PostMapping("/refresh")
     @Operation(summary = "Rotate access and refresh tokens")
-    public AuthResponse refresh(@Valid @RequestBody final RefreshRequest request) {
-        return authService.refresh(request.refreshToken());
+    public ResponseEntity<AuthResponse> refresh(
+        @CookieValue(name = COOKIE_NAME, required = false) final String refreshToken
+    ) {
+        if (refreshToken == null) {
+            throw new BadCredentialsException("Missing refresh token");
+        }
+        final TokenPair pair = authService.refresh(refreshToken);
+        return ResponseEntity.ok()
+            .header(HttpHeaders.SET_COOKIE, issueCookie(pair.refreshToken()).toString())
+            .body(pair.body());
     }
 
     /**
-     * Revokes the presented refresh token.
+     * Revokes the refresh token presented in the {@value #COOKIE_NAME} cookie and clears the
+     * cookie from the browser.
      *
-     * <p>Idempotent: returns 204 whether or not the token was already revoked.
+     * <p>Idempotent: returns 204 whether or not the cookie was present or the token was already
+     * revoked.
      */
     @PostMapping("/logout")
     @Operation(summary = "Revoke a refresh token")
-    public ResponseEntity<Void> logout(@Valid @RequestBody final RefreshRequest request) {
-        authService.logout(request.refreshToken());
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<Void> logout(
+        @CookieValue(name = COOKIE_NAME, required = false) final String refreshToken
+    ) {
+        if (refreshToken != null) {
+            authService.logout(refreshToken);
+        }
+        return ResponseEntity.noContent()
+            .header(HttpHeaders.SET_COOKIE, clearCookie().toString())
+            .build();
+    }
+
+    private ResponseCookie issueCookie(final String value) {
+        return ResponseCookie.from(COOKIE_NAME, value)
+            .httpOnly(true)
+            .secure(cookieProperties.secure())
+            .sameSite(SAME_SITE_STRICT)
+            .path(COOKIE_PATH)
+            .maxAge(refreshLifetime)
+            .build();
+    }
+
+    private ResponseCookie clearCookie() {
+        return ResponseCookie.from(COOKIE_NAME, "")
+            .httpOnly(true)
+            .secure(cookieProperties.secure())
+            .sameSite(SAME_SITE_STRICT)
+            .path(COOKIE_PATH)
+            .maxAge(0)
+            .build();
     }
 }

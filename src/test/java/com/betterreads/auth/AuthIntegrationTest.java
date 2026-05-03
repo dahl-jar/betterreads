@@ -44,7 +44,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "jwt.issuer=betterreads-it",
     "jwt.expiration-minutes=60",
     "jwt.refresh-expiration-days=30",
-    "app.cors.allowed-origins=https://app.betterreads.example.com"
+    "app.cors.allowed-origins=https://app.betterreads.example.com",
+    "auth.refresh-cookie.secure=true"
 })
 @SuppressWarnings("PMD.TooManyStaticImports")
 class AuthIntegrationTest {

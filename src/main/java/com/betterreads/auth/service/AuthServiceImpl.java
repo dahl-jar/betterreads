@@ -71,7 +71,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
-    public AuthResponse register(final RegisterRequest request) {
+    public TokenPair register(final RegisterRequest request) {
         final String normalizedEmail = normalizeEmail(request.email());
 
         if (userRepository.existsByUsername(request.username())) {
@@ -95,7 +95,7 @@ public class AuthServiceImpl implements AuthService {
         }
         LOG.info("auth.register.success userId={} username={}",
             saved.getUserId(), LogSanitizer.forLog(saved.getUsername()));
-        return buildAuthResponse(saved);
+        return buildTokenPair(saved);
     }
 
     private static String normalizeEmail(final String email) {
@@ -104,7 +104,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
-    public AuthResponse login(final LoginRequest request) {
+    public TokenPair login(final LoginRequest request) {
         final String identifier = request.identifier().trim();
         final String normalizedEmailIdentifier = normalizeEmail(identifier);
         final User user = userRepository.findByUsername(identifier)
@@ -119,7 +119,7 @@ public class AuthServiceImpl implements AuthService {
             throw new BadCredentialsException(INVALID_CREDENTIALS);
         }
         LOG.info("auth.login.success userId={}", user.getUserId());
-        return buildAuthResponse(user);
+        return buildTokenPair(user);
     }
 
     @Override
@@ -132,7 +132,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
-    public AuthResponse refresh(final String refreshToken) {
+    public TokenPair refresh(final String refreshToken) {
         final Optional<RefreshTokenRotation> rotation = refreshTokenService.rotate(refreshToken);
         if (rotation.isEmpty()) {
             LOG.warn("auth.refresh.rejected");
@@ -145,7 +145,8 @@ public class AuthServiceImpl implements AuthService {
                 return new BadCredentialsException(INVALID_REFRESH_TOKEN);
             });
         final String accessToken = jwtIssuer.issue(user.getUserId());
-        return new AuthResponse(accessToken, rotation.get().plaintext(), userMapper.toResponse(user));
+        final AuthResponse body = new AuthResponse(accessToken, userMapper.toResponse(user));
+        return new TokenPair(body, rotation.get().plaintext());
     }
 
     @Override
@@ -154,9 +155,10 @@ public class AuthServiceImpl implements AuthService {
         refreshTokenService.revoke(refreshToken);
     }
 
-    private AuthResponse buildAuthResponse(final User user) {
+    private TokenPair buildTokenPair(final User user) {
         final String accessToken = jwtIssuer.issue(user.getUserId());
         final String refreshToken = refreshTokenService.issue(user.getUserId());
-        return new AuthResponse(accessToken, refreshToken, userMapper.toResponse(user));
+        final AuthResponse body = new AuthResponse(accessToken, userMapper.toResponse(user));
+        return new TokenPair(body, refreshToken);
     }
 }

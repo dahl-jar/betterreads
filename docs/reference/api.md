@@ -42,10 +42,10 @@ Returns a precomputed list. Served from cache or a scheduled sync job, never reb
 |---|---|---|
 | `/api/v1/auth/register` | POST | none |
 | `/api/v1/auth/login` | POST | none |
-| `/api/v1/auth/refresh` | POST | refresh token in body |
-| `/api/v1/auth/logout` | POST | refresh token in body |
+| `/api/v1/auth/refresh` | POST | `br_refresh` cookie |
+| `/api/v1/auth/logout` | POST | `br_refresh` cookie |
 | `/api/v1/auth/me` | GET | access JWT |
 
-Access tokens are HS256 JWTs with a 2-hour lifetime. Refresh tokens are opaque, rotated on every refresh, and stored as HMAC-SHA256 hashes server-side. Replaying an already-rotated refresh token revokes every active token for that user.
+Access tokens are HS256 JWTs with a 2-hour lifetime, returned in the JSON body and sent on subsequent requests as `Authorization: Bearer`. Refresh tokens are opaque and travel only in the `br_refresh` cookie: `HttpOnly`, `Secure`, `SameSite=Strict`, scoped to `/api/v1/auth`, with a 30-day lifetime. Each successful refresh rotates the cookie value and invalidates the previous one; replaying an already-rotated refresh token revokes every active token for that user. `register` and `login` set the cookie; `logout` clears it. `refresh` and `logout` take no request body.
 
 Request and response shapes for the auth endpoints are in Swagger UI at `/swagger-ui.html`.

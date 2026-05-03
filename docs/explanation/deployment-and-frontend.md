@@ -6,7 +6,7 @@ A single Hetzner Cloud VM in Helsinki runs the backend and Postgres. Cloudflare 
 
 ## Backend host
 
-Hetzner Cloud `CX23` (x86, 2 vCPU, 4 GB RAM, 40 GB SSD), Helsinki (`hel1`), Ubuntu 24.04 LTS. Provisioned via one `hcloud` command, no Terraform.
+Hetzner Cloud `CX23` (x86, 2 vCPU, 4 GB RAM, 40 GB SSD), Helsinki (`hel1`), Ubuntu 24.04 LTS. Provisioned via one `hcloud` command.
 
 ## Database host
 
