@@ -2,6 +2,7 @@ package com.betterreads.auth.controller;
 
 import com.betterreads.auth.dto.AuthResponse;
 import com.betterreads.auth.dto.LoginRequest;
+import com.betterreads.auth.dto.RefreshRequest;
 import com.betterreads.auth.dto.RegisterRequest;
 import com.betterreads.auth.dto.UserResponse;
 import com.betterreads.auth.service.AuthService;
@@ -61,5 +62,26 @@ public class AuthController {
     @Operation(summary = "Get the current authenticated user")
     public UserResponse me(@AuthenticationPrincipal final Long userId) {
         return authService.currentUser(userId);
+    }
+
+    /**
+     * Exchanges a refresh token for a new access + refresh token pair, rotating the refresh
+     * token. Public endpoint authenticated solely by the refresh token in the request body.
+     */
+    @PostMapping("/refresh")
+    @Operation(summary = "Rotate access and refresh tokens")
+    public AuthResponse refresh(@Valid @RequestBody final RefreshRequest request) {
+        return authService.refresh(request.refreshToken());
+    }
+
+    /**
+     * Revokes the given refresh token. Idempotent: returns 204 whether or not the token was
+     * already revoked. Does not require an access token.
+     */
+    @PostMapping("/logout")
+    @Operation(summary = "Revoke a refresh token")
+    public ResponseEntity<Void> logout(@Valid @RequestBody final RefreshRequest request) {
+        authService.logout(request.refreshToken());
+        return ResponseEntity.noContent().build();
     }
 }
