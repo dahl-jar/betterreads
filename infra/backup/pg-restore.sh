@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Pulls an encrypted Postgres dump from OCI Object Storage and restores it.
+# Pulls an encrypted Postgres dump from Cloudflare R2 and restores it.
 # Used for disaster recovery and, more often, for the quarterly restore drill.
 #
 # Reads its config from the same env file as pg-backup.sh, plus an OBJECT_NAME
@@ -23,33 +23,33 @@ require() {
 
 require OBJECT_NAME
 require PG_CONTAINER
-require PG_DATABASE
-require PG_USER
-require GPG_PASSPHRASE
-require OCI_BUCKET
-require OCI_NAMESPACE
+require DB_NAME
+require DB_USERNAME
+require BACKUP_GPG_PASSPHRASE
+require R2_ACCESS_KEY_ID
+require R2_SECRET_ACCESS_KEY
+require R2_BUCKET
+require R2_ENDPOINT
 
-if [[ -n "${AUTH_FLAG:-}" ]]; then
-    read -r -a auth_args <<<"$AUTH_FLAG"
-else
-    auth_args=(--auth instance_principal)
-fi
+export RCLONE_CONFIG_R2_TYPE=s3
+export RCLONE_CONFIG_R2_PROVIDER=Cloudflare
+export RCLONE_CONFIG_R2_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID"
+export RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
+export RCLONE_CONFIG_R2_ENDPOINT="$R2_ENDPOINT"
+export RCLONE_CONFIG_R2_ACL=private
+export RCLONE_CONFIG_R2_NO_CHECK_BUCKET=true
 
-if [[ "$PG_DATABASE" == "betterreads" ]]; then
+if [[ "$DB_NAME" == "betterreads" ]]; then
     echo "refusing to restore into the live 'betterreads' database. Restore into a throwaway DB and rename." >&2
     exit 66
 fi
 
-echo "restore.start object=${OBJECT_NAME} target=${PG_DATABASE}" >&2
+echo "restore.start object=${OBJECT_NAME} target=${DB_NAME}" >&2
 
-oci os object get "${auth_args[@]}" \
-    --namespace "$OCI_NAMESPACE" \
-    --bucket-name "$OCI_BUCKET" \
-    --name "$OBJECT_NAME" \
-    --file - \
-    | gpg --batch --yes --quiet --decrypt --passphrase-fd 3 3<<<"$GPG_PASSPHRASE" \
+rclone cat "r2:${R2_BUCKET}/${OBJECT_NAME}" \
+    | gpg --batch --yes --quiet --decrypt --passphrase-fd 3 3<<<"$BACKUP_GPG_PASSPHRASE" \
     | gunzip \
     | docker exec -i "$PG_CONTAINER" \
-        psql --username="$PG_USER" --dbname="$PG_DATABASE" --set ON_ERROR_STOP=1
+        psql --username="$DB_USERNAME" --dbname="$DB_NAME" --set ON_ERROR_STOP=1
 
-echo "restore.ok object=${OBJECT_NAME} target=${PG_DATABASE}" >&2
+echo "restore.ok object=${OBJECT_NAME} target=${DB_NAME}" >&2

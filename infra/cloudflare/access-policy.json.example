@@ -2,7 +2,7 @@
   "application": {
     "name": "betterreads-metrics",
     "type": "self_hosted",
-    "domain": "metrics.<your-domain>",
+    "domain": "metrics.betterreadsapp.com",
     "session_duration": "24h",
     "auto_redirect_to_identity": false,
     "allowed_idps": [],
