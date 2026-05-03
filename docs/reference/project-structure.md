@@ -1,7 +1,6 @@
 # Project structure
 
-## Exact v2 package structure
-Recommended Spring Boot package layout:
+## Spring Boot package layout
 
 ```text
 com.betterreads

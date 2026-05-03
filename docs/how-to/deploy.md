@@ -1,4 +1,4 @@
-# Hetzner deploy runbook
+# How to deploy
 
 The production app runs on a Hetzner Cloud CX23 VM in Helsinki. This runbook covers updating the running app, changing config, restarting services, and rolling back if something breaks.
 
@@ -25,7 +25,7 @@ cron                   daily backup at 03:00 UTC
 
 ## Updating the jar
 
-From your laptop:
+From a workstation with the repo checked out:
 
 ```bash
 ./gradlew bootJar
@@ -52,10 +52,11 @@ curl https://api.betterreadsapp.com/healthz
 
 ## Changing environment variables
 
-Edit `/opt/betterreads/.env` over SSH. Don't open `.env` in your local IDE — the IDE auto-attaches selections to chat (a real incident has happened in this project).
+Edit `/opt/betterreads/.env` over SSH; don't open it in a local IDE.
 
 ```bash
-ssh root@<vm-ip> 'nvim /opt/betterreads/.env'
+ssh root@<vm-ip>
+# edit /opt/betterreads/.env
 systemctl restart betterreads
 ```
 
@@ -71,7 +72,7 @@ Postgres only reads `POSTGRES_USER` / `POSTGRES_PASSWORD` from the env on **firs
 
 If `DB_PASSWORD` in `.env` drifts from what Postgres was initialized with, the app fails to connect with `FATAL: password authentication failed`. The only ways out are:
 
-- Run `ALTER USER` inside Postgres to match the current `.env`. Needs a working login first, which is the chicken-and-egg if you only have the new password.
+- Run `ALTER USER` inside Postgres to match the current `.env`. Needs a working login first, which is the chicken-and-egg when only the new password is known.
 - Wipe the volume and let Flyway re-migrate from scratch. Loses data. Acceptable when there's nothing real in the DB yet.
 
 Correct rotation flow:
@@ -84,14 +85,13 @@ postgres=# ALTER USER betterreads WITH PASSWORD '<new>';
 postgres=# ALTER USER betterreads_app WITH PASSWORD '<new app>';
 postgres=# \q
 
-# 2. Update .env to match
-nvim /opt/betterreads/.env
+# 2. Update /opt/betterreads/.env to match
 
 # 3. Restart Spring Boot. Postgres doesn't need to restart.
 systemctl restart betterreads
 ```
 
-If the rotation order gets out of sync (you change `.env` first, then forget the `ALTER USER` step), the container is fine but the app won't start. Reverse the order in `.env` and try again, or `ALTER USER` from another working session.
+If the rotation order gets out of sync (`.env` changed first, then the `ALTER USER` step forgotten), the container is fine but the app won't start. Reverse the order in `.env` and try again, or `ALTER USER` from another working session.
 
 ## Restarting services
 
@@ -145,26 +145,20 @@ ssh root@<vm-ip> 'reboot'
 
 systemd brings everything back automatically: `docker.service` → Postgres container → `betterreads.service` → cloudflared. Verify with `/healthz` once the VM is back. Expect ~30 seconds of downtime during the reboot.
 
-## Adding the SSH key for a new operator
-
-The VM was provisioned with one SSH key (the `Hetzner` key in 1Password). To grant a second person access:
+## Adding an SSH key
 
 ```bash
 ssh root@<vm-ip> 'echo "<new public key>" >> /root/.ssh/authorized_keys'
 ```
 
-Removing keys is the same file, just edit it.
-
 ## Recreating the VM from scratch
 
-Nothing in the codebase regenerates the current VM automatically. If the VM is destroyed, the recipe is:
+If the VM is destroyed, the recipe is:
 
-1. `hcloud server create --name betterreads --type cx22 --image ubuntu-24.04 --location hel1 --ssh-key Hetzner`
-2. ssh in, `apt upgrade`, install GraalVM 25, Docker, cloudflared, rclone (commands recorded in `.local/CHANGELOG.md` 2026-05-03)
-3. `scp` the latest jar, `docker-compose.yml`, both backup scripts to `/opt/betterreads/`
-4. Create `/opt/betterreads/.env` from values in 1Password
-5. Run the systemd unit installs (`betterreads.service`, the `cloudflared service install <token>` flow)
-6. `pg-restore.sh` from the most recent R2 backup, or let Flyway re-migrate on first boot if data loss is acceptable
-7. Update Cloudflare Tunnel ingress rules to point at the new VM IP if the IP changed (Hetzner usually keeps it on rebuild)
-
-The full setup is one OS plus three packages plus copying four files plus one cron line. About an hour from `hcloud server create` to working `/healthz`.
+1. `hcloud server create --name betterreads --type cx22 --image ubuntu-24.04 --location hel1 --ssh-key <key-name>`
+2. SSH in, `apt upgrade`, install GraalVM 25, Docker, cloudflared, rclone.
+3. `scp` the latest jar, `docker-compose.yml`, and both backup scripts to `/opt/betterreads/`.
+4. Create `/opt/betterreads/.env` with the saved secret values.
+5. Install the systemd units (`betterreads.service`, plus the `cloudflared service install <token>` flow).
+6. `pg-restore.sh` from the most recent R2 backup, or let Flyway re-migrate on first boot if data loss is acceptable.
+7. Update Cloudflare Tunnel ingress rules to point at the new VM IP if it changed.

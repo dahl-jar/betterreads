@@ -5,10 +5,10 @@
 #
 # Reads its config from the same env file as pg-backup.sh, plus an OBJECT_NAME
 # that points at the specific backup to restore. The runbook at
-# docs/runbooks/postgres-backup.md walks through both the drill and the real
+# docs/how-to/backup-postgres.md walks through both the drill and the real
 # disaster path step by step.
 #
-# Refuses to write into the live "betterreads" database. If you really mean to
+# Refuses to write into the live "betterreads" database. To intentionally
 # overwrite production, restore into a throwaway and rename. Belt and braces.
 
 set -euo pipefail

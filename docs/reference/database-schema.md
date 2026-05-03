@@ -1,10 +1,10 @@
 # Database schema
 
-## Database schema for interactions and recommendations
-The main goal is to collect user behavior from day one so recommendations can start simple and improve later.
+## Interactions and recommendations
+
+Collect user behavior from day one so recommendations can start simple and improve later.
 
 ### Core interaction table
-Recommended table: `user_book_interaction`
 
 ```sql
 create table user_book_interaction (
@@ -21,41 +21,24 @@ create table user_book_interaction (
 );
 ```
 
-Recommended `event_type` values:
-- `viewed`
-- `searched`
-- `saved`
-- `want_to_read`
-- `currently_reading`
-- `finished`
-- `dropped`
-- `rated`
-- `reviewed`
-- `commented`
-- `club_joined`
-- `club_posted`
+`event_type` values:
+- `viewed`, `searched`, `saved`, `want_to_read`, `currently_reading`, `finished`, `dropped`, `rated`, `reviewed`, `commented`, `club_joined`, `club_posted`
 
-Recommended `event_source` values:
-- `search`
-- `book_page`
-- `collection`
-- `review`
-- `club`
-- `feed`
+`event_source` values:
+- `search`, `book_page`, `collection`, `review`, `club`, `feed`
 
-Example weight ideas:
-- viewed = `1.0`
-- saved = `2.0`
-- currently_reading = `3.0`
-- finished = `4.0`
-- rated_5 = `5.0`
-- rated_1 = `-3.0`
-- reviewed = `4.0`
+Starter weights:
+- viewed = 1.0
+- saved = 2.0
+- currently_reading = 3.0
+- finished = 4.0
+- rated_5 = 5.0
+- rated_1 = -3.0
+- reviewed = 4.0
 
-Weights can start simple and be tuned later.
+Weights can be tuned over time.
 
 ### Aggregated interaction table
-Useful for faster recommender training and API reads.
 
 ```sql
 create table user_book_signal (
@@ -70,10 +53,11 @@ create table user_book_signal (
 );
 ```
 
-This table can be refreshed by background jobs from raw interaction data.
+Refreshed by background jobs from raw interaction data.
 
 ### Recommendation result table
-Store precomputed recommendations here so the Java API only reads and serves them.
+
+Stores precomputed recommendations so the Java API only reads and serves them.
 
 ```sql
 create table user_recommendation (
@@ -92,16 +76,10 @@ create table user_recommendation (
 );
 ```
 
-Possible `reason` values:
-- `similar_users`
-- `similar_books`
-- `same_genre`
-- `club_activity`
-- `trending_in_network`
-- `hybrid_ranked`
+`reason` values:
+- `similar_users`, `similar_books`, `same_genre`, `club_activity`, `trending_in_network`, `hybrid_ranked`
 
-### Similar books table
-Useful even before full personalized ML.
+### Similar books
 
 ```sql
 create table similar_book (
@@ -116,13 +94,9 @@ create table similar_book (
 );
 ```
 
-This can power:
-- "because you read this"
-- "similar books"
-- fallback recommendations for new users
+Powers "because you read this", "similar books", and fallback recommendations for new users.
 
-### Activity feed table
-When the feed becomes a feature, keep event storage separate from rendered feed items.
+### Activity feed
 
 ```sql
 create table activity_event (
@@ -139,10 +113,9 @@ create table activity_event (
 );
 ```
 
-Feed rows can later be materialized into a separate `feed_item` table if needed.
+Event storage stays separate from rendered feed items. A `feed_item` table can be materialized later if needed.
 
-### Index recommendations
-Recommended indexes:
+### Indexes
 
 ```sql
 create index idx_user_book_interaction_user_time
