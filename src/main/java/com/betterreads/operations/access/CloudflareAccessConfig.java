@@ -12,26 +12,18 @@ import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 
 /**
- * Wires the Cloudflare Access JWT decoder when {@code cloudflare.access.aud} and
- * {@code cloudflare.access.team-domain} are both configured.
- *
- * <p>The decoder fetches Cloudflare's JWKS from the team domain, validates RS256 signatures,
- * checks the timestamp claims via Spring's defaults, and runs the AUD validator. When the
- * properties are not set, no {@link JwtDecoder} bean is created; {@code SecurityConfig} detects
- * the absence and leaves the management chain at {@code permitAll} for local dev.
+ * Wires a {@link JwtDecoder} for Cloudflare Access when {@code cloudflare.access.aud} and
+ * {@code cloudflare.access.team-domain} are both set. Decoder fetches the team JWKS, validates
+ * RS256 signatures, applies Spring's default timestamp checks, then enforces AUD.
  */
 @Configuration
 @EnableConfigurationProperties(CloudflareAccessProperties.class)
 public class CloudflareAccessConfig {
 
     /**
-     * Creates the {@link JwtDecoder} that {@code SecurityConfig} uses on the management chain.
-     * Only registered when both env vars are non-blank.
-     */
-    /**
-     * Creates the {@link JwtDecoder} that {@code SecurityConfig} uses on the management chain.
-     * Returns {@code null} when {@code cloudflare.access.aud} or {@code team-domain} is blank
-     * so {@code SecurityConfig} can detect the absence and leave the chain at {@code permitAll}.
+     * Returns the configured {@link JwtDecoder}, or {@code null} when {@code aud} or
+     * {@code teamDomain} is blank so {@code SecurityConfig} can leave the management chain at
+     * {@code permitAll}.
      */
     @Bean
     @Nullable

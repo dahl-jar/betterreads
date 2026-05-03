@@ -14,12 +14,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
- * HMAC-SHA256 hasher for refresh tokens. Keys off the JWT secret so a database read leak
- * cannot let an attacker reconstruct issued tokens without also having the JWT secret.
- *
- * <p>Refresh tokens are 256-bit random opaque strings; there is no password-style brute-force
- * angle. HMAC is sufficient and orders of magnitude faster than BCrypt, which matters because
- * hashing happens on every refresh request.
+ * HMAC-SHA256 hasher for refresh tokens. Keyed by the JWT secret so a DB-only leak cannot
+ * reconstruct active tokens. HMAC is used (not BCrypt) because refresh tokens are 256-bit
+ * random and run on every refresh; the password-style brute-force angle does not apply.
  */
 @Component
 public final class RefreshTokenHasher {
@@ -28,24 +25,20 @@ public final class RefreshTokenHasher {
 
     private final byte[] secret;
 
-    /**
-     * Spring-injected constructor that derives the HMAC key from {@link JwtProperties#secret()}.
-     */
     @Autowired
     public RefreshTokenHasher(final JwtProperties properties) {
         this(properties.secret());
     }
 
     /**
-     * Direct constructor for tests that do not bring up the Spring context.
+     * Test-friendly constructor that takes a raw secret instead of {@link JwtProperties}.
      */
     public RefreshTokenHasher(final String secret) {
         this.secret = secret.getBytes(StandardCharsets.UTF_8).clone();
     }
 
     /**
-     * Returns the lowercase hex HMAC-SHA256 of the given token. Deterministic for the same
-     * input and key.
+     * Returns the lowercase hex HMAC-SHA256 of {@code token}.
      */
     public String hash(final String token) {
         try {

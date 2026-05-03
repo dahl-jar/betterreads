@@ -7,10 +7,8 @@ import java.util.Arrays;
 import org.jspecify.annotations.Nullable;
 
 /**
- * IPv4/IPv6 CIDR range. Internal helper for trusted-proxy matching in {@link RateLimitFilter}.
- *
- * <p>Lives in the same package because it is implementation detail of the filter; promoting it
- * to a shared util would imply a wider use case that doesn't yet exist.
+ * IPv4/IPv6 CIDR range. Package-private helper for trusted-proxy matching in
+ * {@link RateLimitFilter}.
  */
 final class CidrRange {
 
@@ -26,8 +24,8 @@ final class CidrRange {
     }
 
     /**
-     * Parses a CIDR string like {@code 10.0.0.0/8} or {@code 2001:db8::/32}. Returns null if the
-     * input cannot be parsed.
+     * Parses CIDR strings like {@code 10.0.0.0/8} or {@code 2001:db8::/32}. Returns null on
+     * malformed input.
      */
     @Nullable
     static CidrRange parse(@Nullable final String cidr) {
@@ -55,7 +53,7 @@ final class CidrRange {
     }
 
     /**
-     * Returns true when {@code address} is in this range. Returns false on family mismatch.
+     * Returns true when {@code address} is in this range. False on family mismatch.
      */
     boolean contains(final InetAddress address) {
         final byte[] candidateBytes = address.getAddress();

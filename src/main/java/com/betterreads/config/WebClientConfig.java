@@ -10,6 +10,9 @@ import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
 
+/**
+ * Builds the OpenLibrary {@link WebClient} with explicit connect and response timeouts.
+ */
 @Configuration
 public class WebClientConfig {
 

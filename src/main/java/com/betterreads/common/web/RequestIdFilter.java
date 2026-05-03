@@ -15,20 +15,16 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Puts a correlation ID on every request. If the caller sent {@code X-Request-Id} and the value
- * looks sane, that ID is reused; otherwise we generate a UUID. The ID lands in the SLF4J MDC
- * under {@code requestId} and goes back out in the response header, so a client tracing one
- * request through their logs sees the same ID we see in ours.
+ * Puts a correlation ID on every request, reusing a sane inbound {@code X-Request-Id} or
+ * generating a UUID. ID is set on the SLF4J MDC and echoed back on the response header.
  *
- * <p>The validation regex {@code [A-Za-z0-9-]{1,64}} exists because the inbound header is
- * untrusted input that ends up in log lines. Without it, a CR/LF in the header would let a
- * caller forge log entries (CWE-117), and an oversized value would bloat the MDC for the rest
- * of the request.
+ * <p>The character/length restriction guards against CR/LF log-forgery (CWE-117) and oversized
+ * MDC values from untrusted callers.
  */
 @Component
 public final class RequestIdFilter extends OncePerRequestFilter {
 
-    /** Inbound and outbound header name. {@code X-Request-Id} is what Cloudflare emits. */
+    /** Inbound and outbound header name. */
     public static final String HEADER = "X-Request-Id";
 
     /** MDC key the logback pattern reads from. */

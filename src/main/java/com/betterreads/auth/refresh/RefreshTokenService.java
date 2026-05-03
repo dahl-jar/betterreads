@@ -14,16 +14,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Issues, rotates, and revokes refresh tokens.
- *
- * <p>The plaintext token returned to the client is a 256-bit random opaque string. Only its
- * {@link RefreshTokenHasher HMAC-SHA256 hash} is persisted, so a database read leak alone
- * cannot reconstruct active tokens.
- *
- * <p>Rotation chains are tracked via {@link RefreshToken#getReplacedBy()}. If a client presents
- * a token that was already rotated (revoked + replaced), every refresh token belonging to that
- * user is revoked. This catches the case where one of two parties has the original token and
- * is racing the legitimate user.
+ * Issues, rotates, and revokes refresh tokens. Plaintext is 256-bit random and never stored;
+ * only the HMAC-SHA256 hash sits in the DB. Presenting an already-rotated token revokes every
+ * active token for that user (replay defense).
  */
 @Service
 public class RefreshTokenService {
@@ -42,10 +35,6 @@ public class RefreshTokenService {
 
     private final Duration lifetime;
 
-    /**
-     * Constructor wiring. {@code SecureRandom} is created here rather than injected because the
-     * default JVM source is correct and there's no test reason to swap it.
-     */
     public RefreshTokenService(
         final RefreshTokenRepository repository,
         final RefreshTokenHasher hasher,
@@ -60,8 +49,10 @@ public class RefreshTokenService {
     }
 
     /**
-     * Issues a fresh refresh token for the given user. Returns the plaintext token; only the
-     * hash is persisted.
+     * Issues a fresh refresh token for the given user and returns the plaintext.
+     *
+     * <p>Only the HMAC-SHA256 hash is persisted; the plaintext is the only copy the caller
+     * ever sees.
      */
     @Transactional
     public String issue(final long userId) {
@@ -76,14 +67,15 @@ public class RefreshTokenService {
     }
 
     /**
-     * Validates a presented refresh token and rotates it. Returns the user id along with a new
-     * plaintext refresh token. Empty if the token is unknown, expired, revoked, or belongs to a
-     * deleted user. Presenting an already-replaced token revokes the entire chain for that user.
+     * Rotates the presented refresh token. Returns a {@link RefreshTokenRotation} carrying the
+     * owning user id and a new plaintext when the token is active, or an empty {@link Optional}
+     * when it is unknown, expired, or already revoked.
      *
-     * <p>Uses {@code SELECT ... FOR UPDATE} on the lookup so two concurrent rotation requests
-     * presenting the same active token serialize. Without the lock, both transactions could
-     * pass the {@code revokedAt == null} check and issue successors, leaving two active tokens
-     * and bypassing the replay defense for the racing client.
+     * <p>Presenting a token whose {@code replacedBy} is set is treated as a replay and revokes
+     * every active token for that user.
+     *
+     * <p>Uses {@code SELECT ... FOR UPDATE} so two concurrent rotations serialize. Without the
+     * lock both could pass the {@code revokedAt == null} check and issue successors.
      */
     @Transactional
     public Optional<RefreshTokenRotation> rotate(final String presented) {
@@ -121,8 +113,10 @@ public class RefreshTokenService {
     }
 
     /**
-     * Marks the presented refresh token as revoked. No-op if the token is unknown or already
-     * revoked. Always returns success-without-detail to avoid leaking which tokens existed.
+     * Revokes the presented refresh token.
+     *
+     * <p>Idempotent: unknown or already-revoked tokens are silently accepted so callers cannot
+     * probe which tokens exist.
      */
     @Transactional
     public void revoke(final String presented) {

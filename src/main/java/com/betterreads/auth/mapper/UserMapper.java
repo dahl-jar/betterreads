@@ -11,9 +11,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class UserMapper {
 
-    /**
-     * Maps a {@link User} to its public response shape.
-     */
     public UserResponse toResponse(final User user) {
         return new UserResponse(
             user.getUserId(),

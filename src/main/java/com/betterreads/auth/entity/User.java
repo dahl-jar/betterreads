@@ -15,10 +15,8 @@ import java.time.ZoneOffset;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Persistent user account. Maps to the {@code app_user} table from Flyway V1.
- *
- * <p>{@code username} and {@code email} are both unique. Timestamps are written by the JPA
- * lifecycle hooks rather than the database default so the application controls the clock.
+ * Maps to {@code app_user} (Flyway V1). Both {@code username} and {@code email} are unique.
+ * Timestamps are set by JPA lifecycle hooks so the application owns the clock.
  */
 @Entity
 @Table(name = "app_user")

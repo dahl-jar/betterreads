@@ -22,8 +22,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Authentication endpoints. {@code register} and {@code login} are public; {@code me} requires
- * a valid JWT.
+ * Authentication endpoints. {@code register}, {@code login}, {@code refresh}, and {@code logout}
+ * are public; {@code me} requires a valid access JWT.
  */
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -37,7 +37,7 @@ public class AuthController {
     }
 
     /**
-     * Creates a new user and returns a signed JWT.
+     * Creates a new user account and returns a fresh access and refresh token pair.
      */
     @PostMapping("/register")
     @Operation(summary = "Register a new user")
@@ -47,7 +47,8 @@ public class AuthController {
     }
 
     /**
-     * Authenticates an existing user by username or email and returns a signed JWT.
+     * Authenticates the credentials and returns a fresh access and refresh token pair. The
+     * identifier is matched against username first, then email.
      */
     @PostMapping("/login")
     @Operation(summary = "Log in with username or email")
@@ -65,8 +66,9 @@ public class AuthController {
     }
 
     /**
-     * Exchanges a refresh token for a new access + refresh token pair, rotating the refresh
-     * token. Public endpoint authenticated solely by the refresh token in the request body.
+     * Rotates the presented refresh token and returns a fresh access and refresh token pair.
+     *
+     * <p>Authenticated solely by the refresh token in the request body.
      */
     @PostMapping("/refresh")
     @Operation(summary = "Rotate access and refresh tokens")
@@ -75,8 +77,9 @@ public class AuthController {
     }
 
     /**
-     * Revokes the given refresh token. Idempotent: returns 204 whether or not the token was
-     * already revoked. Does not require an access token.
+     * Revokes the presented refresh token.
+     *
+     * <p>Idempotent: returns 204 whether or not the token was already revoked.
      */
     @PostMapping("/logout")
     @Operation(summary = "Revoke a refresh token")

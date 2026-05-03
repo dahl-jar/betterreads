@@ -11,6 +11,10 @@ import org.springframework.cache.support.SimpleCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * In-process Caffeine caches for OpenLibrary search results, book details, and author details.
+ * TTL and max-size are tuned per cache.
+ */
 @Configuration
 @EnableCaching
 public class CacheConfig {

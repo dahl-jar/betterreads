@@ -6,42 +6,48 @@ import com.betterreads.auth.dto.RegisterRequest;
 import com.betterreads.auth.dto.UserResponse;
 
 /**
- * Authentication operations: register a new account, log an existing one in, look up the
- * currently authenticated user by id, exchange a refresh token for a new access + refresh
- * token pair, and revoke a refresh token.
+ * Authentication operations: register, log in, look up the current user, rotate a refresh
+ * token, and revoke one.
  */
 public interface AuthService {
 
     /**
-     * Creates a new user account and returns a fresh access + refresh token pair. Rejects
-     * duplicate username or email with a {@link com.betterreads.common.exception.BusinessRuleException}.
+     * Creates a new user account and returns a fresh access and refresh token pair.
+     *
+     * @throws com.betterreads.common.exception.BusinessRuleException duplicate username or email
      */
     AuthResponse register(RegisterRequest request);
 
     /**
-     * Authenticates by username or email and returns a fresh access + refresh token pair. Throws
-     * {@link org.springframework.security.authentication.BadCredentialsException} when the user
-     * is unknown or the password doesn't match.
+     * Authenticates the credentials and returns a fresh access and refresh token pair. The
+     * identifier is matched against username first, then email.
+     *
+     * @throws org.springframework.security.authentication.BadCredentialsException unknown user
+     *     or wrong password
      */
     AuthResponse login(LoginRequest request);
 
     /**
-     * Loads the user profile for the given id. Throws
-     * {@link com.betterreads.common.exception.ResourceNotFoundException} when the user is gone.
+     * Returns the profile of the user with the given id.
+     *
+     * @throws com.betterreads.common.exception.ResourceNotFoundException user no longer exists
      */
     UserResponse currentUser(long userId);
 
     /**
-     * Exchanges a refresh token for a new access + refresh token pair, rotating the refresh
-     * token. Throws
-     * {@link org.springframework.security.authentication.BadCredentialsException} when the
-     * token is unknown, expired, revoked, or belongs to a deleted user.
+     * Exchanges the presented refresh token for a fresh access and refresh token pair, rotating
+     * the old refresh token.
+     *
+     * @throws org.springframework.security.authentication.BadCredentialsException token is
+     *     unknown, expired, revoked, or its user is gone
      */
     AuthResponse refresh(String refreshToken);
 
     /**
-     * Revokes a refresh token. Idempotent — unknown or already-revoked tokens are silently
-     * accepted to avoid leaking which tokens existed.
+     * Revokes the presented refresh token.
+     *
+     * <p>Idempotent: unknown or already-revoked tokens are silently accepted so callers cannot
+     * probe which tokens exist.
      */
     void logout(String refreshToken);
 }
