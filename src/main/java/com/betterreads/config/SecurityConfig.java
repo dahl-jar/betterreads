@@ -4,6 +4,8 @@ import com.betterreads.auth.jwt.JwtAuthenticationFilter;
 import com.betterreads.auth.ratelimit.RateLimitFilter;
 import com.betterreads.common.web.RequestIdFilter;
 
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.actuate.autoconfigure.security.servlet.EndpointRequest;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -19,6 +21,7 @@ import org.springframework.security.config.annotation.web.configurers.HeadersCon
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -34,9 +37,9 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
  * relaxes CSP for Swagger UI. The api chain is the catch-all for everything else and runs JWT
  * + rate limiting + the strict JSON-API CSP.
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
-public class SecurityConfig {
+public final class SecurityConfig {
 
     private static final long HSTS_MAX_AGE_SECONDS = 31_536_000L;
 
@@ -62,20 +65,35 @@ public class SecurityConfig {
 
     private final int managementPort;
 
-    public SecurityConfig(@Value("${management.server.port}") final int managementPort) {
+    private final ObjectProvider<JwtDecoder> cloudflareAccessJwtDecoderProvider;
+
+    /**
+     * Builds the config with the management port and a provider for the optional Cloudflare
+     * Access JWT decoder. The decoder bean only exists when {@code cloudflare.access.aud} and
+     * {@code cloudflare.access.team-domain} are configured (see {@code CloudflareAccessConfig}).
+     * When absent, the management chain stays at {@code permitAll}, which is correct for local dev.
+     *
+     * <p>The provider is resolved lazily inside {@link #managementSecurityFilterChain} so the
+     * decoder bean has time to be created before lookup.
+     */
+    @Autowired
+    public SecurityConfig(
+        @Value("${management.server.port}") final int managementPort,
+        final ObjectProvider<JwtDecoder> cloudflareAccessJwtDecoderProvider
+    ) {
         this.managementPort = managementPort;
+        this.cloudflareAccessJwtDecoderProvider = cloudflareAccessJwtDecoderProvider;
     }
 
     /**
      * Owns actuator paths, but only when the request arrives on the management port. The
      * management connector is bound to {@code 127.0.0.1:8081} so external traffic cannot
-     * reach it directly; production access goes through Cloudflare Tunnel and Access. The
-     * port-match guard means a curl to {@code :8080/actuator/health} still falls through
-     * to the api chain and 401s, even if Spring routing tried to serve it.
+     * reach it directly; production access goes through Cloudflare Tunnel and Access.
      *
-     * <p>TODO(deploy-day): once Cloudflare Tunnel is live, validate the
-     * {@code Cf-Access-Jwt-Assertion} header here so a request that bypasses Cloudflare
-     * cannot reach the actuator even if it reaches the management port.
+     * <p>When the Cloudflare Access JWT decoder is configured (production), this chain
+     * requires a valid {@code Cf-Access-Jwt-Assertion} header signed by Cloudflare and
+     * carrying the configured AUD. When the decoder is absent (local dev), the chain stays
+     * at {@code permitAll} so Prometheus and curl-against-localhost still work.
      */
     @Bean
     @Order(0)
@@ -84,6 +102,7 @@ public class SecurityConfig {
         final HttpSecurity http,
         final RequestIdFilter requestIdFilter
     ) throws Exception {
+        final JwtDecoder decoder = cloudflareAccessJwtDecoderProvider.getIfAvailable();
         http
             .securityMatcher(request ->
                 request.getLocalPort() == managementPort
@@ -94,8 +113,18 @@ public class SecurityConfig {
             .logout(AbstractHttpConfigurer::disable)
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .addFilterBefore(requestIdFilter, SecurityContextHolderFilter.class)
-            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+            .addFilterBefore(requestIdFilter, SecurityContextHolderFilter.class);
+        if (decoder != null) {
+            http
+                .oauth2ResourceServer(oauth2 -> oauth2
+                    .bearerTokenResolver(new CloudflareAccessJwtAssertionResolver())
+                    .jwt(jwt -> jwt.decoder(decoder)))
+                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                .exceptionHandling(handling -> handling
+                    .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)));
+        } else {
+            http.authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+        }
         return http.build();
     }
 
