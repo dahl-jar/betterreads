@@ -1,6 +1,6 @@
 # BetterReads
 
-A book tracking and recommendation app. Spring Boot backend on Java 25, Postgres, deployed (eventually) to OCI Ampere on the free tier. OpenLibrary supplies the catalog data.
+A book tracking and recommendation app. Spring Boot backend on Java 25, Postgres, deployed at [betterreadsapp.com](https://api.betterreadsapp.com). OpenLibrary supplies the catalog data.
 
 ## Stack
 
@@ -56,7 +56,7 @@ Controller calls service, service calls repository. Each feature package has its
 
 ## Deployment
 
-Production target is OCI Always Free Ampere (aarch64). Local dev is Apple Silicon, also aarch64, so the architecture matches. The Terraform template under `infra/terraform/` provisions the VM and validates the inputs against Free Tier caps so a typo can't push the bill above zero. Native-image is there for when the 6 GB RAM ceiling gets tight, but the build runs fine in JVM mode for now.
+Production runs on a Hetzner Cloud CX23 VM in Helsinki. Spring Boot via systemd, Postgres 17 in Docker on the same host, `cloudflared` connecting to Cloudflare's edge for DNS and TLS termination. Cloudflare Access protects the management endpoints; the public API lives at `api.betterreadsapp.com`.
 
 ## Docs
 

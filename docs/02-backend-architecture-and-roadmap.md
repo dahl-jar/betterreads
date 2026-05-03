@@ -117,7 +117,7 @@ User features:
 - Publish domain events: review created, book added to collection, reading status changed, book detail viewed
 - Build consumers for activity feed writes and recommendation input updates
 - Add dead letter topic for failed events
-- Terraform the broker infrastructure on the OCI VM or a managed Kafka service
+- Provision the broker on the Hetzner VM or a managed Kafka service if scale demands it
 
 ## Background jobs and async work
 Background jobs are allowed to be slow. User-facing API requests should not be.
