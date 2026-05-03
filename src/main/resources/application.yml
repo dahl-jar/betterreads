@@ -68,6 +68,8 @@ cloudflare:
     team-domain: ${CLOUDFLARE_TEAM_DOMAIN:}
 
 auth:
+  refresh-cookie:
+    secure: ${AUTH_REFRESH_COOKIE_SECURE:true}
   rate-limit:
     login-capacity: 10
     login-refill-tokens: 1

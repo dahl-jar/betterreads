@@ -2,17 +2,18 @@ package com.betterreads.auth;
 
 import com.betterreads.auth.entity.User;
 import com.betterreads.auth.ratelimit.RateLimitFilter;
-import com.betterreads.auth.refresh.RefreshToken;
 import com.betterreads.auth.refresh.RefreshTokenRepository;
 import com.betterreads.auth.repository.UserRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import jakarta.servlet.http.Cookie;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -34,14 +35,14 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Verifies the refresh-token flow against a real Postgres via Testcontainers. Covers the happy
- * path (rotation issues a new pair, old token is revoked), the security-critical replay defence
- * (presenting a revoked-and-replaced token wipes the entire user's chain), expiry, and the
- * deleted-user case.
+ * Verifies the refresh-token flow end-to-end: rotation, replay defense, expiry, deleted user, and
+ * the cookie contract that carries the token between client and server. The token never appears
+ * in the JSON body; it lives only in the {@code br_refresh} {@code HttpOnly} cookie.
  */
 @SpringBootTest
 @Testcontainers
@@ -49,8 +50,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "jwt.secret=integration-test-secret-must-be-at-least-256-bits-long-padding-padding",
     "jwt.issuer=betterreads-it",
     "jwt.expiration-minutes=120",
-    "jwt.refresh-expiration-days=30"
+    "jwt.refresh-expiration-days=30",
+    "auth.refresh-cookie.secure=true"
 })
+@SuppressWarnings("PMD.TooManyStaticImports")
 class RefreshTokenIntegrationTest {
 
     private static final String LOGIN_URL = "/api/v1/auth/login";
@@ -59,21 +62,29 @@ class RefreshTokenIntegrationTest {
 
     private static final String LOGOUT_URL = "/api/v1/auth/logout";
 
+    private static final String REGISTER_URL = "/api/v1/auth/register";
+
+    private static final String COOKIE_NAME = "br_refresh";
+
+    private static final String COOKIE_PATH = "/api/v1/auth";
+
+    private static final String SET_COOKIE_HEADER = "Set-Cookie";
+
     private static final String USERNAME = "alice";
 
     private static final String EMAIL = "alice@example.com";
 
     private static final String PASSWORD = "Sup3rSecret!";
 
-    private static final String FIELD_REFRESH_TOKEN = "refreshToken";
+    private static final String FIELD_USERNAME = "username";
+
+    private static final String FIELD_EMAIL = "email";
 
     private static final String FIELD_PASSWORD = "password";
 
     private static final String FIELD_IDENTIFIER = "identifier";
 
-    private static final String JSON_ACCESS_TOKEN = "$.accessToken";
-
-    private static final String JSON_REFRESH_TOKEN = "$.refreshToken";
+    private static final long REFRESH_TTL_SECONDS = 30L * 24 * 60 * 60;
 
     @Container
     @ServiceConnection
@@ -114,20 +125,35 @@ class RefreshTokenIntegrationTest {
     }
 
     @Nested
-    @DisplayName("POST /auth/login response shape")
-    class LoginShape {
+    @DisplayName("Cookie contract on register")
+    class CookieContract {
 
         @Test
-        void includesBothAccessAndRefreshTokens() throws Exception {
-            seedUser(USERNAME, EMAIL, PASSWORD);
+        void setsHttpOnlySecureSameSiteStrictCookieScopedToAuthPath() throws Exception {
+            final MvcResult result = mockMvc.perform(post(REGISTER_URL)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(registerPayload(USERNAME, EMAIL, PASSWORD)))
+                .andExpect(status().isCreated())
+                .andExpect(cookie().exists(COOKIE_NAME))
+                .andExpect(cookie().httpOnly(COOKIE_NAME, true))
+                .andExpect(cookie().secure(COOKIE_NAME, true))
+                .andExpect(cookie().path(COOKIE_NAME, COOKIE_PATH))
+                .andExpect(cookie().maxAge(COOKIE_NAME, (int) REFRESH_TTL_SECONDS))
+                .andReturn();
 
-            mockMvc.perform(post(LOGIN_URL).contentType(MediaType.APPLICATION_JSON)
-                    .content(loginPayload(USERNAME, PASSWORD)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath(JSON_ACCESS_TOKEN).isNotEmpty())
-                .andExpect(jsonPath(JSON_REFRESH_TOKEN).isNotEmpty());
+            assertThat(result.getResponse().getHeader(SET_COOKIE_HEADER))
+                .as("SameSite attribute must be Strict on the raw Set-Cookie header")
+                .containsIgnoringCase("samesite=strict");
+        }
 
-            assertThat(refreshTokenRepository.count()).isEqualTo(1L);
+        @Test
+        void omitsRefreshTokenFromJsonBody() throws Exception {
+            mockMvc.perform(post(REGISTER_URL)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(registerPayload(USERNAME, EMAIL, PASSWORD)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty());
         }
     }
 
@@ -138,73 +164,58 @@ class RefreshTokenIntegrationTest {
         @Test
         void rotatesAndRevokesOldToken() throws Exception {
             final long userId = seedUser(USERNAME, EMAIL, PASSWORD);
-            final String original = loginAndExtractRefreshToken();
+            final String original = loginAndExtractCookieValue();
 
-            final MvcResult result = mockMvc.perform(post(REFRESH_URL)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(refreshPayload(original)))
+            mockMvc.perform(post(REFRESH_URL).cookie(new Cookie(COOKIE_NAME, original)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath(JSON_ACCESS_TOKEN).isNotEmpty())
-                .andExpect(jsonPath(JSON_REFRESH_TOKEN).isNotEmpty())
-                .andReturn();
-
-            final String rotated = readJsonField(result, FIELD_REFRESH_TOKEN);
+                .andExpect(cookie().exists(COOKIE_NAME))
+                .andExpect(cookie().value(COOKIE_NAME, Matchers.not(Matchers.equalTo(original))));
 
             assertThat(refreshTokenRepository.findAll())
-                .as("rotated token differs from original, only the successor stays active")
-                .satisfies(rows -> {
-                    assertThat(rotated).isNotEqualTo(original);
-                    assertThat(rows).extracting(RefreshToken::getUserId).allMatch(id -> id == userId);
-                    assertThat(activeTokenCountForUser(userId)).isEqualTo(1L);
-                });
+                .as("rotation leaves exactly one active token for this user")
+                .allSatisfy(row -> assertThat(row.getUserId()).isEqualTo(userId))
+                .satisfies(rows -> assertThat(activeTokenCountForUser(userId)).isEqualTo(1L));
         }
 
         @Test
         void replayingRevokedTokenRevokesEntireChain() throws Exception {
             final long userId = seedUser(USERNAME, EMAIL, PASSWORD);
-            final String original = loginAndExtractRefreshToken();
+            final String original = loginAndExtractCookieValue();
 
-            final MvcResult firstRotate = mockMvc.perform(post(REFRESH_URL)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(refreshPayload(original)))
-                .andExpect(status().isOk())
-                .andReturn();
-            final String rotated = readJsonField(firstRotate, FIELD_REFRESH_TOKEN);
+            mockMvc.perform(post(REFRESH_URL).cookie(new Cookie(COOKIE_NAME, original)))
+                .andExpect(status().isOk());
 
-            mockMvc.perform(post(REFRESH_URL)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(refreshPayload(original)))
+            mockMvc.perform(post(REFRESH_URL).cookie(new Cookie(COOKIE_NAME, original)))
                 .andExpect(status().isUnauthorized());
 
             assertThat(activeTokenCountForUser(userId)).isZero();
-
-            mockMvc.perform(post(REFRESH_URL)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(refreshPayload(rotated)))
-                .andExpect(status().isUnauthorized());
         }
 
         @Test
         void rejectsExpiredToken() throws Exception {
             final long userId = seedUser(USERNAME, EMAIL, PASSWORD);
-            final String original = loginAndExtractRefreshToken();
+            final String original = loginAndExtractCookieValue();
             expireUserTokens(userId);
 
-            mockMvc.perform(post(REFRESH_URL)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(refreshPayload(original)))
+            mockMvc.perform(post(REFRESH_URL).cookie(new Cookie(COOKIE_NAME, original)))
                 .andExpect(status().isUnauthorized());
         }
 
         @Test
         void rejectsTokenForDeletedUser() throws Exception {
             final long userId = seedUser(USERNAME, EMAIL, PASSWORD);
-            final String original = loginAndExtractRefreshToken();
+            final String original = loginAndExtractCookieValue();
             userRepository.deleteById(userId);
 
-            mockMvc.perform(post(REFRESH_URL)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(refreshPayload(original)))
+            mockMvc.perform(post(REFRESH_URL).cookie(new Cookie(COOKIE_NAME, original)))
+                .andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        void rejectsRequestWithoutCookie() throws Exception {
+            seedUser(USERNAME, EMAIL, PASSWORD);
+
+            mockMvc.perform(post(REFRESH_URL))
                 .andExpect(status().isUnauthorized());
         }
     }
@@ -214,21 +225,26 @@ class RefreshTokenIntegrationTest {
     class Logout {
 
         @Test
-        void revokesTokenAndPreventsSubsequentRefresh() throws Exception {
+        void revokesTokenAndClearsCookie() throws Exception {
             final long userId = seedUser(USERNAME, EMAIL, PASSWORD);
-            final String token = loginAndExtractRefreshToken();
+            final String original = loginAndExtractCookieValue();
 
-            mockMvc.perform(post(LOGOUT_URL)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(refreshPayload(token)))
-                .andExpect(status().isNoContent());
+            mockMvc.perform(post(LOGOUT_URL).cookie(new Cookie(COOKIE_NAME, original)))
+                .andExpect(status().isNoContent())
+                .andExpect(cookie().exists(COOKIE_NAME))
+                .andExpect(cookie().maxAge(COOKIE_NAME, 0))
+                .andExpect(cookie().path(COOKIE_NAME, COOKIE_PATH));
 
             assertThat(activeTokenCountForUser(userId)).isZero();
 
-            mockMvc.perform(post(REFRESH_URL)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(refreshPayload(token)))
+            mockMvc.perform(post(REFRESH_URL).cookie(new Cookie(COOKIE_NAME, original)))
                 .andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        void isIdempotentWithoutCookie() throws Exception {
+            mockMvc.perform(post(LOGOUT_URL))
+                .andExpect(status().isNoContent());
         }
     }
 
@@ -241,19 +257,25 @@ class RefreshTokenIntegrationTest {
     }
 
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
-    private String loginAndExtractRefreshToken() throws Exception {
-        final MvcResult result = mockMvc.perform(post(LOGIN_URL)
+    private String loginAndExtractCookieValue() throws Exception {
+        final String setCookie = mockMvc.perform(post(LOGIN_URL)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(loginPayload(USERNAME, PASSWORD)))
             .andExpect(status().isOk())
-            .andReturn();
-        return readJsonField(result, FIELD_REFRESH_TOKEN);
+            .andExpect(cookie().exists(COOKIE_NAME))
+            .andReturn()
+            .getResponse()
+            .getHeader(SET_COOKIE_HEADER);
+        if (setCookie == null) {
+            throw new IllegalStateException("login response is missing the Set-Cookie header");
+        }
+        return parseCookieValue(setCookie);
     }
 
-    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
-    private String readJsonField(final MvcResult result, final String field) throws Exception {
-        final JsonNode root = objectMapper.readTree(result.getResponse().getContentAsString());
-        return root.get(field).asText();
+    private String parseCookieValue(final String setCookieHeader) {
+        final int equals = setCookieHeader.indexOf('=');
+        final int semi = setCookieHeader.indexOf(';');
+        return setCookieHeader.substring(equals + 1, semi);
     }
 
     private long activeTokenCountForUser(final long userId) {
@@ -274,9 +296,12 @@ class RefreshTokenIntegrationTest {
             });
     }
 
-    private String refreshPayload(final String token) throws JsonProcessingException {
+    private String registerPayload(final String username, final String email, final String password)
+        throws JsonProcessingException {
         final ObjectNode node = objectMapper.createObjectNode();
-        node.put(FIELD_REFRESH_TOKEN, token);
+        node.put(FIELD_USERNAME, username);
+        node.put(FIELD_EMAIL, email);
+        node.put(FIELD_PASSWORD, password);
         return objectMapper.writeValueAsString(node);
     }
 
