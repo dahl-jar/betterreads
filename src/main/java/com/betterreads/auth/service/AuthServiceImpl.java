@@ -7,12 +7,15 @@ import com.betterreads.auth.dto.UserResponse;
 import com.betterreads.auth.entity.User;
 import com.betterreads.auth.jwt.JwtIssuer;
 import com.betterreads.auth.mapper.UserMapper;
+import com.betterreads.auth.refresh.RefreshTokenRotation;
+import com.betterreads.auth.refresh.RefreshTokenService;
 import com.betterreads.auth.repository.UserRepository;
 import com.betterreads.common.exception.BusinessRuleException;
 import com.betterreads.common.exception.ResourceNotFoundException;
 import com.betterreads.common.util.LogSanitizer;
 
 import java.util.Locale;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,8 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Default {@link AuthService}. Delegates persistence to {@link UserRepository}, password hashing
- * to {@link PasswordEncoder}, and token signing to {@link JwtIssuer}. Login accepts either a
- * username or an email; the lookup tries username first, then falls back to email.
+ * to {@link PasswordEncoder}, JWT signing to {@link JwtIssuer}, and refresh-token issuance and
+ * rotation to {@link RefreshTokenService}. Login accepts either a username or an email.
  */
 @Service
 public class AuthServiceImpl implements AuthService {
@@ -40,6 +43,8 @@ public class AuthServiceImpl implements AuthService {
 
     private static final String INVALID_CREDENTIALS = "Invalid credentials";
 
+    private static final String INVALID_REFRESH_TOKEN = "Invalid refresh token";
+
     private static final String USER_NOT_FOUND = "User not found";
 
     private final UserRepository userRepository;
@@ -50,30 +55,25 @@ public class AuthServiceImpl implements AuthService {
 
     private final UserMapper userMapper;
 
+    private final RefreshTokenService refreshTokenService;
+
     /**
-     * Constructor injection of the four collaborators the auth flow needs.
+     * Constructor injection of the five collaborators the auth flow needs.
      */
     public AuthServiceImpl(
         final UserRepository userRepository,
         final PasswordEncoder passwordEncoder,
         final JwtIssuer jwtIssuer,
-        final UserMapper userMapper
+        final UserMapper userMapper,
+        final RefreshTokenService refreshTokenService
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtIssuer = jwtIssuer;
         this.userMapper = userMapper;
+        this.refreshTokenService = refreshTokenService;
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * <p>The {@code existsBy*} pre-checks return per-field errors on the normal path. The
-     * {@code DataIntegrityViolationException} catch covers the race window between pre-check
-     * and insert when two concurrent requests both pass and one loses the unique constraint
-     * at commit time. Without the pre-checks, every duplicate register surfaces the same
-     * combined-field message.
-     */
     @Override
     @Transactional
     public AuthResponse register(final RegisterRequest request) {
@@ -108,7 +108,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public AuthResponse login(final LoginRequest request) {
         final String identifier = request.identifier().trim();
         final String normalizedEmailIdentifier = normalizeEmail(identifier);
@@ -135,8 +135,33 @@ public class AuthServiceImpl implements AuthService {
         return userMapper.toResponse(user);
     }
 
+    @Override
+    @Transactional
+    public AuthResponse refresh(final String refreshToken) {
+        final Optional<RefreshTokenRotation> rotation = refreshTokenService.rotate(refreshToken);
+        if (rotation.isEmpty()) {
+            LOG.warn("auth.refresh.rejected");
+            throw new BadCredentialsException(INVALID_REFRESH_TOKEN);
+        }
+        final long userId = rotation.get().userId();
+        final User user = userRepository.findById(userId)
+            .orElseThrow(() -> {
+                LOG.warn("auth.refresh.user-missing userId={}", userId);
+                return new BadCredentialsException(INVALID_REFRESH_TOKEN);
+            });
+        final String accessToken = jwtIssuer.issue(user.getUserId());
+        return new AuthResponse(accessToken, rotation.get().plaintext(), userMapper.toResponse(user));
+    }
+
+    @Override
+    @Transactional
+    public void logout(final String refreshToken) {
+        refreshTokenService.revoke(refreshToken);
+    }
+
     private AuthResponse buildAuthResponse(final User user) {
-        final String token = jwtIssuer.issue(user.getUserId());
-        return new AuthResponse(token, userMapper.toResponse(user));
+        final String accessToken = jwtIssuer.issue(user.getUserId());
+        final String refreshToken = refreshTokenService.issue(user.getUserId());
+        return new AuthResponse(accessToken, refreshToken, userMapper.toResponse(user));
     }
 }

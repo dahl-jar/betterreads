@@ -55,7 +55,8 @@ management:
 jwt:
   secret: ${JWT_SECRET}
   issuer: ${JWT_ISSUER:betterreads}
-  expiration-minutes: ${JWT_EXPIRATION_MINUTES:60}
+  expiration-minutes: ${JWT_EXPIRATION_MINUTES:120}
+  refresh-expiration-days: ${JWT_REFRESH_EXPIRATION_DAYS:30}
 
 app:
   cors:

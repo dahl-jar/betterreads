@@ -15,12 +15,14 @@ import org.springframework.validation.annotation.Validated;
  *
  * @param secret HS256 signing secret, at least 32 bytes UTF-8
  * @param issuer issuer claim written into every token
- * @param expirationMinutes token lifetime, must be positive
+ * @param expirationMinutes access token lifetime in minutes, must be positive
+ * @param refreshExpirationDays refresh token lifetime in days, must be positive
  */
 @Validated
 @ConfigurationProperties(prefix = "jwt")
 public record JwtProperties(
     @NotBlank @Size(min = 32) String secret,
     @NotBlank String issuer,
-    @Positive long expirationMinutes
+    @Positive long expirationMinutes,
+    @Positive long refreshExpirationDays
 ) { }

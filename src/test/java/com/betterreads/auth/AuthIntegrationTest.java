@@ -43,6 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "jwt.secret=integration-test-secret-must-be-at-least-256-bits-long-padding-padding",
     "jwt.issuer=betterreads-it",
     "jwt.expiration-minutes=60",
+    "jwt.refresh-expiration-days=30",
     "app.cors.allowed-origins=https://app.betterreads.example.com"
 })
 @SuppressWarnings("PMD.TooManyStaticImports")
@@ -75,7 +76,7 @@ class AuthIntegrationTest {
 
     private static final String BEARER_PREFIX = "Bearer ";
 
-    private static final String JSON_TOKEN = "$.token";
+    private static final String JSON_TOKEN = "$.accessToken";
 
     private static final String JSON_USER_USERNAME = "$.user.username";
 
@@ -319,7 +320,7 @@ class AuthIntegrationTest {
                     post(REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content(registerBody))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-            final String apiToken = objectMapper.readTree(registerResponse).get("token").asText();
+            final String apiToken = objectMapper.readTree(registerResponse).get("accessToken").asText();
 
             mockMvc.perform(get(ME_URL).header(AUTH_HEADER, BEARER_PREFIX + apiToken))
                 .andExpect(status().isOk())
