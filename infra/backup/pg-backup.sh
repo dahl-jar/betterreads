@@ -5,7 +5,7 @@
 #
 # Reads its config from env vars sourced from /opt/betterreads/.env (the same
 # file Spring Boot reads, plus the R2 and backup-specific vars). The runbook
-# at docs/runbooks/postgres-backup.md lists every var and its meaning.
+# at docs/how-to/backup-postgres.md lists every var and its meaning.
 # Anything missing aborts before pg_dump opens.
 
 set -euo pipefail
