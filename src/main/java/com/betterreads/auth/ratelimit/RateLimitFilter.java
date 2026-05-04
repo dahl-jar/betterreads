@@ -46,6 +46,8 @@ public final class RateLimitFilter extends OncePerRequestFilter {
 
     private static final String FORWARDED_FOR_HEADER = "X-Forwarded-For";
 
+    private static final String CF_CONNECTING_IP_HEADER = "CF-Connecting-IP";
+
     private static final String RETRY_AFTER_HEADER = "Retry-After";
 
     private static final Duration BUCKET_TTL = Duration.ofMinutes(15);
@@ -135,7 +137,24 @@ public final class RateLimitFilter extends OncePerRequestFilter {
         return null;
     }
 
+    /**
+     * Resolves the rate-limit bucket key from the incoming request.
+     *
+     * <p>{@code CF-Connecting-IP} is preferred when present: Cloudflare sets it from the real
+     * client connection and overwrites any client-supplied value, so it is unforgeable behind
+     * the tunnel. Trusting this header closes the bypass where a fresh forged
+     * {@code X-Forwarded-For} per request granted a fresh bucket per request after Cloudflare
+     * appended the real IP to the chain.
+     *
+     * <p>The legacy trusted-proxy-gated {@code X-Forwarded-For} path stays in place as a
+     * fallback for non-Cloudflare environments such as local dev and integration tests that
+     * exercise the proxy CIDR logic directly.
+     */
     private String clientIp(final HttpServletRequest request) {
+        final String cfConnectingIp = request.getHeader(CF_CONNECTING_IP_HEADER);
+        if (cfConnectingIp != null && parseAddress(cfConnectingIp.trim()) != null) {
+            return cfConnectingIp.trim();
+        }
         final String remoteAddr = request.getRemoteAddr();
         if (!isTrustedProxy(remoteAddr)) {
             return remoteAddr;

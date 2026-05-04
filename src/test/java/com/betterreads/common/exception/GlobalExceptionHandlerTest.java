@@ -4,11 +4,18 @@ import com.betterreads.common.dto.ApiErrorResponse;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.as;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -98,6 +105,38 @@ class GlobalExceptionHandlerTest {
 
             assertThat(response.getBody()).extracting(ApiErrorResponse::message)
                     .isEqualTo("An unexpected error occurred");
+        }
+    }
+
+    @Nested
+    class WhenMethodNotAllowed {
+
+        @Test
+        void returns405Status() {
+            final ResponseEntity<ApiErrorResponse> response = handler.handleMethodNotSupported(
+                    new HttpRequestMethodNotSupportedException(HttpMethod.GET.name(), List.of(HttpMethod.POST.name())));
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+        }
+
+        @Test
+        void exposesAllowHeaderWithSupportedMethods() {
+            final ResponseEntity<ApiErrorResponse> response = handler.handleMethodNotSupported(
+                    new HttpRequestMethodNotSupportedException(HttpMethod.GET.name(), List.of(HttpMethod.POST.name())));
+
+            assertThat(response.getHeaders().get(HttpHeaders.ALLOW)).contains(HttpMethod.POST.name());
+        }
+    }
+
+    @Nested
+    class WhenContentTypeNotSupported {
+
+        @Test
+        void returns415Status() {
+            final ResponseEntity<ApiErrorResponse> response = handler.handleMediaTypeNotSupported(
+                    new HttpMediaTypeNotSupportedException(MediaType.TEXT_PLAIN, List.of(MediaType.APPLICATION_JSON)));
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
         }
     }
 
