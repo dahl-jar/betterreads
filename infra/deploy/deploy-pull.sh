@@ -83,8 +83,8 @@ api_call() {
 }
 
 if [ -n "$target_sha" ]; then
-  release_json=$(api_call "${api_base}/releases/tags/${target_sha}") || {
-    err "no release found for pinned tag ${target_sha}"
+  release_json=$(api_call "${api_base}/releases/tags/deploy-${target_sha}") || {
+    err "no release found for pinned tag deploy-${target_sha}"
     exit 1
   }
 else
@@ -94,9 +94,16 @@ else
   }
 fi
 
-release_sha=$(echo "$release_json" | jq -r '.tag_name // empty')
-if [ -z "$release_sha" ]; then
+# Tags are "deploy-<sha>"; strip the prefix to recover the bare SHA used in
+# asset filenames and recorded in installed.sha.
+release_tag=$(echo "$release_json" | jq -r '.tag_name // empty')
+if [ -z "$release_tag" ]; then
   err "could not extract tag from release JSON"
+  exit 1
+fi
+release_sha="${release_tag#deploy-}"
+if [ "$release_sha" = "$release_tag" ]; then
+  err "release tag '$release_tag' does not have expected 'deploy-' prefix"
   exit 1
 fi
 
