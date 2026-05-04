@@ -1,8 +1,8 @@
-# Deployment and frontend
+# Deployment
 
 ## Architecture
 
-A single Hetzner Cloud VM in Helsinki runs the backend and Postgres. Cloudflare sits in front for DNS, TLS, tunnel, Access, and R2 backups. The frontend lives in a separate repo on Cloudflare Pages.
+A single Hetzner Cloud VM in Helsinki runs the backend and Postgres. Cloudflare sits in front for DNS, TLS, tunnel, Access, and R2 backups.
 
 ## Backend host
 
@@ -17,10 +17,6 @@ Flyway V10 creates a separate `betterreads_app` role with CRUD-only privileges. 
 ## Backups
 
 Daily and Sunday-weekly backups go to a Cloudflare R2 bucket via rclone. The script encrypts with GPG before upload (AES-256, env-supplied passphrase). R2 lifecycle expires anything in `betterreads/postgres/` after 30 days. Operational details, restore drill, and disaster recovery flow live in [how-to/backup-postgres.md](../how-to/backup-postgres.md).
-
-## Frontend host
-
-Vite + React + TypeScript on Cloudflare Pages. JWT in `Authorization: Bearer` header, refresh tokens via `POST /api/v1/auth/refresh`. Separate repo (`betterreads-frontend`) because deployment paths differ from the backend.
 
 ## Edge
 
