@@ -13,7 +13,6 @@ public class UserMapper {
 
     public UserResponse toResponse(final User user) {
         return new UserResponse(
-            user.getUserId(),
             user.getUsername(),
             user.getEmail(),
             user.getDisplayName(),
