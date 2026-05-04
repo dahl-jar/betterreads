@@ -27,6 +27,7 @@ ENV_FILE="${APP_DIR}/.env"
 APP_JAR="${APP_DIR}/app.jar"
 APP_JAR_PREVIOUS="${APP_DIR}/app.jar.previous"
 INSTALLED_SHA_FILE="${DEPLOY_DIR}/installed.sha"
+FAILED_SHAS_FILE="${DEPLOY_DIR}/failed.shas"
 PUBKEY="${DEPLOY_DIR}/pubkey.minisig.pub"
 VERSION_LOCK="/etc/betterreads/version.lock"
 LOCK_FILE="/run/betterreads-deploy.lock"
@@ -36,6 +37,8 @@ HEALTH_POLL_INTERVAL_SEC=2
 SERVICE_NAME="betterreads"
 JAR_MIN_SIZE=10485760    # 10 MB sanity floor
 JAR_MAX_SIZE=209715200   # 200 MB sanity ceiling
+FAILED_JAR_MAX_AGE_DAYS=14
+FAILED_SHAS_MAX_AGE_DAYS=30
 
 # --- Logging helpers ---
 log() { logger -t betterreads-deploy -p user.info -- "$*"; echo "$(date -u +%FT%TZ) $*"; }
@@ -114,7 +117,25 @@ if [ -s "$INSTALLED_SHA_FILE" ]; then
     # Cheap exit path. No log to keep the journal quiet on the common case.
     exit 0
   fi
-  log "new release available: $installed_sha -> $release_sha"
+fi
+
+# --- Has this SHA already failed once? ---
+# Once a SHA has failed healthcheck, it is recorded in $FAILED_SHAS_FILE so the
+# puller does not loop redeploying the same broken release every 60s. Recovery
+# requires a fresh release with a different SHA, or operator action: removing
+# the line from failed.shas, or pinning a known-good SHA in version.lock.
+if [ -s "$FAILED_SHAS_FILE" ] && awk -v sha="$release_sha" '$1 == sha { found = 1 } END { exit !found }' "$FAILED_SHAS_FILE"; then
+  # Log once an hour so the operator notices, but stay quiet otherwise.
+  marker="${DEPLOY_DIR}/.skipped-${release_sha}"
+  if [ ! -f "$marker" ] || [ "$(find "$marker" -mmin +60 2>/dev/null)" ]; then
+    err "skipping release ${release_sha}: previously failed healthcheck. Remove from ${FAILED_SHAS_FILE} or pin a different SHA in ${VERSION_LOCK} to retry."
+    touch "$marker"
+  fi
+  exit 0
+fi
+
+if [ -s "$INSTALLED_SHA_FILE" ]; then
+  log "new release available: $(tr -d '[:space:]' < "$INSTALLED_SHA_FILE") -> $release_sha"
 else
   log "no prior installed SHA; deploying $release_sha"
 fi
@@ -213,9 +234,60 @@ if [ "$healthy" -ne 1 ]; then
   else
     err "no previous jar to roll back to; service is in a bad state"
   fi
+  # Record the failed SHA so the next timer fire does not redeploy the same bad
+  # jar in a loop. Recovery is operator-driven: ship a different SHA, remove
+  # the line from $FAILED_SHAS_FILE, or pin a known-good SHA in $VERSION_LOCK.
+  echo "$release_sha $(date -u +%FT%TZ)" >> "$FAILED_SHAS_FILE"
   exit 1
 fi
 
 # --- Success ---
 echo "$release_sha" > "$INSTALLED_SHA_FILE"
 log "deploy succeeded: ${release_sha}"
+
+# --- Bounded cleanup of past-failure artifacts ---
+# Runs only on the success path so cleanup never competes with a struggling
+# deploy. Three categories of debris accumulate over time:
+#   1. app.jar.failed-<sha>     forensic jars from previous rollbacks
+#   2. failed.shas              blocklist of SHAs that previously failed
+#   3. .skipped-<sha>           throttle markers for once-per-hour skip logs
+# Old entries fade after FAILED_JAR_MAX_AGE_DAYS / FAILED_SHAS_MAX_AGE_DAYS
+# so disk usage stays bounded even after months of churn.
+cleanup_old_artifacts() {
+  # Delete forensic jars older than the retention window.
+  find "$APP_DIR" -maxdepth 1 -type f -name 'app.jar.failed-*' \
+       -mtime "+${FAILED_JAR_MAX_AGE_DAYS}" -delete 2>/dev/null || true
+
+  # Prune failed.shas lines older than the retention window. The file format
+  # is "<sha> <iso8601>". The cutoff is rendered in Python (portable between
+  # GNU date on Linux and BSD date on macOS, both of which lack a uniform
+  # epoch-to-iso8601 helper). Awk then keeps lines whose ISO 8601 timestamp
+  # sorts lexically >= the cutoff; lexical comparison is correct for the
+  # fixed-format YYYY-MM-DDTHH:MM:SSZ strings emitted by `date -u +%FT%TZ`.
+  if [ -s "$FAILED_SHAS_FILE" ]; then
+    cutoff=$(python3 -c "
+import datetime, sys
+days = int(sys.argv[1])
+print((datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=days)).strftime('%Y-%m-%dT%H:%M:%SZ'))
+" "$FAILED_SHAS_MAX_AGE_DAYS")
+    tmp_failed=$(mktemp)
+    awk -v cutoff="$cutoff" '$2 >= cutoff' "$FAILED_SHAS_FILE" > "$tmp_failed"
+    if ! cmp -s "$FAILED_SHAS_FILE" "$tmp_failed"; then
+      mv "$tmp_failed" "$FAILED_SHAS_FILE"
+    else
+      rm -f "$tmp_failed"
+    fi
+  fi
+
+  # Drop skip-throttle markers for SHAs no longer on the blocklist.
+  for marker in "${DEPLOY_DIR}"/.skipped-*; do
+    [ -e "$marker" ] || continue
+    sha=${marker##*/.skipped-}
+    if [ ! -s "$FAILED_SHAS_FILE" ] || \
+       ! awk -v sha="$sha" '$1 == sha { found = 1 } END { exit !found }' "$FAILED_SHAS_FILE"; then
+      rm -f "$marker"
+    fi
+  done
+}
+
+cleanup_old_artifacts
