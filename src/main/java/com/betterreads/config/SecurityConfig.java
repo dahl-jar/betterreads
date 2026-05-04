@@ -27,6 +27,7 @@ import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.security.web.header.writers.StaticHeadersWriter;
 
 /**
  * Three filter chains, ordered most-specific first: management (actuator on the internal port),
@@ -43,6 +44,10 @@ public final class SecurityConfig {
     private static final String DOCS_CSP =
         "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
             + "img-src 'self' data:; font-src 'self' data:; frame-ancestors 'none'";
+
+    private static final String ROBOTS_HEADER = "X-Robots-Tag";
+
+    private static final String ROBOTS_NOINDEX = "noindex, nofollow";
 
     private static final String PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=()";
 
@@ -138,7 +143,8 @@ public final class SecurityConfig {
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .headers(headers -> commonHeaders(headers)
-                .contentSecurityPolicy(csp -> csp.policyDirectives(DOCS_CSP)))
+                .contentSecurityPolicy(csp -> csp.policyDirectives(DOCS_CSP))
+                .addHeaderWriter(new StaticHeadersWriter(ROBOTS_HEADER, ROBOTS_NOINDEX)))
             .addFilterBefore(requestIdFilter, SecurityContextHolderFilter.class)
             .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
         return http.build();
