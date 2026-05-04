@@ -1,6 +1,6 @@
 # BetterReads
 
-A book tracking and recommendation app. Spring Boot backend on Java 25, Postgres, deployed at [api.betterreadsapp.com](https://api.betterreadsapp.com). OpenLibrary supplies the catalog data.
+Backend service for BetterReads, a book tracking app. Spring Boot on Java 25, Postgres, deployed at [api.betterreadsapp.com](https://api.betterreadsapp.com).
 
 Live API documentation: [api.betterreadsapp.com/swagger-ui.html](https://api.betterreadsapp.com/swagger-ui.html).
 
@@ -8,7 +8,7 @@ Live API documentation: [api.betterreadsapp.com/swagger-ui.html](https://api.bet
 
 The first version of BetterReads was a school project: a Thymeleaf app that called OpenLibrary on every page load, used Spring's default session auth, and let Hibernate auto-create the schema. The original code is at [dahl-jar/legacy-betterreads](https://github.com/dahl-jar/legacy-betterreads).
 
-This is a rebuild. The backend is a headless JSON API. Auth uses short-lived access JWTs and refresh tokens that rotate on every use, with replay detection. Schema changes go through Flyway, and the runtime database role has no DDL privileges. OpenLibrary data is cached and persisted on first encounter. Production runs on a 4 GB Hetzner VM behind a Cloudflare Tunnel, with encrypted nightly backups to Cloudflare R2.
+This is a rebuild. The backend is a headless JSON API. Auth uses short-lived access JWTs and refresh tokens that rotate on every use, with replay detection. Schema changes go through Flyway, and the runtime database role has no DDL privileges. Production runs on a 4 GB Hetzner VM behind a Cloudflare Tunnel, with encrypted nightly backups to Cloudflare R2.
 
 ## Notable areas
 
@@ -89,9 +89,7 @@ Reference:
 
 Explanation:
 - [Backend architecture](docs/explanation/architecture.md)
-- [Search design](docs/explanation/search-design.md)
-- [Recommendations and ML](docs/explanation/recommendations-and-ml.md)
-- [Deployment and frontend](docs/explanation/deployment-and-frontend.md)
+- [Deployment](docs/explanation/deployment.md)
 
 How-to:
 - [Deploy](docs/how-to/deploy.md)
