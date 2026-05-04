@@ -127,7 +127,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          tag="${{ github.sha }}"
+          # GitHub rejects tag names that are exactly 40 or 64 hex characters
+          # (collides with Git ref short-form rules), so prefix with "deploy-".
+          tag="deploy-${{ github.sha }}"
           jar="${{ steps.jar.outputs.path }}"
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$tag" \
