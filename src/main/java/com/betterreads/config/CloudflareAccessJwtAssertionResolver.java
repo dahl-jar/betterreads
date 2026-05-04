@@ -9,7 +9,7 @@ import org.springframework.security.oauth2.server.resource.web.BearerTokenResolv
  * Reads the Cloudflare Access JWT from {@code Cf-Access-Jwt-Assertion}. The {@code Authorization}
  * header is reserved for the app's own bearer token on other chains.
  */
-public final class CloudflareAccessJwtAssertionResolver implements BearerTokenResolver {
+final class CloudflareAccessJwtAssertionResolver implements BearerTokenResolver {
 
     private static final String HEADER = "Cf-Access-Jwt-Assertion";
 

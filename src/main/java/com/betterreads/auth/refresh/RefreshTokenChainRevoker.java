@@ -12,11 +12,11 @@ import org.springframework.transaction.annotation.Transactional;
  * the proxy and the rotate-path rollback would undo the revoke.
  */
 @Component
-public class RefreshTokenChainRevoker {
+class RefreshTokenChainRevoker {
 
     private final RefreshTokenRepository repository;
 
-    public RefreshTokenChainRevoker(final RefreshTokenRepository repository) {
+    RefreshTokenChainRevoker(final RefreshTokenRepository repository) {
         this.repository = repository;
     }
 

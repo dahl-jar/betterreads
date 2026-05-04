@@ -22,7 +22,7 @@ import org.slf4j.LoggerFactory;
  * at ERROR with stack trace.
  */
 @RestControllerAdvice
-public class GlobalExceptionHandler {
+class GlobalExceptionHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 

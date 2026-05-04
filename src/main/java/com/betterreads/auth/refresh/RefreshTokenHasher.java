@@ -19,21 +19,21 @@ import org.springframework.stereotype.Component;
  * random and run on every refresh; the password-style brute-force angle does not apply.
  */
 @Component
-public final class RefreshTokenHasher {
+final class RefreshTokenHasher {
 
     private static final String ALGORITHM = "HmacSHA256";
 
     private final byte[] secret;
 
     @Autowired
-    public RefreshTokenHasher(final JwtProperties properties) {
+    RefreshTokenHasher(final JwtProperties properties) {
         this(properties.secret());
     }
 
     /**
      * Test-friendly constructor that takes a raw secret instead of {@link JwtProperties}.
      */
-    public RefreshTokenHasher(final String secret) {
+    RefreshTokenHasher(final String secret) {
         this.secret = secret.getBytes(StandardCharsets.UTF_8).clone();
     }
 
