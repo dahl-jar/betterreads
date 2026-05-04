@@ -9,18 +9,6 @@ on:
       - "gradle/**"
       - "config/**"
       - ".github/workflows/backend-quality.yml"
-  push:
-    branches:
-      - main
-      - master
-      - dev
-    paths:
-      - "src/**"
-      - "build.gradle.kts"
-      - "settings.gradle.kts"
-      - "gradle/**"
-      - "config/**"
-      - ".github/workflows/backend-quality.yml"
 
 jobs:
   static-checks:
