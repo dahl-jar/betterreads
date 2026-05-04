@@ -39,7 +39,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping(AuthController.COOKIE_PATH)
 @Tag(name = "Authentication", description = "Register, log in, and look up the current user")
-public class AuthController {
+class AuthController {
 
     static final String COOKIE_NAME = "br_refresh";
 
@@ -53,7 +53,7 @@ public class AuthController {
 
     private final Duration refreshLifetime;
 
-    public AuthController(
+    AuthController(
         final AuthService authService,
         final RefreshCookieProperties cookieProperties,
         final JwtProperties jwtProperties

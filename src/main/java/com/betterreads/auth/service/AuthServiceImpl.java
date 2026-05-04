@@ -29,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Default {@link AuthService}. Login accepts a username or email; lookup tries username first.
  */
 @Service
-public class AuthServiceImpl implements AuthService {
+class AuthServiceImpl implements AuthService {
 
     private static final Logger LOG = LoggerFactory.getLogger(AuthServiceImpl.class);
 
@@ -55,7 +55,7 @@ public class AuthServiceImpl implements AuthService {
 
     private final RefreshTokenService refreshTokenService;
 
-    public AuthServiceImpl(
+    AuthServiceImpl(
         final UserRepository userRepository,
         final PasswordEncoder passwordEncoder,
         final JwtIssuer jwtIssuer,

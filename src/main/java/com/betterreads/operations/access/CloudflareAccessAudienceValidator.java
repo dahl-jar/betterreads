@@ -13,11 +13,11 @@ import org.springframework.security.oauth2.jwt.Jwt;
  * tag. Without this check, any JWT signed by Cloudflare for any application in the same team
  * would pass signature validation.
  */
-public final class CloudflareAccessAudienceValidator implements OAuth2TokenValidator<Jwt> {
+final class CloudflareAccessAudienceValidator implements OAuth2TokenValidator<Jwt> {
 
     private final String expectedAudience;
 
-    public CloudflareAccessAudienceValidator(final String expectedAudience) {
+    CloudflareAccessAudienceValidator(final String expectedAudience) {
         this.expectedAudience = expectedAudience;
     }
 
