@@ -8,17 +8,6 @@ on:
       - "settings.gradle.kts"
       - "gradle/**"
       - ".github/workflows/backend-tests.yml"
-  push:
-    branches:
-      - main
-      - master
-      - dev
-    paths:
-      - "src/**"
-      - "build.gradle.kts"
-      - "settings.gradle.kts"
-      - "gradle/**"
-      - ".github/workflows/backend-tests.yml"
 
 jobs:
   test:
