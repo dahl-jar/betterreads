@@ -2,10 +2,13 @@ package com.betterreads.auth.controller;
 
 import com.betterreads.auth.cookie.RefreshCookieProperties;
 import com.betterreads.auth.dto.AuthResponse;
+import com.betterreads.auth.dto.ForgotPasswordRequest;
 import com.betterreads.auth.dto.LoginRequest;
 import com.betterreads.auth.dto.RegisterRequest;
+import com.betterreads.auth.dto.ResetPasswordRequest;
 import com.betterreads.auth.dto.UserResponse;
 import com.betterreads.auth.jwt.JwtProperties;
+import com.betterreads.auth.passwordreset.PasswordResetService;
 import com.betterreads.auth.service.AuthService;
 import com.betterreads.auth.service.TokenPair;
 
@@ -49,16 +52,20 @@ class AuthController {
 
     private final AuthService authService;
 
+    private final PasswordResetService passwordResetService;
+
     private final RefreshCookieProperties cookieProperties;
 
     private final Duration refreshLifetime;
 
     AuthController(
         final AuthService authService,
+        final PasswordResetService passwordResetService,
         final RefreshCookieProperties cookieProperties,
         final JwtProperties jwtProperties
     ) {
         this.authService = authService;
+        this.passwordResetService = passwordResetService;
         this.cookieProperties = cookieProperties;
         this.refreshLifetime = Duration.ofDays(jwtProperties.refreshExpirationDays());
     }
@@ -136,6 +143,30 @@ class AuthController {
         return ResponseEntity.noContent()
             .header(HttpHeaders.SET_COOKIE, clearCookie().toString())
             .build();
+    }
+
+    /**
+     * Issues a password-reset token and sends it to the supplied email when an account matches.
+     * Returns {@code 204} regardless so the response cannot be used to enumerate registered
+     * addresses.
+     */
+    @PostMapping("/forgot-password")
+    @Operation(summary = "Start a password reset")
+    public ResponseEntity<Void> forgotPassword(@Valid @RequestBody final ForgotPasswordRequest request) {
+        passwordResetService.requestReset(request.email());
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Consumes a reset token, replaces the user's password, and revokes every refresh token for
+     * the account so other devices are signed out. Returns {@code 400} for unknown, expired, or
+     * already-consumed tokens with the same message in each branch.
+     */
+    @PostMapping("/reset-password")
+    @Operation(summary = "Complete a password reset")
+    public ResponseEntity<Void> resetPassword(@Valid @RequestBody final ResetPasswordRequest request) {
+        passwordResetService.resetPassword(request.token(), request.newPassword());
+        return ResponseEntity.noContent().build();
     }
 
     private ResponseCookie issueCookie(final String value) {

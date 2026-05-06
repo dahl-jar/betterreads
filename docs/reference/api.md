@@ -45,7 +45,11 @@ Returns a precomputed list. Served from cache or a scheduled sync job, never reb
 | `/api/v1/auth/refresh` | POST | `br_refresh` cookie |
 | `/api/v1/auth/logout` | POST | `br_refresh` cookie |
 | `/api/v1/auth/me` | GET | access JWT |
+| `/api/v1/auth/forgot-password` | POST | none |
+| `/api/v1/auth/reset-password` | POST | reset token |
 
 Access tokens are HS256 JWTs with a 2-hour lifetime, returned in the JSON body and sent on subsequent requests as `Authorization: Bearer`. Refresh tokens are opaque and travel only in the `br_refresh` cookie: `HttpOnly`, `Secure`, `SameSite=Strict`, scoped to `/api/v1/auth`, with a 30-day lifetime. Each successful refresh rotates the cookie value and invalidates the previous one; replaying an already-rotated refresh token revokes every active token for that user. `register` and `login` set the cookie; `logout` clears it. `refresh` and `logout` take no request body.
+
+`forgot-password` returns 204 whether or not the email matches an account so the response cannot be used to enumerate registered users. When the email matches, an outbox row is queued and a worker delivers the reset link asynchronously. `reset-password` consumes the token, replaces the password, and revokes every refresh token for the account so other devices are signed out. Reset tokens are single-use, expire after 15 minutes, and the same opaque 400 covers unknown, expired, and already-consumed tokens.
 
 Request and response shapes for the auth endpoints are in Swagger UI at `/swagger-ui.html`.

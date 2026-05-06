@@ -44,6 +44,10 @@ public final class RateLimitFilter extends OncePerRequestFilter {
 
     private static final String REGISTER_PATH = "/api/v1/auth/register";
 
+    private static final String FORGOT_PASSWORD_PATH = "/api/v1/auth/forgot-password";
+
+    private static final String RESET_PASSWORD_PATH = "/api/v1/auth/reset-password";
+
     private static final String FORWARDED_FOR_HEADER = "X-Forwarded-For";
 
     private static final String CF_CONNECTING_IP_HEADER = "CF-Connecting-IP";
@@ -56,9 +60,17 @@ public final class RateLimitFilter extends OncePerRequestFilter {
 
     private final Cache<String, Bucket> registerBuckets;
 
+    private final Cache<String, Bucket> forgotPasswordBuckets;
+
+    private final Cache<String, Bucket> resetPasswordBuckets;
+
     private final Supplier<Bandwidth> loginBandwidth;
 
     private final Supplier<Bandwidth> registerBandwidth;
+
+    private final Supplier<Bandwidth> forgotPasswordBandwidth;
+
+    private final Supplier<Bandwidth> resetPasswordBandwidth;
 
     private final List<CidrRange> trustedProxies;
 
@@ -76,12 +88,30 @@ public final class RateLimitFilter extends OncePerRequestFilter {
             .capacity(properties.registerCapacity())
             .refillGreedy(properties.registerRefillTokens(), Duration.ofSeconds(properties.registerRefillSeconds()))
             .build();
+        this.forgotPasswordBandwidth = () -> Bandwidth.builder()
+            .capacity(properties.forgotPasswordCapacity())
+            .refillGreedy(properties.forgotPasswordRefillTokens(),
+                Duration.ofSeconds(properties.forgotPasswordRefillSeconds()))
+            .build();
+        this.resetPasswordBandwidth = () -> Bandwidth.builder()
+            .capacity(properties.resetPasswordCapacity())
+            .refillGreedy(properties.resetPasswordRefillTokens(),
+                Duration.ofSeconds(properties.resetPasswordRefillSeconds()))
+            .build();
         // HACK: in-memory bucket map. Restart wipes state and multi-instance breaks. Move to Redis when scaling out.
         this.loginBuckets = Caffeine.newBuilder()
             .expireAfterAccess(BUCKET_TTL)
             .maximumSize(properties.maxBuckets())
             .build();
         this.registerBuckets = Caffeine.newBuilder()
+            .expireAfterAccess(BUCKET_TTL)
+            .maximumSize(properties.maxBuckets())
+            .build();
+        this.forgotPasswordBuckets = Caffeine.newBuilder()
+            .expireAfterAccess(BUCKET_TTL)
+            .maximumSize(properties.maxBuckets())
+            .build();
+        this.resetPasswordBuckets = Caffeine.newBuilder()
             .expireAfterAccess(BUCKET_TTL)
             .maximumSize(properties.maxBuckets())
             .build();
@@ -94,6 +124,8 @@ public final class RateLimitFilter extends OncePerRequestFilter {
     public void reset() {
         loginBuckets.invalidateAll();
         registerBuckets.invalidateAll();
+        forgotPasswordBuckets.invalidateAll();
+        resetPasswordBuckets.invalidateAll();
     }
 
     @Override
@@ -133,6 +165,14 @@ public final class RateLimitFilter extends OncePerRequestFilter {
         }
         if (REGISTER_PATH.equals(path)) {
             return registerBuckets.get(key, ip -> Bucket.builder().addLimit(registerBandwidth.get()).build());
+        }
+        if (FORGOT_PASSWORD_PATH.equals(path)) {
+            return forgotPasswordBuckets.get(key,
+                ip -> Bucket.builder().addLimit(forgotPasswordBandwidth.get()).build());
+        }
+        if (RESET_PASSWORD_PATH.equals(path)) {
+            return resetPasswordBuckets.get(key,
+                ip -> Bucket.builder().addLimit(resetPasswordBandwidth.get()).build());
         }
         return null;
     }

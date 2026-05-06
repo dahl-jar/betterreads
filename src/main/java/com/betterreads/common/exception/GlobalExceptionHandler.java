@@ -81,6 +81,21 @@ class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(InvalidRequestException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidRequest(final InvalidRequestException exception) {
+        LOG.warn("Invalid request: {}",
+                LogSanitizer.forLog(Objects.requireNonNullElse(exception.getMessage(), "")));
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                new ApiErrorResponse(
+                        HttpStatus.BAD_REQUEST.value(),
+                        Objects.requireNonNullElse(exception.getMessage(), "Invalid request"),
+                        Instant.now(),
+                        List.of()
+                )
+        );
+    }
+
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiErrorResponse> handleUnreadableMessage(final HttpMessageNotReadableException exception) {
         final String message = "Malformed request body";
