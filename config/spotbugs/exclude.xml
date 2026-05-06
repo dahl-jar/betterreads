@@ -29,6 +29,22 @@
     -->
     <Match>
         <Bug pattern="THROWS_METHOD_THROWS_CLAUSE_BASIC_EXCEPTION"/>
-        <Class name="~.*Test"/>
+        <Class name="~.*Test(\$.+)?"/>
+    </Match>
+
+    <!--
+      EI_EXPOSE_REP2 on Spring services that hold injected ObjectMapper, repositories, or
+      other singleton beans. Defensive copies are wrong here: the injected references are
+      Spring-managed singletons, never mutated post-construction, and shared across the
+      application by design. Suppression is narrow to the mail.outbox package and the one
+      auth service that talks to it.
+    -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Package name="com.betterreads.mail.outbox"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.betterreads.auth.passwordreset.PasswordResetService"/>
     </Match>
 </FindBugsFilter>

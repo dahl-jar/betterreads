@@ -67,6 +67,17 @@ cloudflare:
     aud: ${CLOUDFLARE_ACCESS_AUD:}
     team-domain: ${CLOUDFLARE_TEAM_DOMAIN:}
 
+mail:
+  provider: ${MAIL_PROVIDER:logging}
+  api-key: ${RESEND_API_KEY:}
+  from: ${MAIL_FROM:}
+  app-base-url: ${APP_BASE_URL:}
+  outbox:
+    worker-enabled: ${MAIL_OUTBOX_WORKER_ENABLED:true}
+    claim-batch-size: 10
+    max-attempts: 3
+    lease-seconds: 300
+
 auth:
   refresh-cookie:
     secure: ${AUTH_REFRESH_COOKIE_SECURE:true}
@@ -77,6 +88,12 @@ auth:
     register-capacity: 5
     register-refill-tokens: 1
     register-refill-seconds: 60
+    forgot-password-capacity: 3
+    forgot-password-refill-tokens: 1
+    forgot-password-refill-seconds: 300
+    reset-password-capacity: 5
+    reset-password-refill-tokens: 1
+    reset-password-refill-seconds: 60
     max-buckets: 10000
     trusted-proxies: ${AUTH_TRUSTED_PROXIES:}
 

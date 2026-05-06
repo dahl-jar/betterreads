@@ -12,11 +12,11 @@ import org.springframework.transaction.annotation.Transactional;
  * the proxy and the rotate-path rollback would undo the revoke.
  */
 @Component
-class RefreshTokenChainRevoker {
+public class RefreshTokenChainRevoker {
 
     private final RefreshTokenRepository repository;
 
-    RefreshTokenChainRevoker(final RefreshTokenRepository repository) {
+    public RefreshTokenChainRevoker(final RefreshTokenRepository repository) {
         this.repository = repository;
     }
 
@@ -28,12 +28,25 @@ class RefreshTokenChainRevoker {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void revokeAllActiveForUser(final long userId) {
+        revoke(userId);
+    }
+
+    /**
+     * Revokes every active refresh token belonging to the given user, participating in the
+     * caller's transaction. Use from flows where the revoke must be atomic with the surrounding
+     * write (password reset, account deletion). The replay-defense path uses
+     * {@link #revokeAllActiveForUser(long)} instead so the revoke survives a rollback.
+     */
+    @Transactional
+    public void revokeAllActiveForUserInTransaction(final long userId) {
+        revoke(userId);
+    }
+
+    private void revoke(final long userId) {
         final Instant now = Instant.now();
-        repository.findAllByUserId(userId).forEach(rt -> {
-            if (rt.getRevokedAt() == null) {
-                rt.setRevokedAt(now);
-                repository.save(rt);
-            }
+        repository.findAllByUserIdAndRevokedAtIsNull(userId).forEach(rt -> {
+            rt.setRevokedAt(now);
+            repository.save(rt);
         });
     }
 }

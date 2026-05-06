@@ -30,4 +30,6 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
     Optional<RefreshToken> findByTokenHashForUpdate(@Param("tokenHash") String tokenHash);
 
     List<RefreshToken> findAllByUserId(long userId);
+
+    List<RefreshToken> findAllByUserIdAndRevokedAtIsNull(long userId);
 }
