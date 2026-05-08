@@ -104,6 +104,7 @@ public final class SecurityConfig {
             .securityMatcher(request ->
                 request.getLocalPort() == managementPort
                     && EndpointRequest.toAnyEndpoint().matches(request))
+            // NOTE(csrf): stateless, 127.0.0.1-bound, header-auth only. lgtm[java/spring-disabled-csrf-protection]
             .csrf(AbstractHttpConfigurer::disable)
             .formLogin(AbstractHttpConfigurer::disable)
             .httpBasic(AbstractHttpConfigurer::disable)
@@ -140,6 +141,7 @@ public final class SecurityConfig {
         http
             .securityMatcher(DOCS_PATHS)
             .cors(Customizer.withDefaults())
+            // NOTE(csrf): read-only Swagger assets, no auth, no cookies. lgtm[java/spring-disabled-csrf-protection]
             .csrf(AbstractHttpConfigurer::disable)
             .formLogin(AbstractHttpConfigurer::disable)
             .httpBasic(AbstractHttpConfigurer::disable)
@@ -169,6 +171,7 @@ public final class SecurityConfig {
     ) throws Exception {
         http
             .cors(Customizer.withDefaults())
+            // NOTE(csrf): bearer JWT + SameSite=Strict refresh cookie. lgtm[java/spring-disabled-csrf-protection]
             .csrf(AbstractHttpConfigurer::disable)
             .formLogin(AbstractHttpConfigurer::disable)
             .httpBasic(AbstractHttpConfigurer::disable)
