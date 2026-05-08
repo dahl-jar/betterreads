@@ -10,7 +10,8 @@ import org.springframework.validation.annotation.Validated;
 
 /**
  * Per-IP token-bucket limits for {@code /auth/login}, {@code /auth/register},
- * {@code /auth/forgot-password}, and {@code /auth/reset-password}. Empty bucket returns 429.
+ * {@code /auth/forgot-password}, {@code /auth/reset-password}, {@code /auth/verify-email},
+ * and {@code /auth/resend-verification}. Empty bucket returns 429.
  *
  * <p>{@code trustedProxies} CIDRs whitelist sources whose {@code X-Forwarded-For} header is
  * honored. Anything else is bucketed by {@code remoteAddr} so a direct attacker cannot pick a
@@ -31,6 +32,12 @@ public record RateLimitProperties(
     @Positive long resetPasswordCapacity,
     @Positive long resetPasswordRefillTokens,
     @Positive long resetPasswordRefillSeconds,
+    @Positive long verifyEmailCapacity,
+    @Positive long verifyEmailRefillTokens,
+    @Positive long verifyEmailRefillSeconds,
+    @Positive long resendVerificationCapacity,
+    @Positive long resendVerificationRefillTokens,
+    @Positive long resendVerificationRefillSeconds,
     @Positive long maxBuckets,
     @NotNull List<String> trustedProxies
 ) {

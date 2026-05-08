@@ -29,7 +29,7 @@ The currently-implemented module is `auth`. The same shape is enforced by ArchUn
 
 ## Data access
 
-Spring Data JPA repositories. Read paths use derived query methods or `@Query` with named parameters. The runtime database role (`betterreads_app`) holds only `SELECT/INSERT/UPDATE/DELETE` on data tables, no DDL — Flyway migrations run as the migration owner. SQL injection on the runtime cannot drop tables or alter the schema.
+Spring Data JPA repositories. Read paths use derived query methods or `@Query` with named parameters. The runtime database role (`betterreads_app`) holds only `SELECT/INSERT/UPDATE/DELETE` on data tables, no DDL; Flyway migrations run as the migration owner. SQL injection on the runtime cannot drop tables or alter the schema.
 
 ## Background work
 

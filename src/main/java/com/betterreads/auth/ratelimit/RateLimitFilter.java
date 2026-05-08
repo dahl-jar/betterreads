@@ -19,6 +19,7 @@ import java.net.UnknownHostException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
@@ -31,7 +32,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Token-bucket rate limiter for {@code POST /auth/login} and {@code POST /auth/register}.
+ * Token-bucket rate limiter for the public auth endpoints (login, register, forgot-password,
+ * reset-password, verify-email, resend-verification). Each path keeps its own per-IP bucket
+ * cache and bandwidth recipe so a burst against one endpoint does not consume another's budget.
  * Buckets are keyed by client IP; trusted-proxy CIDRs unlock {@code X-Forwarded-For} parsing
  * so direct callers cannot spoof the limit. Empty bucket returns 429 with {@code Retry-After}.
  */
@@ -48,6 +51,10 @@ public final class RateLimitFilter extends OncePerRequestFilter {
 
     private static final String RESET_PASSWORD_PATH = "/api/v1/auth/reset-password";
 
+    private static final String VERIFY_EMAIL_PATH = "/api/v1/auth/verify-email";
+
+    private static final String RESEND_VERIFICATION_PATH = "/api/v1/auth/resend-verification";
+
     private static final String FORWARDED_FOR_HEADER = "X-Forwarded-For";
 
     private static final String CF_CONNECTING_IP_HEADER = "CF-Connecting-IP";
@@ -56,21 +63,7 @@ public final class RateLimitFilter extends OncePerRequestFilter {
 
     private static final Duration BUCKET_TTL = Duration.ofMinutes(15);
 
-    private final Cache<String, Bucket> loginBuckets;
-
-    private final Cache<String, Bucket> registerBuckets;
-
-    private final Cache<String, Bucket> forgotPasswordBuckets;
-
-    private final Cache<String, Bucket> resetPasswordBuckets;
-
-    private final Supplier<Bandwidth> loginBandwidth;
-
-    private final Supplier<Bandwidth> registerBandwidth;
-
-    private final Supplier<Bandwidth> forgotPasswordBandwidth;
-
-    private final Supplier<Bandwidth> resetPasswordBandwidth;
+    private final Map<String, Endpoint> endpoints;
 
     private final List<CidrRange> trustedProxies;
 
@@ -78,54 +71,52 @@ public final class RateLimitFilter extends OncePerRequestFilter {
      * Trusted-proxy CIDRs are parsed once at construction. Malformed entries are dropped with
      * a warning log so a single bad config line cannot break filter startup.
      */
+    // HACK: in-memory bucket map. Restart wipes state and multi-instance breaks. Move to Redis when scaling out.
     public RateLimitFilter(final RateLimitProperties properties) {
         super();
-        this.loginBandwidth = () -> Bandwidth.builder()
-            .capacity(properties.loginCapacity())
-            .refillGreedy(properties.loginRefillTokens(), Duration.ofSeconds(properties.loginRefillSeconds()))
-            .build();
-        this.registerBandwidth = () -> Bandwidth.builder()
-            .capacity(properties.registerCapacity())
-            .refillGreedy(properties.registerRefillTokens(), Duration.ofSeconds(properties.registerRefillSeconds()))
-            .build();
-        this.forgotPasswordBandwidth = () -> Bandwidth.builder()
-            .capacity(properties.forgotPasswordCapacity())
-            .refillGreedy(properties.forgotPasswordRefillTokens(),
-                Duration.ofSeconds(properties.forgotPasswordRefillSeconds()))
-            .build();
-        this.resetPasswordBandwidth = () -> Bandwidth.builder()
-            .capacity(properties.resetPasswordCapacity())
-            .refillGreedy(properties.resetPasswordRefillTokens(),
-                Duration.ofSeconds(properties.resetPasswordRefillSeconds()))
-            .build();
-        // HACK: in-memory bucket map. Restart wipes state and multi-instance breaks. Move to Redis when scaling out.
-        this.loginBuckets = Caffeine.newBuilder()
-            .expireAfterAccess(BUCKET_TTL)
-            .maximumSize(properties.maxBuckets())
-            .build();
-        this.registerBuckets = Caffeine.newBuilder()
-            .expireAfterAccess(BUCKET_TTL)
-            .maximumSize(properties.maxBuckets())
-            .build();
-        this.forgotPasswordBuckets = Caffeine.newBuilder()
-            .expireAfterAccess(BUCKET_TTL)
-            .maximumSize(properties.maxBuckets())
-            .build();
-        this.resetPasswordBuckets = Caffeine.newBuilder()
-            .expireAfterAccess(BUCKET_TTL)
-            .maximumSize(properties.maxBuckets())
-            .build();
+        this.endpoints = buildEndpoints(properties);
         this.trustedProxies = parseCidrs(properties.trustedProxies());
+    }
+
+    private static Map<String, Endpoint> buildEndpoints(final RateLimitProperties props) {
+        return Map.ofEntries(
+            Map.entry(LOGIN_PATH, endpoint(props.maxBuckets(), props.loginCapacity(),
+                props.loginRefillTokens(), props.loginRefillSeconds())),
+            Map.entry(REGISTER_PATH, endpoint(props.maxBuckets(), props.registerCapacity(),
+                props.registerRefillTokens(), props.registerRefillSeconds())),
+            Map.entry(FORGOT_PASSWORD_PATH, endpoint(props.maxBuckets(), props.forgotPasswordCapacity(),
+                props.forgotPasswordRefillTokens(), props.forgotPasswordRefillSeconds())),
+            Map.entry(RESET_PASSWORD_PATH, endpoint(props.maxBuckets(), props.resetPasswordCapacity(),
+                props.resetPasswordRefillTokens(), props.resetPasswordRefillSeconds())),
+            Map.entry(VERIFY_EMAIL_PATH, endpoint(props.maxBuckets(), props.verifyEmailCapacity(),
+                props.verifyEmailRefillTokens(), props.verifyEmailRefillSeconds())),
+            Map.entry(RESEND_VERIFICATION_PATH, endpoint(props.maxBuckets(), props.resendVerificationCapacity(),
+                props.resendVerificationRefillTokens(), props.resendVerificationRefillSeconds()))
+        );
+    }
+
+    private static Endpoint endpoint(
+        final long maxBuckets,
+        final long capacity,
+        final long refillTokens,
+        final long refillSeconds
+    ) {
+        final Cache<String, Bucket> cache = Caffeine.newBuilder()
+            .expireAfterAccess(BUCKET_TTL)
+            .maximumSize(maxBuckets)
+            .build();
+        final Supplier<Bandwidth> bandwidth = () -> Bandwidth.builder()
+            .capacity(capacity)
+            .refillGreedy(refillTokens, Duration.ofSeconds(refillSeconds))
+            .build();
+        return new Endpoint(cache, bandwidth);
     }
 
     /**
      * Drops all in-memory buckets. Used by tests to isolate state between scenarios.
      */
     public void reset() {
-        loginBuckets.invalidateAll();
-        registerBuckets.invalidateAll();
-        forgotPasswordBuckets.invalidateAll();
-        resetPasswordBuckets.invalidateAll();
+        endpoints.values().forEach(e -> e.cache().invalidateAll());
     }
 
     @Override
@@ -158,24 +149,19 @@ public final class RateLimitFilter extends OncePerRequestFilter {
         if (!HttpMethod.POST.matches(request.getMethod())) {
             return null;
         }
-        final String path = request.getRequestURI();
-        final String key = clientIp(request);
-        if (LOGIN_PATH.equals(path)) {
-            return loginBuckets.get(key, ip -> Bucket.builder().addLimit(loginBandwidth.get()).build());
+        final Endpoint endpoint = endpoints.get(request.getRequestURI());
+        if (endpoint == null) {
+            return null;
         }
-        if (REGISTER_PATH.equals(path)) {
-            return registerBuckets.get(key, ip -> Bucket.builder().addLimit(registerBandwidth.get()).build());
-        }
-        if (FORGOT_PASSWORD_PATH.equals(path)) {
-            return forgotPasswordBuckets.get(key,
-                ip -> Bucket.builder().addLimit(forgotPasswordBandwidth.get()).build());
-        }
-        if (RESET_PASSWORD_PATH.equals(path)) {
-            return resetPasswordBuckets.get(key,
-                ip -> Bucket.builder().addLimit(resetPasswordBandwidth.get()).build());
-        }
-        return null;
+        return endpoint.cache().get(clientIp(request),
+            ip -> Bucket.builder().addLimit(endpoint.bandwidth().get()).build());
     }
+
+    /**
+     * Pairs a per-IP bucket cache with the bandwidth recipe used to build new buckets. Each
+     * rate-limited path owns one {@code Endpoint}.
+     */
+    private record Endpoint(Cache<String, Bucket> cache, Supplier<Bandwidth> bandwidth) { }
 
     /**
      * Resolves the rate-limit bucket key from the incoming request.

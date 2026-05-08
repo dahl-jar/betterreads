@@ -47,4 +47,8 @@
         <Bug pattern="EI_EXPOSE_REP2"/>
         <Class name="com.betterreads.auth.passwordreset.PasswordResetService"/>
     </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.betterreads.auth.emailverification.EmailVerificationService"/>
+    </Match>
 </FindBugsFilter>

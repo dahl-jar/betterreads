@@ -5,7 +5,7 @@
          xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0
                              https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
 
-    <description>Strict PMD ruleset for BetterReads — catches magic strings, duplication, complexity, and bad practices.</description>
+    <description>Strict PMD ruleset for BetterReads: catches magic strings, duplication, complexity, and bad practices.</description>
 
     <!-- ===================== Best Practices ===================== -->
     <rule ref="category/java/bestpractices.xml">
@@ -13,12 +13,25 @@
         <exclude name="GuardLogStatement"/>
         <!-- Re-included below with MockMvc-aware config -->
         <exclude name="UnitTestShouldIncludeAssert"/>
+        <!-- Re-included below with a higher cap; integration tests for side-effecting flows
+             validate user state + side-effect tables + response, which exceeds the default 4. -->
+        <exclude name="UnitTestContainsTooManyAsserts"/>
     </rule>
 
     <!-- MockMvc's andExpect chain is a real assertion; PMD doesn't recognize it by default. -->
     <rule ref="category/java/bestpractices.xml/UnitTestShouldIncludeAssert">
         <properties>
             <property name="extraAssertMethodNames" value="andExpect,andExpectAll,satisfies"/>
+        </properties>
+    </rule>
+
+    <!-- Integration tests for register/verify/reset legitimately assert: HTTP status, user row
+         state, side-effect table state (refresh tokens, outbox, etc.). Default of 4 fires on
+         legitimate chained-fact tests. Bumping to 8 still catches tests that genuinely test
+         too many things at once. -->
+    <rule ref="category/java/bestpractices.xml/UnitTestContainsTooManyAsserts">
+        <properties>
+            <property name="maximumAsserts" value="8"/>
         </properties>
     </rule>
 

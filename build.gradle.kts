@@ -54,7 +54,7 @@ dependencies {
 	// Prometheus metrics for /actuator/prometheus
 	implementation("io.micrometer:micrometer-registry-prometheus")
 
-	// OpenAPI / Swagger UI — auto-generates /v3/api-docs and /swagger-ui.html
+	// OpenAPI / Swagger UI: auto-generates /v3/api-docs and /swagger-ui.html
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6")
 
 	// Database & migration

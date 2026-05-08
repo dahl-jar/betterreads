@@ -94,6 +94,12 @@ auth:
     reset-password-capacity: 5
     reset-password-refill-tokens: 1
     reset-password-refill-seconds: 60
+    verify-email-capacity: 5
+    verify-email-refill-tokens: 1
+    verify-email-refill-seconds: 60
+    resend-verification-capacity: 3
+    resend-verification-refill-tokens: 1
+    resend-verification-refill-seconds: 300
     max-buckets: 10000
     trusted-proxies: ${AUTH_TRUSTED_PROXIES:}
 

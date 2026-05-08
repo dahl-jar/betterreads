@@ -33,18 +33,23 @@ public class MailOutboxWorker {
 
     private final PasswordResetTemplate passwordResetTemplate;
 
+    private final EmailVerificationTemplate emailVerificationTemplate;
+
+    @SuppressWarnings("PMD.ExcessiveParameterList")
     public MailOutboxWorker(
         final MailOutboxRepository repository,
         final MailOutboxClaimer claimer,
         final MailOutboxResolver resolver,
         final MailSender mailSender,
-        final PasswordResetTemplate passwordResetTemplate
+        final PasswordResetTemplate passwordResetTemplate,
+        final EmailVerificationTemplate emailVerificationTemplate
     ) {
         this.repository = repository;
         this.claimer = claimer;
         this.resolver = resolver;
         this.mailSender = mailSender;
         this.passwordResetTemplate = passwordResetTemplate;
+        this.emailVerificationTemplate = emailVerificationTemplate;
     }
 
     /**
@@ -82,12 +87,18 @@ public class MailOutboxWorker {
         if (MailOutboxService.TEMPLATE_PASSWORD_RESET.equals(template)) {
             return PasswordResetTemplate.SUBJECT;
         }
+        if (MailOutboxService.TEMPLATE_EMAIL_VERIFICATION.equals(template)) {
+            return EmailVerificationTemplate.SUBJECT;
+        }
         throw unknownTemplate(template);
     }
 
     private String renderBody(final MailOutbox row) {
         if (MailOutboxService.TEMPLATE_PASSWORD_RESET.equals(row.getTemplate())) {
             return passwordResetTemplate.renderBody(row.getPayload());
+        }
+        if (MailOutboxService.TEMPLATE_EMAIL_VERIFICATION.equals(row.getTemplate())) {
+            return emailVerificationTemplate.renderBody(row.getPayload());
         }
         throw unknownTemplate(row.getTemplate());
     }

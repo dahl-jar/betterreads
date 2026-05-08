@@ -15,6 +15,7 @@ public class UserMapper {
         return new UserResponse(
             user.getUsername(),
             user.getEmail(),
+            user.getEmailVerifiedAt() != null,
             user.getDisplayName(),
             user.getAvatarUrl(),
             user.getBio()

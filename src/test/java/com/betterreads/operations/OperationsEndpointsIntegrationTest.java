@@ -31,7 +31,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "jwt.secret=integration-test-secret-must-be-at-least-256-bits-long-padding-padding",
     "jwt.issuer=betterreads-it",
     "jwt.expiration-minutes=60",
-    "jwt.refresh-expiration-days=30"
+    "jwt.refresh-expiration-days=30",
+    "mail.outbox.worker-enabled=false"
 })
 @DisplayName("Operations endpoints")
 class OperationsEndpointsIntegrationTest {

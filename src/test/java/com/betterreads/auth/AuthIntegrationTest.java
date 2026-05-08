@@ -4,6 +4,7 @@ import com.betterreads.auth.entity.User;
 import com.betterreads.auth.jwt.JwtIssuer;
 import com.betterreads.auth.ratelimit.RateLimitFilter;
 import com.betterreads.auth.repository.UserRepository;
+import com.betterreads.mail.outbox.MailOutboxRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -45,7 +46,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "jwt.expiration-minutes=60",
     "jwt.refresh-expiration-days=30",
     "app.cors.allowed-origins=https://app.betterreads.example.com",
-    "auth.refresh-cookie.secure=true"
+    "auth.refresh-cookie.secure=true",
+    "mail.outbox.worker-enabled=false"
 })
 @SuppressWarnings("PMD.TooManyStaticImports")
 class AuthIntegrationTest {
@@ -156,6 +158,9 @@ class AuthIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private MailOutboxRepository mailOutboxRepository;
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -164,6 +169,7 @@ class AuthIntegrationTest {
             .webAppContextSetup(webApplicationContext)
             .addFilter(springSecurityFilterChain)
             .build();
+        mailOutboxRepository.deleteAll();
         userRepository.deleteAll();
         rateLimitFilter.reset();
     }

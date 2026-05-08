@@ -9,6 +9,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
@@ -48,6 +49,10 @@ public class User {
     @Column(columnDefinition = "TEXT")
     @Nullable
     private String bio;
+
+    @Column(name = "email_verified_at")
+    @Nullable
+    private Instant emailVerifiedAt;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
@@ -124,6 +129,15 @@ public class User {
 
     public void setBio(@Nullable final String bio) {
         this.bio = bio;
+    }
+
+    @Nullable
+    public Instant getEmailVerifiedAt() {
+        return emailVerifiedAt;
+    }
+
+    public void setEmailVerifiedAt(@Nullable final Instant emailVerifiedAt) {
+        this.emailVerifiedAt = emailVerifiedAt;
     }
 
     public OffsetDateTime getCreatedAt() {

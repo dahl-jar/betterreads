@@ -4,6 +4,7 @@ import com.betterreads.auth.entity.User;
 import com.betterreads.auth.ratelimit.RateLimitFilter;
 import com.betterreads.auth.refresh.RefreshTokenRepository;
 import com.betterreads.auth.repository.UserRepository;
+import com.betterreads.mail.outbox.MailOutboxRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -51,7 +52,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "jwt.issuer=betterreads-it",
     "jwt.expiration-minutes=120",
     "jwt.refresh-expiration-days=30",
-    "auth.refresh-cookie.secure=true"
+    "auth.refresh-cookie.secure=true",
+    "mail.outbox.worker-enabled=false"
 })
 @SuppressWarnings("PMD.TooManyStaticImports")
 class RefreshTokenIntegrationTest {
@@ -111,6 +113,9 @@ class RefreshTokenIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private MailOutboxRepository mailOutboxRepository;
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -119,6 +124,7 @@ class RefreshTokenIntegrationTest {
             .webAppContextSetup(webApplicationContext)
             .addFilter(springSecurityFilterChain)
             .build();
+        mailOutboxRepository.deleteAll();
         refreshTokenRepository.deleteAll();
         userRepository.deleteAll();
         rateLimitFilter.reset();

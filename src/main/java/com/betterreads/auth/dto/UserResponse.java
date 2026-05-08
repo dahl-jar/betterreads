@@ -9,6 +9,7 @@ import org.jspecify.annotations.Nullable;
 public record UserResponse(
     String username,
     String email,
+    boolean emailVerified,
     @Nullable String displayName,
     @Nullable String avatarUrl,
     @Nullable String bio
