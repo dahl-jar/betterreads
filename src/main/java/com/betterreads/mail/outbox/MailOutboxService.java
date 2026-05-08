@@ -23,6 +23,12 @@ public class MailOutboxService {
      */
     public static final String TEMPLATE_PASSWORD_RESET = "password_reset";
 
+    /**
+     * Template name for email-verification emails. Allowed by the {@code chk_mail_outbox_template}
+     * CHECK constraint as of Flyway V15.
+     */
+    public static final String TEMPLATE_EMAIL_VERIFICATION = "email_verification";
+
     private final MailOutboxRepository repository;
 
     private final ObjectMapper objectMapper;
@@ -39,8 +45,26 @@ public class MailOutboxService {
      */
     @Transactional
     public void enqueuePasswordReset(final String recipient, final String plaintextToken) {
+        enqueue(TEMPLATE_PASSWORD_RESET, recipient, plaintextToken);
+    }
+
+    /**
+     * Enqueues an email-verification email. Same payload shape and worker semantics as the
+     * password-reset enqueue; the only difference is the template name the worker dispatches on.
+     *
+     * <p>Joins the caller's transaction via {@code Propagation.REQUIRED} so registration and
+     * resend can commit user/token writes atomically with the outbox row. A rollback in the
+     * caller takes the outbox insert with it, preventing a verification mail for a user whose
+     * insert failed.
+     */
+    @Transactional
+    public void enqueueEmailVerification(final String recipient, final String plaintextToken) {
+        enqueue(TEMPLATE_EMAIL_VERIFICATION, recipient, plaintextToken);
+    }
+
+    private void enqueue(final String template, final String recipient, final String plaintextToken) {
         final MailOutbox row = new MailOutbox();
-        row.setTemplate(TEMPLATE_PASSWORD_RESET);
+        row.setTemplate(template);
         row.setRecipient(recipient);
         row.setPayload(serialize(Map.of("token", plaintextToken)));
         row.setCreatedAt(Instant.now());

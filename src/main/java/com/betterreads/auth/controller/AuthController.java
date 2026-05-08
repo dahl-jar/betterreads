@@ -5,8 +5,11 @@ import com.betterreads.auth.dto.AuthResponse;
 import com.betterreads.auth.dto.ForgotPasswordRequest;
 import com.betterreads.auth.dto.LoginRequest;
 import com.betterreads.auth.dto.RegisterRequest;
+import com.betterreads.auth.dto.ResendVerificationRequest;
 import com.betterreads.auth.dto.ResetPasswordRequest;
 import com.betterreads.auth.dto.UserResponse;
+import com.betterreads.auth.dto.VerifyEmailRequest;
+import com.betterreads.auth.emailverification.EmailVerificationService;
 import com.betterreads.auth.jwt.JwtProperties;
 import com.betterreads.auth.passwordreset.PasswordResetService;
 import com.betterreads.auth.service.AuthService;
@@ -54,6 +57,8 @@ class AuthController {
 
     private final PasswordResetService passwordResetService;
 
+    private final EmailVerificationService emailVerificationService;
+
     private final RefreshCookieProperties cookieProperties;
 
     private final Duration refreshLifetime;
@@ -61,11 +66,13 @@ class AuthController {
     AuthController(
         final AuthService authService,
         final PasswordResetService passwordResetService,
+        final EmailVerificationService emailVerificationService,
         final RefreshCookieProperties cookieProperties,
         final JwtProperties jwtProperties
     ) {
         this.authService = authService;
         this.passwordResetService = passwordResetService;
+        this.emailVerificationService = emailVerificationService;
         this.cookieProperties = cookieProperties;
         this.refreshLifetime = Duration.ofDays(jwtProperties.refreshExpirationDays());
     }
@@ -166,6 +173,32 @@ class AuthController {
     @Operation(summary = "Complete a password reset")
     public ResponseEntity<Void> resetPassword(@Valid @RequestBody final ResetPasswordRequest request) {
         passwordResetService.resetPassword(request.token(), request.newPassword());
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Confirms ownership of an email address by consuming the verification token sent at
+     * registration. Returns {@code 204} for successful and replayed-success cases (idempotent);
+     * returns {@code 400} for unknown or expired tokens.
+     */
+    @PostMapping("/verify-email")
+    @Operation(summary = "Confirm an email address")
+    public ResponseEntity<Void> verifyEmail(@Valid @RequestBody final VerifyEmailRequest request) {
+        emailVerificationService.verify(request.token());
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Issues a fresh verification link for the supplied email when an unverified account
+     * matches. Returns {@code 204} for unknown addresses and for already-verified accounts so
+     * the response cannot be used to enumerate registered or unverified emails.
+     */
+    @PostMapping("/resend-verification")
+    @Operation(summary = "Resend an email-verification link")
+    public ResponseEntity<Void> resendVerification(
+        @Valid @RequestBody final ResendVerificationRequest request
+    ) {
+        emailVerificationService.requestResend(request.email());
         return ResponseEntity.noContent().build();
     }
 

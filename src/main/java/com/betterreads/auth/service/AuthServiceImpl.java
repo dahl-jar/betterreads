@@ -4,6 +4,7 @@ import com.betterreads.auth.dto.AuthResponse;
 import com.betterreads.auth.dto.LoginRequest;
 import com.betterreads.auth.dto.RegisterRequest;
 import com.betterreads.auth.dto.UserResponse;
+import com.betterreads.auth.emailverification.EmailVerificationService;
 import com.betterreads.auth.entity.User;
 import com.betterreads.auth.jwt.JwtIssuer;
 import com.betterreads.auth.mapper.UserMapper;
@@ -55,18 +56,23 @@ class AuthServiceImpl implements AuthService {
 
     private final RefreshTokenService refreshTokenService;
 
+    private final EmailVerificationService emailVerificationService;
+
+    @SuppressWarnings("PMD.ExcessiveParameterList")
     AuthServiceImpl(
         final UserRepository userRepository,
         final PasswordEncoder passwordEncoder,
         final JwtIssuer jwtIssuer,
         final UserMapper userMapper,
-        final RefreshTokenService refreshTokenService
+        final RefreshTokenService refreshTokenService,
+        final EmailVerificationService emailVerificationService
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtIssuer = jwtIssuer;
         this.userMapper = userMapper;
         this.refreshTokenService = refreshTokenService;
+        this.emailVerificationService = emailVerificationService;
     }
 
     @Override
@@ -93,6 +99,7 @@ class AuthServiceImpl implements AuthService {
             LOG.warn("auth.register.conflict username={}", LogSanitizer.forLog(request.username()));
             throw new BusinessRuleException(DUPLICATE_USERNAME_OR_EMAIL, ex);
         }
+        emailVerificationService.issueVerification(saved.getUserId(), saved.getEmail());
         LOG.info("auth.register.success userId={} username={}",
             saved.getUserId(), LogSanitizer.forLog(saved.getUsername()));
         return buildTokenPair(saved);
