@@ -92,6 +92,20 @@ class MailOutboxWorkerIntegrationTest {
     }
 
     @Test
+    void successfulSendClearsThePayload() {
+        final String secretToken = "secret-token-must-not-linger";
+        outbox.enqueuePasswordReset(EMAIL, secretToken);
+        sender.script.add(SendOutcome.success());
+
+        worker.drain();
+
+        final MailOutbox row = repository.findAll().get(0);
+        assertThat(row.getPayload())
+            .as("payload must not retain the plaintext token after send so a DB read leak cannot redeem it")
+            .doesNotContain(secretToken);
+    }
+
+    @Test
     void retryableFailureSchedulesNextAttemptAndKeepsRowPending() {
         outbox.enqueuePasswordReset(EMAIL, "tok-2");
         sender.script.add(SendOutcome.retryable(TRANSIENT_ERROR));

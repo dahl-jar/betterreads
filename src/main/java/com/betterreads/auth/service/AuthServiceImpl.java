@@ -11,6 +11,7 @@ import com.betterreads.auth.mapper.UserMapper;
 import com.betterreads.auth.refresh.RefreshTokenRotation;
 import com.betterreads.auth.refresh.RefreshTokenService;
 import com.betterreads.auth.repository.UserRepository;
+import com.betterreads.common.crypto.PasswordByteLimit;
 import com.betterreads.common.exception.BusinessRuleException;
 import com.betterreads.common.exception.ResourceNotFoundException;
 import com.betterreads.common.util.LogSanitizer;
@@ -79,6 +80,7 @@ class AuthServiceImpl implements AuthService {
     @Transactional
     public TokenPair register(final RegisterRequest request) {
         final String normalizedEmail = normalizeEmail(request.email());
+        PasswordByteLimit.check(request.password());
 
         if (userRepository.existsByUsername(request.username())) {
             throw new BusinessRuleException(DUPLICATE_USERNAME);
@@ -96,11 +98,12 @@ class AuthServiceImpl implements AuthService {
         try {
             saved = userRepository.saveAndFlush(user);
         } catch (final DataIntegrityViolationException ex) {
-            LOG.warn("auth.register.conflict username={}", LogSanitizer.forLog(request.username()));
+            LOG.warn("Registration conflicted with existing username or email username={}",
+                LogSanitizer.forLog(request.username()));
             throw new BusinessRuleException(DUPLICATE_USERNAME_OR_EMAIL, ex);
         }
         emailVerificationService.issueVerification(saved.getUserId(), saved.getEmail());
-        LOG.info("auth.register.success userId={} username={}",
+        LOG.info("Registered new user userId={} username={}",
             saved.getUserId(), LogSanitizer.forLog(saved.getUsername()));
         return buildTokenPair(saved);
     }
@@ -117,15 +120,15 @@ class AuthServiceImpl implements AuthService {
         final User user = userRepository.findByUsername(identifier)
             .or(() -> userRepository.findByEmail(normalizedEmailIdentifier))
             .orElseThrow(() -> {
-                LOG.warn("auth.login.failed reason=user-not-found");
+                LOG.warn("Login failed: no user matches identifier");
                 return new BadCredentialsException(INVALID_CREDENTIALS);
             });
 
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-            LOG.warn("auth.login.failed reason=bad-password userId={}", user.getUserId());
+            LOG.warn("Login failed: password mismatch userId={}", user.getUserId());
             throw new BadCredentialsException(INVALID_CREDENTIALS);
         }
-        LOG.info("auth.login.success userId={}", user.getUserId());
+        LOG.info("Logged in user userId={}", user.getUserId());
         return buildTokenPair(user);
     }
 
@@ -142,13 +145,13 @@ class AuthServiceImpl implements AuthService {
     public TokenPair refresh(final String refreshToken) {
         final Optional<RefreshTokenRotation> rotation = refreshTokenService.rotate(refreshToken);
         if (rotation.isEmpty()) {
-            LOG.warn("auth.refresh.rejected");
+            LOG.warn("Refresh rejected: token unknown, expired, or already revoked");
             throw new BadCredentialsException(INVALID_REFRESH_TOKEN);
         }
         final long userId = rotation.get().userId();
         final User user = userRepository.findById(userId)
             .orElseThrow(() -> {
-                LOG.warn("auth.refresh.user-missing userId={}", userId);
+                LOG.warn("Refresh succeeded but owning user is gone userId={}", userId);
                 return new BadCredentialsException(INVALID_REFRESH_TOKEN);
             });
         final String accessToken = jwtIssuer.issue(user.getUserId());

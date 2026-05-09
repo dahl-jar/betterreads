@@ -66,10 +66,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 new UsernamePasswordAuthenticationToken(userId, null, List.of());
             authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(authentication);
-            LOG.debug("auth.jwt.success userId={}", userId);
+            LOG.debug("Authenticated request via JWT userId={}", userId);
         } catch (final InvalidJwtException ex) {
             SecurityContextHolder.clearContext();
-            LOG.warn("auth.jwt.invalid reason={}", LogSanitizer.forLog(ex.getMessage()));
+            LOG.warn("Rejected JWT reason={}", LogSanitizer.forLog(ex.getMessage()));
         }
     }
 }

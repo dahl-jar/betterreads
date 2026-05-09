@@ -1,6 +1,7 @@
 package com.betterreads.auth.refresh;
 
 import com.betterreads.auth.jwt.JwtProperties;
+import com.betterreads.common.crypto.HmacTokenHasher;
 
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -27,7 +28,7 @@ public class RefreshTokenService {
 
     private final RefreshTokenRepository repository;
 
-    private final RefreshTokenHasher hasher;
+    private final HmacTokenHasher hasher;
 
     private final RefreshTokenChainRevoker chainRevoker;
 
@@ -37,7 +38,7 @@ public class RefreshTokenService {
 
     public RefreshTokenService(
         final RefreshTokenRepository repository,
-        final RefreshTokenHasher hasher,
+        final HmacTokenHasher hasher,
         final RefreshTokenChainRevoker chainRevoker,
         final JwtProperties jwtProperties
     ) {
@@ -62,7 +63,7 @@ public class RefreshTokenService {
         row.setTokenHash(hasher.hash(plaintext));
         row.setExpiresAt(Instant.now().plus(lifetime));
         repository.save(row);
-        LOG.info("auth.refresh.issue userId={}", userId);
+        LOG.info("Issued refresh token userId={}", userId);
         return plaintext;
     }
 
@@ -87,7 +88,8 @@ public class RefreshTokenService {
 
         if (row.getRevokedAt() != null) {
             if (row.getReplacedBy() != null) {
-                LOG.warn("auth.refresh.replay userId={} tokenId={}", row.getUserId(), row.getRefreshTokenId());
+                LOG.warn("Refresh token replayed, revoking entire chain userId={} tokenId={}",
+                    row.getUserId(), row.getRefreshTokenId());
                 chainRevoker.revokeAllActiveForUser(row.getUserId());
             }
             return Optional.empty();
@@ -108,7 +110,7 @@ public class RefreshTokenService {
         row.setReplacedBy(saved.getRefreshTokenId());
         repository.saveAndFlush(row);
 
-        LOG.info("auth.refresh.rotate userId={}", row.getUserId());
+        LOG.info("Rotated refresh token userId={}", row.getUserId());
         return Optional.of(new RefreshTokenRotation(row.getUserId(), newPlaintext));
     }
 
@@ -130,7 +132,7 @@ public class RefreshTokenService {
         }
         row.setRevokedAt(Instant.now());
         repository.save(row);
-        LOG.info("auth.refresh.revoke userId={}", row.getUserId());
+        LOG.info("Revoked refresh token userId={}", row.getUserId());
     }
 
     private String generatePlaintext() {

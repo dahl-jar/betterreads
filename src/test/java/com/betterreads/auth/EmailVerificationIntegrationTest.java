@@ -1,8 +1,8 @@
 package com.betterreads.auth;
 
 import com.betterreads.auth.emailverification.EmailVerificationService;
-import com.betterreads.auth.emailverification.EmailVerificationTokenRepository;
-import com.betterreads.auth.passwordreset.PasswordResetTokenRepository;
+import com.betterreads.auth.token.EmailToken;
+import com.betterreads.auth.token.EmailTokenRepository;
 import com.betterreads.auth.ratelimit.RateLimitFilter;
 import com.betterreads.auth.refresh.RefreshTokenRepository;
 import com.betterreads.auth.repository.UserRepository;
@@ -73,7 +73,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "mail.app-base-url=https://test.example.com",
     "mail.outbox.worker-enabled=false"
 })
-@SuppressWarnings({"PMD.ExcessiveImports", "PMD.CouplingBetweenObjects"})
+@SuppressWarnings("PMD.ExcessiveImports")
 class EmailVerificationIntegrationTest {
 
     private static final String REGISTER_URL = "/api/v1/auth/register";
@@ -114,7 +114,7 @@ class EmailVerificationIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
-    private EmailVerificationTokenRepository emailVerificationTokenRepository;
+    private EmailTokenRepository emailTokenRepository;
 
     @Autowired
     private EmailVerificationService emailVerificationService;
@@ -124,9 +124,6 @@ class EmailVerificationIntegrationTest {
 
     @Autowired
     private RefreshTokenRepository refreshTokenRepository;
-
-    @Autowired
-    private PasswordResetTokenRepository passwordResetTokenRepository;
 
     @Autowired
     private RateLimitFilter rateLimitFilter;
@@ -143,8 +140,7 @@ class EmailVerificationIntegrationTest {
             .addFilter(springSecurityFilterChain)
             .build();
         mailOutboxRepository.deleteAll();
-        emailVerificationTokenRepository.deleteAll();
-        passwordResetTokenRepository.deleteAll();
+        emailTokenRepository.deleteAll();
         refreshTokenRepository.deleteAll();
         userRepository.deleteAll();
         rateLimitFilter.reset();
@@ -177,7 +173,7 @@ class EmailVerificationIntegrationTest {
                     .isEqualTo(MailOutboxService.TEMPLATE_EMAIL_VERIFICATION))
                 .satisfies(row -> assertThat(payloadField(row, FIELD_TOKEN)).isNotBlank());
 
-            assertThat(emailVerificationTokenRepository.findAll())
+            assertThat(emailTokenRepository.findAll())
                 .as("exactly one unconsumed verification token persisted for the new user")
                 .hasSize(1)
                 .first()
@@ -204,7 +200,8 @@ class EmailVerificationIntegrationTest {
                 .as("verify must set email_verified_at on the user")
                 .isNotNull();
 
-            assertThat(emailVerificationTokenRepository.findAllByUserIdAndConsumedAtIsNull(userId))
+            assertThat(emailTokenRepository.findActive(
+                    userId, EmailToken.Purpose.EMAIL_VERIFICATION))
                 .as("no unconsumed token remains after verify")
                 .isEmpty();
         }
@@ -320,7 +317,8 @@ class EmailVerificationIntegrationTest {
             assertThat(userRepository.findById(userId).orElseThrow().getEmailVerifiedAt())
                 .as("user is verified exactly once even under concurrent verify")
                 .isNotNull();
-            assertThat(emailVerificationTokenRepository.findAllByUserIdAndConsumedAtIsNull(userId))
+            assertThat(emailTokenRepository.findActive(
+                    userId, EmailToken.Purpose.EMAIL_VERIFICATION))
                 .as("the single token row is consumed; no duplicates linger")
                 .isEmpty();
         }
@@ -342,7 +340,8 @@ class EmailVerificationIntegrationTest {
                     .content(resendPayload(EMAIL)))
                 .andExpect(status().isNoContent());
 
-            assertThat(emailVerificationTokenRepository.findAllByUserIdAndConsumedAtIsNull(userId))
+            assertThat(emailTokenRepository.findActive(
+                    userId, EmailToken.Purpose.EMAIL_VERIFICATION))
                 .as("resend leaves exactly one unconsumed token; the prior is consumed by the issue path")
                 .hasSize(1);
             assertThat(mailOutboxRepository.findAll())
@@ -365,7 +364,7 @@ class EmailVerificationIntegrationTest {
             assertThat(mailOutboxRepository.findAll())
                 .as("resend must not leak account existence by writing an outbox row for an unknown email")
                 .isEmpty();
-            assertThat(emailVerificationTokenRepository.findAll())
+            assertThat(emailTokenRepository.findAll())
                 .as("resend must not create token rows for an unknown email")
                 .isEmpty();
         }
@@ -386,7 +385,8 @@ class EmailVerificationIntegrationTest {
             assertThat(mailOutboxRepository.findAll())
                 .as("already-verified users must not trigger another verification email")
                 .isEmpty();
-            assertThat(emailVerificationTokenRepository.findAllByUserIdAndConsumedAtIsNull(userId))
+            assertThat(emailTokenRepository.findActive(
+                    userId, EmailToken.Purpose.EMAIL_VERIFICATION))
                 .as("already-verified users must not get a fresh active token")
                 .isEmpty();
         }
@@ -435,7 +435,8 @@ class EmailVerificationIntegrationTest {
                 }
             }
 
-            assertThat(emailVerificationTokenRepository.findAllByUserIdAndConsumedAtIsNull(userId))
+            assertThat(emailTokenRepository.findActive(
+                    userId, EmailToken.Purpose.EMAIL_VERIFICATION))
                 .as("partial unique index keeps at most one active token under concurrent resend")
                 .hasSizeLessThanOrEqualTo(1);
         }
@@ -450,13 +451,12 @@ class EmailVerificationIntegrationTest {
     }
 
     private void expireTokens(final long userId) {
-        emailVerificationTokenRepository.findAll().stream()
-            .filter(t -> t.getUserId() == userId)
-            .forEach(t -> {
+        emailTokenRepository.findActive(
+            userId, EmailToken.Purpose.EMAIL_VERIFICATION).forEach(t -> {
                 final Instant past = Instant.now().minus(2, ChronoUnit.HOURS);
                 t.setIssuedAt(past);
                 t.setExpiresAt(past.plusSeconds(1));
-                emailVerificationTokenRepository.save(t);
+                emailTokenRepository.save(t);
             });
     }
 

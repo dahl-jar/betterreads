@@ -23,6 +23,14 @@ class MailOutboxResolver {
 
     private static final int ERROR_TEXT_MAX_LENGTH = 500;
 
+    /**
+     * Cleared payload written after a row reaches a terminal state (sent or failed). The original
+     * payload contains plaintext tokens that the worker has already used; persisting them past
+     * the send window would let a DB read leak hand the attacker live, redeemable tokens within
+     * the token-lifetime window. The token tables themselves only ever store HMACs.
+     */
+    private static final String EMPTY_PAYLOAD = "{}";
+
     private static final Map<Integer, Duration> RETRY_BACKOFF = Map.of(
         1, Duration.ofMinutes(5),
         2, Duration.ofMinutes(30)
@@ -44,12 +52,13 @@ class MailOutboxResolver {
         repository.findById(outboxId).ifPresent(row -> {
             row.setSentAt(Instant.now());
             row.setLastError(null);
+            row.setPayload(EMPTY_PAYLOAD);
             repository.save(row);
         });
     }
 
     @Transactional
-    public void handleFailure(final long outboxId, final int currentAttempt, final MailSendException failure) {
+    public void recordFailure(final long outboxId, final int currentAttempt, final MailSendException failure) {
         final String errorText = truncate(failure.getMessage() == null
             ? failure.getClass().getSimpleName() : failure.getMessage());
         repository.findById(outboxId).ifPresent(row -> {
@@ -57,13 +66,14 @@ class MailOutboxResolver {
             if (!failure.isRetryable() || atMaxAttempts) {
                 row.setFailedAt(Instant.now());
                 row.setLastError(errorText);
-                LOG.error("mail.outbox.failed id={} attempts={} retryable={} error={}",
+                row.setPayload(EMPTY_PAYLOAD);
+                LOG.error("Outbox row gave up id={} attempts={} retryable={} error={}",
                     outboxId, currentAttempt, failure.isRetryable(), LogSanitizer.forLog(errorText));
             } else {
                 final Duration backoff = RETRY_BACKOFF.getOrDefault(currentAttempt, DEFAULT_BACKOFF);
                 row.setNextAttemptAt(Instant.now().plus(backoff));
                 row.setLastError(errorText);
-                LOG.warn("mail.outbox.retry id={} attempt={} backoff={}s",
+                LOG.warn("Outbox row scheduled for retry id={} attempt={} backoff={}s",
                     outboxId, currentAttempt, backoff.toSeconds());
             }
             repository.save(row);

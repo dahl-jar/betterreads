@@ -75,10 +75,17 @@ fi
 
 # --- Fetch release metadata ---
 api_base="https://api.github.com/repos/${REPO}"
+response_body=$(mktemp)
+trap 'rm -f "$response_body"' EXIT
+
+# Captures HTTP status separately from the body so the caller can branch on the actual code.
+# A bare `curl --fail || ...` collapses every error (401, 403, 5xx, DNS, timeout) to "no release",
+# which silently disables the deploy timer when only an actual 404 should be a clean no-op.
 api_call() {
   curl -sS \
-    --fail \
     --max-time 30 \
+    -o "$response_body" \
+    -w '%{http_code}' \
     -H "Authorization: Bearer ${GITHUB_TOKEN_DEPLOY}" \
     -H "Accept: application/vnd.github+json" \
     -H "X-GitHub-Api-Version: 2022-11-28" \
@@ -86,16 +93,33 @@ api_call() {
 }
 
 if [ -n "$target_sha" ]; then
-  release_json=$(api_call "${api_base}/releases/tags/deploy-${target_sha}") || {
-    err "no release found for pinned tag deploy-${target_sha}"
+  http_status=$(api_call "${api_base}/releases/tags/deploy-${target_sha}") || {
+    err "GitHub API call failed (network or curl error) for pinned tag deploy-${target_sha}"
     exit 1
   }
+  if [ "$http_status" != "200" ]; then
+    err "GitHub API returned ${http_status} for pinned tag deploy-${target_sha}"
+    exit 1
+  fi
 else
-  release_json=$(api_call "${api_base}/releases/latest") || {
-    log "no releases yet; nothing to deploy"
-    exit 0
+  http_status=$(api_call "${api_base}/releases/latest") || {
+    err "GitHub API call failed (network or curl error) on releases/latest"
+    exit 1
   }
+  case "$http_status" in
+    200)
+      ;;
+    404)
+      log "no releases yet; nothing to deploy"
+      exit 0
+      ;;
+    *)
+      err "GitHub API returned ${http_status} on releases/latest"
+      exit 1
+      ;;
+  esac
 fi
+release_json=$(cat "$response_body")
 
 # Tags are "deploy-<sha>"; strip the prefix to recover the bare SHA used in
 # asset filenames and recorded in installed.sha.
