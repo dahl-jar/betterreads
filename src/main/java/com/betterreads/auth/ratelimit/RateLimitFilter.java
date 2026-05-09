@@ -138,7 +138,7 @@ public final class RateLimitFilter extends OncePerRequestFilter {
         final long retryAfterSeconds = ceilSeconds(probe.getNanosToWaitForRefill());
         response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
         response.setHeader(RETRY_AFTER_HEADER, Long.toString(retryAfterSeconds));
-        LOG.warn("auth.ratelimit.blocked path={} ip={} retryAfter={}s",
+        LOG.warn("Rate limit hit, returning 429 path={} ip={} retryAfter={}s",
             LogSanitizer.forLog(request.getRequestURI()),
             LogSanitizer.forLog(clientIp(request)),
             retryAfterSeconds);
@@ -234,7 +234,7 @@ public final class RateLimitFilter extends OncePerRequestFilter {
             if (range != null) {
                 out.add(range);
             } else {
-                LOG.warn("auth.ratelimit.invalid-trusted-proxy cidr={}", LogSanitizer.forLog(entry));
+                LOG.warn("Skipped malformed trusted-proxy CIDR cidr={}", LogSanitizer.forLog(entry));
             }
         }
         return List.copyOf(out);

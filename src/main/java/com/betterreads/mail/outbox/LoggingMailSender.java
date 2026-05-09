@@ -20,7 +20,7 @@ class LoggingMailSender implements MailSender {
 
     @Override
     public void send(final MailMessage message) {
-        LOG.info("mail.send.skipped recipient={} idempotencyKey={}",
+        LOG.info("Skipped real send (logging mailer) recipient={} idempotencyKey={}",
             LogSanitizer.forLog(message.recipient()), LogSanitizer.forLog(message.idempotencyKey()));
     }
 }

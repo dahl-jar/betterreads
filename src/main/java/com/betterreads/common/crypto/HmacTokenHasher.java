@@ -1,39 +1,44 @@
-package com.betterreads.auth.refresh;
+package com.betterreads.common.crypto;
+
+import com.betterreads.auth.jwt.JwtProperties;
 
 import java.nio.charset.StandardCharsets;
-import java.security.NoSuchAlgorithmException;
 import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
-import com.betterreads.auth.jwt.JwtProperties;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
- * HMAC-SHA256 hasher for refresh tokens. Keyed by the JWT secret so a DB-only leak cannot
- * reconstruct active tokens. HMAC is used (not BCrypt) because refresh tokens are 256-bit
- * random and run on every refresh; the password-style brute-force angle does not apply.
+ * HMAC-SHA256 hasher for keyed tokens stored in the auth domain (refresh, password reset,
+ * email verification). Keyed by the JWT secret so a DB-only leak cannot reconstruct active
+ * tokens. HMAC is used (not BCrypt) because these tokens are 256-bit random and run on every
+ * lookup; the password-style brute-force angle does not apply.
+ *
+ * <p>One shared bean replaces three previously-duplicate per-domain hashers. The hash contract
+ * is identical for every domain; lifetime, revocation, and consume rules live in the services
+ * that call this class.
  */
 @Component
-final class RefreshTokenHasher {
+public final class HmacTokenHasher {
 
     private static final String ALGORITHM = "HmacSHA256";
 
     private final byte[] secret;
 
     @Autowired
-    RefreshTokenHasher(final JwtProperties properties) {
+    public HmacTokenHasher(final JwtProperties properties) {
         this(properties.secret());
     }
 
     /**
      * Test-friendly constructor that takes a raw secret instead of {@link JwtProperties}.
      */
-    RefreshTokenHasher(final String secret) {
+    public HmacTokenHasher(final String secret) {
         this.secret = secret.getBytes(StandardCharsets.UTF_8).clone();
     }
 

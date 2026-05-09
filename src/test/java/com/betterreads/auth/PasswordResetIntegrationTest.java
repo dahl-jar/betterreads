@@ -2,7 +2,8 @@ package com.betterreads.auth;
 
 import com.betterreads.auth.entity.User;
 import com.betterreads.auth.passwordreset.PasswordResetService;
-import com.betterreads.auth.passwordreset.PasswordResetTokenRepository;
+import com.betterreads.auth.token.EmailToken;
+import com.betterreads.auth.token.EmailTokenRepository;
 import com.betterreads.auth.ratelimit.RateLimitFilter;
 import com.betterreads.auth.refresh.RefreshTokenRepository;
 import com.betterreads.auth.repository.UserRepository;
@@ -121,7 +122,7 @@ class PasswordResetIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
-    private PasswordResetTokenRepository passwordResetTokenRepository;
+    private EmailTokenRepository emailTokenRepository;
 
     @Autowired
     private PasswordResetService passwordResetService;
@@ -150,7 +151,7 @@ class PasswordResetIntegrationTest {
             .addFilter(springSecurityFilterChain)
             .build();
         mailOutboxRepository.deleteAll();
-        passwordResetTokenRepository.deleteAll();
+        emailTokenRepository.deleteAll();
         refreshTokenRepository.deleteAll();
         userRepository.deleteAll();
         rateLimitFilter.reset();
@@ -245,8 +246,9 @@ class PasswordResetIntegrationTest {
                 }
             }
 
-            assertThat(passwordResetTokenRepository.findAllByUserIdAndConsumedAtIsNull(
-                    userRepository.findByEmail(EMAIL).orElseThrow().getUserId()))
+            assertThat(emailTokenRepository.findActive(
+                    userRepository.findByEmail(EMAIL).orElseThrow().getUserId(),
+                    EmailToken.Purpose.PASSWORD_RESET))
                 .as("at most one active token survives the race; loser caught DataIntegrityViolation")
                 .hasSizeLessThanOrEqualTo(1);
         }
@@ -380,13 +382,12 @@ class PasswordResetIntegrationTest {
     }
 
     private void expirePasswordResetTokens(final long userId) {
-        passwordResetTokenRepository.findAll().stream()
-            .filter(t -> t.getUserId() == userId)
-            .forEach(t -> {
+        emailTokenRepository.findActive(
+            userId, EmailToken.Purpose.PASSWORD_RESET).forEach(t -> {
                 final Instant past = Instant.now().minus(2, ChronoUnit.HOURS);
                 t.setIssuedAt(past);
                 t.setExpiresAt(past.plusSeconds(1));
-                passwordResetTokenRepository.save(t);
+                emailTokenRepository.save(t);
             });
     }
 

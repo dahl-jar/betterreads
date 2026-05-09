@@ -42,6 +42,19 @@ jobs:
       - name: SpotBugs
         run: ./gradlew spotbugsMain spotbugsTest
 
+      - name: Cache OWASP dependency-check feeds
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/dependency-check-data
+          key: dependency-check-data-${{ runner.os }}-v9
+          restore-keys: |
+            dependency-check-data-${{ runner.os }}-
+
+      - name: OWASP dependency-check
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: ./gradlew dependencyCheckAnalyze
+
       - name: Upload static analysis reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -51,4 +64,5 @@ jobs:
             build/reports/checkstyle/
             build/reports/pmd/
             build/reports/spotbugs/
+            build/reports/dependency-check-report.html
           retention-days: 14

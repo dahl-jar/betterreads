@@ -79,7 +79,7 @@ class ResendMailSender implements MailSender {
                 .retrieve()
                 .toBodilessEntity()
                 .block(RESPONSE_TIMEOUT);
-            LOG.info("mail.send.success idempotencyKey={}", LogSanitizer.forLog(message.idempotencyKey()));
+            LOG.info("Sent mail via Resend idempotencyKey={}", LogSanitizer.forLog(message.idempotencyKey()));
         } catch (final WebClientResponseException ex) {
             throw new MailSendException(
                 "Resend returned " + ex.getStatusCode().value() + ": " + ex.getResponseBodyAsString(),

@@ -59,14 +59,14 @@ public class MailOutboxWorker {
     public void drain() {
         final List<Long> claimedIds = claimer.claimBatch();
         for (final Long claimedId : claimedIds) {
-            processOne(claimedId);
+            sendOne(claimedId);
         }
     }
 
-    private void processOne(final long outboxId) {
+    private void sendOne(final long outboxId) {
         final MailOutbox row = repository.findById(outboxId).orElse(null);
         if (row == null) {
-            LOG.warn("mail.outbox.process.row-vanished id={}", outboxId);
+            LOG.warn("Claimed outbox row vanished before send id={}", outboxId);
             return;
         }
         final MailMessage message = new MailMessage(
@@ -79,7 +79,7 @@ public class MailOutboxWorker {
             mailSender.send(message);
             resolver.markSent(outboxId);
         } catch (final MailSendException failure) {
-            resolver.handleFailure(outboxId, row.getAttemptCount(), failure);
+            resolver.recordFailure(outboxId, row.getAttemptCount(), failure);
         }
     }
 
