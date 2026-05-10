@@ -103,6 +103,12 @@ auth:
     max-buckets: 10000
     trusted-proxies: ${AUTH_TRUSTED_PROXIES:}
 
+betterreads:
+  auth:
+    deletion:
+      grace-period-hours: ${AUTH_DELETION_GRACE_PERIOD_HOURS:720}
+      scheduler-enabled: ${AUTH_DELETION_SCHEDULER_ENABLED:true}
+
 openlibrary:
   base-url: https://openlibrary.org
   search-limit: 20

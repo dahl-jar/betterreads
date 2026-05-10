@@ -1,6 +1,7 @@
 package com.betterreads.auth.controller;
 
 import com.betterreads.auth.cookie.RefreshCookieProperties;
+import com.betterreads.auth.deletion.AccountDeletionService;
 import com.betterreads.auth.dto.AuthResponse;
 import com.betterreads.auth.dto.ForgotPasswordRequest;
 import com.betterreads.auth.dto.LoginRequest;
@@ -29,6 +30,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -59,20 +61,25 @@ class AuthController {
 
     private final EmailVerificationService emailVerificationService;
 
+    private final AccountDeletionService accountDeletionService;
+
     private final RefreshCookieProperties cookieProperties;
 
     private final Duration refreshLifetime;
 
+    @SuppressWarnings("PMD.ExcessiveParameterList")
     AuthController(
         final AuthService authService,
         final PasswordResetService passwordResetService,
         final EmailVerificationService emailVerificationService,
+        final AccountDeletionService accountDeletionService,
         final RefreshCookieProperties cookieProperties,
         final JwtProperties jwtProperties
     ) {
         this.authService = authService;
         this.passwordResetService = passwordResetService;
         this.emailVerificationService = emailVerificationService;
+        this.accountDeletionService = accountDeletionService;
         this.cookieProperties = cookieProperties;
         this.refreshLifetime = Duration.ofDays(jwtProperties.refreshExpirationDays());
     }
@@ -110,6 +117,24 @@ class AuthController {
     @Operation(summary = "Get the current authenticated user")
     public UserResponse me(@AuthenticationPrincipal final Long userId) {
         return authService.currentUser(userId);
+    }
+
+    /**
+     * Soft-deletes the authenticated user. The row stays in {@code app_user} during a 30-day
+     * grace window, then a scheduled sweep hard-deletes it. Refresh tokens are revoked
+     * immediately, outstanding password-reset and verification tokens are invalidated, and the
+     * cookie is cleared from the browser.
+     *
+     * <p>Idempotent: returns {@code 204} whether the account was active or already soft-deleted.
+     * The access JWT remains valid until natural expiry; refresh-revoke kills the renewal path.
+     */
+    @DeleteMapping("/me")
+    @Operation(summary = "Delete the current account (soft-delete with 30-day grace)")
+    public ResponseEntity<Void> deleteMe(@AuthenticationPrincipal final Long userId) {
+        accountDeletionService.deleteOwnAccount(userId);
+        return ResponseEntity.noContent()
+            .header(HttpHeaders.SET_COOKIE, clearCookie().toString())
+            .build();
     }
 
     /**

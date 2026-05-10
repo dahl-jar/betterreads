@@ -13,15 +13,26 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
+import org.hibernate.annotations.SQLRestriction;
 import org.jspecify.annotations.Nullable;
 
 /**
  * Maps to {@code app_user} (Flyway V1). Both {@code username} and {@code email} are unique.
  * Timestamps are set by JPA lifecycle hooks so the application owns the clock.
+ *
+ * <p>Soft-delete: {@link #deletedAt} is the deletion timestamp. The class-level
+ * {@link SQLRestriction} hides every row with {@code deleted_at IS NOT NULL} from every
+ * Hibernate-driven SELECT (derived finders, custom JPQL, inherited {@code findById},
+ * {@code existsBy*}). Forgetting to gate a new finder is therefore the safe default; the auth
+ * path stops surfacing deleted users automatically.
+ *
+ * <p>The hard-delete sweep needs to <em>see</em> deleted rows. It uses a native SQL
+ * {@code DELETE FROM app_user} statement so the filter does not apply.
  */
 @Entity
 @Table(name = "app_user")
-@SuppressWarnings({"NullAway.Init", "PMD.DataClass"})
+@SQLRestriction("deleted_at IS NULL")
+@SuppressWarnings({"NullAway.Init", "PMD.DataClass", "PMD.ExcessivePublicCount"})
 public class User {
 
     @Id
@@ -59,6 +70,10 @@ public class User {
 
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
+
+    @Column(name = "deleted_at")
+    @Nullable
+    private Instant deletedAt;
 
     @PrePersist
     void onCreate() {
@@ -146,5 +161,14 @@ public class User {
 
     public OffsetDateTime getUpdatedAt() {
         return updatedAt;
+    }
+
+    @Nullable
+    public Instant getDeletedAt() {
+        return deletedAt;
+    }
+
+    public void setDeletedAt(@Nullable final Instant deletedAt) {
+        this.deletedAt = deletedAt;
     }
 }

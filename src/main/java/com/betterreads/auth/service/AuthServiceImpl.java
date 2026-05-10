@@ -13,7 +13,6 @@ import com.betterreads.auth.refresh.RefreshTokenService;
 import com.betterreads.auth.repository.UserRepository;
 import com.betterreads.common.crypto.PasswordByteLimit;
 import com.betterreads.common.exception.BusinessRuleException;
-import com.betterreads.common.exception.ResourceNotFoundException;
 import com.betterreads.common.util.LogSanitizer;
 
 import java.util.Locale;
@@ -45,7 +44,7 @@ class AuthServiceImpl implements AuthService {
 
     private static final String INVALID_REFRESH_TOKEN = "Invalid refresh token";
 
-    private static final String USER_NOT_FOUND = "User not found";
+    private static final String SESSION_NO_LONGER_VALID = "Session no longer valid";
 
     private final UserRepository userRepository;
 
@@ -136,7 +135,10 @@ class AuthServiceImpl implements AuthService {
     @Transactional(readOnly = true)
     public UserResponse currentUser(final long userId) {
         final User user = userRepository.findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException(USER_NOT_FOUND));
+            .orElseThrow(() -> {
+                LOG.warn("Current-user lookup rejected: bearer points to deleted or missing user userId={}", userId);
+                return new BadCredentialsException(SESSION_NO_LONGER_VALID);
+            });
         return userMapper.toResponse(user);
     }
 

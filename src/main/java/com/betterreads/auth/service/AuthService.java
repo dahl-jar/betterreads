@@ -31,7 +31,10 @@ public interface AuthService {
     /**
      * Returns the profile of the user with the given id.
      *
-     * @throws com.betterreads.common.exception.ResourceNotFoundException user no longer exists
+     * @throws org.springframework.security.authentication.BadCredentialsException the bearer
+     *     references a user that no longer exists (deleted or hard-removed). The endpoint maps
+     *     this to {@code 401} so a stale token after self-delete is treated as a session
+     *     invalidation, not a missing resource.
      */
     UserResponse currentUser(long userId);
 
