@@ -45,6 +45,7 @@ Returns a precomputed list. Served from cache or a scheduled sync job, never reb
 | `/api/v1/auth/refresh` | POST | `br_refresh` cookie |
 | `/api/v1/auth/logout` | POST | `br_refresh` cookie |
 | `/api/v1/auth/me` | GET | access JWT |
+| `/api/v1/auth/me` | DELETE | access JWT |
 | `/api/v1/auth/forgot-password` | POST | none |
 | `/api/v1/auth/reset-password` | POST | reset token |
 | `/api/v1/auth/verify-email` | POST | verification token |
@@ -55,5 +56,7 @@ Access tokens are HS256 JWTs with a 2-hour lifetime, returned in the JSON body a
 `forgot-password` returns 204 whether or not the email matches an account so the response cannot be used to enumerate registered users. When the email matches, an outbox row is queued and a worker delivers the reset link asynchronously. `reset-password` consumes the token, replaces the password, and revokes every refresh token for the account so other devices are signed out. Reset tokens are single-use, expire after 15 minutes, and the same opaque 400 covers unknown, expired, and already-consumed tokens.
 
 `register` enqueues a verification mail in the same transaction as the user insert. The response carries `emailVerified: false` until the link is clicked. `verify-email` consumes the token and sets `email_verified_at`. Replay of the same successful token returns 204. A token superseded by a later `resend-verification` returns 400; the account is still unverified and the caller must click the new link. Verification tokens are single-use, expire after 24 hours, and the same opaque 400 covers unknown, expired, and superseded tokens. `resend-verification` returns 204 for unknown emails, for already-verified accounts, and for the success case so the response cannot be used to probe registration or verification state.
+
+`DELETE /me` soft-deletes the authenticated user, revokes every active refresh token, marks any outstanding password-reset and verification tokens consumed, and clears the `br_refresh` cookie. The response is 204. The row stays in `app_user` during a 30-day grace window so the email and username slots remain held; after that, an hourly scheduled sweep removes the row and Postgres foreign keys cascade to the user-scoped tables. Once the soft-delete commits, `GET /me` and `POST /refresh` return 401, login with the same credentials returns 401, and `forgot-password` for the same address enqueues no mail. The endpoint is idempotent: a second `DELETE /me` from the same access JWT also returns 204. The access JWT itself remains valid until natural expiry; because every refresh token has been revoked, no fresh access token can be issued.
 
 Request and response shapes for the auth endpoints are in Swagger UI at `/swagger-ui.html`.

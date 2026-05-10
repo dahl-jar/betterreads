@@ -16,7 +16,7 @@ create table user_book_interaction (
   weight numeric(10,2) not null,
   metadata jsonb,
   created_at timestamptz not null default now(),
-  foreign key (user_id) references app_user(user_id),
+  foreign key (user_id) references app_user(user_id) on delete cascade,
   foreign key (book_id) references book(book_id)
 );
 ```
@@ -48,7 +48,7 @@ create table user_book_signal (
   view_count integer not null default 0,
   last_event_at timestamptz not null,
   primary key (user_id, book_id),
-  foreign key (user_id) references app_user(user_id),
+  foreign key (user_id) references app_user(user_id) on delete cascade,
   foreign key (book_id) references book(book_id)
 );
 ```
@@ -70,7 +70,7 @@ create table user_recommendation (
   model_version varchar(100),
   generated_at timestamptz not null default now(),
   expires_at timestamptz,
-  foreign key (user_id) references app_user(user_id),
+  foreign key (user_id) references app_user(user_id) on delete cascade,
   foreign key (book_id) references book(book_id),
   unique (user_id, book_id, model_version)
 );
@@ -101,19 +101,23 @@ Powers "because you read this", "similar books", and fallback recommendations fo
 ```sql
 create table activity_event (
   activity_id bigserial primary key,
-  actor_user_id bigint not null,
+  actor_user_id bigint,
   target_user_id bigint,
   book_id bigint,
   club_id bigint,
   event_type varchar(50) not null,
   payload jsonb,
   created_at timestamptz not null default now(),
-  foreign key (actor_user_id) references app_user(user_id),
+  foreign key (actor_user_id) references app_user(user_id) on delete set null,
   foreign key (book_id) references book(book_id)
 );
 ```
 
-Event storage stays separate from rendered feed items. A `feed_item` table can be materialized later if needed.
+Event storage stays separate from rendered feed items. A `feed_item` table can be materialized later if needed. `actor_user_id` is nullable: when the referenced user is hard-deleted, the row is retained and `actor_user_id` is set to `null` instead of the event being cascade-deleted.
+
+## Account deletion and foreign keys
+
+The hourly account-deletion sweep removes soft-deleted users by issuing `DELETE FROM app_user`. The user-scoped tables in this section use `on delete cascade`, so deleting the parent row removes the dependent rows in the same statement. `activity_event` uses `on delete set null` on `actor_user_id`: the row is retained and the actor reference becomes `null`. Auth-side tables (`refresh_token`, `email_token`, `review`, `collection`) also cascade.
 
 ### Indexes
 

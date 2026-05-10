@@ -51,4 +51,8 @@
         <Bug pattern="EI_EXPOSE_REP2"/>
         <Class name="com.betterreads.auth.emailverification.EmailVerificationService"/>
     </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Package name="com.betterreads.auth.deletion"/>
+    </Match>
 </FindBugsFilter>
