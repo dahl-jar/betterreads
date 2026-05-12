@@ -51,6 +51,11 @@ public final class SecurityConfig {
 
     private static final String PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=()";
 
+    private static final String[] LOCAL_SCRAPE_PATHS = {
+        "/actuator/prometheus",
+        "/actuator/health"
+    };
+
     private static final String[] DOCS_PATHS = {
         "/v3/api-docs/**",
         "/swagger-ui/**",
@@ -91,6 +96,12 @@ public final class SecurityConfig {
      * Matches actuator paths only when the request arrives on the management port. With a
      * Cloudflare Access JWT decoder configured, requires a valid {@code Cf-Access-Jwt-Assertion}
      * header. Without one, falls back to {@code permitAll}.
+     *
+     * <p>{@code /actuator/prometheus} and {@code /actuator/health} are exempted from the JWT gate.
+     * The management port is not routed through the Cloudflare Tunnel, so these two endpoints
+     * are only reachable by processes already on the VM (the local Alloy agent and the systemd
+     * healthcheck). An HTTP gate adds no real security over the existing network binding for
+     * read-only metrics and health.
      */
     @Bean
     @Order(0)
@@ -117,7 +128,9 @@ public final class SecurityConfig {
                 .oauth2ResourceServer(oauth2 -> oauth2
                     .bearerTokenResolver(new CloudflareAccessJwtAssertionResolver())
                     .jwt(jwt -> jwt.decoder(decoder)))
-                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                .authorizeHttpRequests(auth -> auth
+                    .requestMatchers(LOCAL_SCRAPE_PATHS).permitAll()
+                    .anyRequest().authenticated())
                 .exceptionHandling(handling -> handling
                     .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)));
         } else {
