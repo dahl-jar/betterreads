@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
  * same VM without competing. Multi-instance deployments need a distributed lock; today the
  * single VM is the lock.
  */
-// HACK: in-process @Scheduled poller. Multi-instance breaks; idempotency saves us but doubles DB churn.
+// TODO(when scaling beyond one app instance): add leader election so only one replica drains the outbox
 @Component
 public class MailOutboxWorker {
 
