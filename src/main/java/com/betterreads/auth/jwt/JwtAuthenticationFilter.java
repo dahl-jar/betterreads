@@ -1,14 +1,7 @@
 package com.betterreads.auth.jwt;
 
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-
 import java.io.IOException;
 import java.util.List;
-
-import com.betterreads.common.util.LogSanitizer;
 
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -19,6 +12,13 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+
+import com.betterreads.common.util.LogSanitizer;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * Reads {@code Authorization: Bearer} tokens and populates the security context. Invalid tokens

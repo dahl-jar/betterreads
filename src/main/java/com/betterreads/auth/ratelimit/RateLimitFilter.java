@@ -71,7 +71,7 @@ public final class RateLimitFilter extends OncePerRequestFilter {
      * Trusted-proxy CIDRs are parsed once at construction. Malformed entries are dropped with
      * a warning log so a single bad config line cannot break filter startup.
      */
-    // HACK: in-memory bucket map. Restart wipes state and multi-instance breaks. Move to Redis when scaling out.
+    // TODO(when scaling beyond one app instance): move buckets to Redis so replicas share limits
     public RateLimitFilter(final RateLimitProperties properties) {
         super();
         this.endpoints = buildEndpoints(properties);

@@ -21,6 +21,7 @@ import org.springframework.validation.annotation.Validated;
 public record JwtProperties(
     @NotBlank @Size(min = 32) String secret,
     @NotBlank String issuer,
+    // TODO(once admins can ban users): drop to 15 minutes so a ban takes effect within minutes, not hours
     @Positive long expirationMinutes,
     @Positive long refreshExpirationDays
 ) { }
