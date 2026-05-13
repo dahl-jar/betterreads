@@ -228,6 +228,13 @@ dependencyCheck {
 tasks.withType<Test> {
 	useJUnitPlatform()
 	finalizedBy(tasks.jacocoTestReport)
+
+	// Disable @Scheduled jobs during tests. Without these, the mail-outbox worker and the
+	// account-deletion sweep tick on a shared scheduler thread and can race the Testcontainers
+	// Postgres shutdown at the end of an integration test, producing a noisy 30s Hikari timeout
+	// long after the test has already passed.
+	systemProperty("mail.outbox.worker-enabled", "false")
+	systemProperty("betterreads.auth.deletion.scheduler-enabled", "false")
 }
 
 // Wire coverage verification into check
