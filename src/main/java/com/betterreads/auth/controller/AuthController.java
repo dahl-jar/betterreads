@@ -15,8 +15,13 @@ import com.betterreads.auth.jwt.JwtProperties;
 import com.betterreads.auth.passwordreset.PasswordResetService;
 import com.betterreads.auth.service.AuthService;
 import com.betterreads.auth.service.TokenPair;
+import com.betterreads.common.dto.ApiErrorResponse;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import jakarta.validation.Valid;
@@ -90,6 +95,14 @@ class AuthController {
      */
     @PostMapping("/register")
     @Operation(summary = "Register a new user")
+    @SecurityRequirements
+    @ApiResponse(responseCode = "201", description = "Account created")
+    @ApiResponse(responseCode = "400", description = "Validation failed",
+        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    @ApiResponse(responseCode = "409", description = "Username or email already taken",
+        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    @ApiResponse(responseCode = "429", description = "Rate limited",
+        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody final RegisterRequest request) {
         final TokenPair pair = authService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -103,6 +116,14 @@ class AuthController {
      */
     @PostMapping("/login")
     @Operation(summary = "Log in with username or email")
+    @SecurityRequirements
+    @ApiResponse(responseCode = "200", description = "Authenticated")
+    @ApiResponse(responseCode = "400", description = "Validation failed",
+        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    @ApiResponse(responseCode = "401", description = "Invalid credentials",
+        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    @ApiResponse(responseCode = "429", description = "Rate limited",
+        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody final LoginRequest request) {
         final TokenPair pair = authService.login(request);
         return ResponseEntity.ok()
@@ -115,6 +136,9 @@ class AuthController {
      */
     @GetMapping("/me")
     @Operation(summary = "Get the current authenticated user")
+    @ApiResponse(responseCode = "200", description = "Current user profile")
+    @ApiResponse(responseCode = "401", description = "Missing or invalid access token",
+        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     public UserResponse me(@AuthenticationPrincipal final Long userId) {
         return authService.currentUser(userId);
     }
@@ -130,6 +154,9 @@ class AuthController {
      */
     @DeleteMapping("/me")
     @Operation(summary = "Delete the current account (soft-delete with 30-day grace)")
+    @ApiResponse(responseCode = "204", description = "Account soft-deleted")
+    @ApiResponse(responseCode = "401", description = "Missing or invalid access token",
+        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     public ResponseEntity<Void> deleteMe(@AuthenticationPrincipal final Long userId) {
         accountDeletionService.deleteOwnAccount(userId);
         return ResponseEntity.noContent()
@@ -145,6 +172,10 @@ class AuthController {
      */
     @PostMapping("/refresh")
     @Operation(summary = "Rotate access and refresh tokens")
+    @SecurityRequirements
+    @ApiResponse(responseCode = "200", description = "New access token; refresh cookie rotated")
+    @ApiResponse(responseCode = "401", description = "Missing, expired, or already-rotated refresh token",
+        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     public ResponseEntity<AuthResponse> refresh(
         @CookieValue(name = COOKIE_NAME, required = false) final String refreshToken
     ) {
@@ -166,6 +197,8 @@ class AuthController {
      */
     @PostMapping("/logout")
     @Operation(summary = "Revoke a refresh token")
+    @SecurityRequirements
+    @ApiResponse(responseCode = "204", description = "Refresh cookie cleared")
     public ResponseEntity<Void> logout(
         @CookieValue(name = COOKIE_NAME, required = false) final String refreshToken
     ) {
@@ -184,6 +217,12 @@ class AuthController {
      */
     @PostMapping("/forgot-password")
     @Operation(summary = "Start a password reset")
+    @SecurityRequirements
+    @ApiResponse(responseCode = "204", description = "Reset email dispatched if account exists")
+    @ApiResponse(responseCode = "400", description = "Validation failed",
+        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    @ApiResponse(responseCode = "429", description = "Rate limited",
+        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     public ResponseEntity<Void> forgotPassword(@Valid @RequestBody final ForgotPasswordRequest request) {
         passwordResetService.requestReset(request.email());
         return ResponseEntity.noContent().build();
@@ -196,6 +235,12 @@ class AuthController {
      */
     @PostMapping("/reset-password")
     @Operation(summary = "Complete a password reset")
+    @SecurityRequirements
+    @ApiResponse(responseCode = "204", description = "Password replaced")
+    @ApiResponse(responseCode = "400", description = "Invalid, expired, or already-consumed token",
+        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    @ApiResponse(responseCode = "429", description = "Rate limited",
+        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     public ResponseEntity<Void> resetPassword(@Valid @RequestBody final ResetPasswordRequest request) {
         passwordResetService.resetPassword(request.token(), request.newPassword());
         return ResponseEntity.noContent().build();
@@ -208,6 +253,12 @@ class AuthController {
      */
     @PostMapping("/verify-email")
     @Operation(summary = "Confirm an email address")
+    @SecurityRequirements
+    @ApiResponse(responseCode = "204", description = "Email verified or replay accepted")
+    @ApiResponse(responseCode = "400", description = "Invalid or expired token",
+        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    @ApiResponse(responseCode = "429", description = "Rate limited",
+        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     public ResponseEntity<Void> verifyEmail(@Valid @RequestBody final VerifyEmailRequest request) {
         emailVerificationService.verify(request.token());
         return ResponseEntity.noContent().build();
@@ -220,6 +271,12 @@ class AuthController {
      */
     @PostMapping("/resend-verification")
     @Operation(summary = "Resend an email-verification link")
+    @SecurityRequirements
+    @ApiResponse(responseCode = "204", description = "Resend email dispatched if account is unverified")
+    @ApiResponse(responseCode = "400", description = "Validation failed",
+        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    @ApiResponse(responseCode = "429", description = "Rate limited",
+        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     public ResponseEntity<Void> resendVerification(
         @Valid @RequestBody final ResendVerificationRequest request
     ) {

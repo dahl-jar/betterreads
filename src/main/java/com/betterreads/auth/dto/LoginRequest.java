@@ -1,5 +1,6 @@
 package com.betterreads.auth.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 
 /**
@@ -7,6 +8,9 @@ import jakarta.validation.constraints.NotBlank;
  * email; the service tries username first, then email.
  */
 public record LoginRequest(
+    @Schema(example = "john.doe@example.com", description = "Username or email")
     @NotBlank String identifier,
+
+    @Schema(example = "********", description = "Account password")
     @NotBlank String password
 ) { }
