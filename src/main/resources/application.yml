@@ -127,6 +127,7 @@ springdoc:
     tags-sorter: alpha
     display-request-duration: true
   show-actuator: false
+  public-url: ${SPRINGDOC_PUBLIC_URL:http://localhost:8080}
 
 logging:
   level:

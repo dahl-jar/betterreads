@@ -1,5 +1,6 @@
 package com.betterreads.common.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.List;
 
@@ -8,9 +9,9 @@ import java.util.List;
  * for non-validation errors.
  */
 public record ApiErrorResponse(
-    int status,
-    String message,
-    Instant timestamp,
+    @Schema(example = "400") int status,
+    @Schema(example = "Validation failed") String message,
+    @Schema(example = "2026-05-13T08:30:00Z") Instant timestamp,
     List<FieldError> fieldErrors
 ) {
 
@@ -21,5 +22,8 @@ public record ApiErrorResponse(
     /**
      * Per-field validation failure surfaced inside {@link ApiErrorResponse#fieldErrors}.
      */
-    public record FieldError(String field, String message) { }
+    public record FieldError(
+        @Schema(example = "email") String field,
+        @Schema(example = "must be a well-formed email address") String message
+    ) { }
 }
