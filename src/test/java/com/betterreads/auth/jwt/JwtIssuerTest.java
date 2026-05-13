@@ -1,8 +1,12 @@
 package com.betterreads.auth.jwt;
 
-import org.junit.jupiter.api.Test;
-
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -28,6 +32,28 @@ class JwtIssuerTest {
         final String token = issuer.issue(USER_ID);
 
         assertThat(issuer.parseUserId(token)).isEqualTo(USER_ID);
+    }
+
+    @Test
+    void issuedTokenCarriesExpectedAudience() {
+        final JwtIssuer issuer = new JwtIssuer(SECRET, ISSUER, ONE_HOUR);
+
+        final Claims claims = readClaims(issuer.issue(USER_ID));
+
+        assertThat(claims.getAudience()).containsExactly(JwtIssuer.AUDIENCE);
+    }
+
+    @Test
+    void issuedTokensCarryUniqueJti() {
+        final JwtIssuer issuer = new JwtIssuer(SECRET, ISSUER, ONE_HOUR);
+
+        final Claims firstClaims = readClaims(issuer.issue(USER_ID));
+        final Claims secondClaims = readClaims(issuer.issue(USER_ID));
+
+        assertThat(firstClaims.getId())
+            .isNotBlank()
+            .satisfies(UUID::fromString)
+            .isNotEqualTo(secondClaims.getId());
     }
 
     @Test
@@ -57,5 +83,27 @@ class JwtIssuerTest {
 
         assertThatThrownBy(() -> issuer.parseUserId("not.a.real.jwt"))
             .isInstanceOf(InvalidJwtException.class);
+    }
+
+    @Test
+    void tokenWithWrongAudienceIsRejected() {
+        final JwtIssuer issuer = new JwtIssuer(SECRET, ISSUER, ONE_HOUR);
+        final String foreignToken = Jwts.builder()
+            .issuer(ISSUER)
+            .audience().add("some-other-api").and()
+            .subject(Long.toString(USER_ID))
+            .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)))
+            .compact();
+
+        assertThatThrownBy(() -> issuer.parseUserId(foreignToken))
+            .isInstanceOf(InvalidJwtException.class);
+    }
+
+    private static Claims readClaims(final String token) {
+        return Jwts.parser()
+            .verifyWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)))
+            .build()
+            .parseSignedClaims(token)
+            .getPayload();
     }
 }

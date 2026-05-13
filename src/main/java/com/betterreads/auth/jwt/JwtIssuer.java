@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
+import java.util.UUID;
 
 import javax.crypto.SecretKey;
 
@@ -17,10 +18,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
- * Issues and parses HS256-signed JWTs. Subject claim carries the user id.
+ * Issues and parses HS256-signed JWTs. Subject claim carries the user id. Every issued token
+ * also carries an {@code aud} (the API the token is valid against) and a {@code jti} (a UUID
+ * unique per token) so the wire shape matches what most JWT-aware tooling expects.
  */
 @Component
 public final class JwtIssuer {
+
+    static final String AUDIENCE = "betterreads-api";
 
     private final SecretKey signingKey;
 
@@ -50,6 +55,8 @@ public final class JwtIssuer {
         final Instant now = Instant.now();
         return Jwts.builder()
             .issuer(issuer)
+            .audience().add(AUDIENCE).and()
+            .id(UUID.randomUUID().toString())
             .subject(Long.toString(userId))
             .issuedAt(Date.from(now))
             .expiration(Date.from(now.plus(expiration)))
@@ -58,15 +65,18 @@ public final class JwtIssuer {
     }
 
     /**
-     * Returns the user id parsed from the subject claim.
+     * Returns the user id parsed from the subject claim. Tokens that are missing the expected
+     * audience are rejected so a token minted for another service cannot be replayed here.
      *
-     * @throws InvalidJwtException malformed, bad signature, expired, or non-numeric subject
+     * @throws InvalidJwtException malformed, bad signature, expired, wrong issuer, wrong
+     *         audience, or non-numeric subject
      */
     public long parseUserId(final String token) {
         try {
             final Jws<Claims> parsed = Jwts.parser()
                 .verifyWith(signingKey)
                 .requireIssuer(issuer)
+                .requireAudience(AUDIENCE)
                 .build()
                 .parseSignedClaims(token);
             return Long.parseLong(parsed.getPayload().getSubject());
