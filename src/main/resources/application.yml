@@ -133,5 +133,6 @@ logging:
   level:
     com.betterreads: INFO
     org.springframework.security: WARN
+    org.springdoc: WARN
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{requestId:-}] %logger{36} - %msg%n"
