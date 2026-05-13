@@ -34,6 +34,8 @@ LOCK_FILE="/run/betterreads-deploy.lock"
 HEALTH_URL="http://127.0.0.1:8080/healthz"
 HEALTH_TIMEOUT_SEC=90
 HEALTH_POLL_INTERVAL_SEC=2
+PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-https://api.betterreadsapp.com/healthz}"
+PUBLIC_HEALTH_TIMEOUT_SEC=60
 SERVICE_NAME="betterreads"
 JAR_MIN_SIZE=10485760    # 10 MB sanity floor
 JAR_MAX_SIZE=209715200   # 200 MB sanity ceiling
@@ -50,6 +52,11 @@ if ! flock -n 9; then
   log "another deploy run is in progress; exiting"
   exit 0
 fi
+
+# Heartbeat so the Loki {job="bd-deploy"} stream always has a recent entry. Without this the
+# stream is empty 99% of the time and looks broken in dashboards. Anything past this line is
+# either a no-op exit (no new release) or a real deploy with its own log lines.
+log "deploy-pull tick"
 
 # --- Load PAT ---
 if [ ! -f "$ENV_FILE" ]; then
@@ -248,8 +255,9 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
   sleep "$HEALTH_POLL_INTERVAL_SEC"
 done
 
-if [ "$healthy" -ne 1 ]; then
-  err "healthcheck failed after ${HEALTH_TIMEOUT_SEC}s for ${release_sha}; rolling back"
+rollback_and_exit() {
+  local reason="$1"
+  err "${reason}; rolling back ${release_sha}"
   if [ -f "$APP_JAR_PREVIOUS" ]; then
     mv "$APP_JAR" "${APP_DIR}/app.jar.failed-${release_sha}"
     mv "$APP_JAR_PREVIOUS" "$APP_JAR"
@@ -263,6 +271,33 @@ if [ "$healthy" -ne 1 ]; then
   # the line from $FAILED_SHAS_FILE, or pin a known-good SHA in $VERSION_LOCK.
   echo "$release_sha $(date -u +%FT%TZ)" >> "$FAILED_SHAS_FILE"
   exit 1
+}
+
+if [ "$healthy" -ne 1 ]; then
+  rollback_and_exit "localhost healthcheck failed after ${HEALTH_TIMEOUT_SEC}s"
+fi
+
+# --- Public-URL healthcheck ---
+# Localhost-green / public-red is a real failure mode: the app is fine but the
+# tunnel or Cloudflare edge is not forwarding traffic. A previous incident left
+# api.betterreadsapp.com returning 502 for an unknown amount of time while the
+# localhost check stayed green. Treat the public route as part of the deploy
+# contract: if it isn't serving 200 within the window, roll back.
+log "verifying public route ${PUBLIC_HEALTH_URL}"
+public_deadline=$(( $(date +%s) + PUBLIC_HEALTH_TIMEOUT_SEC ))
+public_healthy=0
+while [ "$(date +%s)" -lt "$public_deadline" ]; do
+  public_status=$(curl -s --max-time 5 -o /dev/null -w '%{http_code}' "$PUBLIC_HEALTH_URL" 2>/dev/null || true)
+  [ -n "$public_status" ] || public_status="000"
+  if [ "$public_status" = "200" ]; then
+    public_healthy=1
+    break
+  fi
+  sleep "$HEALTH_POLL_INTERVAL_SEC"
+done
+
+if [ "$public_healthy" -ne 1 ]; then
+  rollback_and_exit "public healthcheck failed after ${PUBLIC_HEALTH_TIMEOUT_SEC}s (last status ${public_status})"
 fi
 
 # --- Success ---
