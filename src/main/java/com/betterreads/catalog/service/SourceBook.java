@@ -37,4 +37,10 @@ public record SourceBook(
         @Nullable Integer ratingCount,
         @Nullable String seriesName,
         @Nullable Integer seriesPosition) {
+
+    public SourceBook {
+        authorNames = authorNames == null ? null : List.copyOf(authorNames);
+        rawSubjects = rawSubjects == null ? null : List.copyOf(rawSubjects);
+        rawCategories = rawCategories == null ? null : List.copyOf(rawCategories);
+    }
 }
