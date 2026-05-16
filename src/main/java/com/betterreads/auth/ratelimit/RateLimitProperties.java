@@ -9,13 +9,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Per-IP token-bucket limits for {@code /auth/login}, {@code /auth/register},
- * {@code /auth/forgot-password}, {@code /auth/reset-password}, {@code /auth/verify-email},
- * and {@code /auth/resend-verification}. Empty bucket returns 429.
+ * Per-IP token-bucket limits for the public auth endpoints, bound from
+ * {@code auth.rate-limit.*}.
  *
- * <p>{@code trustedProxies} CIDRs whitelist sources whose {@code X-Forwarded-For} header is
- * honored. Anything else is bucketed by {@code remoteAddr} so a direct attacker cannot pick a
- * fresh bucket per request by spoofing the header.
+ * <p>{@code X-Forwarded-For} is only read when the immediate client matches a CIDR in
+ * {@code trustedProxies}. Otherwise the bucket key is {@code remoteAddr} so a direct attacker
+ * cannot pick a fresh bucket by setting the header.
  */
 @Validated
 @ConfigurationProperties(prefix = "auth.rate-limit")

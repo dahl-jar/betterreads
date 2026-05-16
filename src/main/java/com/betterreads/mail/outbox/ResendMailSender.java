@@ -23,13 +23,11 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import reactor.netty.http.client.HttpClient;
 
 /**
- * {@link MailSender} backed by Resend's HTTP API. Sends an {@code Idempotency-Key} header set
- * to the outbox row id so retries of the same row dedupe at Resend's side within their 24-hour
- * window.
+ * {@link MailSender} backed by Resend's HTTP API.
  *
- * <p>Maps response codes to {@link MailSendException}: 4xx (except 429) are non-retryable so
- * the worker gives up immediately; 429 and 5xx are retryable and the worker reschedules. A
- * connect or read timeout is also retryable.
+ * <p>Sends an {@code Idempotency-Key} header set to the outbox row id so retries of the same
+ * row dedupe at Resend within its 24-hour window. 4xx other than 429 are mapped to a
+ * non-retryable failure; 429, 5xx, and timeouts are retryable.
  */
 @Component
 @ConditionalOnProperty(prefix = "mail", name = "provider", havingValue = "resend")

@@ -12,18 +12,20 @@ import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 
 /**
- * Wires a {@link JwtDecoder} for Cloudflare Access when {@code cloudflare.access.aud} and
- * {@code cloudflare.access.team-domain} are both set. Decoder fetches the team JWKS, validates
- * RS256 signatures, applies Spring's default timestamp checks, then enforces AUD.
+ * Wires a {@link JwtDecoder} for Cloudflare Access when both {@code cloudflare.access.aud} and
+ * {@code cloudflare.access.team-domain} are set.
+ *
+ * <p>Fetches the team JWKS, checks the RS256 signature, applies Spring's default timestamp
+ * checks, then checks the {@code aud} claim.
  */
 @Configuration
 @EnableConfigurationProperties(CloudflareAccessProperties.class)
 public class CloudflareAccessConfig {
 
     /**
-     * Returns the configured {@link JwtDecoder}, or {@code null} when {@code aud} or
-     * {@code teamDomain} is blank so {@code SecurityConfig} can leave the management chain at
-     * {@code permitAll}.
+     * Returns the {@link JwtDecoder}, or {@code null} when {@code aud} or {@code teamDomain}
+     * is blank so {@link com.betterreads.config.SecurityConfig} can fall back to
+     * {@code permitAll} on the actuator endpoints.
      */
     @Bean
     @Nullable

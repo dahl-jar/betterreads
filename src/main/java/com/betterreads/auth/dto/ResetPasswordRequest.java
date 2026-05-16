@@ -5,8 +5,10 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 /**
- * Request body for {@code POST /api/v1/auth/reset-password}. Password rules match the
- * registration request so a reset cannot downgrade the strength bar.
+ * Request body for {@code POST /api/v1/auth/reset-password}.
+ *
+ * <p>Password rules match the registration request so a reset cannot set a weaker password
+ * than register would have allowed.
  */
 public record ResetPasswordRequest(
     @Schema(example = "8f2a3c4e5d6b7a8f2a3c4e5d6b7a8f2a", description = "Reset token from the email link")

@@ -25,13 +25,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Issues and consumes single-use password-reset tokens. Plaintext is 256-bit random and never
- * stored; only the HMAC-SHA256 hash sits in the DB. A successful reset revokes every refresh
- * token for the user so other devices are kicked off.
+ * Issues and consumes single-use password-reset tokens.
  *
- * <p>The {@code requestReset} side does not reveal whether the email exists: the controller
- * returns {@code 204} for both branches, and the mailer is only invoked when an account
- * actually matches.
+ * <p>Only the HMAC-SHA256 hash is stored. A successful reset revokes every refresh token for
+ * the user so other devices are signed out. The request side returns {@code 204} for both
+ * known and unknown emails so the response cannot be used to enumerate accounts.
  */
 @Service
 public class PasswordResetService {
@@ -77,14 +75,11 @@ public class PasswordResetService {
     }
 
     /**
-     * Issues a reset token for the account matching {@code email} and enqueues the link in the
-     * mail outbox. Returns silently when no account matches so the caller cannot distinguish a
-     * registered email from an unknown one.
+     * Issues a reset token for the matching account and enqueues the email. Silent no-op when
+     * no account matches, so the response does not reveal whether the email is registered.
      *
-     * <p>Holds a row-level write lock on {@code app_user} for the duration of the consume,
-     * insert, and enqueue, so two concurrent reset requests for the same user serialize.
-     * Project-wide lock order is user-first; the consume path acquires the same user lock
-     * before mutating any token row.
+     * <p>Locks the user row for the whole consume-insert-enqueue so two concurrent resets for
+     * the same user serialize.
      */
     @Transactional
     public void requestReset(final String email) {
@@ -103,10 +98,11 @@ public class PasswordResetService {
     }
 
     /**
-     * Marks every active token for the user as consumed. Flushes at the end to force the
-     * UPDATEs to land before the next INSERT in this transaction; Hibernate's default action
-     * queue executes inserts before updates within the same flush, which would hit the partial
-     * unique index on the still-active prior row even though this consume marks it inactive.
+     * Marks every active token for the user as consumed.
+     *
+     * <p>Flushes at the end because Hibernate's default action queue runs inserts before
+     * updates, so the next insert would hit the partial unique index against the still-active
+     * prior row.
      */
     private void consumeOutstandingTokens(final long userId) {
         final Instant now = Instant.now();
@@ -127,17 +123,15 @@ public class PasswordResetService {
     }
 
     /**
-     * Consumes the presented reset token, replaces the user's password, and revokes every
-     * refresh token belonging to the user. Throws {@link InvalidRequestException} when the token
-     * is unknown, expired, or already consumed.
+     * Consumes the token, replaces the password, and revokes every refresh token for the user.
+     * Throws {@link InvalidRequestException} when the token is unknown, expired, or consumed.
      *
-     * <p>The same exception carries the same message for every failure branch so a caller
-     * cannot distinguish "wrong token" from "expired" from "already used."
+     * <p>Every failure branch throws the same message so the response cannot be used to tell
+     * "wrong token" from "expired" from "already used."
      *
-     * <p>Two-phase lookup to honor the project-wide user-first lock order: find the token
-     * unlocked to discover its user_id, then lock the user, then re-fetch the token under that
-     * lock. Without the user lock, two concurrent consumes could both pass the
-     * {@code consumed_at IS NULL} check; with it, the second tx blocks on the first.
+     * <p>Two-phase lookup (find token, lock user, re-fetch token under lock) so two concurrent
+     * consumes serialize on the user row instead of both passing the {@code consumed_at IS NULL}
+     * check.
      */
     @Transactional
     public void resetPassword(final String presentedToken, final String newPassword) {

@@ -9,10 +9,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Allowed browser origins for cross-origin requests. Exact match, wildcards rejected at startup,
- * empty list closes CORS entirely.
+ * Allowed browser origins for cross-origin requests.
  *
- * @param allowedOrigins exact origin strings, e.g. {@code https://app.betterreads.example.com}
+ * <p>Each entry must be a full origin, e.g. {@code https://app.betterreads.example.com}.
+ * Patterns like {@code *.example.com} are rejected at startup. An empty list closes CORS.
+ *
+ * @param allowedOrigins allowed origins
  */
 @Validated
 @ConfigurationProperties(prefix = "app.cors")

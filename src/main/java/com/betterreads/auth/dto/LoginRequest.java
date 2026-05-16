@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 
 /**
  * Request body for {@code POST /api/v1/auth/login}. {@code identifier} accepts a username or
- * email; the service tries username first, then email.
+ * email.
  */
 public record LoginRequest(
     @Schema(example = "john.doe@example.com", description = "Username or email")

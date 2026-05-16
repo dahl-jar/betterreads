@@ -30,8 +30,11 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
 import org.springframework.security.web.header.writers.StaticHeadersWriter;
 
 /**
- * Three filter chains, ordered most-specific first: management (actuator on the internal port),
- * docs (Swagger UI with relaxed CSP), and api (JWT, rate limit, strict CSP).
+ * Three filter chains, ordered most-specific first.
+ *
+ * <p>Management covers the actuator on the internal port. Docs covers Swagger UI and uses a
+ * CSP that allows inline scripts and styles. Api is the catch-all with JWT auth, rate
+ * limiting, and a strict {@code default-src 'none'} CSP.
  */
 @Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
@@ -79,9 +82,10 @@ public final class SecurityConfig {
     private final ObjectProvider<JwtDecoder> cloudflareAccessJwtDecoderProvider;
 
     /**
-     * The Cloudflare Access JWT decoder is optional. When absent, the management chain stays
-     * at {@code permitAll}. Resolved lazily inside the chain bean to avoid bean-creation order
-     * issues.
+     * The Cloudflare Access JWT decoder is optional; when absent, the actuator endpoints stay
+     * at {@code permitAll}.
+     *
+     * <p>Resolved lazily inside the chain bean to avoid bean-creation-order issues.
      */
     @Autowired
     public SecurityConfig(
@@ -93,15 +97,12 @@ public final class SecurityConfig {
     }
 
     /**
-     * Matches actuator paths only when the request arrives on the management port. With a
-     * Cloudflare Access JWT decoder configured, requires a valid {@code Cf-Access-Jwt-Assertion}
-     * header. Without one, falls back to {@code permitAll}.
+     * Filter chain for actuator paths, matched only on the management port.
      *
-     * <p>{@code /actuator/prometheus} and {@code /actuator/health} are exempted from the JWT gate.
-     * The management port is not routed through the Cloudflare Tunnel, so these two endpoints
-     * are only reachable by processes already on the VM (the local Alloy agent and the systemd
-     * healthcheck). An HTTP gate adds no real security over the existing network binding for
-     * read-only metrics and health.
+     * <p>Requires a Cloudflare Access JWT when a decoder is configured; otherwise {@code permitAll}.
+     * {@code /actuator/prometheus} and {@code /actuator/health} skip the JWT check because the
+     * management port is not exposed through the tunnel, so only on-VM processes (Alloy, the
+     * systemd healthcheck) can reach them.
      */
     @Bean
     @Order(0)
@@ -140,9 +141,10 @@ public final class SecurityConfig {
     }
 
     /**
-     * Matches Swagger UI and OpenAPI doc paths. Relaxes CSP enough for the bundled UI to load
-     * its own scripts and styles. Authentication is permitted by default; gate at the network
-     * edge if docs should not be public.
+     * Filter chain for Swagger UI and OpenAPI doc paths.
+     *
+     * <p>CSP allows inline scripts and styles because the bundled Swagger UI loads them. No
+     * authentication; gate at the network edge if docs should not be public.
      */
     @Bean
     @Order(1)
@@ -169,10 +171,7 @@ public final class SecurityConfig {
         return http.build();
     }
 
-    /**
-     * Catch-all chain for application traffic. Stateless, JWT-authenticated, rate-limited at
-     * the public endpoints, and locked down with a strict JSON-API CSP.
-     */
+    /** Catch-all chain: stateless, JWT-authenticated, rate-limited, strict CSP. */
     @Bean
     @Order(2)
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
@@ -222,8 +221,8 @@ public final class SecurityConfig {
     }
 
     /**
-     * Disables the auto-registration that would run {@link RequestIdFilter} twice. The filter
-     * is wired into the security chain via {@code addFilterBefore} instead.
+     * Stops Spring Boot from registering {@link RequestIdFilter} a second time on the servlet
+     * chain; the security chain wires it via {@code addFilterBefore}.
      */
     @Bean
     FilterRegistrationBean<RequestIdFilter> requestIdFilterRegistration(

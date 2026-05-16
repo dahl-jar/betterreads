@@ -1,12 +1,11 @@
 package com.betterreads.mail.outbox;
 
 /**
- * Carrier for a single outbound mail. {@code idempotencyKey} should be stable per outbox row
- * (not per attempt) so a transport-side dedupe collapses retries of the same row.
+ * A single outbound mail.
  *
- * @param recipient destination address, already lowercased
- * @param subject mail subject line
+ * @param recipient destination address
+ * @param subject subject line
  * @param body plaintext body
- * @param idempotencyKey provider-side dedupe key, stable per outbox row
+ * @param idempotencyKey stable per outbox row so provider-side dedupe collapses retries
  */
 public record MailMessage(String recipient, String subject, String body, String idempotencyKey) { }

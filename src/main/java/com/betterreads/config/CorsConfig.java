@@ -39,9 +39,10 @@ public class CorsConfig {
     private static final List<String> EXPOSED_HEADERS = List.of(RequestIdFilter.HEADER);
 
     /**
-     * Credentials are allowed because the frontend sends {@code Authorization: Bearer} on every
-     * authenticated call. Without {@code allowCredentials}, browsers drop the header on
-     * cross-origin requests.
+     * Builds the CORS source.
+     *
+     * <p>{@code allowCredentials} is on because the frontend sends {@code Authorization: Bearer}
+     * cross-origin and browsers otherwise drop the header.
      */
     @Bean
     CorsConfigurationSource corsConfigurationSource(final CorsProperties corsProperties) {

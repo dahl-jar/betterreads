@@ -3,10 +3,7 @@ package com.betterreads.auth.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.Nullable;
 
-/**
- * User profile returned to clients. The password hash and database id are never included;
- * authenticated requests identify the user from the JWT subject claim.
- */
+/** User profile returned to clients. Excludes the password hash and the database id. */
 public record UserResponse(
     @Schema(example = "john.doe") String username,
     @Schema(example = "john.doe@example.com") String email,

@@ -8,9 +8,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * Default {@link MailSender} for environments without a real transport. Records send events as
- * {@code mail.send.skipped} log lines and discards the body. Active when {@code mail.provider}
- * is unset or set to {@code logging}.
+ * {@link MailSender} that logs the send and discards the body.
+ *
+ * <p>Active when {@code mail.provider} is {@code logging} or unset.
  */
 @Component
 @ConditionalOnProperty(prefix = "mail", name = "provider", havingValue = "logging", matchIfMissing = true)

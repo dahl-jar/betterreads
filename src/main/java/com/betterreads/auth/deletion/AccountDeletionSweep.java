@@ -12,17 +12,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Hard-deletes users whose soft-delete is older than the configured grace period. Tests call
- * {@link #sweep()} directly so timing stays deterministic; production runs through
- * {@link AccountDeletionScheduler}.
+ * Hard-deletes users whose soft-delete is older than the grace period.
  *
- * <p>Uses a native SQL {@code DELETE FROM app_user} so the {@code @SQLRestriction} on
- * {@link com.betterreads.auth.entity.User} (which hides deleted rows from JPA queries) does not
- * apply. Dependent rows are removed by the foreign-key cascades configured in the migrations:
- * {@code refresh_token}, {@code email_token}, {@code review}, {@code collection},
- * {@code user_book_interaction}, {@code user_book_signal}, and {@code user_recommendation} all
- * cascade; {@code activity_event.actor_user_id} is set to {@code NULL} so the audit trail
- * survives the user's deletion.
+ * <p>Uses native SQL so the {@code @SQLRestriction} on {@link com.betterreads.auth.entity.User}
+ * (which hides soft-deleted rows from JPA) does not filter them out. Dependent rows are
+ * removed by the FK cascades set up in the migrations.
  */
 @Component
 public class AccountDeletionSweep {
@@ -41,10 +35,7 @@ public class AccountDeletionSweep {
         this.properties = properties;
     }
 
-    /**
-     * Hard-deletes every {@code app_user} row whose {@code deleted_at} is older than the
-     * configured grace period. Returns the number of rows removed.
-     */
+    /** Hard-deletes users past the grace period and returns the number of rows removed. */
     @Transactional
     public int sweep() {
         final Instant cutoff = Instant.now().minus(Duration.ofHours(properties.gracePeriodHours()));

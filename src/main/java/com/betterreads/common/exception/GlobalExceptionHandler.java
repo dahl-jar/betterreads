@@ -24,8 +24,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Maps exceptions to {@link ApiErrorResponse}. 4xx outcomes log at WARN; the catch-all 500 logs
- * at ERROR with stack trace.
+ * Maps exceptions to {@link ApiErrorResponse}.
+ *
+ * <p>4xx outcomes log at WARN; the catch-all 500 logs at ERROR with stack trace.
  */
 @RestControllerAdvice
 class GlobalExceptionHandler {
@@ -112,10 +113,10 @@ class GlobalExceptionHandler {
     }
 
     /**
-     * Maps an unsupported HTTP method to {@code 405 Method Not Allowed} with an {@code Allow}
-     * header listing the supported methods. Without this handler, Spring's default handling
-     * surfaces as a generic {@code 500} from the catch-all below, which masks operator signal
-     * and pollutes 5xx alerting metrics.
+     * Maps an unsupported HTTP method to {@code 405} with an {@code Allow} header.
+     *
+     * <p>Without this handler the default falls through to the catch-all {@code 500}, which is
+     * wrong for a client error and pollutes 5xx alerting.
      */
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ApiErrorResponse> handleMethodNotSupported(
@@ -141,9 +142,10 @@ class GlobalExceptionHandler {
     }
 
     /**
-     * Maps an unsupported request {@code Content-Type} to {@code 415 Unsupported Media Type}.
-     * Without this handler, the default falls through to the catch-all {@code 500}, which is
-     * wrong for a client error and disrupts metrics.
+     * Maps an unsupported {@code Content-Type} to {@code 415}.
+     *
+     * <p>Without this handler the default falls through to {@code 500}, which is wrong for a
+     * client error.
      */
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     public ResponseEntity<ApiErrorResponse> handleMediaTypeNotSupported(

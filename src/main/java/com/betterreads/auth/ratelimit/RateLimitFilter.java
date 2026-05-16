@@ -32,11 +32,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Token-bucket rate limiter for the public auth endpoints (login, register, forgot-password,
- * reset-password, verify-email, resend-verification). Each path keeps its own per-IP bucket
- * cache and bandwidth recipe so a burst against one endpoint does not consume another's budget.
- * Buckets are keyed by client IP; trusted-proxy CIDRs unlock {@code X-Forwarded-For} parsing
- * so direct callers cannot spoof the limit. Empty bucket returns 429 with {@code Retry-After}.
+ * Token-bucket rate limiter for the public auth endpoints.
+ *
+ * <p>Each path has its own per-IP bucket so a burst against one endpoint does not eat
+ * another's budget. {@code X-Forwarded-For} is only read from trusted-proxy CIDRs so a
+ * direct caller cannot spoof the IP. An empty bucket returns 429 with {@code Retry-After}.
  */
 @Component
 public final class RateLimitFilter extends OncePerRequestFilter {
@@ -68,8 +68,9 @@ public final class RateLimitFilter extends OncePerRequestFilter {
     private final List<CidrRange> trustedProxies;
 
     /**
-     * Trusted-proxy CIDRs are parsed once at construction. Malformed entries are dropped with
-     * a warning log so a single bad config line cannot break filter startup.
+     * Parses the trusted-proxy CIDRs once at construction.
+     *
+     * <p>Malformed entries are logged and dropped so one bad config line cannot break startup.
      */
     // TODO(when scaling beyond one app instance): move buckets to Redis so replicas share limits
     public RateLimitFilter(final RateLimitProperties properties) {
@@ -112,9 +113,7 @@ public final class RateLimitFilter extends OncePerRequestFilter {
         return new Endpoint(cache, bandwidth);
     }
 
-    /**
-     * Drops all in-memory buckets. Used by tests to isolate state between scenarios.
-     */
+    /** Drops all in-memory buckets. */
     public void reset() {
         endpoints.values().forEach(e -> e.cache().invalidateAll());
     }
@@ -157,24 +156,15 @@ public final class RateLimitFilter extends OncePerRequestFilter {
             ip -> Bucket.builder().addLimit(endpoint.bandwidth().get()).build());
     }
 
-    /**
-     * Pairs a per-IP bucket cache with the bandwidth recipe used to build new buckets. Each
-     * rate-limited path owns one {@code Endpoint}.
-     */
+    /** Per-IP bucket cache plus the bandwidth recipe used to build new buckets. */
     private record Endpoint(Cache<String, Bucket> cache, Supplier<Bandwidth> bandwidth) { }
 
     /**
-     * Resolves the rate-limit bucket key from the incoming request.
+     * Resolves the bucket key from the incoming request.
      *
-     * <p>{@code CF-Connecting-IP} is preferred when present: Cloudflare sets it from the real
-     * client connection and overwrites any client-supplied value, so it is unforgeable behind
-     * the tunnel. Trusting this header closes the bypass where a fresh forged
-     * {@code X-Forwarded-For} per request granted a fresh bucket per request after Cloudflare
-     * appended the real IP to the chain.
-     *
-     * <p>The legacy trusted-proxy-gated {@code X-Forwarded-For} path stays in place as a
-     * fallback for non-Cloudflare environments such as local dev and integration tests that
-     * exercise the proxy CIDR logic directly.
+     * <p>Prefers {@code CF-Connecting-IP} because Cloudflare overwrites any client-supplied
+     * value, making it unforgeable behind the tunnel. Falls back to trusted-proxy-gated
+     * {@code X-Forwarded-For} for local dev and tests.
      */
     private String clientIp(final HttpServletRequest request) {
         final String cfConnectingIp = request.getHeader(CF_CONNECTING_IP_HEADER);

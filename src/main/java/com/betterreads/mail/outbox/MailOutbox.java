@@ -14,10 +14,10 @@ import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Maps to {@code mail_outbox} (Flyway V14). Each row is a queued outbound email. The worker
- * claims pending rows under {@code FOR UPDATE SKIP LOCKED}, sends, and resolves to either
- * {@code sent_at} or {@code failed_at}. The {@code mail_outbox_id} doubles as the per-row
- * idempotency key sent to the mail provider so retries dedupe transparently.
+ * Maps to {@code mail_outbox}. One row per queued outbound email.
+ *
+ * <p>The {@code mail_outbox_id} doubles as the per-row idempotency key sent to the provider
+ * so retries dedupe.
  */
 @Entity
 @Table(name = "mail_outbox")

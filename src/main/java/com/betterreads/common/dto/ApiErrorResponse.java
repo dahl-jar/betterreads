@@ -5,8 +5,8 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Uniform error envelope returned for every 4xx and 5xx response. {@code fieldErrors} is empty
- * for non-validation errors.
+ * Error response body returned for every 4xx and 5xx. {@code fieldErrors} is empty when the
+ * failure is not a validation error.
  */
 public record ApiErrorResponse(
     @Schema(example = "400") int status,
@@ -19,9 +19,7 @@ public record ApiErrorResponse(
         fieldErrors = List.copyOf(fieldErrors);
     }
 
-    /**
-     * Per-field validation failure surfaced inside {@link ApiErrorResponse#fieldErrors}.
-     */
+    /** Per-field validation failure. */
     public record FieldError(
         @Schema(example = "email") String field,
         @Schema(example = "must be a well-formed email address") String message

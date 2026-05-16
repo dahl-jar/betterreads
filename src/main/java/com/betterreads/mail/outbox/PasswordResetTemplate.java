@@ -9,11 +9,7 @@ import java.nio.charset.StandardCharsets;
 
 import org.springframework.stereotype.Component;
 
-/**
- * Renders the {@code password_reset} mail template. Reads the plaintext token from the outbox
- * row's payload and composes the subject and body. Kept as a concrete class until a second
- * template arrives; rule-of-three says wait before extracting a generic renderer.
- */
+/** Renders the {@code password_reset} mail body. */
 @Component
 class PasswordResetTemplate {
 

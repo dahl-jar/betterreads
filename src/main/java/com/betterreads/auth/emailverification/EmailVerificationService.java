@@ -21,24 +21,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Issues and consumes single-use email-verification tokens. Plaintext is 256-bit random and
- * never stored; only the HMAC-SHA256 hash sits in the DB.
+ * Issues and consumes single-use email-verification tokens.
  *
- * <p>The {@code requestResend} side does not reveal whether the email exists or whether the
- * account is already verified: the controller returns {@code 204} for every branch, and the
- * mailer is only invoked when an unverified account actually matches.
+ * <p>Only the HMAC-SHA256 hash is stored. The resend side returns {@code 204} for every
+ * branch so the response cannot be used to enumerate accounts.
  *
- * <p>Verification is idempotent: presenting the same token twice returns silently the second
- * time so a user who clicks the link from two devices, or whose mail client prefetches the link,
- * does not see an error. This is different from password reset (where replay is rejected),
- * because verification is non-destructive.
+ * <p>Verification is idempotent: the same token clicked twice succeeds silently. Password
+ * reset rejects replays because reset is destructive; verification is not.
  *
- * <p>Lock-order rule: every flow that mutates an {@link com.betterreads.auth.token.EmailToken}
- * for a user must lock the {@code app_user} row first via
- * {@link UserRepository#findByEmailForUpdate(String)} or
- * {@link UserRepository#findByIdForUpdate(long)}. The verify path uses a two-phase lookup (find
- * the token unlocked to discover its user_id, then lock the user, then re-fetch the token) so
- * issue-vs-verify cannot deadlock on opposite lock orders.
+ * <p>Lock order is user-first. The verify path looks up the token without a lock, locks the
+ * user, then re-fetches the token under that lock so issue-vs-verify cannot deadlock.
  */
 @Service
 public class EmailVerificationService {
@@ -75,18 +67,12 @@ public class EmailVerificationService {
     }
 
     /**
-     * Issues a fresh verification token for the given user and enqueues the verification email.
-     * Consumes any prior outstanding tokens for the user so only the latest link works.
+     * Issues a verification token and enqueues the verification email. Older tokens for the
+     * user are consumed so only the latest link works.
      *
-     * <p>Caller contract: the user row must be either brand-new in this transaction (insert
-     * during registration, no other tx can see it under MVCC isolation) or held under a
-     * {@code SELECT ... FOR UPDATE} lock. Today the two callers are
-     * {@link com.betterreads.auth.service.AuthServiceImpl#register} (brand-new row) and
-     * {@link #requestResend(String)} (explicit lock). Without serialization on the user row, a
-     * concurrent issue could insert a second active token before this one's enqueue commits.
-     *
-     * <p>Joins the caller's transaction via the default {@code Propagation.REQUIRED} so the
-     * register path commits the user insert, the token, and the outbox row atomically.
+     * <p>Requires the user row to be either brand-new in this transaction or locked
+     * {@code FOR UPDATE}. Without that serialization, two concurrent calls could both insert
+     * an active token and violate the partial unique index.
      */
     @Transactional
     public void issueVerification(final long userId, final String recipient) {
@@ -98,13 +84,9 @@ public class EmailVerificationService {
     }
 
     /**
-     * Resends a verification link for the account matching {@code email}. Returns silently for
-     * unknown addresses and for accounts that are already verified so the response cannot be
-     * used to enumerate registered or unverified emails.
-     *
-     * <p>Locks the user row before the consume-insert-enqueue sequence so two concurrent
-     * resends for the same user serialize. {@code issueVerification} runs as part of the same
-     * transaction via {@code Propagation.REQUIRED}.
+     * Resends the verification link for the matching account. Silent no-op for unknown
+     * addresses and already-verified accounts so the response cannot be used to enumerate
+     * registered or unverified emails.
      */
     @Transactional
     public void requestResend(final String email) {
@@ -123,10 +105,11 @@ public class EmailVerificationService {
     }
 
     /**
-     * Marks every active token for the user as consumed. Flushes at the end to force the
-     * UPDATEs to land before the next INSERT in this transaction; Hibernate's default action
-     * queue executes inserts before updates within the same flush, which would hit the partial
-     * unique index on the still-active prior row even though this consume marks it inactive.
+     * Marks every active token for the user as consumed.
+     *
+     * <p>Flushes at the end because Hibernate's default action queue runs inserts before
+     * updates, so the next insert would hit the partial unique index against the still-active
+     * prior row.
      */
     private void consumeOutstandingTokens(final long userId) {
         final Instant now = Instant.now();
@@ -147,21 +130,17 @@ public class EmailVerificationService {
     }
 
     /**
-     * Consumes the presented verification token and flips {@code email_verified_at} on the
-     * matching user. Throws {@link InvalidRequestException} when the token is unknown, expired,
-     * superseded by a later resend, or refers to a deleted user.
+     * Consumes the token and flips {@code email_verified_at} on the user. Throws
+     * {@link InvalidRequestException} when the token is unknown, expired, superseded, or
+     * refers to a deleted user.
      *
-     * <p>Idempotent replay returns silently only when the token is already consumed AND the
-     * user is already verified (the same token clicked twice). A consumed token whose user is
-     * still unverified means the token was superseded by a later resend, so this path returns
-     * the same {@code invalid/expired} error as an unknown token; only the freshly issued
-     * token can complete verification.
+     * <p>A replay is only accepted when the user is already verified (same link clicked
+     * twice). A consumed token whose user is still unverified means a later resend
+     * superseded it, so this path rejects it like an unknown token.
      *
-     * <p>Two-phase lookup to honor the project-wide user-first lock order: find the token
-     * unlocked to discover its user_id, then lock the user via
-     * {@link UserRepository#findByIdForUpdate(long)}, then re-fetch the token under that lock
-     * so the row state is fresh. Without the user lock, two concurrent verifies on the same
-     * token could both pass the {@code consumed_at IS NULL} check.
+     * <p>Two-phase lookup (find token, lock user, re-fetch token) so two concurrent verifies
+     * on the same token serialize on the user row instead of both passing
+     * {@code consumed_at IS NULL}.
      */
     @Transactional
     public void verify(final String presentedToken) {
@@ -196,9 +175,8 @@ public class EmailVerificationService {
     }
 
     /**
-     * A consumed token is legal only when the user is already verified (the same link clicked
-     * twice). A consumed token whose user is still unverified means the token was superseded by
-     * a later resend; the freshly issued token is the one that completes verification.
+     * Accepts a consumed token only when the user is already verified (replay), and rejects
+     * the superseded case where a later resend exists.
      */
     private void assertReplay(final EmailToken row, final User user) {
         if (user.getEmailVerifiedAt() != null) {

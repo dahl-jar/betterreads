@@ -14,14 +14,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
- * HMAC-SHA256 hasher for keyed tokens stored in the auth domain (refresh, password reset,
- * email verification). Keyed by the JWT secret so a DB-only leak cannot reconstruct active
- * tokens. HMAC is used (not BCrypt) because these tokens are 256-bit random and run on every
- * lookup; the password-style brute-force angle does not apply.
+ * HMAC-SHA256 hasher for refresh, password-reset, and email-verification tokens.
  *
- * <p>One shared bean replaces three previously-duplicate per-domain hashers. The hash contract
- * is identical for every domain; lifetime, revocation, and consume rules live in the services
- * that call this class.
+ * <p>Keyed by the JWT secret so a DB leak alone cannot reconstruct active tokens. HMAC is
+ * used instead of BCrypt because these tokens are 256-bit random and run on every lookup;
+ * BCrypt's slow design exists to fight password-style brute-force, which does not apply.
  */
 @Component
 public final class HmacTokenHasher {
@@ -35,16 +32,12 @@ public final class HmacTokenHasher {
         this(properties.secret());
     }
 
-    /**
-     * Test-friendly constructor that takes a raw secret instead of {@link JwtProperties}.
-     */
+    /** Constructor for direct wiring with a raw secret, without {@link JwtProperties}. */
     public HmacTokenHasher(final String secret) {
         this.secret = secret.getBytes(StandardCharsets.UTF_8).clone();
     }
 
-    /**
-     * Returns the lowercase hex HMAC-SHA256 of {@code token}.
-     */
+    /** Returns the lowercase hex HMAC-SHA256 of {@code token}. */
     public String hash(final String token) {
         try {
             final Mac mac = Mac.getInstance(ALGORITHM);

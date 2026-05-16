@@ -4,13 +4,13 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Cloudflare Access JWT validation config bound from {@code cloudflare.access.*}. Both fields
- * are optional; blank either side disables validation and the management chain falls back to
- * {@code permitAll}.
+ * Cloudflare Access JWT config bound from {@code cloudflare.access.*}.
+ *
+ * <p>Both fields are optional. Leaving either blank turns the check off and the actuator
+ * endpoints fall back to {@code permitAll}.
  *
  * @param aud Application Audience tag, blank to disable
- * @param teamDomain Zero Trust team domain (e.g. {@code mydomain.cloudflareaccess.com}); JWKS
- *     resolves to {@code https://<teamDomain>/cdn-cgi/access/certs}
+ * @param teamDomain Zero Trust team domain, e.g. {@code mydomain.cloudflareaccess.com}
  */
 @ConfigurationProperties(prefix = "cloudflare.access")
 public record CloudflareAccessProperties(
@@ -18,10 +18,7 @@ public record CloudflareAccessProperties(
     @Nullable String teamDomain
 ) {
 
-    /**
-     * Returns true when both {@code aud} and {@code teamDomain} are set, enabling JWT
-     * validation on the management chain.
-     */
+    /** Returns true when both {@code aud} and {@code teamDomain} are set. */
     public boolean isEnabled() {
         return aud != null && !aud.isBlank()
             && teamDomain != null && !teamDomain.isBlank();

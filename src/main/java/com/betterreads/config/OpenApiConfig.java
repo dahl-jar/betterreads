@@ -14,9 +14,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Springdoc/OpenAPI metadata for {@code /v3/api-docs} and Swagger UI. Declares a bearer-JWT
- * security scheme so the UI surfaces an Authorize button; endpoints opt out by setting
- * {@code @Operation(security = {})}. The {@code servers} list is sourced from
+ * Springdoc/OpenAPI metadata for {@code /v3/api-docs} and Swagger UI.
+ *
+ * <p>Declares a bearer-JWT security scheme so Swagger UI shows the Authorize button. Endpoints
+ * opt out with {@code @Operation(security = {})}. The {@code servers} list uses
  * {@code springdoc.public-url} so the deployed origin replaces the local default at runtime.
  */
 @Configuration
