@@ -7,9 +7,11 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Revokes every active refresh token for a user. Lives in its own bean so {@code REQUIRES_NEW}
- * propagation actually applies. Inside {@link RefreshTokenService}, a self-call would bypass
- * the proxy and the rotate-path rollback would undo the revoke.
+ * Revokes every active refresh token for a user.
+ *
+ * <p>Separate bean so {@code REQUIRES_NEW} actually applies; a self-call inside
+ * {@link RefreshTokenService} would skip the proxy and the rotate-path rollback would undo
+ * the revoke.
  */
 @Component
 public class RefreshTokenChainRevoker {
@@ -21,10 +23,10 @@ public class RefreshTokenChainRevoker {
     }
 
     /**
-     * Revokes every active refresh token belonging to the given user.
+     * Revokes every active refresh token for the user in a new transaction.
      *
-     * <p>Commits in a new transaction so the revoke survives a rollback in the caller (the
-     * rotate path throws {@code BadCredentialsException} after invoking this).
+     * <p>{@code REQUIRES_NEW} because the rotate path throws right after calling this, and the
+     * throw would roll back a same-transaction revoke. The revoke must stick.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void revokeAllActiveForUser(final long userId) {
@@ -32,10 +34,10 @@ public class RefreshTokenChainRevoker {
     }
 
     /**
-     * Revokes every active refresh token belonging to the given user, participating in the
-     * caller's transaction. Use from flows where the revoke must be atomic with the surrounding
-     * write (password reset, account deletion). The replay-defense path uses
-     * {@link #revokeAllActiveForUser(long)} instead so the revoke survives a rollback.
+     * Revokes every active refresh token for the user as part of the surrounding transaction.
+     *
+     * <p>Used when the revoke must commit or roll back together with the surrounding write
+     * (password reset, account deletion).
      */
     @Transactional
     public void revokeAllActiveForUserInTransaction(final long userId) {

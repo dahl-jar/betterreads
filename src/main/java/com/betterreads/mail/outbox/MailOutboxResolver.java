@@ -12,9 +12,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Resolves an outbox row's terminal state (sent, failed, retry). Lives in a sibling bean so the
- * {@code @Transactional} boundary applies. The worker calls these methods after the HTTP send
- * has either succeeded or thrown.
+ * Resolves an outbox row to sent, failed, or scheduled-for-retry.
+ *
+ * <p>Separate bean so the {@code @Transactional} boundary applies; a self-call inside
+ * {@link MailOutboxWorker} would skip it.
  */
 @Component
 class MailOutboxResolver {
@@ -24,10 +25,11 @@ class MailOutboxResolver {
     private static final int ERROR_TEXT_MAX_LENGTH = 500;
 
     /**
-     * Cleared payload written after a row reaches a terminal state (sent or failed). The original
-     * payload contains plaintext tokens that the worker has already used; persisting them past
-     * the send window would let a DB read leak hand the attacker live, redeemable tokens within
-     * the token-lifetime window. The token tables themselves only ever store HMACs.
+     * Payload written once a row is done.
+     *
+     * <p>The original payload holds the plaintext token. Clearing it after the send means a DB
+     * read leak cannot hand an attacker a still-redeemable token; the token tables themselves
+     * only store HMACs.
      */
     private static final String EMPTY_PAYLOAD = "{}";
 

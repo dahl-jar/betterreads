@@ -15,16 +15,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Soft-deletes a user and tears down their auth material in a single transaction so a partial
- * failure cannot leave a half-deleted account. Revokes every refresh token, marks outstanding
- * password-reset and email-verification tokens consumed, and stamps {@code deleted_at} on the
- * {@code app_user} row.
+ * Soft-deletes a user and revokes their refresh and email tokens in one transaction.
  *
- * <p>The access JWT remains valid until natural expiry (today 2 hours); refresh-revoke kills
- * the renewal path immediately, and the residual window is the documented price of stateless
- * validation.
- *
- * <p>The hard-delete sweep is a separate concern; see {@link AccountDeletionSweep}.
+ * <p>Done in one transaction so a partial failure cannot leave a half-deleted account. The
+ * access JWT stays valid until it expires naturally; the refresh revoke kills renewals at
+ * once.
  */
 @Service
 public class AccountDeletionService {
@@ -48,23 +43,16 @@ public class AccountDeletionService {
     }
 
     /**
-     * Soft-deletes the user and tears down active auth material. Idempotent: a second call for
-     * an already-deleted user returns silently. Has no effect if the user does not exist.
+     * Soft-deletes the user and revokes their tokens. Idempotent. No-op if the user is missing.
      *
-     * <p>Reads {@code app_user} without {@code SELECT ... FOR UPDATE} on purpose. The
-     * project's lock order for email-token mutations is "user first, then tokens", but the
-     * refresh-rotation path locks the {@code refresh_token} row first and then takes an FK
-     * lock on {@code app_user} for its successor INSERT. Holding a user {@code FOR UPDATE}
-     * here while updating refresh-token rows therefore deadlocks against a concurrent
-     * {@code POST /refresh} for the same account. Plain {@code UPDATE} on {@code app_user}
-     * only takes {@code FOR NO KEY UPDATE}, which is compatible with rotate's
-     * {@code FOR KEY SHARE}, so dropping the row lock removes the deadlock.
+     * <p>Skips {@code SELECT ... FOR UPDATE} on {@code app_user} on purpose. The refresh-rotate
+     * path locks the refresh row first and then takes an FK lock on the user, so locking the
+     * user here would deadlock against a concurrent {@code POST /refresh}. A plain
+     * {@code UPDATE} only takes {@code FOR NO KEY UPDATE}, which is compatible with rotate.
      *
-     * <p>Race-window orphans are tolerated. A refresh started before this transaction commits
-     * can issue a successor refresh token and a fresh access JWT. That successor is unusable
-     * for any future {@code /refresh} because the {@link User} {@code @SQLRestriction} hides
-     * the soft-deleted row from {@code findById}, so {@code AuthService.refresh} returns 401
-     * on the next call. The orphan row is cascade-deleted when the sweep removes the user.
+     * <p>A refresh that races this delete may issue one successor token before the commit
+     * lands. That successor is dead on the next call because {@code @SQLRestriction} hides
+     * the soft-deleted user, and the row is cleaned up by the sweep.
      */
     @Transactional
     public void deleteOwnAccount(final long userId) {

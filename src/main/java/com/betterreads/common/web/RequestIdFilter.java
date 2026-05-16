@@ -15,11 +15,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Puts a correlation ID on every request, reusing a sane inbound {@code X-Request-Id} or
- * generating a UUID. ID is set on the SLF4J MDC and echoed back on the response header.
+ * Tags every request with an ID, reusing the inbound {@code X-Request-Id} when it is valid or
+ * generating a UUID. The ID goes on the SLF4J MDC and is returned on the response header.
  *
- * <p>The character/length restriction guards against CR/LF log-forgery (CWE-117) and oversized
- * MDC values from untrusted callers.
+ * <p>The format check blocks CR/LF log-forgery (CWE-117) and stops untrusted callers from
+ * setting oversized MDC values.
  */
 @Component
 public final class RequestIdFilter extends OncePerRequestFilter {

@@ -13,9 +13,8 @@ import java.time.Instant;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Maps to {@code refresh_token} (Flyway V11). Plaintext is never stored; lookups go via
- * {@code tokenHash} (HMAC-SHA256). {@code replacedBy} chains rotated tokens so a replay of an
- * already-rotated token is detectable.
+ * Maps to {@code refresh_token}. Lookups go via the HMAC-SHA256 {@code tokenHash}; plaintext
+ * is never stored. {@code replacedBy} chains rotated tokens so a replay can be detected.
  */
 @Entity
 @Table(name = "refresh_token")

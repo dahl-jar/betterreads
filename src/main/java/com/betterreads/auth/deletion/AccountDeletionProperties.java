@@ -5,11 +5,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /**
  * Account-deletion configuration bound from {@code betterreads.auth.deletion.*}.
  *
- * @param gracePeriodHours how long a soft-deleted user remains in {@code app_user} before the
- *     sweep removes the row. 720 hours (30 days) by default; tests override to a smaller value.
- * @param schedulerEnabled whether the scheduled sweep fires automatically. Production runs with
- *     {@code true}; integration tests disable it and call
- *     {@link AccountDeletionSweep#sweep()} directly so timing stays deterministic.
+ * @param gracePeriodHours hours a soft-deleted user is kept before hard deletion (default 720)
+ * @param schedulerEnabled whether the scheduled sweep runs automatically
  */
 @ConfigurationProperties(prefix = "betterreads.auth.deletion")
 public record AccountDeletionProperties(
@@ -21,9 +18,8 @@ public record AccountDeletionProperties(
     public static final long DEFAULT_GRACE_PERIOD_HOURS = 720L;
 
     /**
-     * Replaces a non-positive {@code gracePeriodHours} with {@link #DEFAULT_GRACE_PERIOD_HOURS}
-     * so a misconfigured environment cannot accidentally hard-delete every soft-deleted user
-     * on the next sweep tick.
+     * Falls back to the default grace period when the configured value is non-positive, so a
+     * misconfigured environment cannot hard-delete every soft-deleted user on the next sweep.
      */
     public AccountDeletionProperties {
         if (gracePeriodHours <= 0) {

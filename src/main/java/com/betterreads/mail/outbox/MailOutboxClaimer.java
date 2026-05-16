@@ -7,9 +7,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Claims pending outbox rows in their own transaction so the lock + attempt-count update
- * commits before the worker's HTTP send. Lives in a sibling bean so the proxy boundary
- * actually applies; a self-call inside {@link MailOutboxWorker} would bypass {@code @Transactional}.
+ * Claims pending outbox rows in its own transaction so the claim commits before the HTTP send.
+ *
+ * <p>Separate bean so the proxy applies; a self-call inside {@link MailOutboxWorker} would
+ * skip {@code @Transactional}.
  */
 @Component
 class MailOutboxClaimer {
@@ -24,9 +25,10 @@ class MailOutboxClaimer {
     }
 
     /**
-     * Returns the ids of rows freshly claimed for delivery. Each claimed row's
-     * {@code attempt_count} is incremented and {@code next_attempt_at} bumped by the configured
-     * lease so a crashed worker's claims free up after the lease expires.
+     * Claims a batch of pending rows and returns their ids.
+     *
+     * <p>{@code next_attempt_at} is pushed forward so a crashed worker's claims become
+     * eligible again after the timeout passes.
      */
     @Transactional
     public List<Long> claimBatch() {

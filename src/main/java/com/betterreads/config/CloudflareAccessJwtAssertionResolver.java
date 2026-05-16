@@ -6,8 +6,10 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
 
 /**
- * Reads the Cloudflare Access JWT from {@code Cf-Access-Jwt-Assertion}. The {@code Authorization}
- * header is reserved for the app's own bearer token on other chains.
+ * Reads the Cloudflare Access JWT from {@code Cf-Access-Jwt-Assertion}.
+ *
+ * <p>The {@code Authorization} header is left alone so it remains available for the app's own
+ * bearer token on the API chain.
  */
 final class CloudflareAccessJwtAssertionResolver implements BearerTokenResolver {
 

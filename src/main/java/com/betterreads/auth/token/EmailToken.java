@@ -15,15 +15,10 @@ import java.time.Instant;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Maps to {@code email_token} (Flyway V16). One row per single-use token sent over email.
- * Stored as a keyed HMAC of the plaintext; the plaintext exists only in the email link sent
- * to the user. Single-use via {@code consumed_at}, plus a partial unique index per purpose on
- * {@code (user_id) WHERE consumed_at IS NULL AND purpose = ?} so each user can hold at most
- * one active token per purpose.
+ * One row per single-use token sent over email. Maps to the {@code email_token} table.
  *
- * <p>Replaces the prior per-domain {@code password_reset_token} and {@code email_verification_token}
- * tables. Storage is unified, behavior is not: each calling service ({@code PasswordResetService},
- * {@code EmailVerificationService}) keeps its own lifecycle and consume rules.
+ * <p>Only the hash is stored. The plaintext lives only in the email link. A partial unique
+ * index limits each user to one active token per purpose.
  */
 @Entity
 @Table(name = "email_token")
@@ -119,10 +114,7 @@ public class EmailToken {
         this.consumedAt = consumedAt;
     }
 
-    /**
-     * Discriminator for which feature owns a row. Mirrors the {@code chk_email_token_purpose}
-     * CHECK constraint; renaming a value requires a coordinated Flyway migration.
-     */
+    /** Which feature a token belongs to. Values must match the DB CHECK constraint. */
     public enum Purpose {
         PASSWORD_RESET,
         EMAIL_VERIFICATION

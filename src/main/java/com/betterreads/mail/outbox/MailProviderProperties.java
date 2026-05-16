@@ -11,18 +11,16 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Mail-provider configuration bound from {@code mail.provider} and friends. The
- * {@code provider} switch picks the active {@link MailSender} bean: {@code resend} POSTs to the
- * Resend API, {@code logging} drops the body on the floor (dev fallback).
+ * Mail-provider configuration bound from {@code mail.*}.
  *
  * <p>Provider-specific fields are optional at bind time so the app boots in {@code logging}
- * mode without them. The Resend sender's constructor calls {@code requireXxx} so missing
- * production env fails fast at boot, not on the first send.
+ * mode without them. The {@code requireXxx} methods throw at boot if a required Resend value
+ * is missing, so the app fails to start rather than failing on the first send.
  *
  * @param provider {@code resend} or {@code logging}
- * @param apiKey Resend API key, sent as bearer token
- * @param from verified sender address on a Resend-verified domain
- * @param appBaseUrl public origin embedded in links, trailing slash trimmed
+ * @param apiKey Resend API key
+ * @param from verified Resend sender address
+ * @param appBaseUrl public origin used to build links
  */
 @Validated
 @ConfigurationProperties(prefix = "mail")
@@ -44,8 +42,8 @@ public record MailProviderProperties(
     }
 
     /**
-     * Returns the configured app base URL with any trailing slash trimmed. Throws when
-     * {@code provider=resend} but the value is blank or not a valid origin.
+     * Returns the app base URL without a trailing slash. Throws when {@code appBaseUrl} is
+     * blank or does not start with {@code http://} or {@code https://}.
      */
     @NotNull
     public String requireAppBaseUrl() {

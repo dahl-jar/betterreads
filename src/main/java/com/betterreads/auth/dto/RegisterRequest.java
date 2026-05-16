@@ -7,9 +7,10 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 /**
- * Request body for {@code POST /api/v1/auth/register}. The username pattern excludes {@code @}
- * so login (which accepts username or email) can disambiguate. Password caps at 72 bytes to
- * match BCrypt's input limit.
+ * Request body for {@code POST /api/v1/auth/register}.
+ *
+ * <p>The username pattern excludes {@code @} so login can tell a username from an email.
+ * Password caps at 72 bytes because BCrypt ignores anything past that.
  */
 public record RegisterRequest(
     @Schema(example = "john.doe", description = "3-50 chars: letters, digits, '.', '_', '-'")

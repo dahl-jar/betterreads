@@ -3,11 +3,9 @@ package com.betterreads.auth.service;
 import com.betterreads.auth.dto.AuthResponse;
 
 /**
- * Internal carrier for the two tokens an auth flow produces. The {@link #body} reaches the client
- * as JSON; the {@link #refreshToken} reaches the client as an {@code HttpOnly} cookie. Splitting
- * the two at the service boundary keeps the JSON body honest about what's serialized.
+ * Carries both tokens an auth flow produces back to the controller.
  *
- * @param body response body returned to the caller
- * @param refreshToken refresh token plaintext written to the {@code br_refresh} cookie
+ * <p>Split so the JSON body and the {@code HttpOnly} refresh cookie are serialized at the
+ * right layer; mixing them in a single response DTO leaks the refresh token into JSON.
  */
 public record TokenPair(AuthResponse body, String refreshToken) { }

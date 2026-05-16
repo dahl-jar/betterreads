@@ -11,19 +11,17 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-/**
- * Persistence access for {@link RefreshToken}. Hash lookup is the hot path: every refresh and
- * logout call hits it once.
- */
+/** Persistence access for {@link RefreshToken}. */
 @Repository
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
 
     Optional<RefreshToken> findByTokenHash(String tokenHash);
 
     /**
-     * {@code SELECT ... FOR UPDATE} variant used by the rotation path. Without the row lock,
-     * two concurrent rotations with the same token could both pass the {@code revokedAt is null}
-     * check and each issue a successor.
+     * Hash lookup under a row-level write lock, used by the rotation path.
+     *
+     * <p>Without the lock, two concurrent rotations on the same token could both pass the
+     * {@code revokedAt IS NULL} check and each issue a successor.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT rt FROM RefreshToken rt WHERE rt.tokenHash = :tokenHash")

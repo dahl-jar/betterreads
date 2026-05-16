@@ -18,9 +18,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
- * Issues and parses HS256-signed JWTs. Subject claim carries the user id. Every issued token
- * also carries an {@code aud} (the API the token is valid against) and a {@code jti} (a UUID
- * unique per token) so the wire shape matches what most JWT-aware tooling expects.
+ * Issues and parses HS256-signed JWTs. The subject claim carries the user id; each token also
+ * has an {@code aud} and a per-token {@code jti}.
  */
 @Component
 public final class JwtIssuer {
@@ -39,8 +38,8 @@ public final class JwtIssuer {
     }
 
     /**
-     * Test-friendly constructor that takes a raw secret, issuer, and lifetime so tests can
-     * issue already-expired or wrong-issuer tokens without bringing up a Spring context.
+     * Constructor for direct wiring with a raw secret, issuer, and lifetime, without going
+     * through {@link JwtProperties}.
      */
     public JwtIssuer(final String secret, final String issuer, final Duration expiration) {
         this.signingKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
@@ -48,9 +47,7 @@ public final class JwtIssuer {
         this.expiration = expiration;
     }
 
-    /**
-     * Returns a signed access JWT whose subject is the given user id.
-     */
+    /** Returns a signed access JWT for the user. */
     public String issue(final long userId) {
         final Instant now = Instant.now();
         return Jwts.builder()
@@ -65,8 +62,10 @@ public final class JwtIssuer {
     }
 
     /**
-     * Returns the user id parsed from the subject claim. Tokens that are missing the expected
-     * audience are rejected so a token minted for another service cannot be replayed here.
+     * Returns the user id from the subject claim, or throws if the token does not pass every
+     * check.
+     *
+     * <p>Audience is checked so a token minted for another service cannot be replayed here.
      *
      * @throws InvalidJwtException malformed, bad signature, expired, wrong issuer, wrong
      *         audience, or non-numeric subject

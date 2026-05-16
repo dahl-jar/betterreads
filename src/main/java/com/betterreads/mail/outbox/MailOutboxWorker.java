@@ -7,13 +7,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * Drains the {@code mail_outbox} table. Each pass runs three transactions per row: claim
- * (handled by {@link MailOutboxClaimer}), send (outside any transaction so the lease holds even
- * if the JVM crashes mid-call), resolve (handled by {@link MailOutboxResolver}).
+ * Drains the {@code mail_outbox} table.
  *
- * <p>The {@code FOR UPDATE SKIP LOCKED} on the claim query lets multiple workers run on the
- * same VM without competing. Multi-instance deployments need a distributed lock; today the
- * single VM is the lock.
+ * <p>Each row goes through three steps: claim, send, resolve. The send step runs outside any
+ * transaction so a JVM crash mid-call still leaves the row claimed until the timeout passes.
+ * {@code FOR UPDATE SKIP LOCKED} on the claim query lets multiple workers run on the same VM
+ * without competing.
  */
 // TODO(when scaling beyond one app instance): add leader election so only one replica drains the outbox
 @Component
@@ -52,10 +51,7 @@ public class MailOutboxWorker {
         this.emailVerificationTemplate = emailVerificationTemplate;
     }
 
-    /**
-     * Drains one batch from the outbox. Called by {@link MailOutboxScheduler} on a fixed
-     * interval in production; tests invoke directly for deterministic sequencing.
-     */
+    /** Drains one batch from the outbox. */
     public void drain() {
         final List<Long> claimedIds = claimer.claimBatch();
         for (final Long claimedId : claimedIds) {

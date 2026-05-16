@@ -10,23 +10,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Domain entry point for queuing outbound email. Callers run inside their own transaction so
- * the enqueue commits or rolls back atomically with whatever business state the email refers
- * to (e.g. the password-reset token row).
+ * Entry point for queuing outbound email.
+ *
+ * <p>The enqueue joins the surrounding transaction so the row commits or rolls back together
+ * with the business state the email refers to.
  */
 @Service
 public class MailOutboxService {
 
-    /**
-     * Template name for password-reset emails. Kept as a constant so callers and the renderer
-     * agree on the exact string the {@code chk_mail_outbox_template} CHECK constraint allows.
-     */
+    /** Template name for password-reset emails. Value must match the DB CHECK constraint. */
     public static final String TEMPLATE_PASSWORD_RESET = "password_reset";
 
-    /**
-     * Template name for email-verification emails. Allowed by the {@code chk_mail_outbox_template}
-     * CHECK constraint as of Flyway V15.
-     */
+    /** Template name for email-verification emails. Value must match the DB CHECK constraint. */
     public static final String TEMPLATE_EMAIL_VERIFICATION = "email_verification";
 
     private final MailOutboxRepository repository;
@@ -38,25 +33,13 @@ public class MailOutboxService {
         this.objectMapper = objectMapper;
     }
 
-    /**
-     * Enqueues a password-reset email. The plaintext token is stored in the JSON payload; the
-     * worker reads it back to compose the link. The row is immediately eligible for the next
-     * worker tick.
-     */
+    /** Enqueues a password-reset email. */
     @Transactional
     public void enqueuePasswordReset(final String recipient, final String plaintextToken) {
         enqueue(TEMPLATE_PASSWORD_RESET, recipient, plaintextToken);
     }
 
-    /**
-     * Enqueues an email-verification email. Same payload shape and worker semantics as the
-     * password-reset enqueue; the only difference is the template name the worker dispatches on.
-     *
-     * <p>Joins the caller's transaction via {@code Propagation.REQUIRED} so registration and
-     * resend can commit user/token writes atomically with the outbox row. A rollback in the
-     * caller takes the outbox insert with it, preventing a verification mail for a user whose
-     * insert failed.
-     */
+    /** Enqueues an email-verification email. */
     @Transactional
     public void enqueueEmailVerification(final String recipient, final String plaintextToken) {
         enqueue(TEMPLATE_EMAIL_VERIFICATION, recipient, plaintextToken);

@@ -6,14 +6,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Outbox-worker tunables bound from {@code mail.outbox.*}. Defaults are sized for personal-scale
- * traffic on a single VM: claim 10 rows per pass, retry up to 3 times total, hold a 5-minute
- * lease on each claimed row so a crashed worker's claims free up quickly.
+ * Outbox-worker tunables bound from {@code mail.outbox.*}.
  *
- * @param workerEnabled set to {@code false} in tests so rows stay readable for assertions
+ * @param workerEnabled whether the worker drains the outbox on schedule
  * @param claimBatchSize rows pulled per scheduler tick
- * @param maxAttempts attempts per row before marking it permanently failed
- * @param leaseSeconds how far {@code next_attempt_at} bumps when a row is claimed
+ * @param maxAttempts attempts per row before it is marked permanently failed
+ * @param leaseSeconds seconds before a claimed row becomes eligible again if the worker crashes
  */
 @Validated
 @ConfigurationProperties(prefix = "mail.outbox")

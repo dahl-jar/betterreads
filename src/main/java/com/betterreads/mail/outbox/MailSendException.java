@@ -5,9 +5,10 @@ import java.io.Serial;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Signals that a mail send failed. {@code retryable} distinguishes transient failures (network,
- * 5xx, 429) from permanent ones (400, malformed payload). The worker retries the former and
- * gives up on the latter.
+ * Signals that a mail send failed.
+ *
+ * <p>{@code retryable} separates transient failures (network, 5xx, 429) from permanent ones
+ * (4xx, malformed payload). The worker retries the former and gives up on the latter.
  */
 public class MailSendException extends RuntimeException {
 

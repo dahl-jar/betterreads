@@ -8,8 +8,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Jackson defaults. Unknown properties are ignored on deserialize; dates serialize as ISO-8601
- * strings; null fields are dropped from output.
+ * Jackson defaults.
+ *
+ * <p>Unknown JSON fields are ignored on read. Dates are written as ISO-8601 strings. Null
+ * fields are dropped from output.
  */
 @Configuration
 public class JacksonConfig {

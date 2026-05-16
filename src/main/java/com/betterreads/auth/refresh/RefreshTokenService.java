@@ -15,9 +15,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Issues, rotates, and revokes refresh tokens. Plaintext is 256-bit random and never stored;
- * only the HMAC-SHA256 hash sits in the DB. Presenting an already-rotated token revokes every
- * active token for that user (replay defense).
+ * Issues, rotates, and revokes refresh tokens.
+ *
+ * <p>Only the HMAC-SHA256 hash is stored. Presenting an already-rotated token revokes every
+ * active token for that user as replay defense.
  */
 @Service
 public class RefreshTokenService {
@@ -49,12 +50,7 @@ public class RefreshTokenService {
         this.lifetime = Duration.ofDays(jwtProperties.refreshExpirationDays());
     }
 
-    /**
-     * Issues a fresh refresh token for the given user and returns the plaintext.
-     *
-     * <p>Only the HMAC-SHA256 hash is persisted; the plaintext is the only copy the caller
-     * ever sees.
-     */
+    /** Issues a refresh token for the user and returns its plaintext. */
     @Transactional
     public String issue(final long userId) {
         final String plaintext = generatePlaintext();
@@ -68,15 +64,11 @@ public class RefreshTokenService {
     }
 
     /**
-     * Rotates the presented refresh token. Returns a {@link RefreshTokenRotation} carrying the
-     * owning user id and a new plaintext when the token is active, or an empty {@link Optional}
-     * when it is unknown, expired, or already revoked.
+     * Rotates the presented refresh token, or returns empty if it is unknown, expired, or
+     * already revoked. A replay (token with {@code replacedBy} set) revokes the whole chain.
      *
-     * <p>Presenting a token whose {@code replacedBy} is set is treated as a replay and revokes
-     * every active token for that user.
-     *
-     * <p>Uses {@code SELECT ... FOR UPDATE} so two concurrent rotations serialize. Without the
-     * lock both could pass the {@code revokedAt == null} check and issue successors.
+     * <p>{@code SELECT ... FOR UPDATE} so two concurrent rotations serialize; without the lock
+     * both could pass the {@code revokedAt == null} check and issue two successors.
      */
     @Transactional
     public Optional<RefreshTokenRotation> rotate(final String presented) {
@@ -115,10 +107,10 @@ public class RefreshTokenService {
     }
 
     /**
-     * Revokes the presented refresh token.
+     * Revokes the presented refresh token. Idempotent.
      *
-     * <p>Idempotent: unknown or already-revoked tokens are silently accepted so callers cannot
-     * probe which tokens exist.
+     * <p>Unknown and already-revoked tokens are accepted silently so the response cannot be
+     * used to probe which tokens exist.
      */
     @Transactional
     public void revoke(final String presented) {

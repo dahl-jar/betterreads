@@ -1,0 +1,16 @@
+package com.betterreads.integration.wikidata;
+
+import com.betterreads.catalog.service.BookSourceClient;
+import com.betterreads.catalog.service.SourceBook;
+import java.util.Optional;
+
+/** Wikidata boundary over the SPARQL endpoint and the REST entity API. */
+public interface WikidataClient extends BookSourceClient {
+
+    /**
+     * Returns the book for the given Wikidata QID, or empty if none matches.
+     *
+     * @param qid Wikidata QID (e.g. {@code Q2831})
+     */
+    Optional<SourceBook> fetchByQid(String qid);
+}

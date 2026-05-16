@@ -43,11 +43,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Authentication endpoints. {@code register}, {@code login}, {@code refresh}, and {@code logout}
- * are public; {@code me} requires a valid access JWT. The refresh token is carried in the
- * {@value #COOKIE_NAME} {@code HttpOnly} cookie scoped to {@value #COOKIE_PATH} so JavaScript
- * on the frontend cannot read it and {@code SameSite=Strict} blocks cross-site POSTs from
- * carrying it.
+ * Authentication endpoints. {@code me} requires a valid access JWT; the rest are public.
+ *
+ * <p>The refresh token is sent in the {@value #COOKIE_NAME} {@code HttpOnly} cookie so
+ * frontend JavaScript cannot read it, and {@code SameSite=Strict} blocks cross-site POSTs.
  */
 @RestController
 @RequestMapping(AuthController.COOKIE_PATH)
@@ -89,10 +88,7 @@ class AuthController {
         this.refreshLifetime = Duration.ofDays(jwtProperties.refreshExpirationDays());
     }
 
-    /**
-     * Creates a new user account, issues an access JWT, and writes the refresh token to the
-     * {@value #COOKIE_NAME} cookie.
-     */
+    /** Creates a new user account and returns an access JWT plus refresh cookie. */
     @PostMapping("/register")
     @Operation(summary = "Register a new user")
     @SecurityRequirements
@@ -110,10 +106,7 @@ class AuthController {
             .body(pair.body());
     }
 
-    /**
-     * Authenticates the credentials, issues an access JWT, and writes the refresh token to the
-     * {@value #COOKIE_NAME} cookie. The identifier is matched against username first, then email.
-     */
+    /** Authenticates the credentials and returns an access JWT plus refresh cookie. */
     @PostMapping("/login")
     @Operation(summary = "Log in with username or email")
     @SecurityRequirements
@@ -131,9 +124,7 @@ class AuthController {
             .body(pair.body());
     }
 
-    /**
-     * Returns the profile of the currently authenticated user.
-     */
+    /** Returns the profile of the authenticated user. */
     @GetMapping("/me")
     @Operation(summary = "Get the current authenticated user")
     @ApiResponse(responseCode = "200", description = "Current user profile")
@@ -144,13 +135,10 @@ class AuthController {
     }
 
     /**
-     * Soft-deletes the authenticated user. The row stays in {@code app_user} during a 30-day
-     * grace window, then a scheduled sweep hard-deletes it. Refresh tokens are revoked
-     * immediately, outstanding password-reset and verification tokens are invalidated, and the
-     * cookie is cleared from the browser.
+     * Soft-deletes the authenticated user. The row is hard-deleted after the grace window.
      *
-     * <p>Idempotent: returns {@code 204} whether the account was active or already soft-deleted.
-     * The access JWT remains valid until natural expiry; refresh-revoke kills the renewal path.
+     * <p>Idempotent. The access JWT stays valid until natural expiry; refresh-revoke kills
+     * renewals at once.
      */
     @DeleteMapping("/me")
     @Operation(summary = "Delete the current account (soft-delete with 30-day grace)")
@@ -164,12 +152,7 @@ class AuthController {
             .build();
     }
 
-    /**
-     * Rotates the refresh token presented in the {@value #COOKIE_NAME} cookie and returns a
-     * fresh access JWT. The successor refresh token replaces the cookie value.
-     *
-     * <p>Authenticated solely by the refresh token cookie. A missing cookie is rejected with 401.
-     */
+    /** Rotates the refresh cookie and returns a fresh access JWT. */
     @PostMapping("/refresh")
     @Operation(summary = "Rotate access and refresh tokens")
     @SecurityRequirements
@@ -188,13 +171,7 @@ class AuthController {
             .body(pair.body());
     }
 
-    /**
-     * Revokes the refresh token presented in the {@value #COOKIE_NAME} cookie and clears the
-     * cookie from the browser.
-     *
-     * <p>Idempotent: returns 204 whether or not the cookie was present or the token was already
-     * revoked.
-     */
+    /** Revokes the refresh cookie and clears it from the browser. Idempotent. */
     @PostMapping("/logout")
     @Operation(summary = "Revoke a refresh token")
     @SecurityRequirements
@@ -211,9 +188,8 @@ class AuthController {
     }
 
     /**
-     * Issues a password-reset token and sends it to the supplied email when an account matches.
-     * Returns {@code 204} regardless so the response cannot be used to enumerate registered
-     * addresses.
+     * Starts a password reset. Returns {@code 204} for both known and unknown emails so the
+     * response cannot be used to enumerate registered addresses.
      */
     @PostMapping("/forgot-password")
     @Operation(summary = "Start a password reset")
@@ -229,9 +205,10 @@ class AuthController {
     }
 
     /**
-     * Consumes a reset token, replaces the user's password, and revokes every refresh token for
-     * the account so other devices are signed out. Returns {@code 400} for unknown, expired, or
-     * already-consumed tokens with the same message in each branch.
+     * Completes a password reset and signs out every other device for the account.
+     *
+     * <p>Every failure branch returns {@code 400} with the same message so the response cannot
+     * be used to tell "wrong token" from "expired" from "already used."
      */
     @PostMapping("/reset-password")
     @Operation(summary = "Complete a password reset")
@@ -246,11 +223,7 @@ class AuthController {
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * Confirms ownership of an email address by consuming the verification token sent at
-     * registration. Returns {@code 204} for successful and replayed-success cases (idempotent);
-     * returns {@code 400} for unknown or expired tokens.
-     */
+    /** Confirms an email by consuming the verification token. Idempotent on replay. */
     @PostMapping("/verify-email")
     @Operation(summary = "Confirm an email address")
     @SecurityRequirements
@@ -265,9 +238,8 @@ class AuthController {
     }
 
     /**
-     * Issues a fresh verification link for the supplied email when an unverified account
-     * matches. Returns {@code 204} for unknown addresses and for already-verified accounts so
-     * the response cannot be used to enumerate registered or unverified emails.
+     * Resends the verification link. Returns {@code 204} for every branch so the response
+     * cannot be used to enumerate registered or unverified emails.
      */
     @PostMapping("/resend-verification")
     @Operation(summary = "Resend an email-verification link")
