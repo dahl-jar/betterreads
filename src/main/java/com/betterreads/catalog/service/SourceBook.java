@@ -39,8 +39,32 @@ public record SourceBook(
         @Nullable Integer seriesPosition) {
 
     public SourceBook {
-        authorNames = authorNames == null ? null : List.copyOf(authorNames);
-        rawSubjects = rawSubjects == null ? null : List.copyOf(rawSubjects);
-        rawCategories = rawCategories == null ? null : List.copyOf(rawCategories);
+        if (authorNames != null) {
+            authorNames = List.copyOf(authorNames);
+        }
+        if (rawSubjects != null) {
+            rawSubjects = List.copyOf(rawSubjects);
+        }
+        if (rawCategories != null) {
+            rawCategories = List.copyOf(rawCategories);
+        }
+    }
+
+    @Override
+    @Nullable
+    public List<String> authorNames() {
+        return authorNames == null ? null : List.copyOf(authorNames);
+    }
+
+    @Override
+    @Nullable
+    public List<String> rawSubjects() {
+        return rawSubjects == null ? null : List.copyOf(rawSubjects);
+    }
+
+    @Override
+    @Nullable
+    public List<String> rawCategories() {
+        return rawCategories == null ? null : List.copyOf(rawCategories);
     }
 }
