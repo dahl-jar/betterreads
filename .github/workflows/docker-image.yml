@@ -84,3 +84,31 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy:
+    name: Pin image in manifests
+    needs: build-and-push
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout manifests repo
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          repository: dahl-jar/homelab
+          ssh-key: ${{ secrets.HOMELAB_DEPLOY_KEY }}
+          path: homelab
+
+      - name: Pin app image to this commit
+        working-directory: homelab/projects/betterreads
+        run: kustomize edit set image ghcr.io/dahl-jar/betterreads:sha-${{ github.sha }}
+
+      - name: Commit and push if changed
+        working-directory: homelab
+        run: |
+          if git diff --quiet; then
+            echo "image already pinned to sha-${GITHUB_SHA}, nothing to do"
+            exit 0
+          fi
+          git config user.name "betterreads-ci"
+          git config user.email "ci@betterreadsapp.com"
+          git commit -am "Deploy betterreads sha-${GITHUB_SHA}"
+          git push

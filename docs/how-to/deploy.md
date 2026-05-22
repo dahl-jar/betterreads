@@ -10,7 +10,7 @@ kubectl get nodes
 
 ## Shipping a new version
 
-Deploys are automatic. On push to `main`, CI runs the quality gate, builds the image, and pushes it to GHCR tagged `latest` and `sha-<commit>`. Argo CD picks up the new image and rolls the Deployment.
+Deploys are automatic. On push to `main`, CI runs the quality gate, builds the image, and pushes it to GHCR tagged `latest` and `sha-<commit>`. A final CI job pins that `sha-<commit>` tag in the manifests repo (`kustomize edit set image`, then commit). Argo CD sees the manifest change and rolls the Deployment to the new image.
 
 To watch a rollout:
 
@@ -33,7 +33,7 @@ Argo CD keeps deployment history. Roll the workload back to the previous Replica
 kubectl rollout undo deploy/betterreads -n betterreads
 ```
 
-To pin to a known-good image instead, set the Deployment to a specific `sha-<commit>` tag in the manifests repo and let Argo sync. Reverting the manifests commit has the same effect, and keeps Git as the source of truth.
+To pin to a known-good image instead, set the `sha-<commit>` tag in the manifests repo's `kustomization.yaml` and let Argo sync. Reverting the CI deploy commit has the same effect, and keeps Git as the source of truth.
 
 ## Changing config
 

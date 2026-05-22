@@ -12,7 +12,7 @@ Flyway creates a separate `betterreads_app` role with CRUD-only privileges. Spri
 
 ## Delivery
 
-CI builds the container image on push to `main`, gated behind the quality check (`./gradlew check`), and pushes it to GHCR. Argo CD watches the manifests repo and reconciles the cluster to match. A deploy is a Git commit; Argo applies it and rolls the Deployment.
+CI builds the container image on push to `main`, gated behind the quality check (`./gradlew check`), and pushes it to GHCR tagged with the commit SHA. CI then pins that tag in the manifests repo's Kustomize `images` list and commits. Argo CD watches the manifests repo and reconciles the cluster to match, so a deploy is the Git commit CI just made; Argo applies it and rolls the Deployment. The image tag is a real commit SHA, not a moving `latest`, so the running version always maps back to a known commit.
 
 ## Edge
 
