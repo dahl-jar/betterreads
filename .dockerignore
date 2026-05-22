@@ -1,0 +1,13 @@
+# Never let secrets or local state into the build context.
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+.git
+.gradle
+.idea
+.local
+.claude
+build/reports
+build/tmp
