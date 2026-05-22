@@ -1,6 +1,6 @@
 # How to back up and restore Postgres
 
-Postgres is the only stateful thing in the cluster. Lose it and every user account, review, and collection is gone. A daily CronJob dumps the database, encrypts it, and uploads to Cloudflare R2. This runbook covers operating it.
+Postgres holds all persistent state: user accounts, reviews, collections. A daily CronJob dumps the database, encrypts it, and uploads to Cloudflare R2. This runbook covers operating it.
 
 ## What ends up in the bucket
 
@@ -45,7 +45,7 @@ kubectl logs -n betterreads -l app.kubernetes.io/name=postgres-backup -f
 
 ## Restore drill
 
-Run a restore at least once a quarter. A backup that hasn't been restored is theatre. Restore into a throwaway database, never the live one.
+Run a restore at least once a quarter to confirm the backups are usable. Restore into a throwaway database, never the live one.
 
 ```bash
 # pull the chosen object and decrypt on a workstation with the GPG passphrase

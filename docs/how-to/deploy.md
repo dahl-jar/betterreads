@@ -45,7 +45,7 @@ kubectl rollout restart deploy/betterreads -n betterreads
 
 Secrets are sealed in the manifests repo and decrypted in-cluster. Reseal the changed value, commit, then restart the Deployment.
 
-### Gotcha: Postgres credentials are persisted in the volume
+### Postgres credentials persist in the volume
 
 Postgres only reads `POSTGRES_USER` / `POSTGRES_PASSWORD` on first init of the PVC. After that the credentials live in the data volume and the env is ignored. If the password in the secret drifts from what Postgres was initialized with, the app fails to connect with `FATAL: password authentication failed`.
 
