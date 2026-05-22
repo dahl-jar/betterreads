@@ -6,7 +6,7 @@ Backend service for BetterReads, a book tracking app. Spring Boot on Java 25, Po
 
 The first version of BetterReads was a school project: a Thymeleaf app that called OpenLibrary on every page load, used Spring's default session auth, and let Hibernate auto-create the schema. The original code is at [dahl-jar/legacy-betterreads](https://github.com/dahl-jar/legacy-betterreads).
 
-This is a rebuild. The backend is a headless JSON API. Auth uses short-lived access JWTs and refresh tokens that rotate on every use, with replay detection. Schema changes go through Flyway, and the runtime database role has no DDL privileges. Production runs on a 4 GB Hetzner VM behind a Cloudflare Tunnel, with encrypted nightly backups to Cloudflare R2.
+This is a rebuild. The backend is a headless JSON API. Auth uses short-lived access JWTs and refresh tokens that rotate on every use, with replay detection. Schema changes go through Flyway, and the runtime database role has no DDL privileges. Production runs on a single-node Kubernetes cluster behind a Cloudflare Tunnel, deployed by Argo CD.
 
 ## Stack
 
@@ -62,7 +62,9 @@ Controller calls service, service calls repository. Each feature package has its
 
 ## Deployment
 
-Production runs on a Hetzner Cloud CX23 VM in Helsinki. Spring Boot via systemd, Postgres 17 in Docker on the same host, `cloudflared` connecting to Cloudflare's edge for DNS and TLS termination. The VM has no public ports open; Cloudflare Tunnel maps `api.betterreadsapp.com` to `localhost:8080` and `metrics.betterreadsapp.com` to `localhost:8081`. Cloudflare Access protects the management endpoints.
+Production runs on a single-node k3s cluster. The app, Postgres, and Redis run as Kubernetes workloads, synced from a Git repo by Argo CD. CI builds the container image and pushes it to GHCR after the quality gate passes.
+
+The cluster has no public ports open. A `cloudflared` Deployment connects out to Cloudflare's edge and maps `api.betterreadsapp.com` to the in-cluster ingress, which handles DNS and TLS termination. Metrics and logs ship to Grafana Cloud via a Grafana Alloy agent in the cluster.
 
 ## Docs
 
@@ -78,7 +80,6 @@ Explanation:
 How-to:
 - [Deploy](docs/how-to/deploy.md)
 - [Back up and restore Postgres](docs/how-to/backup-postgres.md)
-- [Set up the Cloudflare Tunnel](docs/how-to/cloudflare-tunnel.md)
 
 ## License
 

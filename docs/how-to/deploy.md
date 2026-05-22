@@ -1,164 +1,93 @@
 # How to deploy
 
-The production app runs on a Hetzner Cloud CX23 VM in Helsinki. This runbook covers updating the running app, changing config, restarting services, and rolling back if something breaks.
+Production runs on a single-node k3s cluster, deployed by Argo CD from a Git manifests repo. This runbook covers shipping a new version, rolling back, changing config, and restarting workloads.
 
-## Layout on the VM
-
-```
-/opt/betterreads/
-  app.jar              the running Spring Boot fat jar
-  app.jar.previous     the previous jar, kept for rollback
-  docker-compose.yml   Postgres definition
-  .env                 runtime config, owned root, mode 600
-  pg-backup.sh         daily backup to R2
-  pg-restore.sh        restore from R2
-```
-
-System services:
-
-```
-betterreads.service    Spring Boot via systemd, depends on docker.service
-docker.service         Docker daemon (Postgres container runs here)
-cloudflared.service    Cloudflare Tunnel
-cron                   daily backup at 03:00 UTC
-```
-
-## Updating the jar
-
-From a workstation with the repo checked out:
+`kubectl` reaches the cluster API over the private network. Confirm access first:
 
 ```bash
-./gradlew bootJar
-ssh root@<vm-ip> 'mv /opt/betterreads/app.jar /opt/betterreads/app.jar.previous'
-scp build/libs/betterreads-backend-*.jar root@<vm-ip>:/opt/betterreads/app.jar
-ssh root@<vm-ip> 'systemctl restart betterreads'
+kubectl get nodes
+```
+
+## Shipping a new version
+
+Deploys are automatic. On push to `main`, CI runs the quality gate, builds the image, and pushes it to GHCR tagged `latest` and `sha-<commit>`. Argo CD picks up the new image and rolls the Deployment.
+
+To watch a rollout:
+
+```bash
+kubectl rollout status deploy/betterreads -n betterreads
 curl https://api.betterreadsapp.com/healthz
 ```
 
-The `mv` step before `scp` keeps a known-good copy at `app.jar.previous` for rollback.
-
-If `/healthz` returns anything other than 200 within 30 seconds:
+If the new pod doesn't go ready, check its logs:
 
 ```bash
-ssh root@<vm-ip> 'journalctl -u betterreads -n 50 --no-pager'
+kubectl logs -n betterreads deploy/betterreads --tail=50
 ```
 
 ## Rolling back
 
-```bash
-ssh root@<vm-ip> 'mv /opt/betterreads/app.jar.previous /opt/betterreads/app.jar && systemctl restart betterreads'
-curl https://api.betterreadsapp.com/healthz
-```
-
-## Changing environment variables
-
-Edit `/opt/betterreads/.env` over SSH; don't open it in a local IDE.
+Argo CD keeps deployment history. Roll the workload back to the previous ReplicaSet:
 
 ```bash
-ssh root@<vm-ip>
-# edit /opt/betterreads/.env
-systemctl restart betterreads
+kubectl rollout undo deploy/betterreads -n betterreads
 ```
 
-Postgres also reads its credentials from this file via `docker compose`, so changes to `DB_USERNAME` / `DB_PASSWORD` need a Postgres restart too:
+To pin to a known-good image instead, set the Deployment to a specific `sha-<commit>` tag in the manifests repo and let Argo sync. Reverting the manifests commit has the same effect, and keeps Git as the source of truth.
+
+## Changing config
+
+Non-secret config lives in the `betterreads-config` ConfigMap in the manifests repo. Edit it there, commit, and Argo applies it. The app picks up the change on its next restart:
 
 ```bash
-ssh root@<vm-ip> 'cd /opt/betterreads && docker compose restart db'
+kubectl rollout restart deploy/betterreads -n betterreads
 ```
+
+Secrets are sealed in the manifests repo and decrypted in-cluster. Reseal the changed value, commit, then restart the Deployment.
 
 ### Gotcha: Postgres credentials are persisted in the volume
 
-Postgres only reads `POSTGRES_USER` / `POSTGRES_PASSWORD` from the env on **first** container start, when it initializes the data volume. After that, the credentials live in `betterreads-db-data` and the env var is ignored.
+Postgres only reads `POSTGRES_USER` / `POSTGRES_PASSWORD` on first init of the PVC. After that the credentials live in the data volume and the env is ignored. If the password in the secret drifts from what Postgres was initialized with, the app fails to connect with `FATAL: password authentication failed`.
 
-If `DB_PASSWORD` in `.env` drifts from what Postgres was initialized with, the app fails to connect with `FATAL: password authentication failed`. The only ways out are:
-
-- Run `ALTER USER` inside Postgres to match the current `.env`. Needs a working login first, which is the chicken-and-egg when only the new password is known.
-- Wipe the volume and let Flyway re-migrate from scratch. Loses data. Acceptable when there's nothing real in the DB yet.
-
-Correct rotation flow:
+To rotate, `ALTER USER` inside Postgres first, then update the secret:
 
 ```bash
-# 1. Connect with the current (still-valid) credentials and ALTER USER
-ssh root@<vm-ip>
-docker exec -it betterreads-db psql -U betterreads -d postgres
+kubectl exec -it -n betterreads postgres-0 -- psql -U betterreads -d postgres
 postgres=# ALTER USER betterreads WITH PASSWORD '<new>';
 postgres=# ALTER USER betterreads_app WITH PASSWORD '<new app>';
 postgres=# \q
-
-# 2. Update /opt/betterreads/.env to match
-
-# 3. Restart Spring Boot. Postgres doesn't need to restart.
-systemctl restart betterreads
 ```
 
-If the rotation order gets out of sync (`.env` changed first, then the `ALTER USER` step forgotten), the container is fine but the app won't start. Reverse the order in `.env` and try again, or `ALTER USER` from another working session.
+Then reseal the secret with the new value and restart the app. Don't change the secret first; the running database keeps the old password until `ALTER USER` runs.
 
-## Restarting services
+## Restarting workloads
 
 ```bash
-ssh root@<vm-ip>
-
-systemctl restart betterreads      # Spring Boot
-docker compose -f /opt/betterreads/docker-compose.yml restart db   # Postgres
-systemctl restart cloudflared      # Cloudflare Tunnel
-
-systemctl status betterreads cloudflared docker
-docker ps
+kubectl rollout restart deploy/betterreads -n betterreads     # app
+kubectl rollout restart statefulset/redis -n betterreads      # redis
+kubectl rollout restart deploy/cloudflared -n cloudflared     # tunnel
 ```
 
-## Logs
+Restarting Postgres (`statefulset/postgres`) drops connections briefly; the app's pool reconnects.
+
+## Logs and status
 
 ```bash
-journalctl -u betterreads -f                 # Spring Boot, follow
-journalctl -u cloudflared -f                 # tunnel
-docker logs -f betterreads-db                # Postgres
-journalctl -t betterreads-backup --since today    # backup cron output
+kubectl get pods -A                                    # everything
+kubectl logs -n betterreads deploy/betterreads -f      # app, follow
+kubectl logs -n betterreads postgres-0 -f              # Postgres
+kubectl logs -n cloudflared deploy/cloudflared -f      # tunnel
 ```
 
-## Disk usage
+Argo CD's UI shows sync state and the resource tree per app.
 
-The 40 GB SSD is shared between the OS, Docker images, the Postgres data volume, and the Spring Boot jar. Check periodically:
+## If the tunnel is down
+
+The API returns a Cloudflare error page (530/1033) when no connector is registered. Check the cloudflared pods:
 
 ```bash
-ssh root@<vm-ip> 'df -h / && docker system df && du -sh /opt/betterreads/'
+kubectl get pods -n cloudflared
+kubectl logs -n cloudflared deploy/cloudflared --tail=30
 ```
 
-If Docker has accumulated unused images:
-
-```bash
-ssh root@<vm-ip> 'docker image prune -f'
-```
-
-The Postgres volume `betterreads-db-data` only grows. Don't `docker volume rm` it without confirming a recent R2 backup exists.
-
-## Updating the OS
-
-```bash
-ssh root@<vm-ip> 'DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y'
-```
-
-If a kernel update lands, reboot the VM:
-
-```bash
-ssh root@<vm-ip> 'reboot'
-```
-
-systemd brings everything back automatically: `docker.service` → Postgres container → `betterreads.service` → cloudflared. Verify with `/healthz` once the VM is back. Expect ~30 seconds of downtime during the reboot.
-
-## Adding an SSH key
-
-```bash
-ssh root@<vm-ip> 'echo "<new public key>" >> /root/.ssh/authorized_keys'
-```
-
-## Recreating the VM from scratch
-
-If the VM is destroyed, the recipe is:
-
-1. `hcloud server create --name betterreads --type cx22 --image ubuntu-24.04 --location hel1 --ssh-key <key-name>`
-2. SSH in, `apt upgrade`, install GraalVM 25, Docker, cloudflared, rclone.
-3. `scp` the latest jar, `docker-compose.yml`, and both backup scripts to `/opt/betterreads/`.
-4. Create `/opt/betterreads/.env` with the saved secret values.
-5. Install the systemd units (`betterreads.service`, plus the `cloudflared service install <token>` flow).
-6. `pg-restore.sh` from the most recent R2 backup, or let Flyway re-migrate on first boot if data loss is acceptable.
-7. Update Cloudflare Tunnel ingress rules to point at the new VM IP if it changed.
+Two replicas run, so a single pod restart doesn't drop the tunnel.
