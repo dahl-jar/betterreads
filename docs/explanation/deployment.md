@@ -2,30 +2,28 @@
 
 ## Architecture
 
-A single Hetzner Cloud VM in Helsinki runs the backend and Postgres. Cloudflare sits in front for DNS, TLS, tunnel, Access, and R2 backups.
+Production runs on a single-node k3s cluster. The Spring Boot app, Postgres, and Redis run as Kubernetes workloads. Argo CD syncs them from a Git repo (GitOps), and Cloudflare sits in front for DNS, TLS, and the tunnel.
 
-## Backend host
+## Workloads
 
-Hetzner Cloud `CX23` (x86, 2 vCPU, 4 GB RAM, 40 GB SSD), Helsinki (`hel1`), Ubuntu 24.04 LTS. Provisioned via one `hcloud` command.
+The app runs as a Deployment pulling its image from GHCR. Postgres 17 and Redis 7 run as StatefulSets, each with its own PersistentVolumeClaim on the cluster's local-path storage. All three live in the `betterreads` namespace. Services are cluster-internal; nothing is published to the host network.
 
-## Database host
+Flyway creates a separate `betterreads_app` role with CRUD-only privileges. Spring Boot connects as `betterreads_app`; Flyway runs as the migration owner `betterreads`. SQL injection on the runtime path can't drop tables or alter schema.
 
-`docker-compose.yml` at `/opt/betterreads/docker-compose.yml` runs Postgres 17 Alpine bound to `127.0.0.1:5432`. Persistent named volume `betterreads-db-data` keeps data across container restarts. Localhost-only binding keeps the database off the public network.
+## Delivery
 
-Flyway V10 creates a separate `betterreads_app` role with CRUD-only privileges. Spring Boot connects as `betterreads_app`; Flyway runs as the migration owner `betterreads`. SQL injection on the runtime can't drop tables or alter schema.
-
-## Backups
-
-Daily and Sunday-weekly backups go to a Cloudflare R2 bucket via rclone. The script encrypts with GPG before upload (AES-256, env-supplied passphrase). R2 lifecycle expires anything in `betterreads/postgres/` after 30 days. Operational details, restore drill, and disaster recovery flow live in [how-to/backup-postgres.md](../how-to/backup-postgres.md).
+CI builds the container image on push to `main`, gated behind the quality check (`./gradlew check`), and pushes it to GHCR. Argo CD watches the manifests repo and reconciles the cluster to match. A deploy is a Git commit; Argo applies it and rolls the Deployment.
 
 ## Edge
 
-Cloudflare provides DNS, TLS, CDN, DDoS protection, Tunnel, Access, and R2 in one account.
+Cloudflare provides DNS, TLS, CDN, and DDoS protection. A `cloudflared` Deployment in the cluster connects out to Cloudflare's edge, so no inbound ports are open on the host. The tunnel routes `api.betterreadsapp.com` to the in-cluster Traefik ingress, which host-routes to the app Service.
 
-`cloudflared` on the VM exposes the backend without opening firewall ports. Two ingress rules: `api.betterreadsapp.com` to `localhost:8080` (public API), `metrics.betterreadsapp.com` to `localhost:8081` (actuator behind Cloudflare Access).
+Per-endpoint rate limiting lives in the backend via Bucket4j, with Cloudflare CIDRs as trusted proxies for `X-Forwarded-For` resolution.
 
-Per-endpoint rate limiting lives in the backend via Bucket4j with Cloudflare CIDRs as trusted proxies for `X-Forwarded-For` resolution.
+## Observability
 
-## Deploy flow
+A Grafana Alloy agent in the cluster scrapes the app's actuator metrics, Postgres metrics, and node metrics, and ships them with pod logs to Grafana Cloud. Alert rules and dashboards live in the Grafana Cloud stack.
 
-Operational details are in [how-to/deploy.md](../how-to/deploy.md). Spring Boot runs as a systemd service with `Restart=on-failure`. Deploys are `scp` of a new jar plus `systemctl restart betterreads`. The previous jar is kept at `app.jar.previous` for rollback.
+## Operating it
+
+See [how-to/deploy.md](../how-to/deploy.md) for updating the app, rolling back, and changing config.
