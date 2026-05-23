@@ -126,6 +126,11 @@ openlibrary:
   connect-timeout: 5000
   read-timeout: 10000
 
+meilisearch:
+  host: ${MEILISEARCH_HOST:http://localhost:7700}
+  master-key: ${MEILI_MASTER_KEY:dev-placeholder-set-MEILI_MASTER_KEY-for-real-use}
+  index-name: ${MEILISEARCH_INDEX_NAME:books}
+
 springdoc:
   api-docs:
     path: /v3/api-docs
