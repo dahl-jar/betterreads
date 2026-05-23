@@ -76,6 +76,9 @@ dependencies {
 	// Rate limiting (token bucket per IP)
 	implementation("com.bucket4j:bucket4j_jdk17-core:8.14.0")
 
+	// Meilisearch (official Java client) — catalog full-text search engine
+	implementation("com.meilisearch.sdk:meilisearch-java:0.14.5")
+
 	// Spring Boot @ConfigurationProperties metadata generator
 	annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
 
