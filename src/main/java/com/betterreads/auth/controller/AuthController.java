@@ -73,13 +73,12 @@ class AuthController {
 
     @SuppressWarnings("PMD.ExcessiveParameterList")
     AuthController(
-        final AuthService authService,
-        final PasswordResetService passwordResetService,
-        final EmailVerificationService emailVerificationService,
-        final AccountDeletionService accountDeletionService,
-        final RefreshCookieProperties cookieProperties,
-        final JwtProperties jwtProperties
-    ) {
+            final AuthService authService,
+            final PasswordResetService passwordResetService,
+            final EmailVerificationService emailVerificationService,
+            final AccountDeletionService accountDeletionService,
+            final RefreshCookieProperties cookieProperties,
+            final JwtProperties jwtProperties) {
         this.authService = authService;
         this.passwordResetService = passwordResetService;
         this.emailVerificationService = emailVerificationService;
