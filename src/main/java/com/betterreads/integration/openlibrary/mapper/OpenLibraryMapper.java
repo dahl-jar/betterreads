@@ -85,8 +85,8 @@ public class OpenLibraryMapper {
     /**
      * Returns the description as plain text.
      *
-     * <p>OpenLibrary sends a plain string on some works and a {@code {"type", "value"}} object on
-     * others, which Jackson binds to a {@link String} or a {@code Map}. Both come out as the text.
+     * <p>OpenLibrary sends it as a plain string on some works and a {@code {"type", "value"}}
+     * object on others, which Jackson binds to a {@link String} or a {@code Map}.
      */
     static @Nullable String coerceDescription(final @Nullable Object description) {
         if (description instanceof String text) {
@@ -102,11 +102,10 @@ public class OpenLibraryMapper {
     }
 
     /**
-     * Returns the canonical genres mentioned across the subject strings, deduplicated and capped.
+     * Returns the canonical genres across the subject strings, deduplicated and capped at
+     * {@link #MAX_SUBJECTS}.
      *
-     * <p>{@link CatalogGenres#extractGenres} does the per-subject reduction; this just collects the
-     * results. A null input returns an empty list rather than null, so the caller decides what a
-     * book with no fetched work detail should store.
+     * <p>A null input returns an empty list, never null.
      */
     static List<String> cleanSubjects(final @Nullable List<String> subjects) {
         if (subjects == null) {

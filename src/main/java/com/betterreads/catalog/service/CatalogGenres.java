@@ -7,9 +7,8 @@ import java.util.Set;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Canonical genre vocabulary shared across source mappers. It boils the verbose, noisy subject
- * strings external sources return down to a small set of shelf genres. The terms are the top-level
- * BISAC genre headings.
+ * Canonical genre vocabulary for reducing external subject strings to shelf genres. The terms are
+ * the top-level BISAC genre headings.
  */
 public final class CatalogGenres {
 
