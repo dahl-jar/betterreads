@@ -121,10 +121,10 @@ betterreads:
       scheduler-enabled: ${AUTH_DELETION_SCHEDULER_ENABLED:true}
 
 openlibrary:
-  base-url: https://openlibrary.org
-  search-limit: 20
-  connect-timeout: 5000
-  read-timeout: 10000
+  base-url: ${OPENLIBRARY_BASE_URL:https://openlibrary.org}
+  contact-email: ${OPENLIBRARY_CONTACT_EMAIL:contact@betterreadsapp.com}
+  connect-timeout: ${OPENLIBRARY_CONNECT_TIMEOUT:5000}
+  read-timeout: ${OPENLIBRARY_READ_TIMEOUT:10000}
 
 googlebooks:
   base-url: ${GOOGLE_BOOKS_BASE_URL:https://www.googleapis.com/books/v1}

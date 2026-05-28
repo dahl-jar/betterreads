@@ -9,7 +9,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 /** Persistence for {@link Book}. */
 public interface BookRepository extends JpaRepository<Book, Long> {
 
-    /** Returns the book with the given Google Books volume id, with its {@code authors} fetched. */
-    @EntityGraph(attributePaths = "authors")
+    /** Returns the book with the given Google Books volume id, with authors and subjects fetched. */
+    @EntityGraph(attributePaths = {"authors", "subjects"})
     Optional<Book> findByGoogleBooksVolumeId(String googleBooksVolumeId);
+
+    /** Returns the book with the given OpenLibrary work key, with authors and subjects fetched. */
+    @EntityGraph(attributePaths = {"authors", "subjects"})
+    Optional<Book> findByOpenLibraryWorkKey(String openLibraryWorkKey);
 }

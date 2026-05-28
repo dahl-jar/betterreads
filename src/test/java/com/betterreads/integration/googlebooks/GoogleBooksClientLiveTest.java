@@ -5,7 +5,6 @@ import static org.assertj.core.api.InstanceOfAssertFactories.STRING;
 
 import java.time.Year;
 import java.time.ZoneOffset;
-import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -66,6 +65,10 @@ class GoogleBooksClientLiveTest {
 
     private static final String GRAPHIC_NOVEL_CATEGORY = "Comics & Graphic Novels";
 
+    private static final int EARLIEST_PLAUSIBLE_YEAR = 1900;
+
+    private static final int MINIMUM_REAL_PAGE_COUNT = 50;
+
     @Autowired
     private GoogleBooksClientImpl client;
 
@@ -94,54 +97,61 @@ class GoogleBooksClientLiveTest {
             .as("Google Books knows about every book in this slate; an empty result is a real regression")
             .isPresent()
             .get()
-            .satisfies(book -> {
-                assertThat(book.source()).isEqualTo(BookFieldSource.GOOGLE_BOOKS);
-                assertThat(book.title()).containsIgnoringCase(titleQuery);
-                assertThat(book.authorNames())
-                    .as("first listed author must contain the author searched for; "
-                        + "a different name means we picked an adaptation or different book entirely")
-                    .isNotNull()
-                    .first(STRING)
-                    .containsIgnoringCase(authorQuery);
-                if (book.isbn13() != null) {
-                    assertThat(book.isbn13())
-                        .as("when ISBN-13 is present it must be a real 978/979 ISBN, never fabricated from ISBN-10")
-                        .matches("^97[89]\\d{10}$");
-                }
-                assertThat(book.publicationYear())
-                    .as("publication year must be a real year, not parsed-wrong from a weird date shape")
-                    .isNotNull()
-                    .isBetween(1900, Year.now(ZoneOffset.UTC).getValue());
-                if (book.pageCount() != null) {
-                    assertThat(book.pageCount())
-                        .as("Google emits pageCount=0 on some editions; mapper must null those out, "
-                            + "and a non-null page count must be a real book length")
-                        .isGreaterThan(50);
-                }
-                if (book.description() != null) {
-                    assertThat(book.description())
-                        .as("Google ships <p>/<b>/<i>/<br> in descriptions; the mapper must strip them")
-                        .doesNotContainPattern("<[^>]+>");
-                }
-                switch (kind) {
-                    case NOVEL -> assertThat(book.rawCategories() == null
-                            || !book.rawCategories().contains(GRAPHIC_NOVEL_CATEGORY))
-                        .as("a prose novel must not be tagged as a graphic novel; "
-                            + "this catches search drifting to the comic adaptation. "
-                            + "Got categories: %s", book.rawCategories())
-                        .isTrue();
-                    case GRAPHIC_NOVEL -> {
-                        final List<String> categories = book.rawCategories();
-                        assertThat(categories)
-                            .as("graphic novels must surface the Comics & Graphic Novels category "
-                                + "so the catalog can shelf them correctly")
-                            .isNotNull()
-                            .satisfies(list -> assertThat(list.contains(GRAPHIC_NOVEL_CATEGORY))
-                                .as("expected '%s' among categories %s", GRAPHIC_NOVEL_CATEGORY, list)
-                                .isTrue());
-                    }
-                }
-            });
+            .satisfies(book -> assertCleanMetadata(book, titleQuery, authorQuery, kind));
+    }
+
+    private static void assertCleanMetadata(
+        final SourceBook book,
+        final String titleQuery,
+        final String authorQuery,
+        final Kind kind
+    ) {
+        assertThat(book.source()).isEqualTo(BookFieldSource.GOOGLE_BOOKS);
+        assertThat(book.title()).containsIgnoringCase(titleQuery);
+        assertThat(book.authorNames())
+            .as("first listed author must contain the author searched for; "
+                + "a different name means we picked an adaptation or different book entirely")
+            .isNotNull()
+            .first(STRING)
+            .containsIgnoringCase(authorQuery);
+        if (book.isbn13() != null) {
+            assertThat(book.isbn13())
+                .as("when ISBN-13 is present it must be a real 978/979 ISBN, never fabricated from ISBN-10")
+                .matches("^97[89]\\d{10}$");
+        }
+        assertThat(book.publicationYear())
+            .as("publication year must be a real year, not parsed-wrong from a weird date shape")
+            .isNotNull()
+            .isBetween(EARLIEST_PLAUSIBLE_YEAR, Year.now(ZoneOffset.UTC).getValue());
+        if (book.pageCount() != null) {
+            assertThat(book.pageCount())
+                .as("Google emits pageCount=0 on some editions; mapper must null those out, "
+                    + "and a non-null page count must be a real book length")
+                .isGreaterThan(MINIMUM_REAL_PAGE_COUNT);
+        }
+        if (book.description() != null) {
+            assertThat(book.description())
+                .as("Google ships <p>/<b>/<i>/<br> in descriptions; the mapper must strip them")
+                .doesNotContainPattern("<[^>]+>");
+        }
+        assertGenreShelf(book, kind);
+    }
+
+    private static void assertGenreShelf(final SourceBook book, final Kind kind) {
+        if (kind == Kind.GRAPHIC_NOVEL) {
+            assertThat(book.rawCategories())
+                .as("graphic novels must surface the Comics & Graphic Novels category "
+                    + "so the catalog can shelf them correctly")
+                .isNotNull()
+                .contains(GRAPHIC_NOVEL_CATEGORY);
+            return;
+        }
+        assertThat(book.rawCategories() == null
+                || !book.rawCategories().contains(GRAPHIC_NOVEL_CATEGORY))
+            .as("a prose novel must not be tagged as a graphic novel; "
+                + "this catches search drifting to the comic adaptation. "
+                + "Got categories: %s", book.rawCategories())
+            .isTrue();
     }
 
     private enum Kind {

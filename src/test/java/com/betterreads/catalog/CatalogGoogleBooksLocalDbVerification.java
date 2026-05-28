@@ -40,7 +40,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 })
 @EnabledIfEnvironmentVariable(named = "RUN_LOCAL_DB_VERIFICATION", matches = "1")
 @EnabledIfEnvironmentVariable(named = "GOOGLE_BOOKS_API_KEY", matches = ".+")
+// PMD.ClassNamingConventions: not *Test on purpose, an opt-in manual DB verification, not a CI test
+@SuppressWarnings("PMD.ClassNamingConventions")
 class CatalogGoogleBooksLocalDbVerification {
+
+    private static final String EYE_OF_THE_WORLD_AUTHOR = "Robert Jordan";
 
     @Autowired
     private GoogleBooksClient googleBooksClient;
@@ -64,7 +68,7 @@ class CatalogGoogleBooksLocalDbVerification {
     @DisplayName("Eye of the World lands in the local compose Postgres for psql inspection")
     void eyeOfTheWorldLandsInLocalCompose() {
         final Optional<SourceBook> source = googleBooksClient.fetchByTitleAuthor(
-            "The Eye of the World", "Robert Jordan");
+            "The Eye of the World", EYE_OF_THE_WORLD_AUTHOR);
         assertThat(source).isPresent();
 
         final Book persisted = catalogService.upsertFromSource(source.get());
@@ -77,7 +81,7 @@ class CatalogGoogleBooksLocalDbVerification {
             .get()
             .satisfies(book -> {
                 assertThat(book.getTitle()).containsIgnoringCase("Eye of the World");
-                assertThat(book.getAuthors()).extracting("name").containsExactly("Robert Jordan");
+                assertThat(book.getAuthors()).extracting("name").containsExactly(EYE_OF_THE_WORLD_AUTHOR);
             });
     }
 }
