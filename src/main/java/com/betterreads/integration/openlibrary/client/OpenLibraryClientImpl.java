@@ -25,7 +25,7 @@ import org.springframework.web.util.UriBuilder;
  * <p>A lookup is two calls: {@code search.json} resolves the work, then {@code /works/{key}.json}
  * adds the description and subjects the search omits. The search ranks fuzzily and can return a
  * related work, so {@link #titleMatches} rejects drift. 4xx resolves to {@link Optional#empty()};
- * 5xx and network failures propagate so an upstream pipeline can retry or fall back.
+ * 5xx and network failures propagate.
  */
 @Component
 public class OpenLibraryClientImpl implements OpenLibraryClient {
@@ -132,11 +132,10 @@ public class OpenLibraryClientImpl implements OpenLibraryClient {
     }
 
     /**
-     * Returns true if the returned work is the queried one, not a prefix-drift relative.
+     * Returns true if the returned title equals the query or the query is the more specific string.
      *
-     * <p>A substring check is too loose: {@code "the sandman - overture"} contains the query
-     * {@code "the sandman"} but is a different work. The title must equal the query, or the query
-     * must be the more specific string, so a title that extends the query is rejected.
+     * <p>A title that extends the query is a different work and is rejected:
+     * {@code "the sandman - overture"} does not match a query of {@code "the sandman"}.
      */
     private static boolean titleMatches(final SearchDoc doc, final String queryTitle) {
         final String docTitle = doc.title();
