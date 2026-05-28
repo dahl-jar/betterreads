@@ -15,4 +15,17 @@ import org.jspecify.annotations.Nullable;
 public record VolumeSearchResponse(
     int totalItems,
     @Nullable List<Volume> items
-) { }
+) {
+
+    public VolumeSearchResponse {
+        if (items != null) {
+            items = List.copyOf(items);
+        }
+    }
+
+    @Override
+    @Nullable
+    public List<Volume> items() {
+        return items == null ? null : List.copyOf(items);
+    }
+}

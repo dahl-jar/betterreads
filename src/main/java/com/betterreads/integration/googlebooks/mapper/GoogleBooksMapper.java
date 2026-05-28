@@ -87,7 +87,7 @@ public class GoogleBooksMapper {
     }
 
     static @Nullable Integer nullIfZero(final @Nullable Integer pageCount) {
-        if (pageCount == null || pageCount.intValue() == 0) {
+        if (pageCount == null || pageCount == 0) {
             return null;
         }
         return pageCount;

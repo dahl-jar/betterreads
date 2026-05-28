@@ -1,5 +1,6 @@
 package com.betterreads.catalog.entity;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -8,6 +9,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -15,7 +17,9 @@ import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import com.betterreads.catalog.service.SourceBook;
@@ -29,7 +33,10 @@ import org.jspecify.annotations.Nullable;
  */
 @Entity
 @Table(name = "book")
-@SuppressWarnings({"NullAway.Init", "PMD.DataClass", "PMD.ExcessivePublicCount", "PMD.TooManyFields"})
+@SuppressWarnings({
+    "NullAway.Init", "PMD.DataClass", "PMD.ExcessivePublicCount", "PMD.TooManyFields",
+    "PMD.CyclomaticComplexity"
+})
 public class Book {
 
     @Id
@@ -102,6 +109,9 @@ public class Book {
     )
     private Set<Author> authors = new HashSet<>();
 
+    @OneToMany(mappedBy = "book", cascade = CascadeType.ALL, orphanRemoval = true)
+    private final List<BookSubject> subjects = new ArrayList<>();
+
     @PrePersist
     void onCreate() {
         final OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
@@ -139,6 +149,29 @@ public class Book {
         this.isbn = source.isbn13();
         this.pageCount = source.pageCount();
         this.language = source.language();
+        replaceSubjects(source.rawSubjects());
+    }
+
+    /**
+     * Replaces the book's subjects with the given list, removing any that are no longer present.
+     *
+     * <p>Re-upserting a book reapplies the source, so subjects are cleared and rebuilt rather than
+     * appended; {@code orphanRemoval} deletes the dropped rows. A null list means the source did
+     * not return the field (for example an OpenLibrary work-detail 4xx), so the existing subjects
+     * are left untouched; an empty list is an explicit "no subjects" and clears them.
+     */
+    private void replaceSubjects(@Nullable final List<String> newSubjects) {
+        if (newSubjects == null) {
+            return;
+        }
+        this.subjects.clear();
+        for (final String subject : newSubjects) {
+            this.subjects.add(new BookSubject(this, subject));
+        }
+    }
+
+    public List<BookSubject> getSubjects() {
+        return subjects;
     }
 
     public Long getBookId() {

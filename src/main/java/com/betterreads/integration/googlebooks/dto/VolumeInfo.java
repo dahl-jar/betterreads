@@ -20,4 +20,35 @@ public record VolumeInfo(
     @Nullable Double averageRating,
     @Nullable Integer ratingsCount,
     @Nullable String description
-) { }
+) {
+
+    public VolumeInfo {
+        if (authors != null) {
+            authors = List.copyOf(authors);
+        }
+        if (industryIdentifiers != null) {
+            industryIdentifiers = List.copyOf(industryIdentifiers);
+        }
+        if (categories != null) {
+            categories = List.copyOf(categories);
+        }
+    }
+
+    @Override
+    @Nullable
+    public List<String> authors() {
+        return authors == null ? null : List.copyOf(authors);
+    }
+
+    @Override
+    @Nullable
+    public List<IndustryIdentifier> industryIdentifiers() {
+        return industryIdentifiers == null ? null : List.copyOf(industryIdentifiers);
+    }
+
+    @Override
+    @Nullable
+    public List<String> categories() {
+        return categories == null ? null : List.copyOf(categories);
+    }
+}

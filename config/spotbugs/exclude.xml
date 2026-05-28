@@ -55,4 +55,57 @@
         <Bug pattern="EI_EXPOSE_REP2"/>
         <Package name="com.betterreads.auth.deletion"/>
     </Match>
+
+    <!--
+      EI_EXPOSE_REP / EI_EXPOSE_REP2 on JPA entities. Hibernate tracks the live collection
+      instance for dirty-checking and cascade; returning or accepting a defensive copy would
+      break orphan removal and managed-collection semantics. Entities are not value objects.
+    -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Package name="com.betterreads.catalog.entity"/>
+    </Match>
+
+    <!--
+      NP_UNWRITTEN_FIELD / UWF_UNWRITTEN_FIELD on @Autowired test fields. Spring sets these
+      reflectively, which SpotBugs cannot see, so it reads them as never written. Scoped to
+      test classes only.
+    -->
+    <Match>
+        <Bug pattern="NP_UNWRITTEN_FIELD,UWF_UNWRITTEN_FIELD"/>
+        <Class name="~.*Test(\$.+)?"/>
+    </Match>
+
+    <!--
+      EI_EXPOSE_REP2 on integration clients holding their injected WebClient and mapper.
+      Both are Spring-managed singletons, never mutated after construction and shared by
+      design. A defensive copy is meaningless for a WebClient. Same rationale as the
+      mail.outbox and auth-service suppressions above.
+    -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Package name="~com\.betterreads\.integration\..*\.client"/>
+    </Match>
+
+    <!--
+      CRLF_INJECTION_LOGS on the opt-in seed verification. The logged title is already passed
+      through LogSanitizer.forLog, but FindSecBugs does not recognize that helper as a sanitizer
+      through the static-import indirection in this class (it accepts the same helper in the
+      integration clients). Test-only seed code; the value is genuinely scrubbed.
+    -->
+    <Match>
+        <Bug pattern="CRLF_INJECTION_LOGS"/>
+        <Class name="com.betterreads.catalog.CatalogOpenLibrarySeedVerification"/>
+    </Match>
+
+    <!--
+      IMPROPER_UNICODE on the OpenLibrary title-drift guard. FindSecBugs flags any case-insensitive
+      comparison as a Unicode case-folding risk. The comparison here is two book titles for a
+      best-effort drift check, not a security token or authorization decision, so a Unicode
+      collision has no exploitable consequence. Case-insensitive title matching is intended.
+    -->
+    <Match>
+        <Bug pattern="IMPROPER_UNICODE"/>
+        <Class name="com.betterreads.integration.openlibrary.client.OpenLibraryClientImpl"/>
+    </Match>
 </FindBugsFilter>

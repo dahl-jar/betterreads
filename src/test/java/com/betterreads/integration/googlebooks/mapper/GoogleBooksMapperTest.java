@@ -47,11 +47,12 @@ class GoogleBooksMapperTest {
         @Test
         @DisplayName("picks ISBN_13 when present alongside ISBN_10, never synthesizes from the 10")
         void picksIsbn13OverIsbn10() {
+            final String isbn13 = "9781250832368";
             final List<IndustryIdentifier> identifiers = List.of(
                 new IndustryIdentifier("ISBN_10", "1250832365"),
-                new IndustryIdentifier("ISBN_13", "9781250832368")
+                new IndustryIdentifier("ISBN_13", isbn13)
             );
-            assertThat(GoogleBooksMapper.findIsbn13(identifiers)).isEqualTo("9781250832368");
+            assertThat(GoogleBooksMapper.findIsbn13(identifiers)).isEqualTo(isbn13);
         }
 
         @Test

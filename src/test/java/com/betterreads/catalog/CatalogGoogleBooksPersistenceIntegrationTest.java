@@ -45,6 +45,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @EnabledIfEnvironmentVariable(named = "GOOGLE_BOOKS_API_KEY", matches = ".+")
 class CatalogGoogleBooksPersistenceIntegrationTest {
 
+    private static final String EYE_OF_THE_WORLD_AUTHOR = "Robert Jordan";
+
     @Container
     @ServiceConnection
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17");
@@ -88,9 +90,9 @@ class CatalogGoogleBooksPersistenceIntegrationTest {
                 assertThat(book.getAuthors())
                     .as("M2M join row must exist; Robert Jordan must be the sole stored author")
                     .extracting("name")
-                    .containsExactly("Robert Jordan");
+                    .containsExactly(EYE_OF_THE_WORLD_AUTHOR);
             });
-        assertThat(authorRepository.findByName("Robert Jordan"))
+        assertThat(authorRepository.findByName(EYE_OF_THE_WORLD_AUTHOR))
             .as("author row visible independently of the book lookup")
             .isPresent();
     }
@@ -122,7 +124,7 @@ class CatalogGoogleBooksPersistenceIntegrationTest {
 
     private SourceBook fetchEyeOfTheWorld() {
         final Optional<SourceBook> source = googleBooksClient.fetchByTitleAuthor(
-            "The Eye of the World", "Robert Jordan");
+            "The Eye of the World", EYE_OF_THE_WORLD_AUTHOR);
         assertThat(source)
             .as("Google Books must know this book; the live client test covers data-quality details")
             .isPresent();

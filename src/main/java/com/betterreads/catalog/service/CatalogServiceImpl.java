@@ -45,6 +45,9 @@ public class CatalogServiceImpl implements CatalogService {
         if (source.googleBooksVolumeId() != null) {
             return bookRepository.findByGoogleBooksVolumeId(source.googleBooksVolumeId());
         }
+        if (source.openLibraryWorkKey() != null) {
+            return bookRepository.findByOpenLibraryWorkKey(source.openLibraryWorkKey());
+        }
         return Optional.empty();
     }
 

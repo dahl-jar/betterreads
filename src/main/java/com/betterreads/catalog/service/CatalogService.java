@@ -3,6 +3,7 @@ package com.betterreads.catalog.service;
 import com.betterreads.catalog.entity.Book;
 
 /** Catalog persistence operations. */
+@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface CatalogService {
 
     /**

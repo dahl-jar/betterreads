@@ -101,6 +101,7 @@ dependencies {
 	testImplementation("org.springframework.security:spring-security-test")
 	testImplementation("org.testcontainers:junit-jupiter")
 	testImplementation("org.testcontainers:postgresql")
+	testImplementation("org.wiremock:wiremock-standalone:3.9.2")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
 	// ArchUnit (architecture rule enforcement)

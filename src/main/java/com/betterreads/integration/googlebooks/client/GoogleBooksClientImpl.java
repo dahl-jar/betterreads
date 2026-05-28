@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import com.betterreads.catalog.service.BookFieldSource;
 import com.betterreads.catalog.service.SourceBook;
+import com.betterreads.common.util.LogSanitizer;
 import com.betterreads.integration.googlebooks.GoogleBooksClient;
 import com.betterreads.integration.googlebooks.dto.Volume;
 import com.betterreads.integration.googlebooks.dto.VolumeSearchResponse;
@@ -78,7 +79,7 @@ public class GoogleBooksClientImpl implements GoogleBooksClient {
         } catch (WebClientResponseException ex) {
             if (ex.getStatusCode().is4xxClientError()) {
                 LOG.debug("Google Books returned 4xx for volume lookup volumeId={} status={}",
-                    volumeId, ex.getStatusCode().value());
+                    LogSanitizer.forLog(volumeId), ex.getStatusCode().value());
                 return Optional.empty();
             }
             throw ex;
@@ -107,7 +108,7 @@ public class GoogleBooksClientImpl implements GoogleBooksClient {
         } catch (WebClientResponseException ex) {
             if (ex.getStatusCode().is4xxClientError()) {
                 LOG.debug("Google Books returned 4xx for search query={} status={}",
-                    query, ex.getStatusCode().value());
+                    LogSanitizer.forLog(query), ex.getStatusCode().value());
                 return Optional.empty();
             }
             throw ex;
