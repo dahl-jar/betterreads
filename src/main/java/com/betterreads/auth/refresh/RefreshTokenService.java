@@ -82,7 +82,7 @@ public class RefreshTokenService {
             if (row.getReplacedBy() != null) {
                 LOG.warn("Refresh token replayed, revoking entire chain userId={} tokenId={}",
                     row.getUserId(), row.getRefreshTokenId());
-                chainRevoker.revokeAllActiveForUser(row.getUserId());
+                chainRevoker.revokeAllInNewTransaction(row.getUserId());
             }
             return Optional.empty();
         }

@@ -92,11 +92,11 @@ public class HardcoverClientImpl implements HardcoverClient {
                 .block();
             return bestHit(response);
         } catch (WebClientResponseException exception) {
-            return onError(exception, query);
+            return recover(exception, query);
         }
     }
 
-    private Optional<HardcoverDocument> onError(
+    private Optional<HardcoverDocument> recover(
         final WebClientResponseException exception,
         final String query
     ) {

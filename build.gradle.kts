@@ -15,6 +15,7 @@ plugins {
 	id("com.github.spotbugs") version "6.4.8"
 	id("net.ltgt.errorprone") version "5.1.0"
 	id("org.owasp.dependencycheck") version "12.2.0"
+	id("de.aaschmid.cpd") version "3.5"
 }
 
 group = "com.betterreads"
@@ -129,6 +130,21 @@ pmd {
 	isConsoleOutput = true
 	isIgnoreFailures = false
 	incrementalAnalysis.set(true)
+}
+
+// Copy-paste detection. JPA entity accessors are identical by ORM necessity, not copied
+// logic, so the entity packages are excluded rather than tripping CPD on getter/setter runs.
+cpd {
+	toolVersion = "7.16.0"
+	language = "java"
+	minimumTokenCount = 75
+	isIgnoreFailures = false
+}
+
+tasks.named<de.aaschmid.gradle.plugins.cpd.Cpd>("cpdCheck") {
+	source = files("src/main/java").asFileTree.matching {
+		exclude("**/entity/**", "**/token/*Token.java", "**/refresh/*Token.java")
+	}
 }
 
 tasks.withType<Pmd>().configureEach {

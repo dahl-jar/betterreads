@@ -1,17 +1,13 @@
 package com.betterreads.integration.googlebooks;
 
-import java.time.Duration;
-
-import io.netty.channel.ChannelOption;
+import com.betterreads.common.web.WebClients;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
-import reactor.netty.http.client.HttpClient;
 
 /**
  * Builds the Google Books {@link WebClient} with explicit connect and response timeouts.
@@ -35,14 +31,9 @@ public class GoogleBooksWebClientConfig {
 
     @Bean
     WebClient googleBooksWebClient() {
-        final HttpClient httpClient = HttpClient.create()
-            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, properties.connectTimeout())
-            .responseTimeout(Duration.ofMillis(properties.readTimeout()));
-
-        return WebClient.builder()
-            .baseUrl(properties.baseUrl())
+        return WebClients.builderWithTimeouts(
+                properties.baseUrl(), properties.connectTimeout(), properties.readTimeout())
             .defaultHeader(HttpHeaders.USER_AGENT, USER_AGENT_VALUE)
-            .clientConnector(new ReactorClientHttpConnector(httpClient))
             .filter(apiKeyFilter())
             .build();
     }

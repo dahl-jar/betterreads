@@ -1,14 +1,10 @@
 package com.betterreads.integration.openlibrary;
 
-import java.time.Duration;
-
-import io.netty.channel.ChannelOption;
+import com.betterreads.common.web.WebClients;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.netty.http.client.HttpClient;
 
 /**
  * Builds the OpenLibrary {@link WebClient} with explicit connect and response timeouts.
@@ -27,14 +23,9 @@ public class OpenLibraryWebClientConfig {
 
     @Bean
     WebClient openLibraryWebClient() {
-        final HttpClient httpClient = HttpClient.create()
-            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, properties.connectTimeout())
-            .responseTimeout(Duration.ofMillis(properties.readTimeout()));
-
-        return WebClient.builder()
-            .baseUrl(properties.baseUrl())
+        return WebClients.builderWithTimeouts(
+                properties.baseUrl(), properties.connectTimeout(), properties.readTimeout())
             .defaultHeader(HttpHeaders.USER_AGENT, userAgent())
-            .clientConnector(new ReactorClientHttpConnector(httpClient))
             .build();
     }
 

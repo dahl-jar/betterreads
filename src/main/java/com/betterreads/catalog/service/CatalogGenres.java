@@ -1,6 +1,8 @@
 package com.betterreads.catalog.service;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
@@ -59,6 +61,26 @@ public final class CatalogGenres {
     /** Returns true if the subject mentions at least one canonical genre. */
     public static boolean isGenre(final @Nullable String subject) {
         return !extractGenres(subject).isEmpty();
+    }
+
+    /**
+     * Reduces a list of raw subject strings to canonical genres, deduplicated and capped.
+     *
+     * <p>A null input returns an empty list. The caller maps "field absent" to null itself, since
+     * null and empty have different persistence semantics on {@code Book}.
+     */
+    public static List<String> reduceToCanonical(final @Nullable List<String> subjects, final int cap) {
+        if (subjects == null) {
+            return List.of();
+        }
+        final Set<String> canonical = new LinkedHashSet<>();
+        for (final String subject : subjects) {
+            canonical.addAll(extractGenres(subject));
+            if (canonical.size() >= cap) {
+                break;
+            }
+        }
+        return new ArrayList<>(canonical);
     }
 
     private static boolean isMachineTag(final String subject) {
