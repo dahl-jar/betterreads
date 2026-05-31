@@ -23,24 +23,22 @@ public class RefreshTokenChainRevoker {
     }
 
     /**
-     * Revokes every active refresh token for the user in a new transaction.
+     * Revokes every active refresh token for the user.
      *
      * <p>{@code REQUIRES_NEW} because the rotate path throws right after calling this, and the
      * throw would roll back a same-transaction revoke. The revoke must stick.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void revokeAllActiveForUser(final long userId) {
+    public void revokeAllInNewTransaction(final long userId) {
         revoke(userId);
     }
 
     /**
-     * Revokes every active refresh token for the user as part of the surrounding transaction.
-     *
-     * <p>Used when the revoke must commit or roll back together with the surrounding write
-     * (password reset, account deletion).
+     * Revokes every active refresh token for the user, committing or rolling back with the
+     * surrounding write (password reset, account deletion).
      */
     @Transactional
-    public void revokeAllActiveForUserInTransaction(final long userId) {
+    public void revokeAllInCurrentTransaction(final long userId) {
         revoke(userId);
     }
 

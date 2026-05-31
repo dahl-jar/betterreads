@@ -1,10 +1,7 @@
 package com.betterreads.integration.openlibrary.mapper;
 
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import com.betterreads.catalog.service.BookFieldSource;
 import com.betterreads.catalog.service.CatalogGenres;
@@ -108,17 +105,7 @@ public class OpenLibraryMapper {
      * <p>A null input returns an empty list, never null.
      */
     static List<String> cleanSubjects(final @Nullable List<String> subjects) {
-        if (subjects == null) {
-            return List.of();
-        }
-        final Set<String> canonical = new LinkedHashSet<>();
-        for (final String subject : subjects) {
-            canonical.addAll(CatalogGenres.extractGenres(subject));
-            if (canonical.size() >= MAX_SUBJECTS) {
-                break;
-            }
-        }
-        return new ArrayList<>(canonical);
+        return CatalogGenres.reduceToCanonical(subjects, MAX_SUBJECTS);
     }
 
     private static @Nullable String firstLanguage(final @Nullable List<String> languages) {

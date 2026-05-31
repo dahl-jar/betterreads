@@ -66,7 +66,7 @@ public class AccountDeletionService {
         user.setDeletedAt(now);
         userRepository.save(user);
         invalidateOutstandingEmailTokens(userId, now);
-        refreshTokenChainRevoker.revokeAllActiveForUserInTransaction(userId);
+        refreshTokenChainRevoker.revokeAllInCurrentTransaction(userId);
         LOG.info("auth.account-deletion.delete soft-deleted userId={}", userId);
     }
 

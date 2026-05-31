@@ -1,9 +1,6 @@
 package com.betterreads.integration.hardcover.mapper;
 
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.regex.Pattern;
 
 import com.betterreads.catalog.service.BookFieldSource;
@@ -66,17 +63,7 @@ public class HardcoverMapper {
     }
 
     static List<String> cleanGenres(final @Nullable List<String> genres) {
-        if (genres == null) {
-            return List.of();
-        }
-        final Set<String> canonical = new LinkedHashSet<>();
-        for (final String genre : genres) {
-            canonical.addAll(CatalogGenres.extractGenres(genre));
-            if (canonical.size() >= MAX_GENRES) {
-                break;
-            }
-        }
-        return new ArrayList<>(canonical);
+        return CatalogGenres.reduceToCanonical(genres, MAX_GENRES);
     }
 
     static @Nullable Integer seriesPosition(final @Nullable Double position) {

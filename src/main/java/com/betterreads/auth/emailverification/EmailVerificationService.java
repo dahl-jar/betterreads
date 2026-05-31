@@ -1,18 +1,17 @@
 package com.betterreads.auth.emailverification;
 
+import com.betterreads.auth.Emails;
 import com.betterreads.auth.entity.User;
 import com.betterreads.auth.repository.UserRepository;
 import com.betterreads.auth.token.EmailToken;
 import com.betterreads.auth.token.EmailTokenRepository;
+import com.betterreads.auth.token.TokenGenerator;
 import com.betterreads.common.crypto.HmacTokenHasher;
 import com.betterreads.common.exception.InvalidRequestException;
 import com.betterreads.mail.outbox.MailOutboxService;
 
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.Locale;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -51,8 +50,6 @@ public class EmailVerificationService {
 
     private final MailOutboxService mailOutbox;
 
-    private final SecureRandom random;
-
     public EmailVerificationService(
         final UserRepository userRepository,
         final EmailTokenRepository tokenRepository,
@@ -63,7 +60,6 @@ public class EmailVerificationService {
         this.tokenRepository = tokenRepository;
         this.hasher = hasher;
         this.mailOutbox = mailOutbox;
-        this.random = new SecureRandom();
     }
 
     /**
@@ -77,7 +73,7 @@ public class EmailVerificationService {
     @Transactional
     public void issueVerification(final long userId, final String recipient) {
         consumeOutstandingTokens(userId);
-        final String plaintext = generatePlaintext();
+        final String plaintext = TokenGenerator.randomToken(TOKEN_BYTES);
         insertNewToken(userId, plaintext);
         mailOutbox.enqueueEmailVerification(recipient, plaintext);
         LOG.info("Issued verification token userId={}", userId);
@@ -90,7 +86,7 @@ public class EmailVerificationService {
      */
     @Transactional
     public void requestResend(final String email) {
-        final String normalized = normalizeEmail(email);
+        final String normalized = Emails.normalize(email);
         final Optional<User> userOpt = userRepository.findByEmailForUpdate(normalized);
         if (userOpt.isEmpty()) {
             LOG.info("Resend request for unknown email, no token issued");
@@ -187,13 +183,4 @@ public class EmailVerificationService {
         throw new InvalidRequestException(INVALID_OR_EXPIRED_TOKEN);
     }
 
-    private static String normalizeEmail(final String email) {
-        return email.trim().toLowerCase(Locale.ROOT);
-    }
-
-    private String generatePlaintext() {
-        final byte[] bytes = new byte[TOKEN_BYTES];
-        random.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-    }
 }

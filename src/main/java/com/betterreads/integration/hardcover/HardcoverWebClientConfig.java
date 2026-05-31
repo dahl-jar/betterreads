@@ -1,15 +1,11 @@
 package com.betterreads.integration.hardcover;
 
-import java.time.Duration;
-
-import io.netty.channel.ChannelOption;
+import com.betterreads.common.web.WebClients;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.netty.http.client.HttpClient;
 
 /**
  * Builds the Hardcover {@link WebClient} with explicit connect and response timeouts.
@@ -32,15 +28,10 @@ public class HardcoverWebClientConfig {
 
     @Bean
     WebClient hardcoverWebClient() {
-        final HttpClient httpClient = HttpClient.create()
-            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, properties.connectTimeout())
-            .responseTimeout(Duration.ofMillis(properties.readTimeout()));
-
-        final WebClient.Builder builder = WebClient.builder()
-            .baseUrl(properties.baseUrl())
+        final WebClient.Builder builder = WebClients.builderWithTimeouts(
+                properties.baseUrl(), properties.connectTimeout(), properties.readTimeout())
             .defaultHeader(HttpHeaders.USER_AGENT, USER_AGENT_VALUE)
-            .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-            .clientConnector(new ReactorClientHttpConnector(httpClient));
+            .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
 
         final String token = properties.bearerToken();
         if (token != null && !token.isBlank()) {
