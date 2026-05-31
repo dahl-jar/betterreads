@@ -48,6 +48,9 @@ public class CatalogServiceImpl implements CatalogService {
         if (source.openLibraryWorkKey() != null) {
             return bookRepository.findByOpenLibraryWorkKey(source.openLibraryWorkKey());
         }
+        if (source.hardcoverId() != null) {
+            return bookRepository.findByHardcoverId(source.hardcoverId());
+        }
         return Optional.empty();
     }
 

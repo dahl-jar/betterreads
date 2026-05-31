@@ -16,4 +16,8 @@ public interface BookRepository extends JpaRepository<Book, Long> {
     /** Returns the book with the given OpenLibrary work key, with authors and subjects fetched. */
     @EntityGraph(attributePaths = {"authors", "subjects"})
     Optional<Book> findByOpenLibraryWorkKey(String openLibraryWorkKey);
+
+    /** Returns the book with the given Hardcover id, with authors and subjects fetched. */
+    @EntityGraph(attributePaths = {"authors", "subjects"})
+    Optional<Book> findByHardcoverId(String hardcoverId);
 }

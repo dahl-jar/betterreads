@@ -239,6 +239,18 @@ tasks.withType<Test> {
 	// long after the test has already passed.
 	systemProperty("mail.outbox.worker-enabled", "false")
 	systemProperty("betterreads.auth.deletion.scheduler-enabled", "false")
+
+	// Forward env vars the opt-in live/local-DB verification tests need. Gradle does not pass the
+	// parent environment to the test JVM, so the compose-DB credentials and source API keys would
+	// fall back to their application.yml defaults and fail to authenticate. Only forwarded when set.
+	listOf(
+		"DB_HOST", "DB_PORT", "DB_NAME", "DB_USERNAME", "DB_PASSWORD",
+		"DB_APP_USERNAME", "DB_APP_PASSWORD",
+		"HARDCOVER_BEARER_TOKEN", "GOOGLE_BOOKS_API_KEY",
+		"RUN_LOCAL_DB_VERIFICATION", "RUN_OPENLIBRARY_LIVE",
+	).forEach { name ->
+		System.getenv(name)?.let { environment(name, it) }
+	}
 }
 
 // Wire coverage verification into check

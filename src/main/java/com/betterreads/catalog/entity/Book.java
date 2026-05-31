@@ -15,6 +15,7 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -34,7 +35,7 @@ import org.jspecify.annotations.Nullable;
 @Entity
 @Table(name = "book")
 @SuppressWarnings({
-    "NullAway.Init", "PMD.DataClass", "PMD.ExcessivePublicCount", "PMD.TooManyFields",
+    "NullAway.Init", "PMD.ExcessivePublicCount", "PMD.TooManyFields",
     "PMD.CyclomaticComplexity"
 })
 public class Book {
@@ -51,6 +52,10 @@ public class Book {
     @Column(name = "google_books_volume_id", unique = true)
     @Nullable
     private String googleBooksVolumeId;
+
+    @Column(name = "hardcover_id", unique = true)
+    @Nullable
+    private String hardcoverId;
 
     @Column(name = "title", nullable = false)
     private String title;
@@ -95,6 +100,14 @@ public class Book {
     @Nullable
     private Integer ratingCount;
 
+    @Column(name = "series_name")
+    @Nullable
+    private String seriesName;
+
+    @Column(name = "series_position")
+    @Nullable
+    private Integer seriesPosition;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -125,7 +138,10 @@ public class Book {
     }
 
     /**
-     * Overwrites every column on this book with the values from {@code source}, including nulls.
+     * Applies {@code source} to this book. Descriptive columns (title, description, cover, year,
+     * isbn, pages, language, subjects) overwrite with the source value including null; source ids
+     * and the rating and series columns are filled only when the source supplies them, via
+     * {@link #accrueFrom}.
      *
      * <p>Authors are not touched here; the catalog service owns the {@code book_author} join
      * because attaching authors requires repository lookups for de-duplication.
@@ -140,8 +156,6 @@ public class Book {
                     + "the upstream source returned a degenerate response");
         }
         this.title = sourceTitle;
-        this.googleBooksVolumeId = source.googleBooksVolumeId();
-        this.openLibraryWorkKey = source.openLibraryWorkKey();
         this.subtitle = source.subtitle();
         this.description = source.description();
         this.coverUrl = source.coverUrl();
@@ -150,6 +164,26 @@ public class Book {
         this.pageCount = source.pageCount();
         this.language = source.language();
         replaceSubjects(source.rawSubjects());
+        accrueFrom(source);
+    }
+
+    /** Fills source ids and the rating and series fields without overwriting a set value with null. */
+    private void accrueFrom(final SourceBook source) {
+        this.googleBooksVolumeId = coalesce(source.googleBooksVolumeId(), this.googleBooksVolumeId);
+        this.openLibraryWorkKey = coalesce(source.openLibraryWorkKey(), this.openLibraryWorkKey);
+        this.hardcoverId = coalesce(source.hardcoverId(), this.hardcoverId);
+        this.averageRating = coalesce(toRating(source.averageRating()), this.averageRating);
+        this.ratingCount = coalesce(source.ratingCount(), this.ratingCount);
+        this.seriesName = coalesce(source.seriesName(), this.seriesName);
+        this.seriesPosition = coalesce(source.seriesPosition(), this.seriesPosition);
+    }
+
+    private static <T> @Nullable T coalesce(final @Nullable T value, final @Nullable T fallback) {
+        return value == null ? fallback : value;
+    }
+
+    private static @Nullable BigDecimal toRating(final @Nullable Double rating) {
+        return rating == null ? null : BigDecimal.valueOf(rating).setScale(2, RoundingMode.HALF_UP);
     }
 
     /**
@@ -198,6 +232,15 @@ public class Book {
 
     public void setGoogleBooksVolumeId(@Nullable final String googleBooksVolumeId) {
         this.googleBooksVolumeId = googleBooksVolumeId;
+    }
+
+    @Nullable
+    public String getHardcoverId() {
+        return hardcoverId;
+    }
+
+    public void setHardcoverId(@Nullable final String hardcoverId) {
+        this.hardcoverId = hardcoverId;
     }
 
     public String getTitle() {
@@ -296,6 +339,24 @@ public class Book {
 
     public void setRatingCount(@Nullable final Integer ratingCount) {
         this.ratingCount = ratingCount;
+    }
+
+    @Nullable
+    public String getSeriesName() {
+        return seriesName;
+    }
+
+    public void setSeriesName(@Nullable final String seriesName) {
+        this.seriesName = seriesName;
+    }
+
+    @Nullable
+    public Integer getSeriesPosition() {
+        return seriesPosition;
+    }
+
+    public void setSeriesPosition(@Nullable final Integer seriesPosition) {
+        this.seriesPosition = seriesPosition;
     }
 
     public OffsetDateTime getCreatedAt() {
