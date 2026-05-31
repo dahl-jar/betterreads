@@ -6,6 +6,7 @@ import java.util.function.Consumer;
 import com.betterreads.catalog.service.BookFieldSource;
 import com.betterreads.catalog.service.SourceBook;
 import com.betterreads.common.util.LogSanitizer;
+import com.betterreads.common.util.TextMatch;
 import com.betterreads.integration.openlibrary.OpenLibraryClient;
 import com.betterreads.integration.openlibrary.dto.SearchDoc;
 import com.betterreads.integration.openlibrary.dto.SearchResponse;
@@ -145,17 +146,7 @@ public class OpenLibraryClientImpl implements OpenLibraryClient {
         final String trimmedDoc = docTitle.trim();
         final String trimmedQuery = queryTitle.trim();
         return trimmedDoc.equalsIgnoreCase(trimmedQuery)
-            || containsIgnoreCase(trimmedQuery, trimmedDoc);
-    }
-
-    private static boolean containsIgnoreCase(final String haystack, final String needle) {
-        final int limit = haystack.length() - needle.length();
-        for (int i = 0; i <= limit; i++) {
-            if (haystack.regionMatches(true, i, needle, 0, needle.length())) {
-                return true;
-            }
-        }
-        return false;
+            || TextMatch.containsIgnoreCase(trimmedQuery, trimmedDoc);
     }
 
     private static @Nullable String stripWorksPrefix(final @Nullable String key) {

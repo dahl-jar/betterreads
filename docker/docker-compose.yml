@@ -1,3 +1,5 @@
+name: betterreads
+
 services:
   db:
     image: postgres:17
