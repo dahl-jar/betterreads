@@ -3,8 +3,8 @@ package com.betterreads.integration.loc;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import org.jspecify.annotations.Nullable;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Navigates a parsed LoC SRU tree (MODS or MARC) by local element name.

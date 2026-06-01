@@ -5,9 +5,8 @@ import com.betterreads.auth.ratelimit.RateLimitFilter;
 import com.betterreads.auth.refresh.RefreshTokenRepository;
 import com.betterreads.auth.repository.UserRepository;
 import com.betterreads.mail.outbox.MailOutboxRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import jakarta.servlet.http.Cookie;
 
@@ -302,8 +301,7 @@ class RefreshTokenIntegrationTest {
             });
     }
 
-    private String registerPayload(final String username, final String email, final String password)
-        throws JsonProcessingException {
+    private String registerPayload(final String username, final String email, final String password) {
         final ObjectNode node = objectMapper.createObjectNode();
         node.put(FIELD_USERNAME, username);
         node.put(FIELD_EMAIL, email);
@@ -311,8 +309,7 @@ class RefreshTokenIntegrationTest {
         return objectMapper.writeValueAsString(node);
     }
 
-    private String loginPayload(final String identifier, final String password)
-        throws JsonProcessingException {
+    private String loginPayload(final String identifier, final String password) {
         final ObjectNode node = objectMapper.createObjectNode();
         node.put(FIELD_IDENTIFIER, identifier);
         node.put(FIELD_PASSWORD, password);

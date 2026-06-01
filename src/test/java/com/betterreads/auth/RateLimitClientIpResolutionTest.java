@@ -1,9 +1,8 @@
 package com.betterreads.auth;
 
 import com.betterreads.auth.ratelimit.RateLimitFilter;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -111,7 +110,7 @@ class RateLimitClientIpResolutionTest {
             .andExpect(status().isUnauthorized());
     }
 
-    private String loginPayload() throws JsonProcessingException {
+    private String loginPayload() {
         final ObjectNode node = objectMapper.createObjectNode();
         node.put("identifier", "ghost");
         node.put("password", "anything-not-matching");

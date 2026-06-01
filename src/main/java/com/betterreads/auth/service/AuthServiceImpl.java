@@ -16,6 +16,7 @@ import com.betterreads.common.crypto.PasswordByteLimit;
 import com.betterreads.common.exception.BusinessRuleException;
 import com.betterreads.common.util.LogSanitizer;
 
+import java.util.Objects;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -91,7 +92,7 @@ class AuthServiceImpl implements AuthService {
         final User user = new User();
         user.setUsername(request.username());
         user.setEmail(normalizedEmail);
-        user.setPasswordHash(passwordEncoder.encode(request.password()));
+        user.setPasswordHash(Objects.requireNonNull(passwordEncoder.encode(request.password())));
 
         final User saved;
         try {

@@ -5,8 +5,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import com.betterreads.integration.loc.SruTree;
-import com.fasterxml.jackson.databind.JsonNode;
 import org.jspecify.annotations.Nullable;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Reads identifiers from the MODS {@code identifier} elements.

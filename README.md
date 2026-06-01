@@ -10,7 +10,7 @@ This is a rebuild. The backend is a headless JSON API. Auth uses short-lived acc
 
 ## Stack
 
-Java 25 · Spring Boot 3.5 · Postgres 17 · Flyway · Caffeine · WebClient · JJWT · Bucket4j · Gradle 9 (Kotlin DSL)
+Java 25 · Spring Boot 4.0 · Postgres 17 · Flyway · Caffeine · WebClient · JJWT · Bucket4j · Gradle 9 (Kotlin DSL)
 
 ## Prerequisites
 

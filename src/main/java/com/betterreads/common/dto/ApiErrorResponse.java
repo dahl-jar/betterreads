@@ -3,6 +3,7 @@ package com.betterreads.common.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Error response body returned for every 4xx and 5xx. {@code fieldErrors} is empty when the
@@ -19,9 +20,9 @@ public record ApiErrorResponse(
         fieldErrors = List.copyOf(fieldErrors);
     }
 
-    /** Per-field validation failure. */
+    /** Per-field validation failure. {@code message} is null when the constraint defines none. */
     public record FieldError(
         @Schema(example = "email") String field,
-        @Schema(example = "must be a well-formed email address") String message
+        @Schema(example = "must be a well-formed email address") @Nullable String message
     ) { }
 }

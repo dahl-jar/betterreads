@@ -11,13 +11,13 @@ import java.util.stream.Stream;
 
 import com.betterreads.integration.loc.LocSru;
 import com.betterreads.integration.loc.SruTree;
-import com.fasterxml.jackson.core.JacksonException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.dataformat.xml.XmlMapper;
 
 /**
  * Walks the LoC SRU endpoint for newly-cataloged books in a year and subject bucket.

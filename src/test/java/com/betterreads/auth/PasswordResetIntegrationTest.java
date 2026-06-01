@@ -9,9 +9,9 @@ import com.betterreads.auth.refresh.RefreshTokenRepository;
 import com.betterreads.auth.repository.UserRepository;
 import com.betterreads.mail.outbox.MailOutbox;
 import com.betterreads.mail.outbox.MailOutboxRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import jakarta.servlet.http.Cookie;
 
@@ -25,7 +25,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -391,22 +391,20 @@ class PasswordResetIntegrationTest {
             });
     }
 
-    private String forgotPayload(final String email) throws JsonProcessingException {
+    private String forgotPayload(final String email) {
         final ObjectNode node = objectMapper.createObjectNode();
         node.put(FIELD_EMAIL, email);
         return objectMapper.writeValueAsString(node);
     }
 
-    private String resetPayload(final String token, final String newPassword)
-        throws JsonProcessingException {
+    private String resetPayload(final String token, final String newPassword) {
         final ObjectNode node = objectMapper.createObjectNode();
         node.put(FIELD_TOKEN, token);
         node.put(FIELD_NEW_PASSWORD, newPassword);
         return objectMapper.writeValueAsString(node);
     }
 
-    private String loginPayload(final String identifier, final String password)
-        throws JsonProcessingException {
+    private String loginPayload(final String identifier, final String password) {
         final ObjectNode node = objectMapper.createObjectNode();
         node.put(FIELD_IDENTIFIER, identifier);
         node.put(FIELD_PASSWORD, password);
@@ -425,7 +423,7 @@ class PasswordResetIntegrationTest {
         try {
             final JsonNode node = objectMapper.readTree(row.getPayload());
             return node.path(field).asText();
-        } catch (final JsonProcessingException ex) {
+        } catch (final JacksonException ex) {
             throw new IllegalStateException("malformed outbox payload", ex);
         }
     }

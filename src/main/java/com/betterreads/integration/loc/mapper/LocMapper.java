@@ -9,13 +9,13 @@ import com.betterreads.catalog.service.BookFieldSource;
 import com.betterreads.catalog.service.CatalogGenres;
 import com.betterreads.catalog.service.SourceBook;
 import com.betterreads.integration.loc.SruTree;
-import com.fasterxml.jackson.core.JacksonException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.dataformat.xml.XmlMapper;
 
 /**
  * Maps a Library of Congress SRU response into a {@link SourceBook}.
