@@ -11,7 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-/** Unit tests for {@link Book#applyFrom} subject handling. */
+/** Unit tests for {@link Book#applyFrom} subject handling and source-id accrual. */
 class BookTest {
 
     private static final String FANTASY = "fantasy";
@@ -19,6 +19,10 @@ class BookTest {
     private static final String FICTION = "fiction";
 
     private static final String CLASSICS = "classics";
+
+    private static final String DUNE_LCCN = "2019287107";
+
+    private static final String A_TITLE = "A Title";
 
     @Nested
     @DisplayName("applyFrom subject replacement")
@@ -77,12 +81,48 @@ class BookTest {
         }
     }
 
+    @Nested
+    @DisplayName("applyFrom LCCN accrual")
+    class LocLccn {
+
+        @Test
+        @DisplayName("a LoC source sets the loc_lccn")
+        void setsLccnFromSource() {
+            final Book book = new Book();
+            book.applyFrom(locSource(DUNE_LCCN));
+
+            assertThat(book.getLocLccn()).isEqualTo(DUNE_LCCN);
+        }
+
+        @Test
+        @DisplayName("a later source without an LCCN keeps the stored one")
+        void laterSourceWithoutLccnPreservesIt() {
+            final Book book = new Book();
+            book.applyFrom(locSource(DUNE_LCCN));
+
+            book.applyFrom(sourceWithSubjects(null));
+
+            assertThat(book.getLocLccn())
+                .as("a Google or OL refresh that carries no LCCN must not wipe the LoC one")
+                .isEqualTo(DUNE_LCCN);
+        }
+    }
+
     private static SourceBook sourceWithSubjects(final @Nullable List<String> subjects) {
         return new SourceBook(
             BookFieldSource.OPEN_LIBRARY,
             null, "OL1W", null, null, null, null,
-            "A Title", null, null, null, null, null, null, null, null,
+            A_TITLE, null, null, null, null, null, null, null, null,
             subjects, null,
+            null, null, null, null);
+    }
+
+    private static SourceBook locSource(final String lccn) {
+        return new SourceBook(
+            BookFieldSource.LOC,
+            null, null, null, null, lccn, null,
+            A_TITLE, null, null, null, null, null, null, null, null,
+            null, null,
             null, null, null, null);
     }
 }
