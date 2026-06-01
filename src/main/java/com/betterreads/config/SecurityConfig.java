@@ -7,7 +7,7 @@ import com.betterreads.common.web.RequestIdFilter;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.actuate.autoconfigure.security.servlet.EndpointRequest;
+import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -106,11 +106,10 @@ public final class SecurityConfig {
      */
     @Bean
     @Order(0)
-    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     SecurityFilterChain managementSecurityFilterChain(
         final HttpSecurity http,
         final RequestIdFilter requestIdFilter
-    ) throws Exception {
+    ) {
         final JwtDecoder decoder = cloudflareAccessJwtDecoderProvider.getIfAvailable();
         http
             .securityMatcher(request ->
@@ -148,11 +147,10 @@ public final class SecurityConfig {
      */
     @Bean
     @Order(1)
-    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     SecurityFilterChain docsSecurityFilterChain(
         final HttpSecurity http,
         final RequestIdFilter requestIdFilter
-    ) throws Exception {
+    ) {
         http
             .securityMatcher(DOCS_PATHS)
             .cors(Customizer.withDefaults())
@@ -174,13 +172,12 @@ public final class SecurityConfig {
     /** Catch-all chain: stateless, JWT-authenticated, rate-limited, strict CSP. */
     @Bean
     @Order(2)
-    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     SecurityFilterChain apiSecurityFilterChain(
         final HttpSecurity http,
         final JwtAuthenticationFilter jwtAuthenticationFilter,
         final RateLimitFilter rateLimitFilter,
         final RequestIdFilter requestIdFilter
-    ) throws Exception {
+    ) {
         http
             .cors(Customizer.withDefaults())
             // NOTE(csrf): bearer JWT + SameSite=Strict refresh cookie. lgtm[java/spring-disabled-csrf-protection]

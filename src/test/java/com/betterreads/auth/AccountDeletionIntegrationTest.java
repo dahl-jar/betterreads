@@ -9,9 +9,8 @@ import com.betterreads.auth.repository.UserRepository;
 import com.betterreads.auth.token.EmailToken;
 import com.betterreads.auth.token.EmailTokenRepository;
 import com.betterreads.mail.outbox.MailOutboxRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import jakarta.servlet.http.Cookie;
 
@@ -72,7 +71,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "mail.outbox.worker-enabled=false"
 })
 @SuppressWarnings({
-    "PMD.ExcessiveImports",
     "PMD.TooManyStaticImports",
     "PMD.TooManyMethods"
 })
@@ -442,8 +440,7 @@ class AccountDeletionIntegrationTest {
         return count == null ? 0 : count;
     }
 
-    private String registerPayload(final String username, final String email, final String password)
-        throws JsonProcessingException {
+    private String registerPayload(final String username, final String email, final String password) {
         final ObjectNode node = objectMapper.createObjectNode();
         node.put(FIELD_USERNAME, username);
         node.put(FIELD_EMAIL, email);
@@ -451,15 +448,14 @@ class AccountDeletionIntegrationTest {
         return objectMapper.writeValueAsString(node);
     }
 
-    private String loginPayload(final String identifier, final String password)
-        throws JsonProcessingException {
+    private String loginPayload(final String identifier, final String password) {
         final ObjectNode node = objectMapper.createObjectNode();
         node.put(FIELD_IDENTIFIER, identifier);
         node.put(FIELD_PASSWORD, password);
         return objectMapper.writeValueAsString(node);
     }
 
-    private String forgotPayload(final String email) throws JsonProcessingException {
+    private String forgotPayload(final String email) {
         final ObjectNode node = objectMapper.createObjectNode();
         node.put(FIELD_EMAIL, email);
         return objectMapper.writeValueAsString(node);

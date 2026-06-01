@@ -15,6 +15,7 @@ import com.betterreads.mail.outbox.MailOutboxService;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -154,7 +155,7 @@ public class PasswordResetService {
             throw new InvalidRequestException(INVALID_OR_EXPIRED_TOKEN);
         }
 
-        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        user.setPasswordHash(Objects.requireNonNull(passwordEncoder.encode(newPassword)));
         userRepository.save(user);
 
         row.setConsumedAt(Instant.now());

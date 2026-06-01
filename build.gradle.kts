@@ -10,7 +10,7 @@ plugins {
 	jacoco
 	checkstyle
 	pmd
-	id("org.springframework.boot") version "3.5.14"
+	id("org.springframework.boot") version "4.0.6"
 	id("io.spring.dependency-management") version "1.1.7"
 	id("com.github.spotbugs") version "6.4.8"
 	id("net.ltgt.errorprone") version "5.1.0"
@@ -56,21 +56,19 @@ dependencies {
 	implementation("io.micrometer:micrometer-registry-prometheus")
 
 	// OpenAPI / Swagger UI: auto-generates /v3/api-docs and /swagger-ui.html
-	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6")
+	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3")
 
-	// Database & migration
-	implementation("org.flywaydb:flyway-core")
+	// Database & migration. Boot 4 ships Flyway auto-configuration in the starter, not in flyway-core.
+	// The postgresql dialect module is separate from the starter.
+	implementation("org.springframework.boot:spring-boot-starter-flyway")
 	implementation("org.flywaydb:flyway-database-postgresql")
 	runtimeOnly("org.postgresql:postgresql")
 
 	// Cache
 	implementation("com.github.ben-manes.caffeine:caffeine")
 
-	// JSON
-	implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
-
 	// XML (Library of Congress SRU returns MARC/MODS records)
-	implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml")
+	implementation("tools.jackson.dataformat:jackson-dataformat-xml")
 
 	// JWT (HS256 signing for stateless auth)
 	implementation("io.jsonwebtoken:jjwt-api:0.12.6")
@@ -103,9 +101,9 @@ dependencies {
 	testImplementation("org.springframework.boot:spring-boot-testcontainers")
 	testImplementation("io.projectreactor:reactor-test")
 	testImplementation("org.springframework.security:spring-security-test")
-	testImplementation("org.testcontainers:junit-jupiter")
-	testImplementation("org.testcontainers:postgresql")
-	testImplementation("org.wiremock:wiremock-standalone:3.9.2")
+	testImplementation("org.testcontainers:testcontainers-junit-jupiter")
+	testImplementation("org.testcontainers:testcontainers-postgresql")
+	testImplementation("org.wiremock:wiremock-standalone:3.13.2")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
 	// ArchUnit (architecture rule enforcement)

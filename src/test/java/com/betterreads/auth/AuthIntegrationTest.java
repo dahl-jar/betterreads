@@ -5,9 +5,8 @@ import com.betterreads.auth.jwt.JwtIssuer;
 import com.betterreads.auth.ratelimit.RateLimitFilter;
 import com.betterreads.auth.repository.UserRepository;
 import com.betterreads.mail.outbox.MailOutboxRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -533,7 +532,7 @@ class AuthIntegrationTest {
 
     private String registerPayload(
         final String username, final String email, final String password
-    ) throws JsonProcessingException {
+    ) {
         final ObjectNode node = objectMapper.createObjectNode();
         node.put(FIELD_USERNAME, username);
         node.put(FIELD_EMAIL, email);
@@ -543,7 +542,7 @@ class AuthIntegrationTest {
 
     private String loginPayload(
         final String identifier, final String password
-    ) throws JsonProcessingException {
+    ) {
         final ObjectNode node = objectMapper.createObjectNode();
         node.put(FIELD_IDENTIFIER, identifier);
         node.put(FIELD_PASSWORD, password);

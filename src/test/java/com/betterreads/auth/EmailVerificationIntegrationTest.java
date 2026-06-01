@@ -9,10 +9,10 @@ import com.betterreads.auth.repository.UserRepository;
 import com.betterreads.mail.outbox.MailOutbox;
 import com.betterreads.mail.outbox.MailOutboxRepository;
 import com.betterreads.mail.outbox.MailOutboxService;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -472,13 +472,12 @@ class EmailVerificationIntegrationTest {
         try {
             final JsonNode node = objectMapper.readTree(row.getPayload());
             return node.path(field).asText();
-        } catch (final JsonProcessingException ex) {
+        } catch (final JacksonException ex) {
             throw new IllegalStateException("malformed outbox payload", ex);
         }
     }
 
-    private String registerPayload(final String username, final String email, final String password)
-        throws JsonProcessingException {
+    private String registerPayload(final String username, final String email, final String password) {
         final ObjectNode node = objectMapper.createObjectNode();
         node.put(FIELD_USERNAME, username);
         node.put(FIELD_EMAIL, email);
@@ -486,13 +485,13 @@ class EmailVerificationIntegrationTest {
         return objectMapper.writeValueAsString(node);
     }
 
-    private String verifyPayload(final String token) throws JsonProcessingException {
+    private String verifyPayload(final String token) {
         final ObjectNode node = objectMapper.createObjectNode();
         node.put(FIELD_TOKEN, token);
         return objectMapper.writeValueAsString(node);
     }
 
-    private String resendPayload(final String email) throws JsonProcessingException {
+    private String resendPayload(final String email) {
         final ObjectNode node = objectMapper.createObjectNode();
         node.put(FIELD_EMAIL, email);
         return objectMapper.writeValueAsString(node);
