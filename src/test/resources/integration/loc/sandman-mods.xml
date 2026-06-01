@@ -1,0 +1,127 @@
+<?xml version="1.0"?>
+<zs:searchRetrieveResponse xmlns:zs="http://www.loc.gov/zing/srw/"><zs:version>1.1</zs:version><zs:numberOfRecords>59</zs:numberOfRecords><zs:records><zs:record><zs:recordSchema>mods</zs:recordSchema><zs:recordPacking>xml</zs:recordPacking><zs:recordData><mods xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.loc.gov/mods/v3" version="3.8" xsi:schemaLocation="http://www.loc.gov/mods/v3 http://www.loc.gov/standards/mods/v3/mods-3-8.xsd">
+  <titleInfo>
+    <nonSort xml:space="preserve">The </nonSort>
+    <title>Sandman</title>
+  </titleInfo>
+  <titleInfo type="alternative">
+    <title>Preludes &amp; nocturnes</title>
+  </titleInfo>
+  <titleInfo type="alternative">
+    <title>Season of mists</title>
+  </titleInfo>
+  <titleInfo type="alternative">
+    <title>Fables and reflections</title>
+  </titleInfo>
+  <titleInfo type="alternative">
+    <title>Dream country</title>
+  </titleInfo>
+  <titleInfo type="alternative">
+    <title>Brief lives</title>
+  </titleInfo>
+  <titleInfo type="alternative">
+    <title>World's end</title>
+  </titleInfo>
+  <titleInfo type="alternative">
+    <title>Kindly ones</title>
+  </titleInfo>
+  <titleInfo type="alternative">
+    <title>Wake</title>
+  </titleInfo>
+  <name type="personal" usage="primary">
+    <namePart>Gaiman, Neil.</namePart>
+  </name>
+  <typeOfResource>text</typeOfResource>
+  <genre authority="rdacontent">text</genre>
+  <originInfo>
+    <place>
+      <placeTerm type="code" authority="marccountry">nyu</placeTerm>
+    </place>
+    <dateIssued encoding="marc" point="start">1991</dateIssued>
+    <dateIssued encoding="marc" point="end">9999</dateIssued>
+    <issuance>monographic</issuance>
+    <place>
+      <placeTerm type="text">New York</placeTerm>
+    </place>
+    <agent>
+      <namePart>DC Comics</namePart>
+    </agent>
+    <dateIssued>c1991-&lt;c1997   &gt;</dateIssued>
+  </originInfo>
+  <language>
+    <languageTerm authority="iso639-2b" type="code">eng</languageTerm>
+  </language>
+  <physicalDescription>
+    <form authority="marcform">print</form>
+    <form type="media" authority="rdamedia">unmediated</form>
+    <form type="carrier" authority="rdacarrier">volume</form>
+    <extent>v. &lt;1-8   &gt; : col. ill. ; 26 cm.</extent>
+  </physicalDescription>
+  <tableOfContents type="Partial contents">[1] Preludes &amp; nocturnes : Sleep of the just, Imperfect hosts, Dream a little dream of me, A hope in hell, Passengers, 24 hours, Sound and fury, The sound of her wings -- [2] Season of mists -- [3] Fables and reflections -- [4] Dream country : Calliope, A dream of a thousand cats, A midsummer's night's dream, Fac&#x327;ade, Original script of Calliope -- [5] Brief lives -- [6] World's end : World's end, A tale of two cities, Cluracan's tale, Hob's leviathan, The golden boy, Cerements, World's end -- [7] The kindly ones -- [8] The wake: The wake, Exiles, The tempest.</tableOfContents>
+  <note type="statement of responsibility">Neil Gaiman, writer.</note>
+  <note>Vol. 1 previously published in single magazine form as Sandman, nos. 1-8; vol. 2 as nos. 21-28; vol. 3 as nos. 29-31, 38-40, 50 and Sandman special 1 and Vertigo preview; vol. 4 as nos. 17-20; vol. 5 as nos. 41-49; vol. 6 as nos. 51-56; vol. 7 as nos. 57-69 and Vertigo jam 1; vol. 8 as nos. 70-75.</note>
+  <classification authority="lcc">PN6728.S26 G35 1992</classification>
+  <relatedItem type="constituent">
+    <titleInfo>
+      <title>Preludes &amp; nocturnes</title>
+    </titleInfo>
+  </relatedItem>
+  <relatedItem type="constituent">
+    <titleInfo>
+      <title>Season of mists</title>
+    </titleInfo>
+  </relatedItem>
+  <relatedItem type="constituent">
+    <titleInfo>
+      <title>Fables and reflections</title>
+    </titleInfo>
+  </relatedItem>
+  <relatedItem type="constituent">
+    <titleInfo>
+      <title>Dream country</title>
+    </titleInfo>
+  </relatedItem>
+  <relatedItem type="constituent">
+    <titleInfo>
+      <title>Brief lives</title>
+    </titleInfo>
+  </relatedItem>
+  <relatedItem type="constituent">
+    <titleInfo>
+      <title>World's end</title>
+    </titleInfo>
+  </relatedItem>
+  <relatedItem type="constituent">
+    <titleInfo>
+      <title>Kindly ones</title>
+    </titleInfo>
+  </relatedItem>
+  <relatedItem type="constituent">
+    <titleInfo>
+      <title>Wake</title>
+    </titleInfo>
+  </relatedItem>
+  <identifier type="isbn">1563890119 (v. 1) :</identifier>
+  <identifier type="isbn">1563891050</identifier>
+  <identifier type="isbn">1563891387</identifier>
+  <identifier type="isbn">1563891700</identifier>
+  <identifier type="isbn">1563892049</identifier>
+  <identifier type="isbn">1563892871</identifier>
+  <identifier type="isbn">9781563890116</identifier>
+  <identifier type="isbn">9781563891052</identifier>
+  <identifier type="isbn">9781563891380</identifier>
+  <identifier type="isbn">9781563891700</identifier>
+  <identifier type="isbn">9781563892042</identifier>
+  <identifier type="isbn">9781563892875</identifier>
+  <identifier type="isbn" invalid="yes">1563890410 (v. 4)</identifier>
+  <identifier type="lccn">92159876</identifier>
+  <recordInfo>
+    <descriptionStandard>aacr</descriptionStandard>
+    <recordContentSource authority="marcorg">DLC</recordContentSource>
+    <recordCreationDate encoding="marc">920513</recordCreationDate>
+    <recordChangeDate encoding="iso8601">20250607151958.0</recordChangeDate>
+    <recordIdentifier>3457564</recordIdentifier>
+    <recordOrigin>Converted from MARCXML to MODS version 3.8 using MARC21slim2MODS3-8_XSLT1-0.xsl
+				(Revision 1.172 20230208)</recordOrigin>
+  </recordInfo>
+</mods></zs:recordData><zs:recordPosition>1</zs:recordPosition></zs:record></zs:records><zs:nextRecordPosition>2</zs:nextRecordPosition><zs:echoedSearchRetrieveRequest><zs:version>1.1</zs:version><zs:query>bath.title="The Sandman" and bath.author="Gaiman"</zs:query><zs:maximumRecords>1</zs:maximumRecords><zs:recordPacking>xml</zs:recordPacking><zs:recordSchema>mods</zs:recordSchema></zs:echoedSearchRetrieveRequest></zs:searchRetrieveResponse>

@@ -2,6 +2,7 @@ package com.betterreads.catalog.service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 
 import com.betterreads.catalog.entity.Author;
 import com.betterreads.catalog.entity.Book;
@@ -42,16 +43,33 @@ public class CatalogServiceImpl implements CatalogService {
     }
 
     private Optional<Book> findExistingForSource(final SourceBook source) {
-        if (source.googleBooksVolumeId() != null) {
-            return bookRepository.findByGoogleBooksVolumeId(source.googleBooksVolumeId());
+        return identityLookups().stream()
+            .map(lookup -> lookup.find(source))
+            .flatMap(Optional::stream)
+            .findFirst();
+    }
+
+    private List<SourceIdentityLookup> identityLookups() {
+        return List.of(
+            new SourceIdentityLookup(
+                SourceBook::googleBooksVolumeId, bookRepository::findByGoogleBooksVolumeId),
+            new SourceIdentityLookup(
+                SourceBook::openLibraryWorkKey, bookRepository::findByOpenLibraryWorkKey),
+            new SourceIdentityLookup(
+                SourceBook::hardcoverId, bookRepository::findByHardcoverId),
+            new SourceIdentityLookup(
+                SourceBook::locLccn, bookRepository::findByLocLccn));
+    }
+
+    private record SourceIdentityLookup(
+        Function<SourceBook, @Nullable String> idOf,
+        Function<String, Optional<Book>> findById
+    ) {
+
+        Optional<Book> find(final SourceBook source) {
+            final String sourceId = idOf.apply(source);
+            return sourceId == null ? Optional.empty() : findById.apply(sourceId);
         }
-        if (source.openLibraryWorkKey() != null) {
-            return bookRepository.findByOpenLibraryWorkKey(source.openLibraryWorkKey());
-        }
-        if (source.hardcoverId() != null) {
-            return bookRepository.findByHardcoverId(source.hardcoverId());
-        }
-        return Optional.empty();
     }
 
     private void attachAuthors(final Book book, final @Nullable List<String> authorNames) {

@@ -20,4 +20,8 @@ public interface BookRepository extends JpaRepository<Book, Long> {
     /** Returns the book with the given Hardcover id, with authors and subjects fetched. */
     @EntityGraph(attributePaths = {"authors", "subjects"})
     Optional<Book> findByHardcoverId(String hardcoverId);
+
+    /** Returns the book with the given LCCN, with authors and subjects fetched. */
+    @EntityGraph(attributePaths = {"authors", "subjects"})
+    Optional<Book> findByLocLccn(String locLccn);
 }

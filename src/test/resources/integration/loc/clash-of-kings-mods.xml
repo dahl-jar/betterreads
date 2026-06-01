@@ -1,0 +1,80 @@
+<?xml version="1.0"?>
+<zs:searchRetrieveResponse xmlns:zs="http://www.loc.gov/zing/srw/"><zs:version>1.1</zs:version><zs:numberOfRecords>5</zs:numberOfRecords><zs:records><zs:record><zs:recordSchema>mods</zs:recordSchema><zs:recordPacking>xml</zs:recordPacking><zs:recordData><mods xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.loc.gov/mods/v3" version="3.8" xsi:schemaLocation="http://www.loc.gov/mods/v3 http://www.loc.gov/standards/mods/v3/mods-3-8.xsd">
+  <titleInfo>
+    <nonSort xml:space="preserve">A </nonSort>
+    <title>clash of kings</title>
+  </titleInfo>
+  <name type="personal" usage="primary">
+    <namePart>Martin, George R. R.</namePart>
+  </name>
+  <typeOfResource>text</typeOfResource>
+  <genre authority="rdacontent">text</genre>
+  <genre authority="gsafd">Fantasy fiction.</genre>
+  <originInfo>
+    <place>
+      <placeTerm type="code" authority="marccountry">nyu</placeTerm>
+    </place>
+    <issuance>monographic</issuance>
+    <place>
+      <placeTerm type="text">New York</placeTerm>
+    </place>
+    <agent>
+      <namePart>Bantam Books</namePart>
+    </agent>
+    <dateIssued>1999</dateIssued>
+  </originInfo>
+  <language>
+    <languageTerm authority="iso639-2b" type="code">eng</languageTerm>
+  </language>
+  <physicalDescription>
+    <form authority="marcform">print</form>
+    <form type="media" authority="rdamedia">unmediated</form>
+    <form type="carrier" authority="rdacarrier">volume</form>
+    <extent>761 p. : ill. ; 25 cm.</extent>
+  </physicalDescription>
+  <note type="statement of responsibility">George R.R. Martin.</note>
+  <note>Sequel to: A game of thrones.</note>
+  <note>Includes two maps of the territory of A clash of kings on endpapers.</note>
+  <classification authority="lcc">PS3563.A7239 C58 1999</classification>
+  <classification authority="ddc" edition="21">813/.54</classification>
+  <location>
+    <url displayLabel="Contributor biographical information">http://www.loc.gov/catdir/bios/random058/98037954.html</url>
+  </location>
+  <location>
+    <url displayLabel="Sample text" usage="primary display">http://www.loc.gov/catdir/samples/random051/98037954.html</url>
+  </location>
+  <location>
+    <url displayLabel="Publisher description">http://www.loc.gov/catdir/description/random0414/98037954.html</url>
+  </location>
+  <relatedItem type="series">
+    <titleInfo>
+      <title>Song of ice and fire</title>
+      <partNumber>bk. 2</partNumber>
+    </titleInfo>
+    <name type="personal">
+      <namePart>Martin, George R. R.</namePart>
+    </name>
+  </relatedItem>
+  <identifier type="isbn">0553108034</identifier>
+  <identifier type="isbn">9780553108033</identifier>
+  <identifier type="lccn">98037954</identifier>
+  <relatedItem>
+    <location>
+      <url displayLabel="Contributor biographical information">http://www.loc.gov/catdir/bios/random058/98037954.html</url>
+    </location>
+  </relatedItem>
+  <relatedItem>
+    <location>
+      <url displayLabel="Publisher description">http://www.loc.gov/catdir/description/random0414/98037954.html</url>
+    </location>
+  </relatedItem>
+  <recordInfo>
+    <descriptionStandard>aacr</descriptionStandard>
+    <recordContentSource authority="marcorg">DLC</recordContentSource>
+    <recordCreationDate encoding="marc">980722</recordCreationDate>
+    <recordChangeDate encoding="iso8601">20250607042435.0</recordChangeDate>
+    <recordIdentifier>1671887</recordIdentifier>
+    <recordOrigin>Converted from MARCXML to MODS version 3.8 using MARC21slim2MODS3-8_XSLT1-0.xsl
+				(Revision 1.172 20230208)</recordOrigin>
+  </recordInfo>
+</mods></zs:recordData><zs:recordPosition>1</zs:recordPosition></zs:record></zs:records><zs:nextRecordPosition>2</zs:nextRecordPosition><zs:echoedSearchRetrieveRequest><zs:version>1.1</zs:version><zs:query>bath.title="A Clash of Kings" and bath.author="Martin"</zs:query><zs:maximumRecords>1</zs:maximumRecords><zs:recordPacking>xml</zs:recordPacking><zs:recordSchema>mods</zs:recordSchema></zs:echoedSearchRetrieveRequest></zs:searchRetrieveResponse>

@@ -1,0 +1,83 @@
+<?xml version="1.0"?>
+<zs:searchRetrieveResponse xmlns:zs="http://www.loc.gov/zing/srw/"><zs:version>1.1</zs:version><zs:numberOfRecords>13</zs:numberOfRecords><zs:records><zs:record><zs:recordSchema>mods</zs:recordSchema><zs:recordPacking>xml</zs:recordPacking><zs:recordData><mods xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.loc.gov/mods/v3" version="3.8" xsi:schemaLocation="http://www.loc.gov/mods/v3 http://www.loc.gov/standards/mods/v3/mods-3-8.xsd">
+  <titleInfo>
+    <nonSort xml:space="preserve">The </nonSort>
+    <title>eye of the world</title>
+  </titleInfo>
+  <name type="personal" usage="primary">
+    <namePart>Jordan, Robert,</namePart>
+    <namePart type="date">1948-2007</namePart>
+  </name>
+  <typeOfResource>text</typeOfResource>
+  <genre authority="rdacontent">text</genre>
+  <genre authority="gsafd">Fantasy fiction.</genre>
+  <genre authority="lcgft" valueURI="https://id.loc.gov/authorities/genreForms/gf2014026339">Fiction.</genre>
+  <originInfo>
+    <place>
+      <placeTerm type="code" authority="marccountry">nyu</placeTerm>
+    </place>
+    <issuance>monographic</issuance>
+    <place>
+      <placeTerm type="text">New York</placeTerm>
+    </place>
+    <agent>
+      <namePart>T. Doherty Associates</namePart>
+    </agent>
+    <dateIssued>1990</dateIssued>
+    <edition>1st ed.</edition>
+  </originInfo>
+  <language>
+    <languageTerm authority="iso639-2b" type="code">eng</languageTerm>
+  </language>
+  <physicalDescription>
+    <form authority="marcform">print</form>
+    <form type="media" authority="rdamedia">unmediated</form>
+    <form type="carrier" authority="rdacarrier">volume</form>
+    <extent>xiv, 670 p., [3] p. of plates : maps ; 24 cm.</extent>
+  </physicalDescription>
+  <note type="statement of responsibility">Robert Jordan.</note>
+  <note>"A TOR book"--T.p. verso.</note>
+  <subject authority="lcsh">
+    <topic>Rand al'Thor (Fictitious character)</topic>
+    <genre>Fiction</genre>
+  </subject>
+  <classification authority="lcc">PS3560.O7617 E94 1990</classification>
+  <classification authority="ddc" edition="20">813/.54</classification>
+  <relatedItem type="series">
+    <titleInfo>
+      <title>TOR fantasy</title>
+    </titleInfo>
+  </relatedItem>
+  <relatedItem type="series">
+    <titleInfo>
+      <title>Wheel of time</title>
+      <partNumber>bk. 1</partNumber>
+    </titleInfo>
+    <name type="personal">
+      <namePart>Jordan, Robert,</namePart>
+      <namePart type="date">1948-2007</namePart>
+    </name>
+  </relatedItem>
+  <identifier type="isbn">0312850093 :</identifier>
+  <identifier type="isbn">9780312850098</identifier>
+  <identifier type="lccn">89007939</identifier>
+  <relatedItem>
+    <location>
+      <url displayLabel="Publisher description">http://www.loc.gov/catdir/description/hol054/89007939.html</url>
+    </location>
+  </relatedItem>
+  <relatedItem>
+    <location>
+      <url displayLabel="Contributor biographical information">http://www.loc.gov/catdir/enhancements/fy0733/89007939-b.html</url>
+    </location>
+  </relatedItem>
+  <recordInfo>
+    <descriptionStandard>aacr</descriptionStandard>
+    <recordContentSource authority="marcorg">DLC</recordContentSource>
+    <recordCreationDate encoding="marc">890425</recordCreationDate>
+    <recordChangeDate encoding="iso8601">20250607080406.9</recordChangeDate>
+    <recordIdentifier>1979655</recordIdentifier>
+    <recordOrigin>Converted from MARCXML to MODS version 3.8 using MARC21slim2MODS3-8_XSLT1-0.xsl
+				(Revision 1.172 20230208)</recordOrigin>
+  </recordInfo>
+</mods></zs:recordData><zs:recordPosition>1</zs:recordPosition></zs:record></zs:records><zs:nextRecordPosition>2</zs:nextRecordPosition><zs:echoedSearchRetrieveRequest><zs:version>1.1</zs:version><zs:query>bath.title="The Eye of the World" and bath.author="Jordan"</zs:query><zs:maximumRecords>1</zs:maximumRecords><zs:recordPacking>xml</zs:recordPacking><zs:recordSchema>mods</zs:recordSchema></zs:echoedSearchRetrieveRequest></zs:searchRetrieveResponse>

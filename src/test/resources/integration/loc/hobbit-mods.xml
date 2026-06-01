@@ -1,0 +1,127 @@
+<?xml version="1.0"?>
+<zs:searchRetrieveResponse xmlns:zs="http://www.loc.gov/zing/srw/"><zs:version>1.1</zs:version><zs:numberOfRecords>47</zs:numberOfRecords><zs:records><zs:record><zs:recordSchema>mods</zs:recordSchema><zs:recordPacking>xml</zs:recordPacking><zs:recordData><mods xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.loc.gov/mods/v3" version="3.8" xsi:schemaLocation="http://www.loc.gov/mods/v3 http://www.loc.gov/standards/mods/v3/mods-3-8.xsd">
+  <titleInfo>
+    <nonSort xml:space="preserve">The </nonSort>
+    <title>hobbit</title>
+  </titleInfo>
+  <name type="personal" usage="primary" valueURI="http://id.loc.gov/authorities/names/n79005673">
+    <namePart>Tolkien, J. R. R. (John Ronald Reuel),</namePart>
+    <namePart type="date">1892-1973</namePart>
+    <role>
+      <roleTerm type="text">author</roleTerm>
+    </role>
+    <role>
+      <roleTerm type="text">illustrator</roleTerm>
+    </role>
+    <role>
+      <roleTerm authority="marcrelator" type="code">aut</roleTerm>
+    </role>
+    <role>
+      <roleTerm authority="marcrelator" type="code">ill</roleTerm>
+    </role>
+    <role>
+      <roleTerm authority="marcrelator" type="code">http://id.loc.gov/vocabulary/relators/aut</roleTerm>
+    </role>
+    <role>
+      <roleTerm authority="marcrelator" type="code">http://id.loc.gov/vocabulary/relators/ill</roleTerm>
+    </role>
+    <nameIdentifier>http://id.loc.gov/rwo/agents/n79005673</nameIdentifier>
+  </name>
+  <name type="personal" valueURI="http://id.loc.gov/authorities/names/n79144796">
+    <namePart>Tolkien, Christopher</namePart>
+    <role>
+      <roleTerm type="text">writer of foreword</roleTerm>
+    </role>
+    <role>
+      <roleTerm authority="marcrelator" type="code">http://id.loc.gov/vocabulary/relators/wfw</roleTerm>
+    </role>
+    <nameIdentifier>http://id.loc.gov/rwo/agents/n79144796</nameIdentifier>
+  </name>
+  <typeOfResource>text</typeOfResource>
+  <genre valueURI="http://id.loc.gov/vocabulary/contentTypes/txt" authority="rdacontent">text</genre>
+  <genre valueURI="http://id.loc.gov/vocabulary/contentTypes/sti" authority="rdacontent">still image</genre>
+  <genre valueURI="http://id.loc.gov/vocabulary/contentTypes/cri" authority="rdacontent">cartographic image</genre>
+  <genre authority="lcgft" valueURI="http://id.loc.gov/authorities/genreForms/gf2014026339">Fiction</genre>
+  <genre authority="fast" valueURI="http://id.worldcat.org/fast/1726607">Fantasy fiction</genre>
+  <genre authority="fast" valueURI="http://id.worldcat.org/fast/1423787">Fiction</genre>
+  <genre authority="lcgft" valueURI="http://id.loc.gov/authorities/genreForms/gf2014026333">Fantasy fiction</genre>
+  <genre authority="lcgft" valueURI="http://id.loc.gov/authorities/genreForms/gf2014026309">Epic fiction</genre>
+  <originInfo>
+    <place>
+      <placeTerm type="code" authority="marccountry">nyu</placeTerm>
+    </place>
+    <dateIssued encoding="marc">2023</dateIssued>
+    <copyrightDate encoding="marc">2023</copyrightDate>
+    <issuance>monographic</issuance>
+    <issuance>single unit</issuance>
+    <edition>First US edition.</edition>
+  </originInfo>
+  <originInfo eventType="publication">
+    <place>
+      <placeTerm type="text">New York :</placeTerm>
+    </place>
+    <agent>
+      <namePart>William Morrow, an imprint of HarperCollinsPublishers,</namePart>
+      <role>
+        <roleTerm>publisher</roleTerm>
+      </role>
+    </agent>
+    <dateIssued>[2023]</dateIssued>
+    <issuance>single unit</issuance>
+  </originInfo>
+  <language>
+    <languageTerm authority="iso639-2b" type="code">eng</languageTerm>
+  </language>
+  <physicalDescription>
+    <form authority="marcform">print</form>
+    <form authority="marccategory">text</form>
+    <form type="media" authority="rdamedia">unmediated</form>
+    <form type="carrier" authority="rdacarrier">volume</form>
+    <extent>xxxix, 272 pages, 36 pages of plates illustrations, maps 23 cm + map tipped in (27 x 35 cm)</extent>
+  </physicalDescription>
+  <physicalDescription>
+    <form type="Illustrative content">illustrations</form>
+  </physicalDescription>
+  <physicalDescription>
+    <form type="Illustrative content">maps</form>
+  </physicalDescription>
+  <abstract type="Summary">For the first time ever, a special enhanced edition of the enchanting prelude to The Lord of the Rings, illustrated throughout with over 50 sketches, drawings, paintings and maps by J.R.R. Tolkien himself and with the complete text printed in two colors. Bilbo Baggins is a hobbit who enjoys a comfortable, unambitious life, rarely travelling further than the pantry of his hobbit-hole in Bag End. But his contentment is disturbed when the wizard, Gandalf, and a company of thirteen dwarves arrive on his doorstep one day to whisk him away on an unexpected journey 'there and back again.' They have a plot to raid the treasure hoard of Smaug the Magnificent, a large and very dangerous dragon . . .Written for J.R.R. Tolkien's own children, The Hobbit was published on 21 September 1937. With a beautiful cover design, a handful of black &amp; white drawings and two maps by the author himself, the book became an instant success and was reprinted shortly afterwards with five color plates. Tolkien's own selection of finished paintings and drawings have become inseparable from his text, adorning editions of The Hobbit for more than 85 years. But the published art has afforded only a glimpse of Tolkien's creative process, and many additional sketches, colored drawings and maps - although exhibited and published elsewhere - have never appeared within the pages of The Hobbit. In this unique enhanced edition of Tolkien's enchanting classic tale, the full panoply of his art is reproduced for the first time, presenting more than 50 illustrations to accompany Bilbo Baggins on his adventure 'there and back again.'--Amazon</abstract>
+  <note type="statement of responsibility">by J. R. R. Tolkien ; foreword by Christopher Tolkien ; illustrated by the author.</note>
+  <note>"This edition is based on the reset edition first published 2020" - verso</note>
+  <subject authority="lcsh">
+    <name type="personal">
+      <namePart>Baggins, Bilbo</namePart>
+    </name>
+    <genre>Fiction</genre>
+  </subject>
+  <subject authority="fast">
+    <name type="personal" valueURI="http://id.worldcat.org/fast/1737940">
+      <namePart>Baggins, Bilbo</namePart>
+    </name>
+  </subject>
+  <subject xmlns:xlink="http://www.w3.org/1999/xlink" authority="lcsh" xlink:href="http://id.loc.gov/authorities/subjects/sh2008107769">
+    <topic>Middle Earth (Imaginary place)</topic>
+    <genre>Fiction</genre>
+  </subject>
+  <subject authority="fast">
+    <topic>Middle Earth (Imaginary place)</topic>
+  </subject>
+  <classification authority="lcc">PR6039.O32 H6 2023</classification>
+  <classification authority="ddc" edition="23/eng/20230216">823.912</classification>
+  <identifier type="isbn">9780063347533</identifier>
+  <identifier type="isbn">0063347539</identifier>
+  <identifier type="lccn">2024442463</identifier>
+  <identifier type="oclc">on1373010819</identifier>
+  <recordInfo>
+    <descriptionStandard>rda</descriptionStandard>
+    <recordContentSource authority="marcorg">YDX</recordContentSource>
+    <recordCreationDate encoding="marc">240822</recordCreationDate>
+    <recordChangeDate encoding="iso8601">20250807120845.8</recordChangeDate>
+    <recordIdentifier source="DLC">23834898</recordIdentifier>
+    <recordOrigin>Converted from MARCXML to MODS version 3.8 using MARC21slim2MODS3-8_XSLT1-0.xsl
+				(Revision 1.172 20230208)</recordOrigin>
+    <languageOfCataloging>
+      <languageTerm authority="iso639-2b" type="code">eng</languageTerm>
+    </languageOfCataloging>
+  </recordInfo>
+</mods></zs:recordData><zs:recordPosition>1</zs:recordPosition></zs:record></zs:records><zs:nextRecordPosition>2</zs:nextRecordPosition><zs:echoedSearchRetrieveRequest><zs:version>1.1</zs:version><zs:query>bath.title="The Hobbit" and bath.author="Tolkien"</zs:query><zs:maximumRecords>1</zs:maximumRecords><zs:recordPacking>xml</zs:recordPacking><zs:recordSchema>mods</zs:recordSchema></zs:echoedSearchRetrieveRequest></zs:searchRetrieveResponse>

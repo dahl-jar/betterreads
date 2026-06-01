@@ -27,10 +27,9 @@ import com.betterreads.catalog.service.SourceBook;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Maps to {@code book}. The two source-id columns ({@code openLibraryWorkKey},
- * {@code googleBooksVolumeId}) are independently unique-nullable; either one identifies a row.
- * The catalog table is fed from external sources via the multi-source pipeline; this slice
- * exercises only the Google Books inserts.
+ * Maps to {@code book}. Each source-id column ({@code openLibraryWorkKey},
+ * {@code googleBooksVolumeId}, {@code hardcoverId}, {@code locLccn}) is independently
+ * unique-nullable; any one identifies a row.
  */
 @Entity
 @Table(name = "book")
@@ -56,6 +55,10 @@ public class Book {
     @Column(name = "hardcover_id", unique = true)
     @Nullable
     private String hardcoverId;
+
+    @Column(name = "loc_lccn", unique = true)
+    @Nullable
+    private String locLccn;
 
     @Column(name = "title", nullable = false)
     private String title;
@@ -172,6 +175,7 @@ public class Book {
         this.googleBooksVolumeId = coalesce(source.googleBooksVolumeId(), this.googleBooksVolumeId);
         this.openLibraryWorkKey = coalesce(source.openLibraryWorkKey(), this.openLibraryWorkKey);
         this.hardcoverId = coalesce(source.hardcoverId(), this.hardcoverId);
+        this.locLccn = coalesce(source.locLccn(), this.locLccn);
         this.averageRating = coalesce(toRating(source.averageRating()), this.averageRating);
         this.ratingCount = coalesce(source.ratingCount(), this.ratingCount);
         this.seriesName = coalesce(source.seriesName(), this.seriesName);
@@ -241,6 +245,15 @@ public class Book {
 
     public void setHardcoverId(@Nullable final String hardcoverId) {
         this.hardcoverId = hardcoverId;
+    }
+
+    @Nullable
+    public String getLocLccn() {
+        return locLccn;
+    }
+
+    public void setLocLccn(@Nullable final String locLccn) {
+        this.locLccn = locLccn;
     }
 
     public String getTitle() {

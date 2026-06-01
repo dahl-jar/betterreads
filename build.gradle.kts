@@ -69,6 +69,9 @@ dependencies {
 	// JSON
 	implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
 
+	// XML (Library of Congress SRU returns MARC/MODS records)
+	implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml")
+
 	// JWT (HS256 signing for stateless auth)
 	implementation("io.jsonwebtoken:jjwt-api:0.12.6")
 	runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
