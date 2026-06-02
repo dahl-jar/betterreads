@@ -70,10 +70,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "mail.app-base-url=https://test.example.com",
     "mail.outbox.worker-enabled=false"
 })
-@SuppressWarnings({
-    "PMD.TooManyStaticImports",
-    "PMD.TooManyMethods"
-})
+@SuppressWarnings("PMD.TooManyMethods")
 class AccountDeletionIntegrationTest {
 
     private static final String REGISTER_URL = "/api/v1/auth/register";

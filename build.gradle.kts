@@ -22,6 +22,11 @@ group = "com.betterreads"
 version = "0.0.1-SNAPSHOT"
 description = "BetterReads v2 - Book tracking and recommendation platform"
 
+// Generates build-info.properties so the version shows on /actuator/info.
+springBoot {
+	buildInfo()
+}
+
 java {
 	toolchain {
 		languageVersion = JavaLanguageVersion.of(25)

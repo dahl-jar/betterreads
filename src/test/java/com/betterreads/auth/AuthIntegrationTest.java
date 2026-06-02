@@ -48,7 +48,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "auth.refresh-cookie.secure=true",
     "mail.outbox.worker-enabled=false"
 })
-@SuppressWarnings("PMD.TooManyStaticImports")
 class AuthIntegrationTest {
 
     private static final String REGISTER_URL = "/api/v1/auth/register";
