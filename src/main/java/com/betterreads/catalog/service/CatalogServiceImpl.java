@@ -38,7 +38,7 @@ public class CatalogServiceImpl implements CatalogService {
     public Book upsertFromSource(final SourceBook source) {
         final Book book = findExistingForSource(source).orElseGet(Book::new);
         book.applyFrom(source);
-        attachAuthors(book, source.authorNames());
+        attachAuthors(book, source.authors());
         return bookRepository.save(book);
     }
 
@@ -58,7 +58,9 @@ public class CatalogServiceImpl implements CatalogService {
             new SourceIdentityLookup(
                 SourceBook::hardcoverId, bookRepository::findByHardcoverId),
             new SourceIdentityLookup(
-                SourceBook::locLccn, bookRepository::findByLocLccn));
+                SourceBook::locLccn, bookRepository::findByLocLccn),
+            new SourceIdentityLookup(
+                SourceBook::wikidataQid, bookRepository::findByWikidataQid));
     }
 
     private record SourceIdentityLookup(
@@ -72,26 +74,50 @@ public class CatalogServiceImpl implements CatalogService {
         }
     }
 
-    private void attachAuthors(final Book book, final @Nullable List<String> authorNames) {
-        if (authorNames == null) {
+    private void attachAuthors(final Book book, final @Nullable List<SourceAuthor> authors) {
+        if (authors == null) {
             return;
         }
-        authorNames.stream()
-            .filter(name -> name != null && !name.isBlank())
+        authors.stream()
+            .filter(author -> !author.name().isBlank())
             .map(this::findOrCreateAuthor)
             .forEach(author -> book.getAuthors().add(author));
     }
 
     /**
-     * Returns an existing author with this name or creates one.
+     * Returns the author matching the source author, by Wikidata QID first and then by name,
+     * creating one when neither matches. Wikidata's photo and bio fill the row without overwriting a
+     * set value with null.
      *
-     * <p>The {@code DataIntegrityViolationException} path handles the race between two
-     * concurrent upserts both finding the author missing and both trying to insert. The
-     * {@code UNIQUE} constraint on {@code author.name} (V21) lets the losing transaction
-     * re-query under the existing row instead of writing a duplicate.
+     * <p>The {@code DataIntegrityViolationException} path handles the race between two concurrent
+     * upserts both finding the author missing and both trying to insert. The {@code UNIQUE}
+     * constraint on {@code author.name} (V21) lets the losing transaction re-query under the existing
+     * row instead of writing a duplicate.
      */
-    private Author findOrCreateAuthor(final String name) {
-        return authorRepository.findByName(name).orElseGet(() -> insertOrLookup(name));
+    private Author findOrCreateAuthor(final SourceAuthor source) {
+        final Author author = lookup(source).orElseGet(() -> insertOrLookup(source.name()));
+        fillIdentityFields(author, source);
+        return author;
+    }
+
+    private Optional<Author> lookup(final SourceAuthor source) {
+        final String qid = source.wikidataQid();
+        final Optional<Author> byQid = qid == null
+            ? Optional.empty()
+            : authorRepository.findByWikidataQid(qid);
+        return byQid.or(() -> authorRepository.findByName(source.name()));
+    }
+
+    private static void fillIdentityFields(final Author author, final SourceAuthor source) {
+        if (author.getWikidataQid() == null) {
+            author.setWikidataQid(source.wikidataQid());
+        }
+        if (author.getPhotoUrl() == null) {
+            author.setPhotoUrl(source.photoUrl());
+        }
+        if (author.getBio() == null) {
+            author.setBio(source.bio());
+        }
     }
 
     private Author insertOrLookup(final String name) {

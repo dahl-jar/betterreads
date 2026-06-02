@@ -32,8 +32,20 @@ public class Author {
     @Nullable
     private String openLibraryKey;
 
+    @Column(name = "wikidata_qid", unique = true)
+    @Nullable
+    private String wikidataQid;
+
     @Column(name = "name", nullable = false)
     private String name;
+
+    @Column(name = "photo_url", columnDefinition = "TEXT")
+    @Nullable
+    private String photoUrl;
+
+    @Column(name = "bio", columnDefinition = "TEXT")
+    @Nullable
+    private String bio;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
@@ -76,6 +88,33 @@ public class Author {
 
     public void setName(final String name) {
         this.name = name;
+    }
+
+    @Nullable
+    public String getWikidataQid() {
+        return wikidataQid;
+    }
+
+    public void setWikidataQid(@Nullable final String wikidataQid) {
+        this.wikidataQid = wikidataQid;
+    }
+
+    @Nullable
+    public String getPhotoUrl() {
+        return photoUrl;
+    }
+
+    public void setPhotoUrl(@Nullable final String photoUrl) {
+        this.photoUrl = photoUrl;
+    }
+
+    @Nullable
+    public String getBio() {
+        return bio;
+    }
+
+    public void setBio(@Nullable final String bio) {
+        this.bio = bio;
     }
 
     public OffsetDateTime getCreatedAt() {

@@ -5,6 +5,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.betterreads.catalog.service.BookFieldSource;
+import com.betterreads.catalog.service.SourceAuthor;
 import com.betterreads.catalog.service.SourceBook;
 import com.betterreads.integration.googlebooks.dto.IndustryIdentifier;
 import com.betterreads.integration.googlebooks.dto.Volume;
@@ -36,30 +37,21 @@ public class GoogleBooksMapper {
             return null;
         }
         final VolumeInfo info = volume.volumeInfo();
-        return new SourceBook(
-            BookFieldSource.GOOGLE_BOOKS,
-            findIsbn13(info.industryIdentifiers()),
-            null,
-            volume.id(),
-            null,
-            null,
-            null,
-            info.title(),
-            info.subtitle(),
-            stripHtml(info.description()),
-            parseYear(info.publishedDate()),
-            info.publisher(),
-            nullIfZero(info.pageCount()),
-            info.language(),
-            null,
-            info.authors(),
-            null,
-            info.categories(),
-            info.averageRating(),
-            info.ratingsCount(),
-            null,
-            null
-        );
+        return SourceBook.builder(BookFieldSource.GOOGLE_BOOKS)
+            .isbn13(findIsbn13(info.industryIdentifiers()))
+            .googleBooksVolumeId(volume.id())
+            .title(info.title())
+            .subtitle(info.subtitle())
+            .description(stripHtml(info.description()))
+            .publicationYear(parseYear(info.publishedDate()))
+            .publisher(info.publisher())
+            .pageCount(nullIfZero(info.pageCount()))
+            .language(info.language())
+            .authors(SourceAuthor.ofNames(info.authors()))
+            .rawCategories(info.categories())
+            .averageRating(info.averageRating())
+            .ratingCount(info.ratingsCount())
+            .build();
     }
 
     static @Nullable String findIsbn13(final @Nullable List<IndustryIdentifier> identifiers) {

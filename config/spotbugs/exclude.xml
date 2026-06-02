@@ -78,7 +78,7 @@
 
     <!--
       EI_EXPOSE_REP2 on integration clients (enrichment under .client, discovery under
-      .discovery) and the shared LoC SRU gateway, all holding their injected WebClient and
+      .discovery) and the shared SRU/REST gateways, all holding their injected WebClient and
       mapper. These are Spring-managed singletons, never mutated after construction and shared
       by design. A defensive copy is meaningless for a WebClient. Same rationale as the
       mail.outbox and auth-service suppressions above.
@@ -90,6 +90,10 @@
     <Match>
         <Bug pattern="EI_EXPOSE_REP2"/>
         <Class name="com.betterreads.integration.loc.LocSru"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.betterreads.integration.wikidata.WikidataApi"/>
     </Match>
 
     <!--

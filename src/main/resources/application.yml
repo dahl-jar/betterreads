@@ -143,6 +143,11 @@ loc:
   connect-timeout: ${LOC_CONNECT_TIMEOUT:5000}
   read-timeout: ${LOC_READ_TIMEOUT:10000}
 
+wikidata:
+  base-url: ${WIKIDATA_BASE_URL:https://www.wikidata.org}
+  connect-timeout: ${WIKIDATA_CONNECT_TIMEOUT:5000}
+  read-timeout: ${WIKIDATA_READ_TIMEOUT:10000}
+
 meilisearch:
   host: ${MEILISEARCH_HOST:http://localhost:7700}
   master-key: ${MEILI_MASTER_KEY:dev-placeholder-set-MEILI_MASTER_KEY-for-real-use}

@@ -5,6 +5,7 @@ import java.util.regex.Pattern;
 
 import com.betterreads.catalog.service.BookFieldSource;
 import com.betterreads.catalog.service.CatalogGenres;
+import com.betterreads.catalog.service.SourceAuthor;
 import com.betterreads.catalog.service.SourceBook;
 import com.betterreads.integration.hardcover.dto.HardcoverDocument;
 import com.betterreads.integration.hardcover.dto.HardcoverDocument.FeaturedSeries;
@@ -30,29 +31,21 @@ public class HardcoverMapper {
             return null;
         }
         final FeaturedSeries series = document.featuredSeries();
-        return new SourceBook(
-            BookFieldSource.HARDCOVER,
-            firstIsbn13(document.isbns()),
-            null,
-            null,
-            null,
-            null,
-            document.id(),
-            document.title(),
-            null,
-            document.description(),
-            document.releaseYear(),
-            null,
-            document.pages(),
-            null,
-            coverUrl(document),
-            document.authorNames(),
-            document.genres() == null ? null : cleanGenres(document.genres()),
-            null,
-            document.rating(),
-            document.ratingsCount(),
-            seriesName(series),
-            series == null ? null : seriesPosition(series.position()));
+        return SourceBook.builder(BookFieldSource.HARDCOVER)
+            .isbn13(firstIsbn13(document.isbns()))
+            .hardcoverId(document.id())
+            .title(document.title())
+            .description(document.description())
+            .publicationYear(document.releaseYear())
+            .pageCount(document.pages())
+            .coverUrl(coverUrl(document))
+            .authors(SourceAuthor.ofNames(document.authorNames()))
+            .rawSubjects(document.genres() == null ? null : cleanGenres(document.genres()))
+            .averageRating(document.rating())
+            .ratingCount(document.ratingsCount())
+            .seriesName(seriesName(series))
+            .seriesPosition(series == null ? null : seriesPosition(series.position()))
+            .build();
     }
 
     static @Nullable String firstIsbn13(final @Nullable List<String> isbns) {
