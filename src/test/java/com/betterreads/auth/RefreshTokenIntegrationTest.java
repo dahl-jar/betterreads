@@ -54,7 +54,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "auth.refresh-cookie.secure=true",
     "mail.outbox.worker-enabled=false"
 })
-@SuppressWarnings("PMD.TooManyStaticImports")
 class RefreshTokenIntegrationTest {
 
     private static final String LOGIN_URL = "/api/v1/auth/login";

@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.http.MediaType;
 import org.springframework.security.web.FilterChainProxy;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -16,8 +17,10 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import static org.hamcrest.Matchers.matchesPattern;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -38,6 +41,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class OperationsEndpointsIntegrationTest {
 
     private static final String HEALTHZ_URL = "/healthz";
+
+    private static final String ISO_INSTANT_PATTERN = "\\d{4}-\\d{2}-\\d{2}T.*Z";
 
     @Container
     @ServiceConnection
@@ -64,10 +69,13 @@ class OperationsEndpointsIntegrationTest {
     class Healthz {
 
         @Test
-        void returnsOkWithoutAuth() throws Exception {
+        void returnsJsonStatusWithoutAuth() throws Exception {
             mockMvc.perform(get(HEALTHZ_URL))
                 .andExpect(status().isOk())
-                .andExpect(content().string("ok"));
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value("UP"))
+                .andExpect(jsonPath("$.service").value("betterreads"))
+                .andExpect(jsonPath("$.timestamp", matchesPattern(ISO_INSTANT_PATTERN)));
         }
     }
 }

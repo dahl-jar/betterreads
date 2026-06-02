@@ -44,6 +44,15 @@
         <exclude name="LongVariable"/>
         <!-- Re-included below to allow nested @Nested grouper classes (Me, Login, Register) -->
         <exclude name="ShortClassName"/>
+        <!-- Re-included below: MockMvc tests statically import get/status/content/jsonPath/matchers -->
+        <exclude name="TooManyStaticImports"/>
+    </rule>
+
+    <!-- MockMvc integration tests pull in get, status, content, jsonPath, and Hamcrest matchers. -->
+    <rule ref="category/java/codestyle.xml/TooManyStaticImports">
+        <properties>
+            <property name="maximumStaticImports" value="12"/>
+        </properties>
     </rule>
 
     <!-- Allow short names like Me, Login, Register, User; flag only single-letter classes. -->
