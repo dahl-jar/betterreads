@@ -14,9 +14,9 @@ import org.springframework.stereotype.Component;
 /**
  * Maps OpenLibrary DTOs into the catalog's {@link SourceBook}.
  *
- * <p>OpenLibrary has a few quirks this handles: {@code description} comes back as a string or a
- * {@code {type, value}} object ({@link #coerceDescription}), {@code subjects} is noisy and gets
- * reduced to canonical genres ({@link #cleanSubjects}), and {@code cover_i = 0} means no cover.
+ * <p>{@code description} comes back as a string or a {@code {type, value}} object
+ * ({@link #coerceDescription}), {@code subjects} is noisy and gets reduced to canonical genres
+ * ({@link #cleanSubjects}), and {@code cover_i = 0} means no cover.
  */
 @Component
 public class OpenLibraryMapper {

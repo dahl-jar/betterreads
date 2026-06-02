@@ -9,12 +9,9 @@ import org.springframework.stereotype.Component;
 /**
  * Pushes the canonical book set from Postgres into the Meilisearch index.
  *
- * <p>Postgres is the source of truth; the index is a derived view. The
- * reconciler is safe to re-run at any cadence because documents are upserted
- * by id.
- *
- * <p>TODO(implementer): {@link #reconcile()} body is not implemented.
+ * <p>Safe to re-run at any cadence because documents are upserted by id.
  */
+// TODO(2026-Q3): implement reconcile() against the Meilisearch SDK; currently throws
 @Component
 @RequiredArgsConstructor
 public class BookIndexReconciler {
