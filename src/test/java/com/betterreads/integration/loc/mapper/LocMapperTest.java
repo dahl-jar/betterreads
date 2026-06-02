@@ -3,9 +3,6 @@ package com.betterreads.integration.loc.mapper;
 import static org.assertj.core.api.Assertions.as;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.util.stream.Stream;
 
 import com.betterreads.catalog.service.BookFieldSource;
@@ -17,22 +14,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.springframework.core.io.ClassPathResource;
 
 /**
- * Maps the captured MODS records onto a {@link SourceBook}.
+ * Maps a MODS record onto a {@link SourceBook}.
  *
- * <p>The fixtures are real SRU responses for the trust slate, so the parse runs against the shapes
- * the live catalog returns rather than invented XML.
+ * <p>Each record is an inline SRU response holding only the elements under test, in the {@code zs:}
+ * wrapper and MODS namespace the parser navigates.
  */
 class LocMapperTest {
-
-    private static final String DUNE = "dune";
-    private static final String WATCHMEN = "watchmen";
-    private static final String HOBBIT = "hobbit";
-    private static final String SANDMAN = "sandman";
-    private static final String EYE = "eye-of-the-world";
-    private static final String CLASH = "clash-of-kings";
 
     private static final int DUNE_YEAR = 2019;
     private static final int DUNE_PAGES = 658;
@@ -47,10 +36,80 @@ class LocMapperTest {
 
     private static final String WHEEL_OF_TIME = "Wheel of time";
 
+    private static final String DUNE = sru("""
+        <titleInfo><title>Dune</title></titleInfo>
+        <name type="personal" usage="primary"><namePart>Herbert, Frank,</namePart></name>
+        <genre authority="lcgft">Science fiction.</genre>
+        <genre authority="fast">Fiction.</genre>
+        <originInfo><dateIssued encoding="marc">2019</dateIssued></originInfo>
+        <physicalDescription><extent>xxii, 658 pages : map ; 24 cm.</extent></physicalDescription>
+        <abstract type="Summary">Follows the adventures of Paul Atreides, the son of a betrayed duke.</abstract>
+        <relatedItem type="series"><titleInfo>
+        <title>Dune chronicles</title><partNumber>bk. 1</partNumber></titleInfo></relatedItem>
+        <identifier type="isbn">9780593099322</identifier>
+        <identifier type="isbn">059309932X</identifier>
+        <identifier type="lccn">2019287107</identifier>""");
+
+    private static final String WATCHMEN = sru("""
+        <titleInfo><title>Watchmen</title></titleInfo>
+        <name type="personal" usage="primary"><namePart>Moore, Alan,</namePart></name>
+        <originInfo><dateIssued encoding="marc">2013</dateIssued></originInfo>
+        <physicalDescription><extent>414 pages : chiefly illustrations ; 26 cm.</extent></physicalDescription>
+        <identifier type="isbn">9781401238964</identifier>
+        <identifier type="lccn">2013003992</identifier>""");
+
+    private static final String HOBBIT = sru("""
+        <titleInfo><title>The Hobbit</title></titleInfo>
+        <name type="personal" usage="primary"><namePart>Tolkien, J. R. R. (John Ronald Reuel),</namePart></name>
+        <originInfo><dateIssued encoding="marc">2023</dateIssued></originInfo>
+        <physicalDescription>
+        <extent>xxxix, 272 pages, 36 pages of plates : illustrations ; 23 cm.</extent></physicalDescription>
+        <identifier type="isbn">9780063347533</identifier>
+        <identifier type="lccn">2024442463</identifier>""");
+
+    private static final String SANDMAN = sru("""
+        <titleInfo><title>The Sandman</title></titleInfo>
+        <name type="personal" usage="primary"><namePart>Gaiman, Neil,</namePart></name>
+        <originInfo><dateIssued encoding="marc">1991</dateIssued></originInfo>
+        <physicalDescription><extent>1 v. (unpaged) : col. ill. ; 26 cm.</extent></physicalDescription>
+        <identifier type="isbn">9781563890116</identifier>
+        <identifier type="lccn">92159876</identifier>""");
+
+    private static final String EYE = sru("""
+        <titleInfo><title>The Eye of the World</title></titleInfo>
+        <name type="personal" usage="primary"><namePart>Jordan, Robert.</namePart></name>
+        <physicalDescription><extent>xiv, 670 p., [3] p. of plates : maps ; 24 cm.</extent></physicalDescription>
+        <relatedItem type="series"><titleInfo><title>TOR fantasy</title></titleInfo></relatedItem>
+        <relatedItem type="series"><titleInfo>
+        <title>Wheel of time</title><partNumber>bk. 1</partNumber></titleInfo></relatedItem>
+        <identifier type="isbn">0312850093 :</identifier>
+        <identifier type="isbn">9780312850098</identifier>
+        <identifier type="lccn">89007939</identifier>""");
+
+    private static final String CLASH = sru("""
+        <titleInfo><title>A Clash of Kings</title></titleInfo>
+        <name type="personal" usage="primary"><namePart>Martin, George R. R.</namePart></name>
+        <physicalDescription><extent>761 p. : ill. ; 25 cm.</extent></physicalDescription>
+        <relatedItem type="series"><titleInfo>
+        <title>Song of ice and fire</title><partNumber>bk. 2</partNumber></titleInfo></relatedItem>
+        <identifier type="isbn">0553108034</identifier>
+        <identifier type="isbn">9780553108033</identifier>
+        <identifier type="lccn">98037954</identifier>""");
+
     private final LocMapper mapper = new LocMapper();
 
+    private static String sru(final String modsBody) {
+        return """
+            <?xml version="1.0"?>
+            <zs:searchRetrieveResponse xmlns:zs="http://www.loc.gov/zing/srw/"><zs:records><zs:record>\
+            <zs:recordData><mods xmlns="http://www.loc.gov/mods/v3" version="3.8">
+            """ + modsBody + """
+            </mods></zs:recordData></zs:record></zs:records></zs:searchRetrieveResponse>""";
+    }
+
     private record Expected(
-        String slug,
+        String record,
+        String name,
         String lccn,
         String isbn13,
         Integer marcYear,
@@ -59,44 +118,35 @@ class LocMapperTest {
         Integer seriesPosition
     ) { }
 
-    private static String fixture(final String slug) {
-        try {
-            return new ClassPathResource("integration/loc/" + slug + "-mods.xml")
-                .getContentAsString(StandardCharsets.UTF_8);
-        } catch (IOException exception) {
-            throw new UncheckedIOException(exception);
-        }
-    }
-
-    private SourceBook map(final String slug) {
-        return mapper.toSourceBook(fixture(slug)).orElseThrow();
+    private SourceBook map(final String record) {
+        return mapper.toSourceBook(record).orElseThrow();
     }
 
     @Nested
     @DisplayName("toSourceBook")
     class ToSourceBook {
 
-        static Stream<Expected> slate() {
+        static Stream<Arguments> slate() {
             return Stream.of(
-                new Expected(DUNE, "2019287107", "9780593099322", DUNE_YEAR, DUNE_PAGES,
-                    "Dune chronicles", 1),
-                new Expected(WATCHMEN, "2013003992", "9781401238964", WATCHMEN_YEAR, WATCHMEN_PAGES,
-                    null, null),
-                new Expected(HOBBIT, "2024442463", "9780063347533", HOBBIT_YEAR, HOBBIT_PAGES,
-                    null, null),
-                new Expected(SANDMAN, "92159876", "9781563890116", SANDMAN_YEAR, null,
-                    null, null),
-                new Expected(EYE, "89007939", "9780312850098", null, EYE_PAGES,
-                    WHEEL_OF_TIME, 1),
-                new Expected(CLASH, "98037954", "9780553108033", null, CLASH_PAGES,
-                    "Song of ice and fire", CLASH_POSITION));
+                Arguments.of("dune", new Expected(DUNE, "Herbert, Frank", "2019287107",
+                    "9780593099322", DUNE_YEAR, DUNE_PAGES, "Dune chronicles", 1)),
+                Arguments.of("watchmen", new Expected(WATCHMEN, "Moore, Alan", "2013003992",
+                    "9781401238964", WATCHMEN_YEAR, WATCHMEN_PAGES, null, null)),
+                Arguments.of("hobbit", new Expected(HOBBIT, "Tolkien, J. R. R. (John Ronald Reuel)",
+                    "2024442463", "9780063347533", HOBBIT_YEAR, HOBBIT_PAGES, null, null)),
+                Arguments.of("sandman", new Expected(SANDMAN, "Gaiman, Neil", "92159876",
+                    "9781563890116", SANDMAN_YEAR, null, null, null)),
+                Arguments.of("eye", new Expected(EYE, "Jordan, Robert", "89007939",
+                    "9780312850098", null, EYE_PAGES, WHEEL_OF_TIME, 1)),
+                Arguments.of("clash", new Expected(CLASH, "Martin, George R. R.", "98037954",
+                    "9780553108033", null, CLASH_PAGES, "Song of ice and fire", CLASH_POSITION)));
         }
 
         @ParameterizedTest(name = "{0}")
         @MethodSource("slate")
         @DisplayName("each record yields its lccn, isbn-13, marc year, page count, and series")
-        void parsesEachRecord(final Expected expected) {
-            final SourceBook book = map(expected.slug());
+        void parsesEachRecord(final String name, final Expected expected) {
+            final SourceBook book = map(expected.record());
 
             assertThat(book.source()).isEqualTo(BookFieldSource.LOC);
             assertThat(book.locLccn()).isEqualTo(expected.lccn());
@@ -107,28 +157,20 @@ class LocMapperTest {
                 .as("the marc-encoded year, or null when the record has none")
                 .isEqualTo(expected.marcYear());
             assertThat(book.pageCount())
-                .as("the page count from the extent, or null for a multi-volume extent")
+                .as("the page count from the extent, or null for an unpaged extent")
                 .isEqualTo(expected.pageCount());
             assertThat(book.seriesName()).isEqualTo(expected.seriesName());
             assertThat(book.seriesPosition()).isEqualTo(expected.seriesPosition());
         }
 
-        static Stream<Arguments> authors() {
-            return Stream.of(
-                Arguments.of(DUNE, "Herbert, Frank"),
-                Arguments.of(SANDMAN, "Gaiman, Neil"),
-                Arguments.of(CLASH, "Martin, George R. R."),
-                Arguments.of(HOBBIT, "Tolkien, J. R. R. (John Ronald Reuel)"));
-        }
-
-        @ParameterizedTest(name = "{0} -> {1}")
-        @MethodSource("authors")
+        @ParameterizedTest(name = "{0}")
+        @MethodSource("slate")
         @DisplayName("strips a trailing comma or period from the primary author, keeps an initial")
-        void normalizesPrimaryAuthorName(final String slug, final String expectedName) {
-            assertThat(map(slug))
+        void normalizesPrimaryAuthorName(final String name, final Expected expected) {
+            assertThat(map(expected.record()))
                 .extracting(SourceBook::authorNames, as(InstanceOfAssertFactories.list(String.class)))
-                .as("only the primary name is taken")
-                .containsExactly(expectedName);
+                .as("only the primary name is taken, trailing punctuation stripped")
+                .containsExactly(expected.name());
         }
 
         @Test

@@ -5,10 +5,6 @@ import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
-
 import com.betterreads.catalog.service.BookFieldSource;
 import com.betterreads.integration.loc.LocProperties;
 import com.betterreads.integration.loc.LocSru;
@@ -27,7 +23,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
@@ -37,8 +32,8 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  * MODS-to-SourceBook map, and the 4xx-to-empty / 5xx-propagates contract run in CI with no live
  * endpoint.
  *
- * <p>The stub body is the real captured Dune SRU response, so the test fails if the client stops
- * handing the raw XML to the mapper.
+ * <p>The stub body is an inline Dune SRU response, so the test fails if the client stops handing the
+ * raw XML to the mapper.
  */
 @SpringBootTest(
     classes = {
@@ -62,7 +57,15 @@ class LocClientWireMockTest {
 
     private static final WireMockServer WIREMOCK = startServer();
 
-    private static final String DUNE_SRU = fixture("integration/loc/dune-mods.xml");
+    private static final String DUNE_SRU = """
+        <?xml version="1.0"?>
+        <zs:searchRetrieveResponse xmlns:zs="http://www.loc.gov/zing/srw/"><zs:records><zs:record>\
+        <zs:recordData><mods xmlns="http://www.loc.gov/mods/v3" version="3.8">
+        <titleInfo><title>Dune</title></titleInfo>
+        <name type="personal" usage="primary"><namePart>Herbert, Frank,</namePart></name>
+        <identifier type="isbn">9780593099322</identifier>
+        <identifier type="lccn">2019287107</identifier>
+        </mods></zs:recordData></zs:record></zs:records></zs:searchRetrieveResponse>""";
 
     @Autowired
     private LocClientImpl client;
@@ -71,14 +74,6 @@ class LocClientWireMockTest {
         final WireMockServer server = new WireMockServer(0);
         server.start();
         return server;
-    }
-
-    private static String fixture(final String path) {
-        try {
-            return new ClassPathResource(path).getContentAsString(StandardCharsets.UTF_8);
-        } catch (IOException exception) {
-            throw new UncheckedIOException(exception);
-        }
     }
 
     private static ResponseDefinitionBuilder xml(final String body) {
