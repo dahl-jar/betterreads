@@ -15,8 +15,8 @@ public interface CatalogService {
      * the author-join row. When a row matches, populated fields on the source overwrite the
      * stored values; null source fields leave the stored value alone.
      *
-     * <p>Not race-safe across replicas. The multi-source pipeline replaces this with native
-     * {@code INSERT ... ON CONFLICT} once concurrent cold-reads become a real path.
+     * <p>Not race-safe across replicas: two concurrent upserts of the same source key can both
+     * miss on the lookup and insert duplicate rows.
      */
     Book upsertFromSource(SourceBook source);
 }
