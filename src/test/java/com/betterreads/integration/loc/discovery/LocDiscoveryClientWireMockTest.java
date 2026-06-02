@@ -5,9 +5,6 @@ import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -17,6 +14,7 @@ import com.betterreads.integration.loc.LocWebClientConfig;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder;
 import com.github.tomakehurst.wiremock.client.WireMock;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,16 +23,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 /**
  * Exercises the LoC discovery walk against a stubbed SRU boundary.
  *
- * <p>The stub body is a real marcxml response with one record cataloged 2024-01-29, one record with
- * no cataloging date, and one cataloged 2023-09-01, so the recency filter and the skip-an-incomplete
- * -record behavior both run against the shape the live endpoint returns.
+ * <p>The stub bodies are inline marcxml: one record cataloged 2024-01-29, one with no cataloging
+ * date, and one cataloged 2023-09-01, so the recency filter and the skip-an-undated-record behaviour
+ * both run.
  */
 @SpringBootTest(
     classes = {
@@ -60,11 +57,27 @@ class LocDiscoveryClientWireMockTest {
 
     private static final String START_RECORD_PARAM = "startRecord";
 
+    private static final String RECENT_008 = "240129s2024    ncu           000 0 eng  ";
+    private static final String OLD_008 = "230901t20241991nyua          000 j eng d";
+    private static final String TOMORROWING_LCCN = "2023042683";
+    private static final String TOMORROWING_ISBN = "9781478030683";
+    private static final String TOMORROWING_TITLE = "Tomorrowing";
+    private static final String LCCN_1 = "1000000001";
+    private static final String LCCN_2 = "1000000002";
+    private static final String LCCN_3 = "1000000003";
+    private static final int TOTAL_OVER_ONE_PAGE = 3;
+
     private static final WireMockServer WIREMOCK = startServer();
 
-    private static final String MIXED_MARCXML = fixture("integration/loc/discovery-mixed-marcxml.xml");
-    private static final String PAGE_1_MARCXML = fixture("integration/loc/discovery-page1-marcxml.xml");
-    private static final String PAGE_2_MARCXML = fixture("integration/loc/discovery-page2-marcxml.xml");
+    private static final String MIXED_MARCXML = sru(
+        record(RECENT_008, TOMORROWING_LCCN, TOMORROWING_ISBN, TOMORROWING_TITLE)
+        + record(null, "9999999999", null, "No cataloging date")
+        + record(OLD_008, "2023945886", "9780446672191", "The state of the art"));
+    private static final String PAGE_1_MARCXML = sru(
+        record(RECENT_008, LCCN_1, "9781000000016", "Page one book A")
+        + record(RECENT_008, LCCN_2, "9781000000023", "Page one book B"));
+    private static final String PAGE_2_MARCXML = sru(
+        record(RECENT_008, LCCN_3, "9781000000030", "Page two book"));
 
     @Autowired
     private LocDiscoveryClientImpl client;
@@ -75,12 +88,26 @@ class LocDiscoveryClientWireMockTest {
         return server;
     }
 
-    private static String fixture(final String path) {
-        try {
-            return new ClassPathResource(path).getContentAsString(StandardCharsets.UTF_8);
-        } catch (IOException exception) {
-            throw new UncheckedIOException(exception);
-        }
+    private static String record(final @Nullable String field008, final String lccn,
+            final @Nullable String isbn, final String title) {
+        final String control = field008 == null ? ""
+            : "<controlfield tag=\"008\">" + field008 + "</controlfield>";
+        final String isbnField = isbn == null ? "" : datafield("020", isbn);
+        return "<zs:record><zs:recordData><record xmlns=\"http://www.loc.gov/MARC21/slim\">"
+            + control + datafield("010", "  " + lccn) + isbnField + datafield("245", title + " /")
+            + "</record></zs:recordData></zs:record>";
+    }
+
+    private static String datafield(final String tag, final String value) {
+        return "<datafield tag=\"" + tag + "\"><subfield code=\"a\">" + value
+            + "</subfield></datafield>";
+    }
+
+    private static String sru(final String records) {
+        return "<?xml version=\"1.0\"?>"
+            + "<zs:searchRetrieveResponse xmlns:zs=\"http://www.loc.gov/zing/srw/\">"
+            + "<zs:numberOfRecords>" + TOTAL_OVER_ONE_PAGE + "</zs:numberOfRecords>"
+            + "<zs:records>" + records + "</zs:records></zs:searchRetrieveResponse>";
     }
 
     private static ResponseDefinitionBuilder xml(final String body) {
@@ -130,9 +157,9 @@ class LocDiscoveryClientWireMockTest {
 
             assertThat(found)
                 .anySatisfy(record -> {
-                    assertThat(record.lccn()).isEqualTo("2023042683");
-                    assertThat(record.isbn13()).isEqualTo("9781478030683");
-                    assertThat(record.title()).isEqualTo("Tomorrowing");
+                    assertThat(record.lccn()).isEqualTo(TOMORROWING_LCCN);
+                    assertThat(record.isbn13()).isEqualTo(TOMORROWING_ISBN);
+                    assertThat(record.title()).isEqualTo(TOMORROWING_TITLE);
                     assertThat(record.catalogedOn()).isEqualTo(RECENT_RECORD_DATE);
                 });
         }
@@ -152,7 +179,7 @@ class LocDiscoveryClientWireMockTest {
             assertThat(found)
                 .extracting(LocDiscoveryRecord::lccn)
                 .as("the third record lives on page two; a single-page walk would miss it")
-                .containsExactlyInAnyOrder("1000000001", "1000000002", "1000000003");
+                .containsExactlyInAnyOrder(LCCN_1, LCCN_2, LCCN_3);
         }
 
         @Test
