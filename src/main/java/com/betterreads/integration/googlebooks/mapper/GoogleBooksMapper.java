@@ -15,10 +15,9 @@ import org.springframework.stereotype.Component;
 /**
  * Translates Google Books DTOs to the {@link SourceBook} contract used by the catalog layer.
  *
- * <p>Three Google Books quirks the catalog has to handle live in this mapper. {@code pageCount}
- * is {@code 0} on reprints where Google has metadata but no real page count, so the mapper
- * nulls it. {@code industryIdentifiers} sometimes carries only an {@code ISBN_10}, never
- * synthesized into an ISBN-13. {@code description} ships with embedded HTML
+ * <p>{@code pageCount} is {@code 0} on reprints where Google has metadata but no real page
+ * count, so it is nulled. {@code industryIdentifiers} sometimes carries only an {@code ISBN_10},
+ * never synthesized into an ISBN-13. {@code description} ships with embedded HTML
  * ({@code <p>}, {@code <b>}, {@code <i>}, {@code <br>}), stripped before persistence so the
  * tags do not leak into rendered catalog text.
  */

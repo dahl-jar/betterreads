@@ -12,10 +12,8 @@ import org.springframework.stereotype.Service;
 
 /**
  * Meilisearch-backed implementation of {@link BookSearchService}.
- *
- * <p>TODO(implementer): method bodies throw {@code UnsupportedOperationException}
- * until the SDK calls land. See {@code BookSearchService} Javadoc for the contract.
  */
+// TODO(2026-Q3): implement search/index/remove against the Meilisearch SDK; methods currently throw
 @Service
 @RequiredArgsConstructor
 public class MeilisearchBookSearchService implements BookSearchService {
