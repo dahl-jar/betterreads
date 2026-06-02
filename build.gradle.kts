@@ -47,7 +47,6 @@ repositories {
 // Dependencies
 // ---------------------------------------------------------------------------
 dependencies {
-	// Spring Boot
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
 	implementation("org.springframework.boot:spring-boot-starter-cache")
 	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
@@ -57,51 +56,34 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-web")
 	implementation("org.springframework.boot:spring-boot-starter-webflux")
 
-	// Prometheus metrics for /actuator/prometheus
 	implementation("io.micrometer:micrometer-registry-prometheus")
-
-	// OpenAPI / Swagger UI: auto-generates /v3/api-docs and /swagger-ui.html
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3")
 
-	// Database & migration. Boot 4 ships Flyway auto-configuration in the starter, not in flyway-core.
-	// The postgresql dialect module is separate from the starter.
+	// Boot 4 ships Flyway auto-configuration in the starter, not in flyway-core; the postgresql dialect is a separate module.
 	implementation("org.springframework.boot:spring-boot-starter-flyway")
 	implementation("org.flywaydb:flyway-database-postgresql")
 	runtimeOnly("org.postgresql:postgresql")
 
-	// Cache
 	implementation("com.github.ben-manes.caffeine:caffeine")
-
-	// XML (Library of Congress SRU returns MARC/MODS records)
 	implementation("tools.jackson.dataformat:jackson-dataformat-xml")
 
-	// JWT (HS256 signing for stateless auth)
 	implementation("io.jsonwebtoken:jjwt-api:0.12.6")
 	runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
 	runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
 
-	// Rate limiting (token bucket per IP)
 	implementation("com.bucket4j:bucket4j_jdk17-core:8.14.0")
-
-	// Meilisearch (official Java client) — catalog full-text search engine
 	implementation("com.meilisearch.sdk:meilisearch-java:0.14.5")
 
-	// Spring Boot @ConfigurationProperties metadata generator
 	annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
-
-	// Null safety annotations (JSpecify)
 	implementation("org.jspecify:jspecify:1.0.0")
 
-	// Lombok
 	compileOnly("org.projectlombok:lombok")
 	annotationProcessor("org.projectlombok:lombok")
 
-	// Error Prone + NullAway (compile-time bug detection)
 	errorprone("com.google.errorprone:error_prone_core:2.48.0")
 	errorprone("com.uber.nullaway:nullaway:0.13.1")
 	spotbugsPlugins("com.h3xstream.findsecbugs:findsecbugs-plugin:1.14.0")
 
-	// Testing
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.springframework.boot:spring-boot-testcontainers")
 	testImplementation("io.projectreactor:reactor-test")
@@ -110,8 +92,6 @@ dependencies {
 	testImplementation("org.testcontainers:testcontainers-postgresql")
 	testImplementation("org.wiremock:wiremock-standalone:3.13.2")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-
-	// ArchUnit (architecture rule enforcement)
 	testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
 }
 
@@ -229,7 +209,7 @@ tasks.jacocoTestCoverageVerification {
 	violationRules {
 		rule {
 			limit {
-				minimum = "0.80".toBigDecimal() // 80% line coverage minimum
+				minimum = "0.80".toBigDecimal()
 			}
 		}
 	}
@@ -242,7 +222,7 @@ dependencyCheck {
 	nvd {
 		apiKey = providers.environmentVariable("NVD_API_KEY").orNull
 	}
-	failBuildOnCVSS = 7.0f // fail on HIGH+ severity
+	failBuildOnCVSS = 7.0f
 	failBuildOnUnusedSuppressionRule = true
 	formats = listOf("HTML", "JSON")
 	suppressionFile = "config/dependency-check/suppressions.xml"
