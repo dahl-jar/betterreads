@@ -60,6 +60,10 @@ public class Book {
     @Nullable
     private String locLccn;
 
+    @Column(name = "wikidata_qid", unique = true)
+    @Nullable
+    private String wikidataQid;
+
     @Column(name = "title", nullable = false)
     private String title;
 
@@ -128,6 +132,9 @@ public class Book {
     @OneToMany(mappedBy = "book", cascade = CascadeType.ALL, orphanRemoval = true)
     private final List<BookSubject> subjects = new ArrayList<>();
 
+    @OneToMany(mappedBy = "book", cascade = CascadeType.ALL, orphanRemoval = true)
+    private final List<BookAward> awards = new ArrayList<>();
+
     @PrePersist
     void onCreate() {
         final OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
@@ -167,6 +174,7 @@ public class Book {
         this.pageCount = source.pageCount();
         this.language = source.language();
         replaceSubjects(source.rawSubjects());
+        replaceAwards(source.awards());
         accrueFrom(source);
     }
 
@@ -176,6 +184,7 @@ public class Book {
         this.openLibraryWorkKey = coalesce(source.openLibraryWorkKey(), this.openLibraryWorkKey);
         this.hardcoverId = coalesce(source.hardcoverId(), this.hardcoverId);
         this.locLccn = coalesce(source.locLccn(), this.locLccn);
+        this.wikidataQid = coalesce(source.wikidataQid(), this.wikidataQid);
         this.averageRating = coalesce(toRating(source.averageRating()), this.averageRating);
         this.ratingCount = coalesce(source.ratingCount(), this.ratingCount);
         this.seriesName = coalesce(source.seriesName(), this.seriesName);
@@ -208,8 +217,37 @@ public class Book {
         }
     }
 
+    /**
+     * Replaces the book's awards with the given list, removing any no longer present.
+     *
+     * <p>A null list leaves the existing awards untouched, since a source that does not carry awards
+     * must not wipe another source's. An empty list clears them.
+     */
+    private void replaceAwards(@Nullable final List<String> newAwards) {
+        if (newAwards == null) {
+            return;
+        }
+        this.awards.clear();
+        for (final String award : newAwards) {
+            this.awards.add(new BookAward(this, award));
+        }
+    }
+
     public List<BookSubject> getSubjects() {
         return subjects;
+    }
+
+    public List<BookAward> getAwards() {
+        return awards;
+    }
+
+    @Nullable
+    public String getWikidataQid() {
+        return wikidataQid;
+    }
+
+    public void setWikidataQid(@Nullable final String wikidataQid) {
+        this.wikidataQid = wikidataQid;
     }
 
     public Long getBookId() {

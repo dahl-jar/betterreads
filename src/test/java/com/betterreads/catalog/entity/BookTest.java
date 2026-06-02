@@ -109,20 +109,17 @@ class BookTest {
     }
 
     private static SourceBook sourceWithSubjects(final @Nullable List<String> subjects) {
-        return new SourceBook(
-            BookFieldSource.OPEN_LIBRARY,
-            null, "OL1W", null, null, null, null,
-            A_TITLE, null, null, null, null, null, null, null, null,
-            subjects, null,
-            null, null, null, null);
+        return SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+            .openLibraryWorkKey("OL1W")
+            .title(A_TITLE)
+            .rawSubjects(subjects)
+            .build();
     }
 
     private static SourceBook locSource(final String lccn) {
-        return new SourceBook(
-            BookFieldSource.LOC,
-            null, null, null, null, lccn, null,
-            A_TITLE, null, null, null, null, null, null, null, null,
-            null, null,
-            null, null, null, null);
+        return SourceBook.builder(BookFieldSource.LOC)
+            .locLccn(lccn)
+            .title(A_TITLE)
+            .build();
     }
 }

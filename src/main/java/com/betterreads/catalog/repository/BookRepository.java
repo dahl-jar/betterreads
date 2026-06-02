@@ -24,4 +24,12 @@ public interface BookRepository extends JpaRepository<Book, Long> {
     /** Returns the book with the given LCCN, with authors and subjects fetched. */
     @EntityGraph(attributePaths = {"authors", "subjects"})
     Optional<Book> findByLocLccn(String locLccn);
+
+    /** Returns the book with the given Wikidata QID, with authors and subjects fetched. */
+    @EntityGraph(attributePaths = {"authors", "subjects"})
+    Optional<Book> findByWikidataQid(String wikidataQid);
+
+    /** Returns the book with the given Wikidata QID, with its awards fetched. */
+    @EntityGraph(attributePaths = "awards")
+    Optional<Book> findWithAwardsByWikidataQid(String wikidataQid);
 }

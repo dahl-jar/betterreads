@@ -7,6 +7,7 @@ import java.util.regex.Pattern;
 
 import com.betterreads.catalog.service.BookFieldSource;
 import com.betterreads.catalog.service.CatalogGenres;
+import com.betterreads.catalog.service.SourceAuthor;
 import com.betterreads.catalog.service.SourceBook;
 import com.betterreads.integration.loc.SruTree;
 import org.jspecify.annotations.Nullable;
@@ -58,29 +59,19 @@ public class LocMapper {
 
     private static SourceBook mapRecord(final JsonNode mods) {
         final List<String> genres = genres(mods);
-        return new SourceBook(
-            BookFieldSource.LOC,
-            ModsIdentifiers.isbn13(mods),
-            null,
-            null,
-            null,
-            ModsIdentifiers.firstOfType(mods, "lccn"),
-            null,
-            SruTree.firstText(SruTree.firstByTag(mods, "titleInfo"), "title"),
-            null,
-            summary(mods),
-            marcYear(mods).orElse(null),
-            null,
-            pageCount(mods).orElse(null),
-            languageCode(mods),
-            null,
-            authorNames(mods),
-            genres.isEmpty() ? null : genres,
-            null,
-            null,
-            null,
-            ModsSeries.name(mods),
-            ModsSeries.position(mods).orElse(null));
+        return SourceBook.builder(BookFieldSource.LOC)
+            .isbn13(ModsIdentifiers.isbn13(mods))
+            .locLccn(ModsIdentifiers.firstOfType(mods, "lccn"))
+            .title(SruTree.firstText(SruTree.firstByTag(mods, "titleInfo"), "title"))
+            .description(summary(mods))
+            .publicationYear(marcYear(mods).orElse(null))
+            .pageCount(pageCount(mods).orElse(null))
+            .language(languageCode(mods))
+            .authors(SourceAuthor.ofNames(authorNames(mods)))
+            .rawSubjects(genres.isEmpty() ? null : genres)
+            .seriesName(ModsSeries.name(mods))
+            .seriesPosition(ModsSeries.position(mods).orElse(null))
+            .build();
     }
 
     private static @Nullable List<String> authorNames(final JsonNode mods) {

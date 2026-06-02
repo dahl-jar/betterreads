@@ -5,6 +5,7 @@ import java.util.Map;
 
 import com.betterreads.catalog.service.BookFieldSource;
 import com.betterreads.catalog.service.CatalogGenres;
+import com.betterreads.catalog.service.SourceAuthor;
 import com.betterreads.catalog.service.SourceBook;
 import com.betterreads.integration.openlibrary.dto.SearchDoc;
 import com.betterreads.integration.openlibrary.dto.WorkDetail;
@@ -40,29 +41,17 @@ public class OpenLibraryMapper {
         if (doc == null || doc.title() == null) {
             return null;
         }
-        return new SourceBook(
-            BookFieldSource.OPEN_LIBRARY,
-            null,
-            stripWorksPrefix(doc.key()),
-            null,
-            null,
-            null,
-            null,
-            doc.title(),
-            doc.subtitle(),
-            work == null ? null : coerceDescription(work.description()),
-            doc.firstPublishYear(),
-            null,
-            null,
-            firstLanguage(doc.language()),
-            buildCoverUrl(doc.coverId()),
-            doc.authorName(),
-            work == null ? null : cleanSubjects(work.subjects()),
-            null,
-            null,
-            null,
-            null,
-            null);
+        return SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+            .openLibraryWorkKey(stripWorksPrefix(doc.key()))
+            .title(doc.title())
+            .subtitle(doc.subtitle())
+            .description(work == null ? null : coerceDescription(work.description()))
+            .publicationYear(doc.firstPublishYear())
+            .language(firstLanguage(doc.language()))
+            .coverUrl(buildCoverUrl(doc.coverId()))
+            .authors(SourceAuthor.ofNames(doc.authorName()))
+            .rawSubjects(work == null ? null : cleanSubjects(work.subjects()))
+            .build();
     }
 
     static @Nullable String stripWorksPrefix(final @Nullable String key) {
