@@ -4,7 +4,7 @@ import com.betterreads.catalog.service.BookSourceClient;
 import com.betterreads.catalog.service.SourceBook;
 import java.util.Optional;
 
-/** Google Books REST API boundary. */
+/** Google Books REST API client. */
 public interface GoogleBooksClient extends BookSourceClient {
 
     /**

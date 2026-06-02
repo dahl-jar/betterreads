@@ -4,7 +4,7 @@ import com.betterreads.catalog.service.BookSourceClient;
 import com.betterreads.catalog.service.SourceBook;
 import java.util.Optional;
 
-/** Hardcover.app GraphQL API boundary. */
+/** Hardcover.app GraphQL API client. */
 public interface HardcoverClient extends BookSourceClient {
 
     /**

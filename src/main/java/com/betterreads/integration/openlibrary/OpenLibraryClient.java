@@ -4,7 +4,7 @@ import com.betterreads.catalog.service.BookSourceClient;
 import com.betterreads.catalog.service.SourceBook;
 import java.util.Optional;
 
-/** OpenLibrary HTTP boundary. */
+/** OpenLibrary HTTP client. */
 public interface OpenLibraryClient extends BookSourceClient {
 
     /**

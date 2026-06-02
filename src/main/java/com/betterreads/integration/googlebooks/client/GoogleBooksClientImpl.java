@@ -21,7 +21,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  *
  * <p>4xx responses resolve to {@link Optional#empty()} so callers treat "no such volume" and
  * "search returned nothing" uniformly. 5xx responses and network failures propagate as
- * {@link WebClientResponseException} so an upstream pipeline can choose to retry or fall back.
+ * {@link WebClientResponseException}.
  *
  * <p>Search ordering on the {@code /volumes} endpoint biases toward the most recent reprint
  * for a given title, so {@link #fetchByTitleAuthor} returns reprint-edition metadata

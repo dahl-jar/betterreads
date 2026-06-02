@@ -8,12 +8,7 @@ import java.time.Instant;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Public health check endpoint.
- *
- * <p>Returns 200 when the app is running. Detailed component health (database, mail) lives on
- * the actuator on the management port, which is not exposed publicly.
- */
+/** Public health check endpoint. */
 @RestController
 @Tag(name = "Operations", description = "Public probes used by external monitors")
 public class PublicHealthController {
