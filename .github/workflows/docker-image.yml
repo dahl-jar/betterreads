@@ -18,6 +18,9 @@ concurrency:
   group: docker-image-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 env:
   IMAGE: ghcr.io/${{ github.repository_owner }}/betterreads
 
@@ -89,6 +92,8 @@ jobs:
     name: Pin image in manifests
     needs: build-and-push
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     steps:
       - name: Checkout manifests repo
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
