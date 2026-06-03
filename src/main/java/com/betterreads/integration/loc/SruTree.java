@@ -71,7 +71,7 @@ public final class SruTree {
         if (node == null) {
             return null;
         }
-        final String value = node.isValueNode() ? node.asText() : asText(node.get(TEXT_FIELD));
+        final String value = node.isValueNode() ? node.asString() : asText(node.get(TEXT_FIELD));
         return value == null || value.isBlank() ? null : value.trim();
     }
 
@@ -88,6 +88,6 @@ public final class SruTree {
     }
 
     private static @Nullable String asText(final @Nullable JsonNode node) {
-        return node == null ? null : node.asText();
+        return node == null ? null : node.asString();
     }
 }

@@ -45,6 +45,7 @@ import org.springframework.web.context.WebApplicationContext;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -71,7 +72,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "mail.app-base-url=https://test.example.com",
     "mail.outbox.worker-enabled=false"
 })
-@SuppressWarnings({"PMD.ExcessiveImports", "PMD.CouplingBetweenObjects"})
+@SuppressWarnings("PMD.ExcessiveImports")
 class PasswordResetIntegrationTest {
 
     private static final String FORGOT_URL = "/api/v1/auth/forgot-password";
@@ -110,7 +111,7 @@ class PasswordResetIntegrationTest {
 
     @Container
     @ServiceConnection
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17");
+    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(DockerImageName.parse("postgres:17"));
 
     @Autowired
     private WebApplicationContext webApplicationContext;
@@ -422,7 +423,7 @@ class PasswordResetIntegrationTest {
     private String payloadField(final MailOutbox row, final String field) {
         try {
             final JsonNode node = objectMapper.readTree(row.getPayload());
-            return node.path(field).asText();
+            return node.path(field).asString();
         } catch (final JacksonException ex) {
             throw new IllegalStateException("malformed outbox payload", ex);
         }

@@ -10,7 +10,6 @@ import org.jspecify.annotations.Nullable;
  * @param volumeInfo per-edition metadata; can be missing on degenerate responses
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-@SuppressWarnings("PMD.ShortVariable")
 public record Volume(
     @Nullable String id,
     @Nullable VolumeInfo volumeInfo

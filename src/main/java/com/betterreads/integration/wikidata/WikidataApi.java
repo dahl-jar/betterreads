@@ -80,7 +80,7 @@ public class WikidataApi {
         for (final JsonNode hit : JSON.readTree(body).path(SEARCH_FIELD)) {
             final JsonNode hitId = hit.path("id");
             if (hitId.isValueNode()) {
-                ids.add(hitId.asText());
+                ids.add(hitId.asString());
             }
         }
         return ids;

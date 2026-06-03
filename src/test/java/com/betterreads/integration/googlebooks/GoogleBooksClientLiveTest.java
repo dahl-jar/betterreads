@@ -63,7 +63,7 @@ import org.springframework.test.context.TestPropertySource;
 @EnabledIfEnvironmentVariable(named = "GOOGLE_BOOKS_API_KEY", matches = ".+")
 class GoogleBooksClientLiveTest {
 
-    private static final String GRAPHIC_NOVEL_CATEGORY = "Comics & Graphic Novels";
+    private static final String GRAPHIC_NOVEL_GENRE = "graphic novel";
 
     private static final int EARLIEST_PLAUSIBLE_YEAR = 1900;
 
@@ -139,18 +139,17 @@ class GoogleBooksClientLiveTest {
 
     private static void assertGenreShelf(final SourceBook book, final Kind kind) {
         if (kind == Kind.GRAPHIC_NOVEL) {
-            assertThat(book.rawCategories())
-                .as("graphic novels must surface the Comics & Graphic Novels category "
-                    + "so the catalog can shelf them correctly")
+            assertThat(book.rawSubjects())
+                .as("graphic novels must reduce to the graphic-novel genre so the catalog shelves them")
                 .isNotNull()
-                .contains(GRAPHIC_NOVEL_CATEGORY);
+                .contains(GRAPHIC_NOVEL_GENRE);
             return;
         }
-        assertThat(book.rawCategories() == null
-                || !book.rawCategories().contains(GRAPHIC_NOVEL_CATEGORY))
+        assertThat(book.rawSubjects() == null
+                || !book.rawSubjects().contains(GRAPHIC_NOVEL_GENRE))
             .as("a prose novel must not be tagged as a graphic novel; "
                 + "this catches search drifting to the comic adaptation. "
-                + "Got categories: %s", book.rawCategories())
+                + "Got subjects: %s", book.rawSubjects())
             .isTrue();
     }
 

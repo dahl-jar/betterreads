@@ -71,7 +71,7 @@ public final class WikidataTree {
 
     /** Returns the node's text when it is a value node, otherwise null. */
     static @Nullable String text(final JsonNode node) {
-        return node.isValueNode() ? node.asText() : null;
+        return node.isValueNode() ? node.asString() : null;
     }
 
     private static Stream<JsonNode> mainValues(final JsonNode entity, final String property) {

@@ -26,6 +26,7 @@ import org.springframework.security.web.FilterChainProxy;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
 import java.time.Duration;
 
@@ -136,7 +137,7 @@ class AuthIntegrationTest {
 
     @Container
     @ServiceConnection
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17");
+    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(DockerImageName.parse("postgres:17"));
 
     @Autowired
     private WebApplicationContext webApplicationContext;
@@ -325,7 +326,7 @@ class AuthIntegrationTest {
                     post(REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content(registerBody))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-            final String apiToken = objectMapper.readTree(registerResponse).get("accessToken").asText();
+            final String apiToken = objectMapper.readTree(registerResponse).get("accessToken").asString();
 
             mockMvc.perform(get(ME_URL).header(AUTH_HEADER, BEARER_PREFIX + apiToken))
                 .andExpect(status().isOk())

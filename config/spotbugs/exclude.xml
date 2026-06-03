@@ -97,14 +97,22 @@
     </Match>
 
     <!--
-      CRLF_INJECTION_LOGS on the opt-in seed verification. The logged title is already passed
+      CRLF_INJECTION_LOGS on the opt-in seed and pipeline verification. The logged title is passed
       through LogSanitizer.forLog, but FindSecBugs does not recognize that helper as a sanitizer
-      through the static-import indirection in this class (it accepts the same helper in the
-      integration clients). Test-only seed code; the value is genuinely scrubbed.
+      through the static-import indirection in these classes (it accepts the same helper in the
+      integration clients). Test-only verification code; the value is genuinely scrubbed.
     -->
     <Match>
         <Bug pattern="CRLF_INJECTION_LOGS"/>
         <Class name="com.betterreads.catalog.CatalogOpenLibrarySeedVerification"/>
+    </Match>
+    <Match>
+        <Bug pattern="CRLF_INJECTION_LOGS"/>
+        <Class name="com.betterreads.catalog.CatalogPipelineLiveE2eTest"/>
+    </Match>
+    <Match>
+        <Bug pattern="CRLF_INJECTION_LOGS"/>
+        <Class name="com.betterreads.catalog.CatalogPipelineLocalDbVerification"/>
     </Match>
 
     <!--

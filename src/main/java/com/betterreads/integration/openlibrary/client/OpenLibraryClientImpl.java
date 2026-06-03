@@ -1,5 +1,6 @@
 package com.betterreads.integration.openlibrary.client;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 
@@ -40,6 +41,12 @@ public class OpenLibraryClientImpl implements OpenLibraryClient {
     private static final String SEARCH_FIELDS =
         "key,title,subtitle,author_name,first_publish_year,cover_i,isbn,language";
 
+    private static final String LIMIT_PARAM = "limit";
+
+    private static final String FIELDS_PARAM = "fields";
+
+    private static final String SEARCH_4XX_LOG = "OpenLibrary search returned 4xx status={}";
+
     private static final String WORKS_PREFIX = "/works/";
 
     private final WebClient openLibraryWebClient;
@@ -61,15 +68,43 @@ public class OpenLibraryClientImpl implements OpenLibraryClient {
 
     @Override
     public Optional<SourceBook> fetchByIsbn(final String isbn) {
-        return search(builder -> builder.queryParam("q", "isbn:" + isbn))
+        return firstMatch(builder -> builder.queryParam("q", "isbn:" + isbn))
             .flatMap(this::enrichAndMap);
     }
 
     @Override
     public Optional<SourceBook> fetchByTitleAuthor(final String title, final String author) {
-        return search(builder -> builder.queryParam("title", title).queryParam("author", author))
+        return firstMatch(builder -> builder.queryParam("title", title).queryParam("author", author))
             .filter(doc -> titleMatches(doc, title))
             .flatMap(this::enrichAndMap);
+    }
+
+    @Override
+    public List<SourceBook> search(final String query, final int limit) {
+        try {
+            final SearchResponse response = openLibraryWebClient.get()
+                .uri(builder -> builder.path(SEARCH_PATH)
+                    .queryParam("q", query)
+                    .queryParam(LIMIT_PARAM, limit)
+                    .queryParam(FIELDS_PARAM, SEARCH_FIELDS)
+                    .build())
+                .retrieve()
+                .bodyToMono(SearchResponse.class)
+                .block();
+            if (response == null || response.docs() == null) {
+                return List.of();
+            }
+            return response.docs().stream()
+                .map(doc -> mapper.toSourceBook(doc, null))
+                .filter(book -> book != null)
+                .toList();
+        } catch (WebClientResponseException ex) {
+            if (ex.getStatusCode().is4xxClientError()) {
+                LOG.debug(SEARCH_4XX_LOG, ex.getStatusCode().value());
+                return List.of();
+            }
+            throw ex;
+        }
     }
 
     @Override
@@ -89,13 +124,13 @@ public class OpenLibraryClientImpl implements OpenLibraryClient {
         return Optional.ofNullable(mapper.toSourceBook(doc, work));
     }
 
-    private Optional<SearchDoc> search(final Consumer<UriBuilder> queryCustomizer) {
+    private Optional<SearchDoc> firstMatch(final Consumer<UriBuilder> queryCustomizer) {
         try {
             final SearchResponse response = openLibraryWebClient.get()
                 .uri(builder -> {
                     builder.path(SEARCH_PATH)
-                        .queryParam("limit", 1)
-                        .queryParam("fields", SEARCH_FIELDS);
+                        .queryParam(LIMIT_PARAM, 1)
+                        .queryParam(FIELDS_PARAM, SEARCH_FIELDS);
                     queryCustomizer.accept(builder);
                     return builder.build();
                 })
@@ -108,7 +143,7 @@ public class OpenLibraryClientImpl implements OpenLibraryClient {
             return Optional.ofNullable(response.docs().get(0));
         } catch (WebClientResponseException ex) {
             if (ex.getStatusCode().is4xxClientError()) {
-                LOG.debug("OpenLibrary search returned 4xx status={}", ex.getStatusCode().value());
+                LOG.debug(SEARCH_4XX_LOG, ex.getStatusCode().value());
                 return Optional.empty();
             }
             throw ex;
