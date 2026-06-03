@@ -86,7 +86,26 @@ public class PendingBookService {
         if (row == null) {
             return;
         }
-        final MergedBook collected = sourceCollector.collectFor(mapper.toSourceBook(row));
-        promoter.promote(dedupKey, collected);
+        final SourceBook staged = mapper.toSourceBook(row);
+        final MergedBook collected = sourceCollector.collectFor(staged);
+        promoter.promote(dedupKey, keepStagedSignals(collected, staged));
+    }
+
+    /**
+     * Restores the rating and series the candidate was staged with when the collect re-merge dropped
+     * them. Promotion rebuilds the staged row as a single OpenLibrary-tagged book, but the merger
+     * resolves rating and series only from Hardcover and Wikidata, so those staged signals would
+     * otherwise be lost on every promotion.
+     */
+    private static MergedBook keepStagedSignals(final MergedBook collected, final SourceBook staged) {
+        final SourceBook book = collected.book();
+        final SourceBook restored = book.toBuilder()
+            .averageRating(book.averageRating() == null ? staged.averageRating() : book.averageRating())
+            .ratingCount(book.ratingCount() == null ? staged.ratingCount() : book.ratingCount())
+            .seriesName(book.seriesName() == null ? staged.seriesName() : book.seriesName())
+            .seriesPosition(
+                book.seriesPosition() == null ? staged.seriesPosition() : book.seriesPosition())
+            .build();
+        return collected.withBook(restored);
     }
 }

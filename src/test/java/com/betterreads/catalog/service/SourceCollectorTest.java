@@ -7,6 +7,8 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 /**
  * Unit tests for {@link SourceCollector}. A staged book carries only the discovery source's data;
@@ -25,6 +27,14 @@ class SourceCollectorTest {
 
     private static final String HUGO = "Hugo Award";
 
+    private static final int YEAR = 1965;
+
+    private static final int HTTP_SERVER_ERROR = 503;
+
+    private static final String HARDCOVER_ID = "123";
+
+    private static final String SERIES = "Dune Saga";
+
     @Test
     @DisplayName("fetches every source by ISBN and merges them with the seed")
     void collectsAllSourcesByIsbn() {
@@ -38,8 +48,9 @@ class SourceCollectorTest {
             .title(TITLE)
             .averageRating(HARDCOVER_RATING)
             .build();
-        final SourceCollector collector = new SourceCollector(
-            new SourceMerger(), List.of(stubByIsbn(BookFieldSource.HARDCOVER, ISBN, hardcoverHit)));
+        final SourceCollector collector = new SourceCollector(new SourceMerger(),
+            new RequiredFieldsCheck(),
+            List.of(stubByIsbn(BookFieldSource.HARDCOVER, ISBN, hardcoverHit)));
 
         final MergedBook merged = collector.collectFor(seed);
 
@@ -61,8 +72,8 @@ class SourceCollectorTest {
             .title(TITLE)
             .awards(List.of(HUGO))
             .build();
-        final SourceCollector collector = new SourceCollector(
-            new SourceMerger(), List.of(stubByTitleAuthor(TITLE, AUTHOR, wikidataHit)));
+        final SourceCollector collector = new SourceCollector(new SourceMerger(),
+            new RequiredFieldsCheck(), List.of(stubByTitleAuthor(TITLE, AUTHOR, wikidataHit)));
 
         final MergedBook merged = collector.collectFor(seed);
 
@@ -78,14 +89,96 @@ class SourceCollectorTest {
             .isbn13(ISBN)
             .title(TITLE)
             .build();
-        final SourceCollector collector = new SourceCollector(
-            new SourceMerger(), List.of(stubByIsbn(BookFieldSource.HARDCOVER, "other-isbn", null)));
+        final SourceCollector collector = new SourceCollector(new SourceMerger(),
+            new RequiredFieldsCheck(),
+            List.of(stubByIsbn(BookFieldSource.HARDCOVER, "other-isbn", null)));
 
         final MergedBook merged = collector.collectFor(seed);
 
         assertThat(merged.book().title())
             .as("a non-matching source drops out; the seed still produces a merged book")
             .isEqualTo(TITLE);
+    }
+
+    @Test
+    @DisplayName("the seed's own source is not called again; its rating and series are kept")
+    void skipsSeedsOwnSource() {
+        final SourceBook seed = SourceBook.builder(BookFieldSource.HARDCOVER)
+            .hardcoverId(HARDCOVER_ID)
+            .title(TITLE)
+            .authors(SourceAuthor.ofNames(List.of(AUTHOR)))
+            .averageRating(HARDCOVER_RATING)
+            .seriesName(SERIES)
+            .seriesPosition(YEAR)
+            .build();
+        final SourceCollector collector = new SourceCollector(new SourceMerger(),
+            new RequiredFieldsCheck(), List.of(failingByTitleAuthor(BookFieldSource.HARDCOVER)));
+
+        final MergedBook merged = collector.collectFor(seed);
+
+        assertThat(merged.book())
+            .as("the Hardcover seed is trusted as is; its rating and series survive the merge")
+            .satisfies(book -> {
+                assertThat(book.averageRating()).isEqualTo(HARDCOVER_RATING);
+                assertThat(book.seriesName()).isEqualTo(SERIES);
+            });
+    }
+
+    @Test
+    @DisplayName("a seed that already has the show fields calls no source at all")
+    void stopsWhenGatePasses() {
+        final SourceBook seed = SourceBook.builder(BookFieldSource.HARDCOVER)
+            .hardcoverId(HARDCOVER_ID)
+            .isbn13(ISBN)
+            .title(TITLE)
+            .authors(SourceAuthor.ofNames(List.of(AUTHOR)))
+            .description("A long enough description to pass the show bar comfortably.")
+            .coverUrl("https://example.com/c.jpg")
+            .publicationYear(YEAR)
+            .build();
+        final SourceCollector collector = new SourceCollector(new SourceMerger(),
+            new RequiredFieldsCheck(), List.of(
+                failingByTitleAuthor(BookFieldSource.GOOGLE_BOOKS),
+                failingByTitleAuthor(BookFieldSource.OPEN_LIBRARY)));
+
+        final MergedBook merged = collector.collectFor(seed);
+
+        assertThat(merged.book().title())
+            .as("the seed is already showable, so no enrichment source is called")
+            .isEqualTo(TITLE);
+    }
+
+    @Test
+    @DisplayName("one source's 5xx is isolated; the other sources still merge into the book")
+    void isolatesSourceFailure() {
+        final SourceBook seed = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+            .isbn13(ISBN)
+            .title(TITLE)
+            .build();
+        final SourceBook hardcoverHit = SourceBook.builder(BookFieldSource.HARDCOVER)
+            .isbn13(ISBN)
+            .averageRating(HARDCOVER_RATING)
+            .build();
+        final SourceCollector collector = new SourceCollector(new SourceMerger(),
+            new RequiredFieldsCheck(), List.of(
+                failingByIsbn(BookFieldSource.GOOGLE_BOOKS),
+                stubByIsbn(BookFieldSource.HARDCOVER, ISBN, hardcoverHit)));
+
+        final MergedBook merged = collector.collectFor(seed);
+
+        assertThat(merged.book().averageRating())
+            .as("a 503 from one source must not stop the others from enriching the book")
+            .isEqualTo(HARDCOVER_RATING);
+    }
+
+    private static BookSourceClient failingByIsbn(final BookFieldSource source) {
+        return new StubClient(source) {
+            @Override
+            public Optional<SourceBook> fetchByIsbn(final String isbn) {
+                throw WebClientResponseException.create(
+                    HTTP_SERVER_ERROR, "Service Unavailable", HttpHeaders.EMPTY, new byte[0], null);
+            }
+        };
     }
 
     private static BookSourceClient stubByIsbn(
@@ -100,11 +193,26 @@ class SourceCollectorTest {
 
     private static BookSourceClient stubByTitleAuthor(
         final String matchTitle, final String matchAuthor, final SourceBook hit) {
-        return new StubClient(BookFieldSource.WIKIDATA) {
+        return stubByTitleAuthor(BookFieldSource.WIKIDATA, matchTitle, matchAuthor, hit);
+    }
+
+    private static BookSourceClient stubByTitleAuthor(
+        final BookFieldSource source, final String matchTitle, final String matchAuthor,
+        final SourceBook hit) {
+        return new StubClient(source) {
             @Override
             public Optional<SourceBook> fetchByTitleAuthor(final String title, final String author) {
                 return matchTitle.equals(title) && matchAuthor.equals(author)
                     ? Optional.ofNullable(hit) : Optional.empty();
+            }
+        };
+    }
+
+    private static BookSourceClient failingByTitleAuthor(final BookFieldSource source) {
+        return new StubClient(source) {
+            @Override
+            public Optional<SourceBook> fetchByTitleAuthor(final String title, final String author) {
+                throw new AssertionError("this source must not be called: " + source);
             }
         };
     }

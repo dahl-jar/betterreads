@@ -109,6 +109,32 @@ public record SourceBook(
         return new Builder(source);
     }
 
+    /** Returns a builder pre-filled with this book's fields, for deriving a near-copy. */
+    public Builder toBuilder() {
+        return new Builder(source)
+            .isbn13(isbn13)
+            .openLibraryWorkKey(openLibraryWorkKey)
+            .googleBooksVolumeId(googleBooksVolumeId)
+            .wikidataQid(wikidataQid)
+            .locLccn(locLccn)
+            .hardcoverId(hardcoverId)
+            .title(title)
+            .subtitle(subtitle)
+            .description(description)
+            .publicationYear(publicationYear)
+            .publisher(publisher)
+            .pageCount(pageCount)
+            .language(language)
+            .coverUrl(coverUrl)
+            .authors(authors)
+            .rawSubjects(rawSubjects)
+            .awards(awards)
+            .averageRating(averageRating)
+            .ratingCount(ratingCount)
+            .seriesName(seriesName)
+            .seriesPosition(seriesPosition);
+    }
+
     /**
      * Builds a {@link SourceBook} field by field so a mapper sets only the fields its source
      * supplies, instead of passing positional nulls for the rest.

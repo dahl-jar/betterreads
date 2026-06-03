@@ -13,11 +13,12 @@ import com.betterreads.common.util.TextMatch;
 import com.betterreads.integration.hardcover.HardcoverClient;
 import com.betterreads.integration.hardcover.dto.GraphQlRequest;
 import com.betterreads.integration.hardcover.dto.HardcoverDocument;
-import com.betterreads.integration.hardcover.dto.SearchResponse;
+import com.betterreads.integration.hardcover.dto.TypesenseHits;
+import com.betterreads.integration.hardcover.dto.TypesenseSearchResponse;
 import com.betterreads.integration.hardcover.mapper.HardcoverMapper;
-import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -42,6 +43,9 @@ public class HardcoverClientImpl implements HardcoverClient {
           search(query: $q, query_type: "Book", per_page: 5, page: 1) { results }
         }
         """;
+
+    private static final ParameterizedTypeReference<TypesenseSearchResponse<HardcoverDocument>>
+        BOOK_HITS = new ParameterizedTypeReference<>() { };
 
     private static final Comparator<HardcoverDocument> BY_READ_COUNT =
         Comparator.comparingInt(HardcoverClientImpl::readCount);
@@ -85,12 +89,14 @@ public class HardcoverClientImpl implements HardcoverClient {
 
     private Optional<HardcoverDocument> search(final String query) {
         try {
-            final SearchResponse response = hardcoverWebClient.post()
+            final TypesenseSearchResponse<HardcoverDocument> response = hardcoverWebClient.post()
                 .bodyValue(new GraphQlRequest(SEARCH_QUERY, Map.of("q", query)))
                 .retrieve()
-                .bodyToMono(SearchResponse.class)
+                .bodyToMono(BOOK_HITS)
                 .block();
-            return bestHit(response);
+            return TypesenseHits.documents(response).stream()
+                .filter(document -> document.title() != null)
+                .max(BY_READ_COUNT);
         } catch (WebClientResponseException exception) {
             return recover(exception, query);
         }
@@ -110,22 +116,6 @@ public class HardcoverClientImpl implements HardcoverClient {
             return Optional.empty();
         }
         throw exception;
-    }
-
-    private static Optional<HardcoverDocument> bestHit(final @Nullable SearchResponse response) {
-        return hits(response).stream()
-            .map(SearchResponse.Hit::document)
-            .filter(document -> document != null && document.title() != null)
-            .max(BY_READ_COUNT);
-    }
-
-    private static List<SearchResponse.Hit> hits(final @Nullable SearchResponse response) {
-        return Optional.ofNullable(response)
-            .map(SearchResponse::data)
-            .map(SearchResponse.Data::search)
-            .map(SearchResponse.Search::results)
-            .map(SearchResponse.Results::hits)
-            .orElseGet(List::of);
     }
 
     private static int readCount(final HardcoverDocument document) {

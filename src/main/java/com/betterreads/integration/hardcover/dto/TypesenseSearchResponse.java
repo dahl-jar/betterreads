@@ -6,23 +6,24 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Hardcover GraphQL search response.
+ * Hardcover {@code search} response shared by the book, series, and author queries.
  *
- * <p>Chain: {@code data.search.results.hits[].document}. {@code results} is a typesense payload
- * the GraphQL schema types as {@code jsonb}; only the fields the mapper reads are bound here, the
- * rest are ignored.
+ * <p>Chain: {@code data.search.results.hits[].document}. {@code results} is a typesense payload the
+ * GraphQL schema types as {@code jsonb}; {@code D} is the document type each query binds.
+ *
+ * @param <D> the search document type
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record SearchResponse(@Nullable Data data) {
+public record TypesenseSearchResponse<D>(@Nullable Data<D> data) {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Data(@Nullable Search search) { }
+    public record Data<D>(@Nullable Search<D> search) { }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Search(@Nullable Results results) { }
+    public record Search<D>(@Nullable Results<D> results) { }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Results(@Nullable List<Hit> hits) {
+    public record Results<D>(@Nullable List<Hit<D>> hits) {
 
         public Results {
             if (hits != null) {
@@ -32,11 +33,11 @@ public record SearchResponse(@Nullable Data data) {
 
         @Override
         @Nullable
-        public List<Hit> hits() {
+        public List<Hit<D>> hits() {
             return hits == null ? null : List.copyOf(hits);
         }
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Hit(@Nullable HardcoverDocument document) { }
+    public record Hit<D>(@Nullable D document) { }
 }

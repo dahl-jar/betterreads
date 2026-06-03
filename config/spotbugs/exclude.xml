@@ -116,6 +116,21 @@
     </Match>
 
     <!--
+      CRLF_INJECTION_LOGS on the catalog source fan-out. These warn lines log a BookFieldSource enum
+      constant and an exception class name, never an external string. FindSecBugs taints the whole
+      log call because the surrounding objects came from an HTTP response, but neither logged value
+      can carry CRLF.
+    -->
+    <Match>
+        <Bug pattern="CRLF_INJECTION_LOGS"/>
+        <Class name="com.betterreads.catalog.service.SourceCollector"/>
+    </Match>
+    <Match>
+        <Bug pattern="CRLF_INJECTION_LOGS"/>
+        <Class name="com.betterreads.catalog.service.CatalogSearchService"/>
+    </Match>
+
+    <!--
       IMPROPER_UNICODE on the OpenLibrary title-drift guard. FindSecBugs flags any case-insensitive
       comparison as a Unicode case-folding risk. The comparison here is two book titles for a
       best-effort drift check, not a security token or authorization decision, so a Unicode

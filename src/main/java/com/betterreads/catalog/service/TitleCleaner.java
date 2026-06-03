@@ -18,12 +18,22 @@ public final class TitleCleaner {
     private static final Pattern EDITION_SUBTITLE =
         Pattern.compile("\\s*:\\s*[^:]*edition\\s*$", Pattern.CASE_INSENSITIVE);
 
+    private static final Pattern EDITION_VARIANT_PHRASE =
+        Pattern.compile("(?:the\\s+)?(?:deluxe|illustrated|annotated|collector'?s|anniversary)"
+            + "\\s+edition,?\\s*", Pattern.CASE_INSENSITIVE);
+
+    private static final Pattern SPLIT_PART_SUFFIX =
+        Pattern.compile(",?\\s+part\\s+(?:one|two|three|four|five|\\d+)\\s*$",
+            Pattern.CASE_INSENSITIVE);
+
     private TitleCleaner() {
     }
 
-    /** Returns the title with a trailing edition tag removed. */
+    /** Returns the title with edition tags and a trailing split-part suffix removed. */
     public static String clean(final String title) {
         final String withoutParenthetical = EDITION_PARENTHETICAL.matcher(title).replaceAll("");
-        return EDITION_SUBTITLE.matcher(withoutParenthetical).replaceAll("").strip();
+        final String withoutSubtitle = EDITION_SUBTITLE.matcher(withoutParenthetical).replaceAll("");
+        final String withoutVariant = EDITION_VARIANT_PHRASE.matcher(withoutSubtitle).replaceAll("");
+        return SPLIT_PART_SUFFIX.matcher(withoutVariant).replaceAll("").strip();
     }
 }

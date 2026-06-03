@@ -39,4 +39,9 @@ public record MergedBook(
     public @Nullable BookFieldSource provenanceOf(final BookField field) {
         return fieldSources.get(field);
     }
+
+    /** Returns a copy with the book replaced and the provenance unchanged. */
+    public MergedBook withBook(final SourceBook replacement) {
+        return new MergedBook(replacement, fieldSources, subjectSources);
+    }
 }
