@@ -3,11 +3,8 @@ package com.betterreads.integration.hardcover;
 import com.betterreads.catalog.service.SourceSeries;
 import java.util.Optional;
 
-/**
- * Resolves a series and its ordered volumes from Hardcover.
- *
- * <p>A DI seam with one implementation today, not a lambda target.
- */
+/** Resolves a series and its ordered volumes from Hardcover. */
+// PMD.ImplicitFunctionalInterface: a Spring service contract with a @Component impl that happens to have one method.
 @SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface HardcoverSeriesClient {
 
