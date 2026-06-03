@@ -15,6 +15,7 @@ import com.betterreads.catalog.repository.PendingBookRepository;
 import com.betterreads.catalog.service.BookFieldSource;
 import com.betterreads.catalog.service.MergedBook;
 import com.betterreads.catalog.service.PendingBookService;
+import com.betterreads.catalog.service.RequiredFieldsCheck;
 import com.betterreads.catalog.service.SourceAuthor;
 import com.betterreads.catalog.service.SourceBook;
 import com.betterreads.catalog.service.SourceCollector;
@@ -56,6 +57,10 @@ class PendingBookServiceIntegrationTest {
     private static final String OL_KEY = "OL893415W";
 
     private static final int YEAR = 1965;
+
+    private static final int SERIES_POSITION = 1;
+
+    private static final double RATING = 4.25;
 
     private static final String TITLE = "Dune";
 
@@ -189,6 +194,33 @@ class PendingBookServiceIntegrationTest {
             .satisfies(row -> assertThat(row.getStatus()).isEqualTo(STATUS_PENDING));
     }
 
+    @Test
+    @DisplayName("promotion keeps the Hardcover series and rating the candidate was staged with")
+    void promotionKeepsSeriesAndRating() {
+        pendingBookService.stage(merger.merge(List.of(completeDune(), hardcoverDune())));
+
+        pendingBookService.promoteReady();
+
+        assertThat(books.findByOpenLibraryWorkKey(OL_KEY))
+            .as("the staged series and rating must survive promotion into book")
+            .get()
+            .satisfies(book -> {
+                assertThat(book.getSeriesName()).isEqualTo(TITLE);
+                assertThat(book.getSeriesPosition()).isEqualTo(SERIES_POSITION);
+                assertThat(book.getAverageRating()).isNotNull();
+            });
+    }
+
+    private static SourceBook hardcoverDune() {
+        return SourceBook.builder(BookFieldSource.HARDCOVER)
+            .isbn13(ISBN)
+            .title(TITLE)
+            .seriesName(TITLE)
+            .seriesPosition(SERIES_POSITION)
+            .averageRating(RATING)
+            .build();
+    }
+
     private static SourceBook completeDune() {
         return SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
             .isbn13(ISBN)
@@ -220,7 +252,7 @@ class PendingBookServiceIntegrationTest {
         @Bean
         @Primary
         SourceCollector noNetworkSourceCollector(final SourceMerger merger) {
-            return new SourceCollector(merger, List.of());
+            return new SourceCollector(merger, new RequiredFieldsCheck(), List.of());
         }
     }
 }

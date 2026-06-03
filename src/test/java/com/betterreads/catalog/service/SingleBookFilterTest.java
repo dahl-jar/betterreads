@@ -19,8 +19,12 @@ class SingleBookFilterTest {
         "'The Wheel of Time, Books 1-4'",
         "'Wheel of Time, Books 5-9'",
         "'The Complete Wheel of Time Series Set'",
+        "'The Sandman Volumes 1-10 Box'",
         "'The Eye of the World (part 1/2)'",
-        "'The Great Hunt (part 2/2)'"
+        "'The Great Hunt (part 2/2)'",
+        "'The Way of Kings, Part 1'",
+        "'Rhythm of War Part One'",
+        "'The Stand: Part Two'"
     })
     @DisplayName("a boxed set, omnibus, or split-part edition is rejected")
     void rejectsCollectionsAndSplits(final String title) {

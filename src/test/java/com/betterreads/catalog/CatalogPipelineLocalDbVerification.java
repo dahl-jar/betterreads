@@ -2,19 +2,14 @@ package com.betterreads.catalog;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import com.betterreads.catalog.entity.Book;
 import com.betterreads.catalog.repository.BookRepository;
 import com.betterreads.catalog.repository.PendingBookRepository;
-import com.betterreads.common.util.LogSanitizer;
-import com.betterreads.catalog.service.BookSourceClient;
+import com.betterreads.catalog.service.CatalogSearchService;
 import com.betterreads.catalog.service.PendingBookService;
-import com.betterreads.catalog.service.SingleBookFilter;
-import com.betterreads.catalog.service.SourceBook;
-import com.betterreads.catalog.service.SourceMerger;
-import com.betterreads.integration.openlibrary.OpenLibraryClient;
+import com.betterreads.common.util.LogSanitizer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -24,18 +19,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 /**
- * Runs the whole catalog pipeline for the six-book slate against the locally-running compose
- * Postgres, so the merged rows stay in {@code book} for inspection with {@code psql} after the JVM
- * exits. Unlike the Testcontainers E2E, this writes to the real long-lived database.
+ * Runs the catalog search spine for the six series against the locally-running compose Postgres, so
+ * the staged and promoted rows stay in {@code book} for inspection with {@code psql} after the JVM
+ * exits.
  *
- * <p>Skipped unless {@code RUN_LOCAL_DB_VERIFICATION=1} AND {@code GOOGLE_BOOKS_API_KEY} are set;
+ * <p>Skipped unless {@code RUN_LOCAL_DB_VERIFICATION=1} and {@code GOOGLE_BOOKS_API_KEY} are set;
  * opt-in because it writes to a real database. Run with:
  * <pre>
  *   docker compose up -d db
  *   source .env &amp;&amp; RUN_LOCAL_DB_VERIFICATION=1 ./gradlew test \
  *     --tests '*CatalogPipelineLocalDbVerification*'
  *   docker exec -it betterreads-db psql -U betterreads -d betterreads -c \
- *     "SELECT title, first_publish_year, average_rating, page_count FROM book ORDER BY title;"
+ *     "SELECT series_name, series_position, title FROM book ORDER BY series_name, series_position;"
  * </pre>
  */
 @SpringBootTest(properties = "betterreads.catalog.staging.poll-enabled=false")
@@ -47,24 +42,20 @@ class CatalogPipelineLocalDbVerification {
 
     private static final Logger LOG = LoggerFactory.getLogger(CatalogPipelineLocalDbVerification.class);
 
-    private static final int MAIN_SERIES_BOOKS = 14;
+    private static final int FIRST_POSITION = 1;
 
-    private static final List<Slate> SLATE = List.of(
-        new Slate("The Eye of the World", "Robert Jordan"),
-        new Slate("A Clash of Kings", "George R. R. Martin"),
-        new Slate("The Hobbit", "J.R.R. Tolkien"),
-        new Slate("Dune", "Frank Herbert"),
-        new Slate("The Sandman", "Neil Gaiman"),
-        new Slate("Watchmen", "Alan Moore"));
+    private static final String AUTHOR_QUERY = "Brandon Sanderson";
 
-    @Autowired
-    private List<BookSourceClient> sourceClients;
-
-    @Autowired
-    private OpenLibraryClient openLibraryClient;
+    private static final List<String> SERIES_QUERIES = List.of(
+        "the wheel of time",
+        "a song of ice and fire",
+        "the lord of the rings",
+        "dune",
+        "the sandman",
+        "watchmen");
 
     @Autowired
-    private SourceMerger merger;
+    private CatalogSearchService searchService;
 
     @Autowired
     private PendingBookService pendingBookService;
@@ -76,64 +67,75 @@ class CatalogPipelineLocalDbVerification {
     private BookRepository books;
 
     @Test
-    @DisplayName("the slate flows from live sources into the local book table, with the merged fields logged per book")
-    void slateLandsInLocalDb() {
+    @DisplayName("the six series resolve through the spine into the local book table with real field values")
+    void seriesLandInLocalDb() {
         pendingBooks.deleteAll();
         books.deleteAll();
 
-        for (final Slate slate : SLATE) {
-            stageFromLiveSources(slate);
+        for (final String query : SERIES_QUERIES) {
+            searchService.searchAndStage(query);
         }
         pendingBookService.promoteReady();
 
-        for (final Book book : books.findAll()) {
-            LOG.info("catalog.localdb {} | year={} rating={} pages={} cover={} isbn={}",
+        final List<Book> stored = books.findAll();
+        for (final Book book : stored) {
+            LOG.info("catalog.localdb series={} pos={} {} | year={} rating={} cover={}",
+                LogSanitizer.forLog(book.getSeriesName()),
+                book.getSeriesPosition(),
                 LogSanitizer.forLog(book.getTitle()),
                 book.getFirstPublishYear(),
                 book.getAverageRating(),
-                book.getPageCount(),
-                book.getCoverUrl() != null,
-                book.getIsbn() != null);
+                book.getCoverUrl() != null);
         }
-        assertThat(books.count())
-            .as("at least one slate book must reach the local catalog")
-            .isGreaterThanOrEqualTo(1L);
-    }
 
-    private void stageFromLiveSources(final Slate slate) {
-        final List<SourceBook> sources = new ArrayList<>();
-        for (final BookSourceClient client : sourceClients) {
-            client.fetchByTitleAuthor(slate.title(), slate.author()).ifPresent(sources::add);
-        }
-        if (sources.isEmpty()) {
-            LOG.warn("catalog.localdb no source returned {}", LogSanitizer.forLog(slate.title()));
-            return;
-        }
-        pendingBookService.stage(merger.merge(sources));
+        assertThat(stored)
+            .as("every stored book carries a title and a publication year, the show fields")
+            .allSatisfy(book -> assertThat(book)
+                .extracting(Book::getTitle, Book::getFirstPublishYear)
+                .doesNotContainNull());
+
+        assertThat(stored)
+            .as("a series volume keeps the series name, ordered position, and rating from the spine")
+            .anySatisfy(book -> assertThat(book)
+                .satisfies(value -> {
+                    assertThat(value.getSeriesName()).isEqualTo("The Wheel of Time");
+                    assertThat(value.getSeriesPosition()).isEqualTo(FIRST_POSITION);
+                    assertThat(value.getTitle()).isEqualTo("The Eye of the World");
+                    assertThat(value.getAverageRating()).isNotNull();
+                }));
     }
 
     @Test
-    @DisplayName("a Wheel of Time search keeps the single novels and drops the collections")
-    void wheelOfTimeSearchReturnsTheSeries() {
-        final List<SourceBook> hits = openLibraryClient.search("The Wheel of Time Robert Jordan", 30);
-        final List<SourceBook> singleBooks = hits.stream()
-            .filter(hit -> hit.title() != null && SingleBookFilter.isSingleBook(hit.title()))
-            .toList();
+    @DisplayName("an author search resolves Brandon Sanderson's books into the local book table, clean")
+    void authorBooksLandInLocalDb() {
+        pendingBooks.deleteAll();
+        books.deleteAll();
 
-        for (final SourceBook hit : singleBooks) {
-            LOG.info("catalog.series {}", LogSanitizer.forLog(hit.title()));
+        searchService.searchAuthorAndStage(AUTHOR_QUERY);
+        pendingBookService.promoteReady();
+
+        final List<Book> stored = books.findAll();
+        for (final Book book : stored) {
+            LOG.info("catalog.localdb.author {} | year={} rating={} isbn={} cover={}",
+                LogSanitizer.forLog(book.getTitle()),
+                book.getFirstPublishYear(),
+                book.getAverageRating(),
+                book.getIsbn() != null,
+                book.getCoverUrl() != null);
         }
-        LOG.info("catalog.series.summary {} hits, {} single books after filtering",
-            hits.size(), singleBooks.size());
-        assertThat(singleBooks)
-            .as("the fourteen main novels are distinct single books, kept after filtering collections")
-            .hasSizeGreaterThanOrEqualTo(MAIN_SERIES_BOOKS);
-        assertThat(singleBooks)
-            .extracting(SourceBook::title)
-            .anySatisfy(title -> assertThat(title).contains("Eye of the World"))
-            .noneSatisfy(title -> assertThat(title).contains("Boxed Set"));
-    }
 
-    private record Slate(String title, String author) {
+        assertThat(stored)
+            .as("each of the author's books carries a title, year, and ISBN, with no edition or split noise")
+            .isNotEmpty()
+            .allSatisfy(book -> {
+                assertThat(book.getTitle())
+                    .doesNotContainIgnoringCase("audiobook", "deluxe edition", "boxed set")
+                    .doesNotContainIgnoringCase(", part 1", "part one", "trilogy");
+                assertThat(book.getFirstPublishYear()).isNotNull();
+                assertThat(book.getIsbn()).isNotNull();
+            });
+        assertThat(stored)
+            .as("a headline Sanderson novel resolves")
+            .anySatisfy(book -> assertThat(book.getTitle()).isEqualTo("The Way of Kings"));
     }
 }

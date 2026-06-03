@@ -15,9 +15,10 @@ public final class SingleBookFilter {
 
     private static final List<Pattern> COLLECTION_MARKERS = List.of(
         Pattern.compile("box(?:ed)?\\s+set", Pattern.CASE_INSENSITIVE),
-        Pattern.compile("books\\s+\\d+\\s*-\\s*\\d+", Pattern.CASE_INSENSITIVE),
+        Pattern.compile("(?:books|volumes)\\s+\\d+\\s*-\\s*\\d+", Pattern.CASE_INSENSITIVE),
         Pattern.compile("complete\\b.*\\bset", Pattern.CASE_INSENSITIVE),
-        Pattern.compile("\\(part\\s+\\d+/\\d+\\)", Pattern.CASE_INSENSITIVE));
+        Pattern.compile("\\(part\\s+\\d+/\\d+\\)", Pattern.CASE_INSENSITIVE),
+        Pattern.compile("\\bpart\\s+(?:one|two|three|four|five|\\d+)\\b", Pattern.CASE_INSENSITIVE));
 
     private SingleBookFilter() {
     }

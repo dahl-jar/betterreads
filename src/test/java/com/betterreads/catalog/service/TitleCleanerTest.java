@@ -23,7 +23,11 @@ class TitleCleanerTest {
         "'The Great Hunt (The Wheel of Time Book 2)',        'The Great Hunt'",
         "'Sandman (Deluxe Edition)',                         'Sandman'",
         "'The Hobbit: Illustrated Edition',                  'The Hobbit'",
-        "'The Hobbit: 75th Anniversary Edition',            'The Hobbit'"
+        "'The Hobbit: 75th Anniversary Edition',            'The Hobbit'",
+        "'The Sandman: The Deluxe Edition Book Three',       'The Sandman: Book Three'",
+        "'The Sandman: The Deluxe Edition, Book One',        'The Sandman: Book One'",
+        "'Rhythm of War Part One',                           'Rhythm of War'",
+        "'The Way of Kings, Part 1',                         'The Way of Kings'"
     })
     @DisplayName("a trailing tag carrying an edition or book-number marker is stripped")
     void stripsEditionAndBookNumberTags(final String raw, final String expected) {

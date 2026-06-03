@@ -40,7 +40,7 @@ public class SourceMerger {
 
     private static final List<BookFieldSource> YEAR_CHAIN = List.of(
         BookFieldSource.OPEN_LIBRARY, BookFieldSource.GOOGLE_BOOKS,
-        BookFieldSource.WIKIDATA, BookFieldSource.LOC);
+        BookFieldSource.WIKIDATA, BookFieldSource.LOC, BookFieldSource.HARDCOVER);
 
     private static final List<BookFieldSource> PUBLISHER_CHAIN =
         List.of(BookFieldSource.GOOGLE_BOOKS);

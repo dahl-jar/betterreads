@@ -1,52 +1,92 @@
 package com.betterreads.catalog.service;
 
-import java.util.List;
+import java.util.Optional;
 
+import com.betterreads.integration.hardcover.HardcoverAuthorClient;
+import com.betterreads.integration.hardcover.HardcoverSeriesClient;
 import com.betterreads.integration.openlibrary.OpenLibraryClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 
 /**
- * Turns a user search into staged candidates. Each matching book from the discovery source becomes
- * its own pending candidate, so a series query stages every volume. The poll later collects the
- * remaining sources for each candidate and promotes the complete ones.
+ * Turns a user search into staged candidates.
  *
- * <p>OpenLibrary is the discovery source because its search returns the cleanest work-level hits.
- * The other sources are not searched here; they fill each candidate in during collection, keyed by
- * the candidate's identifiers, which avoids matching the same book across sources by fuzzy title.
+ * <p>A series query resolves to a Hardcover series and stages one candidate per volume; an author
+ * query resolves to a Hardcover author and stages one per book. Both fill each book across the other
+ * sources by title and author. A series query with no match falls back to a single OpenLibrary hit,
+ * so a standalone book still stages.
  */
 @Service
 public class CatalogSearchService {
 
-    private static final int SEARCH_LIMIT = 20;
+    private static final Logger LOG = LoggerFactory.getLogger(CatalogSearchService.class);
+
+    private static final int FALLBACK_SEARCH_LIMIT = 5;
+
+    private final HardcoverSeriesClient seriesClient;
+
+    private final HardcoverAuthorClient authorClient;
 
     private final OpenLibraryClient openLibraryClient;
 
-    private final SourceMerger merger;
+    private final SourceCollector sourceCollector;
 
     private final PendingBookService pendingBookService;
 
     public CatalogSearchService(
+        final HardcoverSeriesClient seriesClient,
+        final HardcoverAuthorClient authorClient,
         final OpenLibraryClient openLibraryClient,
-        final SourceMerger merger,
+        final SourceCollector sourceCollector,
         final PendingBookService pendingBookService
     ) {
+        this.seriesClient = seriesClient;
+        this.authorClient = authorClient;
         this.openLibraryClient = openLibraryClient;
-        this.merger = merger;
+        this.sourceCollector = sourceCollector;
         this.pendingBookService = pendingBookService;
     }
 
-    /** Stages one pending candidate per single book matching the query, skipping collections. */
+    /** Stages a candidate for each volume of the matching series, or one for a standalone book. */
     public void searchAndStage(final String query) {
-        final List<SourceBook> hits = openLibraryClient.search(query, SEARCH_LIMIT);
-        for (final SourceBook hit : hits) {
-            if (isSingleBook(hit)) {
-                pendingBookService.stage(merger.merge(List.of(hit)));
-            }
+        final Optional<SourceSeries> series = seriesClient.fetchSeries(query);
+        if (series.isPresent()) {
+            stageSeries(series.get());
+            return;
+        }
+        stageStandalone(query);
+    }
+
+    /** Stages a candidate for each book of the matching author. */
+    public void searchAuthorAndStage(final String query) {
+        authorClient.fetchAuthorWorks(query)
+            .ifPresent(works -> works.books().forEach(this::stage));
+    }
+
+    private void stageSeries(final SourceSeries series) {
+        for (final SourceSeriesVolume volume : series.volumes()) {
+            stage(volume.book());
         }
     }
 
-    private static boolean isSingleBook(final SourceBook hit) {
-        final String title = hit.title();
-        return title != null && SingleBookFilter.isSingleBook(title);
+    private void stageStandalone(final String query) {
+        openLibraryClient.search(query, FALLBACK_SEARCH_LIMIT).stream()
+            .filter(hit -> hit.title() != null && SingleBookFilter.isSingleBook(hit.title()))
+            .findFirst()
+            .ifPresent(this::stage);
+    }
+
+    private void stage(final SourceBook seed) {
+        try {
+            final MergedBook merged = sourceCollector.collectFor(seed);
+            if (merged.book().dedupKey() != null) {
+                pendingBookService.stage(merged);
+            }
+        } catch (DataAccessException ex) {
+            LOG.warn("catalog.search staging failed for source {} ({}), skipping it",
+                seed.source(), ex.getClass().getSimpleName());
+        }
     }
 }
