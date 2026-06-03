@@ -5,6 +5,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.betterreads.catalog.service.BookFieldSource;
+import com.betterreads.catalog.service.CatalogGenres;
 import com.betterreads.catalog.service.SourceAuthor;
 import com.betterreads.catalog.service.SourceBook;
 import com.betterreads.integration.googlebooks.dto.IndustryIdentifier;
@@ -20,7 +21,8 @@ import org.springframework.stereotype.Component;
  * count, so it is nulled. {@code industryIdentifiers} sometimes carries only an {@code ISBN_10},
  * never synthesized into an ISBN-13. {@code description} ships with embedded HTML
  * ({@code <p>}, {@code <b>}, {@code <i>}, {@code <br>}), stripped before persistence so the
- * tags do not leak into rendered catalog text.
+ * tags do not leak into rendered catalog text. {@code categories} are reduced to canonical genres
+ * like the other sources. Rating is not mapped; only Hardcover supplies a trustworthy rating.
  */
 @Component
 public class GoogleBooksMapper {
@@ -30,6 +32,8 @@ public class GoogleBooksMapper {
     private static final Pattern YEAR_PREFIX = Pattern.compile("^(\\d{4})");
 
     private static final String ISBN_13_TYPE = "ISBN_13";
+
+    private static final int MAX_SUBJECTS = 25;
 
     /** Returns the {@link SourceBook} projection of a Google Books volume, or null if unmappable. */
     public @Nullable SourceBook toSourceBook(final @Nullable Volume volume) {
@@ -48,10 +52,12 @@ public class GoogleBooksMapper {
             .pageCount(nullIfZero(info.pageCount()))
             .language(info.language())
             .authors(SourceAuthor.ofNames(info.authors()))
-            .rawCategories(info.categories())
-            .averageRating(info.averageRating())
-            .ratingCount(info.ratingsCount())
+            .rawSubjects(info.categories() == null ? null : canonicalSubjects(info.categories()))
             .build();
+    }
+
+    static List<String> canonicalSubjects(final @Nullable List<String> categories) {
+        return CatalogGenres.reduceToCanonical(categories, MAX_SUBJECTS);
     }
 
     static @Nullable String findIsbn13(final @Nullable List<IndustryIdentifier> identifiers) {

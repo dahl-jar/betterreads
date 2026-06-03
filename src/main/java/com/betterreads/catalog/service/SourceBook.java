@@ -35,7 +35,6 @@ public record SourceBook(
         @Nullable List<SourceAuthor> authors,
 
         @Nullable List<String> rawSubjects,
-        @Nullable List<String> rawCategories,
         @Nullable List<String> awards,
 
         @Nullable Double averageRating,
@@ -49,9 +48,6 @@ public record SourceBook(
         }
         if (rawSubjects != null) {
             rawSubjects = List.copyOf(rawSubjects);
-        }
-        if (rawCategories != null) {
-            rawCategories = List.copyOf(rawCategories);
         }
         if (awards != null) {
             awards = List.copyOf(awards);
@@ -72,12 +68,6 @@ public record SourceBook(
 
     @Override
     @Nullable
-    public List<String> rawCategories() {
-        return rawCategories == null ? null : List.copyOf(rawCategories);
-    }
-
-    @Override
-    @Nullable
     public List<String> awards() {
         return awards == null ? null : List.copyOf(awards);
     }
@@ -86,6 +76,32 @@ public record SourceBook(
     @Nullable
     public List<String> authorNames() {
         return authors == null ? null : authors.stream().map(SourceAuthor::name).toList();
+    }
+
+    /**
+     * Returns the first present source identifier, used as the staging dedup key, or null when no
+     * source supplied any identifier.
+     *
+     * <p>ISBN-13 is preferred because it is the identifier most sources share, so two sources for
+     * the same book collapse to one staging row.
+     */
+    public @Nullable String dedupKey() {
+        if (isbn13 != null) {
+            return isbn13;
+        }
+        if (openLibraryWorkKey != null) {
+            return openLibraryWorkKey;
+        }
+        if (googleBooksVolumeId != null) {
+            return googleBooksVolumeId;
+        }
+        if (hardcoverId != null) {
+            return hardcoverId;
+        }
+        if (locLccn != null) {
+            return locLccn;
+        }
+        return wikidataQid;
     }
 
     /** Returns a builder for the given source, with every other field unset. */
@@ -121,7 +137,6 @@ public record SourceBook(
         private @Nullable String coverUrl;
         private @Nullable List<SourceAuthor> authors;
         private @Nullable List<String> rawSubjects;
-        private @Nullable List<String> rawCategories;
         private @Nullable List<String> awards;
         private @Nullable Double averageRating;
         private @Nullable Integer ratingCount;
@@ -212,11 +227,6 @@ public record SourceBook(
             return this;
         }
 
-        public Builder rawCategories(final @Nullable List<String> value) {
-            this.rawCategories = value == null ? null : List.copyOf(value);
-            return this;
-        }
-
         public Builder awards(final @Nullable List<String> value) {
             this.awards = value == null ? null : List.copyOf(value);
             return this;
@@ -246,7 +256,7 @@ public record SourceBook(
             return new SourceBook(
                 source, isbn13, openLibraryWorkKey, googleBooksVolumeId, wikidataQid, locLccn,
                 hardcoverId, title, subtitle, description, publicationYear, publisher, pageCount,
-                language, coverUrl, authors, rawSubjects, rawCategories, awards, averageRating,
+                language, coverUrl, authors, rawSubjects, awards, averageRating,
                 ratingCount, seriesName, seriesPosition);
         }
     }

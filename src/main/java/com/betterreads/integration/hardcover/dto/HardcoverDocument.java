@@ -16,7 +16,6 @@ import tools.jackson.databind.annotation.JsonNaming;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonNaming(SnakeCaseStrategy.class)
-@SuppressWarnings("PMD.ShortVariable")
 public record HardcoverDocument(
     @Nullable String id,
     @Nullable String title,

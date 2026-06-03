@@ -2,6 +2,7 @@ package com.betterreads.integration.openlibrary;
 
 import com.betterreads.catalog.service.BookSourceClient;
 import com.betterreads.catalog.service.SourceBook;
+import java.util.List;
 import java.util.Optional;
 
 /** OpenLibrary HTTP client. */
@@ -13,4 +14,12 @@ public interface OpenLibraryClient extends BookSourceClient {
      * @param workKey work key with the {@code /works/} prefix stripped (e.g. {@code OL45883W})
      */
     Optional<SourceBook> fetchByWorkKey(String workKey);
+
+    /**
+     * Returns up to {@code limit} books matching the query, each a distinct work, for catalog
+     * search. Unlike the resolve-one fetches, this keeps every hit so a series query returns its
+     * volumes. The results carry only the search-level fields; description and subjects come from
+     * later per-book enrichment.
+     */
+    List<SourceBook> search(String query, int limit);
 }

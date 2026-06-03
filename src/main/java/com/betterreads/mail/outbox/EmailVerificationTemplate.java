@@ -37,7 +37,7 @@ class EmailVerificationTemplate {
     private String readToken(final String payload) {
         try {
             final JsonNode node = objectMapper.readTree(payload);
-            final String token = node.path("token").asText();
+            final String token = node.path("token").asString();
             if (token.isEmpty()) {
                 throw new IllegalStateException("email_verification payload missing token");
             }

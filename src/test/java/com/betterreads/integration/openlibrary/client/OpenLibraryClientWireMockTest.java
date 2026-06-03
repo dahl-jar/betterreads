@@ -5,6 +5,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
 import java.util.Optional;
 
 import com.betterreads.catalog.service.BookFieldSource;
@@ -98,6 +99,8 @@ class OpenLibraryClientWireMockTest {
           "subjects": ["Fantasy", "thrushes", "Fantasy fiction", "the one ring", "Classics"]
         }
         """;
+
+    private static final String EMPTY_SEARCH_JSON = "{\"numFound\": 0, \"docs\": []}";
 
     private static final String DRIFT_SEARCH_JSON = """
         {
@@ -203,6 +206,61 @@ class OpenLibraryClientWireMockTest {
     }
 
     @Nested
+    @DisplayName("search: multi-result discovery list")
+    class Search {
+
+        private static final int SEARCH_LIMIT = 10;
+
+        private static final int SERIES_HIT_COUNT = 3;
+
+        private static final String SERIES_SEARCH_JSON = """
+            {
+              "numFound": 3,
+              "docs": [
+                {"key": "/works/OL1W", "title": "The Eye of the World",
+                 "author_name": ["Robert Jordan"], "first_publish_year": 1990},
+                {"key": "/works/OL2W", "title": "The Great Hunt",
+                 "author_name": ["Robert Jordan"], "first_publish_year": 1990},
+                {"key": "/works/OL3W", "title": "The Dragon Reborn",
+                 "author_name": ["Robert Jordan"], "first_publish_year": 1991}
+              ]
+            }
+            """;
+
+        @Test
+        @DisplayName("a multi-hit search returns one SourceBook per hit, each with its work key")
+        void mapsEveryHit() {
+            WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH)).willReturn(json(SERIES_SEARCH_JSON)));
+
+            final List<SourceBook> results = client.search("The Wheel of Time", SEARCH_LIMIT);
+
+            assertThat(results)
+                .as("each series volume is a distinct book, not collapsed to one")
+                .hasSize(SERIES_HIT_COUNT)
+                .extracting(SourceBook::openLibraryWorkKey)
+                .containsExactly("OL1W", "OL2W", "OL3W");
+        }
+
+        @Test
+        @DisplayName("an empty docs array returns an empty list, not null")
+        void emptyResultIsEmptyList() {
+            WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH))
+                .willReturn(json(EMPTY_SEARCH_JSON)));
+
+            assertThat(client.search("nothing matches this", SEARCH_LIMIT)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("a 404 from search resolves to an empty list, not an exception")
+        void notFoundIsEmptyList() {
+            WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH))
+                .willReturn(aResponse().withStatus(HTTP_NOT_FOUND)));
+
+            assertThat(client.search("anything", SEARCH_LIMIT)).isEmpty();
+        }
+    }
+
+    @Nested
     @DisplayName("error handling")
     class ErrorHandling {
 
@@ -219,7 +277,7 @@ class OpenLibraryClientWireMockTest {
         @DisplayName("an empty docs array resolves to empty")
         void noDocsIsEmpty() {
             WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH))
-                .willReturn(json("{\"numFound\": 0, \"docs\": []}")));
+                .willReturn(json(EMPTY_SEARCH_JSON)));
 
             assertThat(client.fetchByTitleAuthor(MISSING_TITLE, MISSING_AUTHOR)).isEmpty();
         }

@@ -204,9 +204,6 @@ class LocMapperTest {
             assertThat(book.rawSubjects())
                 .as("the lcgft and fast genre elements reduce to canonical genres")
                 .containsExactlyInAnyOrder("science fiction", "fiction");
-            assertThat(book.rawCategories())
-                .as("genres must not be parked in rawCategories, which applyFrom ignores")
-                .isNull();
         }
     }
 }

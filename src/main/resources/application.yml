@@ -119,6 +119,9 @@ betterreads:
     deletion:
       grace-period-hours: ${AUTH_DELETION_GRACE_PERIOD_HOURS:720}
       scheduler-enabled: ${AUTH_DELETION_SCHEDULER_ENABLED:true}
+  catalog:
+    staging:
+      poll-enabled: ${CATALOG_STAGING_POLL_ENABLED:true}
 
 openlibrary:
   base-url: ${OPENLIBRARY_BASE_URL:https://openlibrary.org}

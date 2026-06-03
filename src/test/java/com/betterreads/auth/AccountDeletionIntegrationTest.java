@@ -37,6 +37,7 @@ import org.springframework.web.context.WebApplicationContext;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -70,7 +71,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "mail.app-base-url=https://test.example.com",
     "mail.outbox.worker-enabled=false"
 })
-@SuppressWarnings("PMD.TooManyMethods")
+@SuppressWarnings({"PMD.TooManyMethods", "PMD.ExcessiveImports"})
 class AccountDeletionIntegrationTest {
 
     private static final String REGISTER_URL = "/api/v1/auth/register";
@@ -115,7 +116,7 @@ class AccountDeletionIntegrationTest {
 
     @Container
     @ServiceConnection
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17");
+    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(DockerImageName.parse("postgres:17"));
 
     @Autowired
     private WebApplicationContext webApplicationContext;
@@ -382,7 +383,7 @@ class AccountDeletionIntegrationTest {
             .andExpect(status().isOk())
             .andReturn();
         final String body = result.getResponse().getContentAsString();
-        final String accessToken = objectMapper.readTree(body).at("/accessToken").asText();
+        final String accessToken = objectMapper.readTree(body).at("/accessToken").asString();
         final String setCookie = result.getResponse().getHeader(SET_COOKIE_HEADER);
         if (setCookie == null) {
             throw new IllegalStateException("login response is missing the Set-Cookie header");
