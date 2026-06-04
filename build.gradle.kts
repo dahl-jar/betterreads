@@ -50,6 +50,7 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
 	implementation("org.springframework.boot:spring-boot-starter-cache")
 	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+	implementation("org.springframework.boot:spring-boot-starter-data-redis")
 	implementation("org.springframework.boot:spring-boot-starter-security")
 	implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
 	implementation("org.springframework.boot:spring-boot-starter-validation")
@@ -72,6 +73,7 @@ dependencies {
 	runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
 
 	implementation("com.bucket4j:bucket4j_jdk17-core:8.14.0")
+	implementation("com.bucket4j:bucket4j_jdk17-lettuce:8.14.0")
 	implementation("com.meilisearch.sdk:meilisearch-java:0.14.5")
 
 	annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
@@ -90,6 +92,7 @@ dependencies {
 	testImplementation("org.springframework.security:spring-security-test")
 	testImplementation("org.testcontainers:testcontainers-junit-jupiter")
 	testImplementation("org.testcontainers:testcontainers-postgresql")
+	testImplementation("org.testcontainers:testcontainers")
 	testImplementation("org.wiremock:wiremock-standalone:3.13.2")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 	testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")

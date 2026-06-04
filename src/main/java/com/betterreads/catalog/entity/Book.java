@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import com.betterreads.catalog.service.SourceBook;
 import org.jspecify.annotations.Nullable;
@@ -43,6 +44,9 @@ public class Book {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "book_id")
     private Long bookId;
+
+    @Column(name = "dedup_key", nullable = false, unique = true)
+    private String dedupKey;
 
     @Column(name = "open_library_work_key", unique = true)
     @Nullable
@@ -176,6 +180,26 @@ public class Book {
         replaceSubjects(source.rawSubjects());
         replaceAwards(source.awards());
         accrueFrom(source);
+        assignDedupKey();
+    }
+
+    /**
+     * Sets the public key once, to the first present source identifier in the staging order, so the
+     * key stays stable even when a later source supplies a higher-precedence id.
+     *
+     * @throws IllegalArgumentException if the source carries no identifier to key the book on
+     */
+    private void assignDedupKey() {
+        if (this.dedupKey != null) {
+            return;
+        }
+        this.dedupKey = Stream.of(
+                this.isbn, this.openLibraryWorkKey, this.googleBooksVolumeId,
+                this.hardcoverId, this.locLccn, this.wikidataQid)
+            .filter(id -> id != null)
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException(
+                "book has no source identifier to key on; cannot promote a book with no id"));
     }
 
     /** Fills source ids and the rating and series fields without overwriting a set value with null. */
@@ -248,6 +272,14 @@ public class Book {
 
     public void setWikidataQid(@Nullable final String wikidataQid) {
         this.wikidataQid = wikidataQid;
+    }
+
+    public String getDedupKey() {
+        return dedupKey;
+    }
+
+    public void setDedupKey(final String dedupKey) {
+        this.dedupKey = dedupKey;
     }
 
     public Long getBookId() {

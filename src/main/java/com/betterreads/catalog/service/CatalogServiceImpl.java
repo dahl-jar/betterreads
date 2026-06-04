@@ -9,6 +9,7 @@ import com.betterreads.catalog.entity.Book;
 import com.betterreads.catalog.repository.AuthorRepository;
 import com.betterreads.catalog.repository.BookRepository;
 import org.jspecify.annotations.Nullable;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Persists external metadata into the local catalog. Identity per source comes from the
  * source-specific id column on {@code book}, so the upsert is a lookup-then-save in a single
- * transaction.
+ * transaction. Writing a book evicts its cached detail so a refreshed book is never served stale.
  */
 @Service
 public class CatalogServiceImpl implements CatalogService {
@@ -35,6 +36,7 @@ public class CatalogServiceImpl implements CatalogService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = "bookDetails", key = "#result.dedupKey")
     public Book upsertFromSource(final SourceBook source) {
         final Book book = findExistingForSource(source).orElseGet(Book::new);
         book.applyFrom(source);

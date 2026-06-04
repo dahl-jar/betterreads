@@ -18,10 +18,10 @@
         <exclude name="UnitTestContainsTooManyAsserts"/>
     </rule>
 
-    <!-- MockMvc's andExpect chain is a real assertion; PMD doesn't recognize it by default. -->
+    <!-- MockMvc's andExpect chain and Awaitility's untilAsserted are real assertions; PMD doesn't recognize them by default. -->
     <rule ref="category/java/bestpractices.xml/UnitTestShouldIncludeAssert">
         <properties>
-            <property name="extraAssertMethodNames" value="andExpect,andExpectAll,satisfies"/>
+            <property name="extraAssertMethodNames" value="andExpect,andExpectAll,satisfies,untilAsserted"/>
         </properties>
     </rule>
 

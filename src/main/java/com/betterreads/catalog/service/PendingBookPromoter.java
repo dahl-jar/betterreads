@@ -1,9 +1,12 @@
 package com.betterreads.catalog.service;
 
+import com.betterreads.catalog.entity.Book;
 import com.betterreads.catalog.entity.PendingBook;
+import com.betterreads.catalog.event.BookPromotedEvent;
 import com.betterreads.catalog.mapper.PendingBookMapper;
 import com.betterreads.catalog.repository.PendingBookRepository;
 import com.betterreads.catalog.service.RequiredFieldsCheck.MissingFields;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,16 +31,20 @@ public class PendingBookPromoter {
 
     private final PendingBookMapper mapper;
 
+    private final ApplicationEventPublisher events;
+
     public PendingBookPromoter(
         final PendingBookRepository pendingBooks,
         final CatalogService catalogService,
         final RequiredFieldsCheck requiredFields,
-        final PendingBookMapper mapper
+        final PendingBookMapper mapper,
+        final ApplicationEventPublisher events
     ) {
         this.pendingBooks = pendingBooks;
         this.catalogService = catalogService;
         this.requiredFields = requiredFields;
         this.mapper = mapper;
+        this.events = events;
     }
 
     /** Re-applies the collected merge to the candidate and promotes it when it is ready to show. */
@@ -50,8 +57,9 @@ public class PendingBookPromoter {
         mapper.applyTo(row, collected);
         final MissingFields missing = requiredFields.check(collected.book());
         if (missing.isReady()) {
-            catalogService.upsertFromSource(collected.book());
+            final Book promoted = catalogService.upsertFromSource(collected.book());
             row.setStatus(STATUS_PROMOTED);
+            events.publishEvent(new BookPromotedEvent(promoted.getDedupKey()));
         } else {
             row.setMissingFields(mapper.join(missing.missing()));
         }
