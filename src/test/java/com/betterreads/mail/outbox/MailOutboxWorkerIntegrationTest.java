@@ -1,5 +1,11 @@
 package com.betterreads.mail.outbox;
 
+import com.betterreads.support.ContainerizedTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -10,14 +16,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.TestPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -39,7 +41,11 @@ import static org.assertj.core.api.Assertions.assertThat;
     "mail.outbox.worker-enabled=false",
     "mail.outbox.max-attempts=3"
 })
-class MailOutboxWorkerIntegrationTest {
+class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
+
+    @Container
+    @ServiceConnection
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
 
     private static final int MAX_ATTEMPTS = 3;
 
@@ -48,10 +54,6 @@ class MailOutboxWorkerIntegrationTest {
     private static final String IDEMPOTENCY_PREFIX = "outbox-";
 
     private static final String TRANSIENT_ERROR = "temporary";
-
-    @Container
-    @ServiceConnection
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(DockerImageName.parse("postgres:17"));
 
     @Autowired
     private MailOutboxRepository repository;

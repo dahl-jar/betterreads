@@ -1,5 +1,11 @@
 package com.betterreads.catalog;
 
+import com.betterreads.support.ContainerizedTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
@@ -22,11 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 /**
  * Drives the whole catalog pipeline for the six-book slate against the live source APIs and a real
@@ -43,7 +45,11 @@ import org.testcontainers.utility.DockerImageName;
 })
 @Testcontainers
 @EnabledIfEnvironmentVariable(named = "GOOGLE_BOOKS_API_KEY", matches = ".+")
-class CatalogPipelineLiveE2eTest {
+class CatalogPipelineLiveE2eTest extends ContainerizedTest {
+
+    @Container
+    @ServiceConnection
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
 
     private static final Logger LOG = LoggerFactory.getLogger(CatalogPipelineLiveE2eTest.class);
 
@@ -56,10 +62,6 @@ class CatalogPipelineLiveE2eTest {
         new Slate("Dune", "Frank Herbert"),
         new Slate("The Sandman", "Neil Gaiman"),
         new Slate("Watchmen", "Alan Moore"));
-
-    @Container
-    @ServiceConnection
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(DockerImageName.parse("postgres:17"));
 
     @Autowired
     private List<BookSourceClient> sourceClients;

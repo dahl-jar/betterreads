@@ -1,5 +1,11 @@
 package com.betterreads.auth;
 
+import com.betterreads.support.ContainerizedTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
+
 import com.betterreads.auth.deletion.AccountDeletionSweep;
 import com.betterreads.auth.emailverification.EmailVerificationService;
 import com.betterreads.auth.passwordreset.PasswordResetService;
@@ -25,7 +31,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.web.FilterChainProxy;
@@ -34,10 +39,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -72,7 +74,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "mail.outbox.worker-enabled=false"
 })
 @SuppressWarnings({"PMD.TooManyMethods", "PMD.ExcessiveImports"})
-class AccountDeletionIntegrationTest {
+class AccountDeletionIntegrationTest extends ContainerizedTest {
+
+    @Container
+    @ServiceConnection
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
 
     private static final String REGISTER_URL = "/api/v1/auth/register";
 
@@ -113,10 +119,6 @@ class AccountDeletionIntegrationTest {
     private static final long IN_GRACE_HOURS_AGO = 1L;
 
     private static final long PAST_GRACE_HOURS_AGO = 7L;
-
-    @Container
-    @ServiceConnection
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(DockerImageName.parse("postgres:17"));
 
     @Autowired
     private WebApplicationContext webApplicationContext;
