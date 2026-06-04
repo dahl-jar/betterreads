@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Map;
 
-import com.betterreads.catalog.service.SourceAuthor;
-import com.betterreads.catalog.service.SourceBook;
+import com.betterreads.catalog.service.source.SourceAuthor;
+import com.betterreads.catalog.service.source.SourceBook;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;

@@ -1,7 +1,7 @@
 package com.betterreads.catalog.controller;
 
 import com.betterreads.catalog.dto.BookDetailResponse;
-import com.betterreads.catalog.service.BookReadService;
+import com.betterreads.catalog.service.read.BookReadService;
 import com.betterreads.common.exception.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;

@@ -7,8 +7,8 @@ import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.betterreads.catalog.service.SourceAuthorWorks;
-import com.betterreads.catalog.service.SourceBook;
+import com.betterreads.catalog.service.source.SourceAuthorWorks;
+import com.betterreads.catalog.service.source.SourceBook;
 import com.betterreads.integration.hardcover.HardcoverProperties;
 import com.betterreads.integration.hardcover.HardcoverWebClientConfig;
 import com.betterreads.integration.hardcover.mapper.HardcoverAuthorMapper;

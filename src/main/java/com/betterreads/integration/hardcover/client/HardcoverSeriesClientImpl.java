@@ -4,7 +4,7 @@ import java.util.Comparator;
 import java.util.Map;
 import java.util.Optional;
 
-import com.betterreads.catalog.service.SourceSeries;
+import com.betterreads.catalog.service.source.SourceSeries;
 import com.betterreads.integration.hardcover.HardcoverSeriesClient;
 import com.betterreads.integration.hardcover.dto.GraphQlRequest;
 import com.betterreads.integration.hardcover.dto.SeriesEnumerationResponse;

@@ -8,8 +8,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
-import com.betterreads.catalog.service.SourceSeries;
-import com.betterreads.catalog.service.SourceSeriesVolume;
+import com.betterreads.catalog.service.source.SourceSeries;
+import com.betterreads.catalog.service.source.SourceSeriesVolume;
 import com.betterreads.integration.hardcover.HardcoverProperties;
 import com.betterreads.integration.hardcover.HardcoverWebClientConfig;
 import com.betterreads.integration.hardcover.mapper.HardcoverSeriesMapper;

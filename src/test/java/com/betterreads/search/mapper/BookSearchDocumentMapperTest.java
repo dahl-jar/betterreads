@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.within;
 
 import com.betterreads.catalog.entity.Author;
 import com.betterreads.catalog.entity.Book;
-import com.betterreads.catalog.service.BookFieldSource;
-import com.betterreads.catalog.service.SourceBook;
+import com.betterreads.catalog.service.source.BookFieldSource;
+import com.betterreads.catalog.service.source.SourceBook;
 import com.betterreads.search.dto.BookSearchDocument;
 import java.util.List;
 import java.util.function.UnaryOperator;

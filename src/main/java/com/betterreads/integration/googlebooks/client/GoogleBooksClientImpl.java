@@ -3,8 +3,8 @@ package com.betterreads.integration.googlebooks.client;
 import java.util.List;
 import java.util.Optional;
 
-import com.betterreads.catalog.service.BookFieldSource;
-import com.betterreads.catalog.service.SourceBook;
+import com.betterreads.catalog.service.source.BookFieldSource;
+import com.betterreads.catalog.service.source.SourceBook;
 import com.betterreads.common.util.LogSanitizer;
 import com.betterreads.integration.googlebooks.GoogleBooksClient;
 import com.betterreads.integration.googlebooks.dto.Volume;

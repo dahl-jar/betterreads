@@ -7,7 +7,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Optional;
 
-import com.betterreads.catalog.service.SourceBook;
+import com.betterreads.catalog.service.source.SourceBook;
 import com.betterreads.integration.wikidata.WikidataApi;
 import com.betterreads.integration.wikidata.WikidataProperties;
 import com.betterreads.integration.wikidata.WikidataWebClientConfig;

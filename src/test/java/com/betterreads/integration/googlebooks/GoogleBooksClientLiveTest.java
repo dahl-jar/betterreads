@@ -8,8 +8,8 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-import com.betterreads.catalog.service.BookFieldSource;
-import com.betterreads.catalog.service.SourceBook;
+import com.betterreads.catalog.service.source.BookFieldSource;
+import com.betterreads.catalog.service.source.SourceBook;
 import com.betterreads.integration.googlebooks.client.GoogleBooksClientImpl;
 import com.betterreads.integration.googlebooks.mapper.GoogleBooksMapper;
 import org.junit.jupiter.api.DisplayName;

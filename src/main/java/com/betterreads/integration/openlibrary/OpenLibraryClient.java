@@ -1,7 +1,7 @@
 package com.betterreads.integration.openlibrary;
 
-import com.betterreads.catalog.service.BookSourceClient;
-import com.betterreads.catalog.service.SourceBook;
+import com.betterreads.catalog.service.source.BookSourceClient;
+import com.betterreads.catalog.service.source.SourceBook;
 import java.util.List;
 import java.util.Optional;
 
