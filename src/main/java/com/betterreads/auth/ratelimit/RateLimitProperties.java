@@ -9,7 +9,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Per-IP token-bucket limits for the public auth endpoints, bound from
+ * Per-IP token-bucket limits for the public auth and catalog-read endpoints, bound from
  * {@code auth.rate-limit.*}.
  *
  * <p>{@code X-Forwarded-For} is only read when the immediate client matches a CIDR in
@@ -37,7 +37,10 @@ public record RateLimitProperties(
     @Positive long resendVerificationCapacity,
     @Positive long resendVerificationRefillTokens,
     @Positive long resendVerificationRefillSeconds,
-    @Positive long maxBuckets,
+    @Positive long searchCapacity,
+    @Positive long searchRefillTokens,
+    @Positive long searchRefillSeconds,
+    @Positive long bucketTtlSeconds,
     @NotNull List<String> trustedProxies
 ) {
 

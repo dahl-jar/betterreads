@@ -1,5 +1,11 @@
 package com.betterreads.catalog;
 
+import com.betterreads.support.ContainerizedTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
@@ -26,16 +32,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.TestPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 /**
  * Staging and promotion against a real Postgres: a merged book is staged into {@code pending_book};
@@ -50,7 +52,11 @@ import org.testcontainers.utility.DockerImageName;
     "betterreads.catalog.staging.poll-enabled=false"
 })
 @Import(PendingBookServiceIntegrationTest.NoNetworkSources.class)
-class PendingBookServiceIntegrationTest {
+class PendingBookServiceIntegrationTest extends ContainerizedTest {
+
+    @Container
+    @ServiceConnection
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
 
     private static final String ISBN = "9780441013593";
 
@@ -69,10 +75,6 @@ class PendingBookServiceIntegrationTest {
     private static final String STATUS_PROMOTED = "PROMOTED";
 
     private static final int STAGING_THREADS = 4;
-
-    @Container
-    @ServiceConnection
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(DockerImageName.parse("postgres:17"));
 
     @Autowired
     private PendingBookService pendingBookService;

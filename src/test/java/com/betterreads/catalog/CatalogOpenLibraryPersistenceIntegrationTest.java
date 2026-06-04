@@ -1,5 +1,11 @@
 package com.betterreads.catalog;
 
+import com.betterreads.support.ContainerizedTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.OffsetDateTime;
@@ -18,12 +24,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.test.context.TestPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 /**
  * End-to-end round-trip from the live OpenLibrary API into a real Postgres via the Flyway-managed
@@ -51,13 +53,13 @@ import org.testcontainers.utility.DockerImageName;
     "mail.outbox.worker-enabled=false"
 })
 @EnabledIfEnvironmentVariable(named = "RUN_OPENLIBRARY_LIVE", matches = "1")
-class CatalogOpenLibraryPersistenceIntegrationTest {
-
-    private static final int HOBBIT_FIRST_PUBLISHED = 1937;
+class CatalogOpenLibraryPersistenceIntegrationTest extends ContainerizedTest {
 
     @Container
     @ServiceConnection
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(DockerImageName.parse("postgres:17"));
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
+
+    private static final int HOBBIT_FIRST_PUBLISHED = 1937;
 
     @Autowired
     private OpenLibraryClient openLibraryClient;

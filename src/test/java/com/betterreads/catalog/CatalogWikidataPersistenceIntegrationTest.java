@@ -1,5 +1,11 @@
 package com.betterreads.catalog;
 
+import com.betterreads.support.ContainerizedTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
@@ -18,11 +24,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 /**
  * Round-trips a Wikidata {@link SourceBook} through {@code CatalogService} into a real Postgres and
@@ -30,7 +32,11 @@ import org.testcontainers.utility.DockerImageName;
  */
 @SpringBootTest(properties = "jwt.secret=test-secret-at-least-thirty-two-bytes-long")
 @Testcontainers
-class CatalogWikidataPersistenceIntegrationTest {
+class CatalogWikidataPersistenceIntegrationTest extends ContainerizedTest {
+
+    @Container
+    @ServiceConnection
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
 
     private static final String DUNE_QID = "Q190192";
     private static final String HERBERT_NAME = "Frank Herbert";
@@ -40,10 +46,6 @@ class CatalogWikidataPersistenceIntegrationTest {
     private static final String HERBERT_BIO = "https://en.wikipedia.org/wiki/Frank_Herbert";
     private static final String HUGO = "Hugo Award for Best Novel";
     private static final String NEBULA = "Nebula Award for Best Novel";
-
-    @Container
-    @ServiceConnection
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(DockerImageName.parse("postgres:17"));
 
     @Autowired
     private CatalogService catalogService;

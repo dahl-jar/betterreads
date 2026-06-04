@@ -1,5 +1,11 @@
 package com.betterreads.catalog;
 
+import com.betterreads.support.ContainerizedTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -30,13 +36,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 /**
  * Verifies that a catalog search stages one pending candidate per series volume against a real
@@ -51,7 +53,11 @@ import org.testcontainers.utility.DockerImageName;
     "jwt.issuer=betterreads-it",
     "betterreads.catalog.staging.poll-enabled=false"
 })
-class CatalogSearchServiceIntegrationTest {
+class CatalogSearchServiceIntegrationTest extends ContainerizedTest {
+
+    @Container
+    @ServiceConnection
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
 
     private static final String SERIES_QUERY = "The Wheel of Time";
 
@@ -89,10 +95,6 @@ class CatalogSearchServiceIntegrationTest {
         DRAGON_REBORN, "OL3W",
         MISTBORN, "OL10W",
         WAY_OF_KINGS, "OL11W");
-
-    @Container
-    @ServiceConnection
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(DockerImageName.parse("postgres:17"));
 
     @MockitoBean
     private HardcoverSeriesClient seriesClient;
