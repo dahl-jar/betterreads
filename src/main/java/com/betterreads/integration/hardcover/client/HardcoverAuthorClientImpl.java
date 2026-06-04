@@ -4,7 +4,7 @@ import java.util.Comparator;
 import java.util.Map;
 import java.util.Optional;
 
-import com.betterreads.catalog.service.SourceAuthorWorks;
+import com.betterreads.catalog.service.source.SourceAuthorWorks;
 import com.betterreads.integration.hardcover.HardcoverAuthorClient;
 import com.betterreads.integration.hardcover.dto.AuthorSearchDocument;
 import com.betterreads.integration.hardcover.dto.AuthorWorksResponse;

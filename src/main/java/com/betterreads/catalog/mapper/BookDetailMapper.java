@@ -8,8 +8,8 @@ import com.betterreads.catalog.entity.Book;
 import com.betterreads.catalog.entity.BookAward;
 import com.betterreads.catalog.entity.BookSubject;
 import com.betterreads.catalog.entity.PendingBook;
-import com.betterreads.catalog.service.SourceAuthor;
-import com.betterreads.catalog.service.SourceBook;
+import com.betterreads.catalog.service.source.SourceAuthor;
+import com.betterreads.catalog.service.source.SourceBook;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 

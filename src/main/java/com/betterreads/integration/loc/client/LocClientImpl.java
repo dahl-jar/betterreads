@@ -2,8 +2,8 @@ package com.betterreads.integration.loc.client;
 
 import java.util.Optional;
 
-import com.betterreads.catalog.service.BookFieldSource;
-import com.betterreads.catalog.service.SourceBook;
+import com.betterreads.catalog.service.source.BookFieldSource;
+import com.betterreads.catalog.service.source.SourceBook;
 import com.betterreads.integration.loc.LocClient;
 import com.betterreads.integration.loc.LocSru;
 import com.betterreads.integration.loc.mapper.LocMapper;

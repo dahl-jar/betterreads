@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-import com.betterreads.catalog.service.BookFieldSource;
-import com.betterreads.catalog.service.SourceBook;
+import com.betterreads.catalog.service.source.BookFieldSource;
+import com.betterreads.catalog.service.source.SourceBook;
 import com.betterreads.integration.hardcover.client.HardcoverClientImpl;
 import com.betterreads.integration.hardcover.mapper.HardcoverMapper;
 import org.junit.jupiter.api.DisplayName;

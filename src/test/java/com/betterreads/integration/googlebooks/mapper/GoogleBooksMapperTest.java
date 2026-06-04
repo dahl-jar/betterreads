@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.UnaryOperator;
 
-import com.betterreads.catalog.service.SourceBook;
+import com.betterreads.catalog.service.source.SourceBook;
 import com.betterreads.integration.googlebooks.dto.IndustryIdentifier;
 import com.betterreads.integration.googlebooks.dto.Volume;
 import com.betterreads.integration.googlebooks.dto.VolumeInfo;

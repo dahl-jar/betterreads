@@ -5,7 +5,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.betterreads.catalog.service.BookFieldSource;
+import com.betterreads.catalog.service.source.BookFieldSource;
 import com.betterreads.integration.loc.LocProperties;
 import com.betterreads.integration.loc.LocSru;
 import com.betterreads.integration.loc.LocWebClientConfig;

@@ -108,15 +108,15 @@
     -->
     <Match>
         <Bug pattern="CRLF_INJECTION_LOGS"/>
-        <Class name="com.betterreads.catalog.CatalogOpenLibrarySeedVerification"/>
+        <Class name="com.betterreads.catalog.source.CatalogOpenLibrarySeedVerification"/>
     </Match>
     <Match>
         <Bug pattern="CRLF_INJECTION_LOGS"/>
-        <Class name="com.betterreads.catalog.CatalogPipelineLiveE2eTest"/>
+        <Class name="com.betterreads.catalog.pipeline.CatalogPipelineLiveE2eTest"/>
     </Match>
     <Match>
         <Bug pattern="CRLF_INJECTION_LOGS"/>
-        <Class name="com.betterreads.catalog.CatalogPipelineLocalDbVerification"/>
+        <Class name="com.betterreads.catalog.pipeline.CatalogPipelineLocalDbVerification"/>
     </Match>
 
     <!--
@@ -127,11 +127,11 @@
     -->
     <Match>
         <Bug pattern="CRLF_INJECTION_LOGS"/>
-        <Class name="com.betterreads.catalog.service.SourceCollector"/>
+        <Class name="com.betterreads.catalog.service.pipeline.SourceCollector"/>
     </Match>
     <Match>
         <Bug pattern="CRLF_INJECTION_LOGS"/>
-        <Class name="com.betterreads.catalog.service.CatalogSearchService"/>
+        <Class name="com.betterreads.catalog.service.pipeline.CatalogSearchService"/>
     </Match>
 
     <!--

@@ -6,8 +6,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
 
-import com.betterreads.catalog.service.BookFieldSource;
-import com.betterreads.catalog.service.SourceBook;
+import com.betterreads.catalog.service.source.BookFieldSource;
+import com.betterreads.catalog.service.source.SourceBook;
 import com.betterreads.common.util.LogSanitizer;
 import com.betterreads.common.util.TextMatch;
 import com.betterreads.integration.hardcover.HardcoverClient;

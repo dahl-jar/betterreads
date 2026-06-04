@@ -8,8 +8,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import java.util.Optional;
 
-import com.betterreads.catalog.service.BookFieldSource;
-import com.betterreads.catalog.service.SourceBook;
+import com.betterreads.catalog.service.source.BookFieldSource;
+import com.betterreads.catalog.service.source.SourceBook;
 import com.betterreads.integration.openlibrary.OpenLibraryProperties;
 import com.betterreads.integration.openlibrary.OpenLibraryWebClientConfig;
 import com.betterreads.integration.openlibrary.mapper.OpenLibraryMapper;

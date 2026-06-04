@@ -4,10 +4,10 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.betterreads.catalog.service.BookFieldSource;
-import com.betterreads.catalog.service.CatalogGenres;
-import com.betterreads.catalog.service.SourceAuthor;
-import com.betterreads.catalog.service.SourceBook;
+import com.betterreads.catalog.service.source.BookFieldSource;
+import com.betterreads.catalog.service.source.CatalogGenres;
+import com.betterreads.catalog.service.source.SourceAuthor;
+import com.betterreads.catalog.service.source.SourceBook;
 import com.betterreads.integration.googlebooks.dto.IndustryIdentifier;
 import com.betterreads.integration.googlebooks.dto.Volume;
 import com.betterreads.integration.googlebooks.dto.VolumeInfo;

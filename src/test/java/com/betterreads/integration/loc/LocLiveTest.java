@@ -7,8 +7,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-import com.betterreads.catalog.service.BookFieldSource;
-import com.betterreads.catalog.service.SourceBook;
+import com.betterreads.catalog.service.source.BookFieldSource;
+import com.betterreads.catalog.service.source.SourceBook;
 import com.betterreads.integration.loc.client.LocClientImpl;
 import com.betterreads.integration.loc.discovery.LocDiscoveryClientImpl;
 import com.betterreads.integration.loc.discovery.LocDiscoveryRecord;

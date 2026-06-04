@@ -1,6 +1,6 @@
 package com.betterreads.integration.hardcover;
 
-import com.betterreads.catalog.service.SourceSeries;
+import com.betterreads.catalog.service.source.SourceSeries;
 import java.util.Optional;
 
 /** Resolves a series and its ordered volumes from Hardcover. */

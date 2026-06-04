@@ -7,8 +7,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Optional;
 
-import com.betterreads.catalog.service.BookFieldSource;
-import com.betterreads.catalog.service.SourceBook;
+import com.betterreads.catalog.service.source.BookFieldSource;
+import com.betterreads.catalog.service.source.SourceBook;
 import com.betterreads.integration.googlebooks.GoogleBooksProperties;
 import com.betterreads.integration.googlebooks.GoogleBooksWebClientConfig;
 import com.betterreads.integration.googlebooks.mapper.GoogleBooksMapper;

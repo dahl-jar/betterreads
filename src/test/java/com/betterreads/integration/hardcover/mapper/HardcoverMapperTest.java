@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.within;
 
 import java.util.List;
 
-import com.betterreads.catalog.service.SourceBook;
+import com.betterreads.catalog.service.source.SourceBook;
 import com.betterreads.integration.hardcover.dto.HardcoverDocument;
 import com.betterreads.integration.hardcover.dto.HardcoverDocument.FeaturedSeries;
 import com.betterreads.integration.hardcover.dto.HardcoverDocument.Image;

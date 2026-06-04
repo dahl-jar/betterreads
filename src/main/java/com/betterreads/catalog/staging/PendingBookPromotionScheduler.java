@@ -1,6 +1,6 @@
 package com.betterreads.catalog.staging;
 
-import com.betterreads.catalog.service.PendingBookService;
+import com.betterreads.catalog.service.pipeline.PendingBookService;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
