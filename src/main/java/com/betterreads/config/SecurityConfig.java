@@ -12,6 +12,7 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -63,6 +64,11 @@ public final class SecurityConfig {
         "/v3/api-docs/**",
         "/swagger-ui/**",
         "/swagger-ui.html"
+    };
+
+    private static final String[] PUBLIC_CATALOG_GET_PATHS = {
+        "/api/v1/search/**",
+        "/api/v1/books/**"
     };
 
     private static final String[] PUBLIC_PATHS = {
@@ -191,6 +197,7 @@ public final class SecurityConfig {
                 .contentSecurityPolicy(csp -> csp.policyDirectives(API_CSP)))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(PUBLIC_PATHS).permitAll()
+                .requestMatchers(HttpMethod.GET, PUBLIC_CATALOG_GET_PATHS).permitAll()
                 .anyRequest().authenticated())
             .exceptionHandling(handling -> handling
                 .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))

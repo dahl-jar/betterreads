@@ -17,6 +17,13 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2s
+
   flyway:
     enabled: true
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:betterreads}?sslmode=${DB_SSL_MODE:disable}
@@ -111,7 +118,10 @@ auth:
     resend-verification-capacity: 3
     resend-verification-refill-tokens: 1
     resend-verification-refill-seconds: 300
-    max-buckets: 10000
+    search-capacity: 30
+    search-refill-tokens: 10
+    search-refill-seconds: 10
+    bucket-ttl-seconds: 900
     trusted-proxies: ${AUTH_TRUSTED_PROXIES:}
 
 betterreads:
@@ -122,6 +132,8 @@ betterreads:
   catalog:
     staging:
       poll-enabled: ${CATALOG_STAGING_POLL_ENABLED:true}
+  cache:
+    book-detail-ttl: ${BOOK_DETAIL_CACHE_TTL:PT24H}
 
 openlibrary:
   base-url: ${OPENLIBRARY_BASE_URL:https://openlibrary.org}

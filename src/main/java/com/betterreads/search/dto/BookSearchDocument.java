@@ -26,6 +26,9 @@ public record BookSearchDocument(
     double popularityScore
 ) {
 
+    /** Name of the {@code bookId} field, used as the Meilisearch index primary key. */
+    public static final String PRIMARY_KEY = "bookId";
+
     public BookSearchDocument {
         authors = List.copyOf(authors);
         subjects = List.copyOf(subjects);
