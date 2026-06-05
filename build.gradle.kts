@@ -14,13 +14,17 @@ plugins {
 	id("io.spring.dependency-management") version "1.1.7"
 	id("com.github.spotbugs") version "6.4.8"
 	id("net.ltgt.errorprone") version "5.1.0"
-	id("org.owasp.dependencycheck") version "12.2.0"
+	id("org.owasp.dependencycheck") version "12.2.2"
 	id("de.aaschmid.cpd") version "3.5"
 }
 
 group = "com.betterreads"
 version = "0.0.1-SNAPSHOT"
 description = "BetterReads v2 - Book tracking and recommendation platform"
+
+extra["netty.version"] = "4.2.15.Final"
+extra["tomcat.version"] = "11.0.22"
+extra["postgresql.version"] = "42.7.11"
 
 // Generates build-info.properties so the version shows on /actuator/info.
 springBoot {
@@ -229,6 +233,16 @@ dependencyCheck {
 	failBuildOnUnusedSuppressionRule = true
 	formats = listOf("HTML", "JSON")
 	suppressionFile = "config/dependency-check/suppressions.xml"
+	analyzers {
+		assemblyEnabled = false
+		nuspecEnabled = false
+		nugetconfEnabled = false
+		nodeEnabled = false
+		nodeAuditEnabled = false
+		retirejs {
+			enabled = false
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
