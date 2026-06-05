@@ -10,7 +10,7 @@ This is a rebuild. The backend is a headless JSON API. Auth uses short-lived acc
 
 ## Stack
 
-Java 25 · Spring Boot 3.5 · Postgres 17 · Flyway · Caffeine · WebClient · JJWT · Bucket4j · Gradle 9 (Kotlin DSL)
+Java 25 · Spring Boot 4.0 · Postgres 17 · Flyway · Caffeine · WebClient · JJWT · Bucket4j · Gradle 9 (Kotlin DSL)
 
 ## Prerequisites
 
@@ -21,11 +21,11 @@ Java 25 · Spring Boot 3.5 · Postgres 17 · Flyway · Caffeine · WebClient · 
 ## Quickstart
 
 ```bash
-# start local Postgres
-docker compose up -d
-
 # copy the env template, then set JWT_SECRET to a 32+ byte random value
 cp .env.example .env
+
+# start local Postgres
+docker compose -f docker/docker-compose.yml --env-file .env up -d
 
 # run the app, Flyway migrates on first startup
 ./gradlew bootRun
@@ -52,8 +52,8 @@ API at `http://localhost:8080`, Swagger UI at `http://localhost:8080/swagger-ui.
 ./gradlew nativeCompile
 
 # Postgres lifecycle
-docker compose up -d        # start
-docker compose down -v      # stop and wipe
+docker compose -f docker/docker-compose.yml --env-file .env up -d    # start
+docker compose -f docker/docker-compose.yml --env-file .env down -v   # stop and wipe
 ```
 
 ## Architecture

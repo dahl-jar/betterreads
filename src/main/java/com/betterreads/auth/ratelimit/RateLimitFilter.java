@@ -1,12 +1,13 @@
 package com.betterreads.auth.ratelimit;
 
 import com.betterreads.common.util.LogSanitizer;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
+import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.ConsumptionProbe;
+import io.github.bucket4j.distributed.proxy.ProxyManager;
+import io.lettuce.core.api.StatefulRedisConnection;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -21,7 +22,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -32,7 +32,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Token-bucket rate limiter for the public auth endpoints.
+ * Token-bucket rate limiter for the public auth endpoints, backed by Redis so every app replica
+ * shares one count per client.
  *
  * <p>Each path has its own per-IP bucket so a burst against one endpoint does not eat
  * another's budget. {@code X-Forwarded-For} is only read from trusted-proxy CIDRs so a
@@ -55,67 +56,94 @@ public final class RateLimitFilter extends OncePerRequestFilter {
 
     private static final String RESEND_VERIFICATION_PATH = "/api/v1/auth/resend-verification";
 
+    private static final String SEARCH_PATH = "/api/v1/search/books";
+
+    private static final String BOOK_DETAIL_PREFIX = "/api/v1/books/";
+
     private static final String FORWARDED_FOR_HEADER = "X-Forwarded-For";
 
     private static final String CF_CONNECTING_IP_HEADER = "CF-Connecting-IP";
 
     private static final String RETRY_AFTER_HEADER = "Retry-After";
 
-    private static final Duration BUCKET_TTL = Duration.ofMinutes(15);
-
     private final Map<String, Endpoint> endpoints;
 
+    private final Endpoint detailEndpoint;
+
     private final List<CidrRange> trustedProxies;
+
+    private final ProxyManager<String> proxyManager;
+
+    private final StatefulRedisConnection<String, byte[]> redis;
 
     /**
      * Parses the trusted-proxy CIDRs once at construction.
      *
      * <p>Malformed entries are logged and dropped so one bad config line cannot break startup.
      */
-    // TODO(when scaling beyond one app instance): move buckets to Redis so replicas share limits
-    public RateLimitFilter(final RateLimitProperties properties) {
+    public RateLimitFilter(
+        final RateLimitProperties properties,
+        final ProxyManager<String> proxyManager,
+        final StatefulRedisConnection<String, byte[]> redis
+    ) {
         super();
         this.endpoints = buildEndpoints(properties);
+        this.detailEndpoint = endpoint(HttpMethod.GET, "book-detail", properties.searchCapacity(),
+            properties.searchRefillTokens(), properties.searchRefillSeconds());
         this.trustedProxies = parseCidrs(properties.trustedProxies());
+        this.proxyManager = proxyManager;
+        this.redis = redis;
     }
 
     private static Map<String, Endpoint> buildEndpoints(final RateLimitProperties props) {
         return Map.ofEntries(
-            Map.entry(LOGIN_PATH, endpoint(props.maxBuckets(), props.loginCapacity(),
+            Map.entry(LOGIN_PATH, endpoint(HttpMethod.POST, "login", props.loginCapacity(),
                 props.loginRefillTokens(), props.loginRefillSeconds())),
-            Map.entry(REGISTER_PATH, endpoint(props.maxBuckets(), props.registerCapacity(),
+            Map.entry(REGISTER_PATH, endpoint(HttpMethod.POST, "register", props.registerCapacity(),
                 props.registerRefillTokens(), props.registerRefillSeconds())),
-            Map.entry(FORGOT_PASSWORD_PATH, endpoint(props.maxBuckets(), props.forgotPasswordCapacity(),
+            Map.entry(FORGOT_PASSWORD_PATH, endpoint(HttpMethod.POST, "forgot-password",
+                props.forgotPasswordCapacity(),
                 props.forgotPasswordRefillTokens(), props.forgotPasswordRefillSeconds())),
-            Map.entry(RESET_PASSWORD_PATH, endpoint(props.maxBuckets(), props.resetPasswordCapacity(),
+            Map.entry(RESET_PASSWORD_PATH, endpoint(HttpMethod.POST, "reset-password",
+                props.resetPasswordCapacity(),
                 props.resetPasswordRefillTokens(), props.resetPasswordRefillSeconds())),
-            Map.entry(VERIFY_EMAIL_PATH, endpoint(props.maxBuckets(), props.verifyEmailCapacity(),
+            Map.entry(VERIFY_EMAIL_PATH, endpoint(HttpMethod.POST, "verify-email",
+                props.verifyEmailCapacity(),
                 props.verifyEmailRefillTokens(), props.verifyEmailRefillSeconds())),
-            Map.entry(RESEND_VERIFICATION_PATH, endpoint(props.maxBuckets(), props.resendVerificationCapacity(),
-                props.resendVerificationRefillTokens(), props.resendVerificationRefillSeconds()))
+            Map.entry(RESEND_VERIFICATION_PATH, endpoint(HttpMethod.POST, "resend-verification",
+                props.resendVerificationCapacity(),
+                props.resendVerificationRefillTokens(), props.resendVerificationRefillSeconds())),
+            Map.entry(SEARCH_PATH, endpoint(HttpMethod.GET, "search", props.searchCapacity(),
+                props.searchRefillTokens(), props.searchRefillSeconds()))
         );
     }
 
     private static Endpoint endpoint(
-        final long maxBuckets,
+        final HttpMethod method,
+        final String keyPrefix,
         final long capacity,
         final long refillTokens,
         final long refillSeconds
     ) {
-        final Cache<String, Bucket> cache = Caffeine.newBuilder()
-            .expireAfterAccess(BUCKET_TTL)
-            .maximumSize(maxBuckets)
-            .build();
-        final Supplier<Bandwidth> bandwidth = () -> Bandwidth.builder()
+        final Bandwidth bandwidth = Bandwidth.builder()
             .capacity(capacity)
             .refillGreedy(refillTokens, Duration.ofSeconds(refillSeconds))
             .build();
-        return new Endpoint(cache, bandwidth);
+        final BucketConfiguration config = BucketConfiguration.builder().addLimit(bandwidth).build();
+        return new Endpoint(method, keyPrefix, config);
     }
 
-    /** Drops all in-memory buckets. */
+    /** Deletes every rate-limit bucket from Redis, so the next request starts at full. For tests. */
     public void reset() {
-        endpoints.values().forEach(e -> e.cache().invalidateAll());
+        final List<String> prefixes = new ArrayList<>();
+        endpoints.values().forEach(e -> prefixes.add(e.keyPrefix()));
+        prefixes.add(detailEndpoint.keyPrefix());
+        prefixes.forEach(prefix -> {
+            final List<String> keys = redis.sync().keys(prefix + ":*");
+            if (!keys.isEmpty()) {
+                redis.sync().del(keys.toArray(new String[0]));
+            }
+        });
     }
 
     @Override
@@ -145,19 +173,30 @@ public final class RateLimitFilter extends OncePerRequestFilter {
 
     @Nullable
     private Bucket bucketFor(final HttpServletRequest request) {
-        if (!HttpMethod.POST.matches(request.getMethod())) {
-            return null;
-        }
-        final Endpoint endpoint = endpoints.get(request.getRequestURI());
+        final Endpoint endpoint = endpointFor(request);
         if (endpoint == null) {
             return null;
         }
-        return endpoint.cache().get(clientIp(request),
-            ip -> Bucket.builder().addLimit(endpoint.bandwidth().get()).build());
+        final String key = endpoint.keyPrefix() + ':' + clientIp(request);
+        return proxyManager.getProxy(key, endpoint::config);
     }
 
-    /** Per-IP bucket cache plus the bandwidth recipe used to build new buckets. */
-    private record Endpoint(Cache<String, Bucket> cache, Supplier<Bandwidth> bandwidth) { }
+    @Nullable
+    private Endpoint endpointFor(final HttpServletRequest request) {
+        final String uri = request.getRequestURI();
+        final Endpoint exact = endpoints.get(uri);
+        if (exact != null && exact.method().matches(request.getMethod())) {
+            return exact;
+        }
+        if (detailEndpoint.method().matches(request.getMethod())
+            && uri.startsWith(BOOK_DETAIL_PREFIX)) {
+            return detailEndpoint;
+        }
+        return null;
+    }
+
+    /** The HTTP method and Redis key prefix that isolate one endpoint's buckets, plus its recipe. */
+    private record Endpoint(HttpMethod method, String keyPrefix, BucketConfiguration config) { }
 
     /**
      * Resolves the bucket key from the incoming request.

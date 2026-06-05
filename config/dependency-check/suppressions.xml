@@ -8,4 +8,29 @@
       - Temporary suppressions must use the `until` attribute and point to a tracking issue.
       - Remove suppressions as soon as the dependency is upgraded or the false positive is fixed upstream.
     -->
+    <suppress>
+        <notes><![CDATA[
+            Guava 30.1.1 reaches the tree only through the ErrorProne dataflow shading on the
+            errorprone configuration. ErrorProne runs at compile time and ships nothing, so
+            CVE-2023-2976 (temp-directory file disclosure) cannot run in the application.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/com\.google\.guava/guava@30\.1\.1.*$</packageUrl>
+        <cve>CVE-2023-2976</cve>
+    </suppress>
+    <suppress>
+        <notes><![CDATA[
+            plexus-utils 3.3.0 is a build-tool transitive, not on runtimeClasspath, so
+            CVE-2025-67030 cannot run in the application.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.codehaus\.plexus/plexus-utils@3\.3\.0$</packageUrl>
+        <cve>CVE-2025-67030</cve>
+    </suppress>
+    <suppress>
+        <notes><![CDATA[
+            Rhino 1.7.15 is pulled by the dependency-check plugin's own RetireJS analyzer, not by
+            the application, so CVE-2025-66453 cannot run in the application.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.mozilla/rhino@1\.7\.15$</packageUrl>
+        <cve>CVE-2025-66453</cve>
+    </suppress>
 </suppressions>

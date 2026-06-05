@@ -1,21 +1,21 @@
 package com.betterreads.auth.passwordreset;
 
+import com.betterreads.auth.Emails;
 import com.betterreads.auth.entity.User;
 import com.betterreads.auth.refresh.RefreshTokenChainRevoker;
 import com.betterreads.auth.repository.UserRepository;
 import com.betterreads.auth.token.EmailToken;
 import com.betterreads.auth.token.EmailTokenRepository;
+import com.betterreads.auth.token.TokenGenerator;
 import com.betterreads.common.crypto.HmacTokenHasher;
 import com.betterreads.common.crypto.PasswordByteLimit;
 import com.betterreads.common.exception.InvalidRequestException;
 
 import com.betterreads.mail.outbox.MailOutboxService;
 
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -54,8 +54,6 @@ public class PasswordResetService {
 
     private final RefreshTokenChainRevoker refreshTokenChainRevoker;
 
-    private final SecureRandom random;
-
     @SuppressWarnings("PMD.ExcessiveParameterList")
     public PasswordResetService(
         final UserRepository userRepository,
@@ -71,7 +69,6 @@ public class PasswordResetService {
         this.mailOutbox = mailOutbox;
         this.passwordEncoder = passwordEncoder;
         this.refreshTokenChainRevoker = refreshTokenChainRevoker;
-        this.random = new SecureRandom();
     }
 
     /**
@@ -83,7 +80,7 @@ public class PasswordResetService {
      */
     @Transactional
     public void requestReset(final String email) {
-        final String normalized = normalizeEmail(email);
+        final String normalized = Emails.normalize(email);
         final Optional<User> userOpt = userRepository.findByEmailForUpdate(normalized);
         if (userOpt.isEmpty()) {
             LOG.info("Password-reset request for unknown email, no token issued");
@@ -91,7 +88,7 @@ public class PasswordResetService {
         }
         final User user = userOpt.get();
         consumeOutstandingTokens(user.getUserId());
-        final String plaintext = generatePlaintext();
+        final String plaintext = TokenGenerator.randomToken(TOKEN_BYTES);
         insertNewToken(user.getUserId(), plaintext);
         mailOutbox.enqueuePasswordReset(user.getEmail(), plaintext);
         LOG.info("Issued password-reset token userId={}", user.getUserId());
@@ -158,23 +155,14 @@ public class PasswordResetService {
             throw new InvalidRequestException(INVALID_OR_EXPIRED_TOKEN);
         }
 
-        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        user.setPasswordHash(Objects.requireNonNull(passwordEncoder.encode(newPassword)));
         userRepository.save(user);
 
         row.setConsumedAt(Instant.now());
         tokenRepository.save(row);
 
-        refreshTokenChainRevoker.revokeAllActiveForUserInTransaction(user.getUserId());
+        refreshTokenChainRevoker.revokeAllInCurrentTransaction(user.getUserId());
         LOG.info("Password reset, all refresh tokens revoked userId={}", user.getUserId());
     }
 
-    private static String normalizeEmail(final String email) {
-        return email.trim().toLowerCase(Locale.ROOT);
-    }
-
-    private String generatePlaintext() {
-        final byte[] bytes = new byte[TOKEN_BYTES];
-        random.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-    }
 }

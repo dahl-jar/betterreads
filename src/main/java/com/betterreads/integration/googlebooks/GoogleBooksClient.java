@@ -1,10 +1,10 @@
 package com.betterreads.integration.googlebooks;
 
-import com.betterreads.catalog.service.BookSourceClient;
-import com.betterreads.catalog.service.SourceBook;
+import com.betterreads.catalog.service.source.BookSourceClient;
+import com.betterreads.catalog.service.source.SourceBook;
 import java.util.Optional;
 
-/** Google Books REST API boundary. */
+/** Google Books REST API client. */
 public interface GoogleBooksClient extends BookSourceClient {
 
     /**

@@ -1,13 +1,12 @@
 package com.betterreads.mail.outbox;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
 import org.springframework.stereotype.Component;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /** Renders the {@code email_verification} mail body. */
 @Component
@@ -38,12 +37,12 @@ class EmailVerificationTemplate {
     private String readToken(final String payload) {
         try {
             final JsonNode node = objectMapper.readTree(payload);
-            final String token = node.path("token").asText();
+            final String token = node.path("token").asString();
             if (token.isEmpty()) {
                 throw new IllegalStateException("email_verification payload missing token");
             }
             return token;
-        } catch (final JsonProcessingException ex) {
+        } catch (final JacksonException ex) {
             throw new IllegalStateException("malformed email_verification payload", ex);
         }
     }

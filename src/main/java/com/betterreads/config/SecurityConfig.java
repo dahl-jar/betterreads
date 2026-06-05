@@ -7,11 +7,12 @@ import com.betterreads.common.web.RequestIdFilter;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.actuate.autoconfigure.security.servlet.EndpointRequest;
+import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -65,6 +66,11 @@ public final class SecurityConfig {
         "/swagger-ui.html"
     };
 
+    private static final String[] PUBLIC_CATALOG_GET_PATHS = {
+        "/api/v1/search/**",
+        "/api/v1/books/**"
+    };
+
     private static final String[] PUBLIC_PATHS = {
         "/api/v1/auth/register",
         "/api/v1/auth/login",
@@ -97,20 +103,19 @@ public final class SecurityConfig {
     }
 
     /**
-     * Filter chain for actuator paths, matched only on the management port.
+     * Filter chain for the actuator endpoints, matched on port 8081.
      *
      * <p>Requires a Cloudflare Access JWT when a decoder is configured; otherwise {@code permitAll}.
-     * {@code /actuator/prometheus} and {@code /actuator/health} skip the JWT check because the
-     * management port is not exposed through the tunnel, so only on-VM processes (Alloy, the
-     * systemd healthcheck) can reach them.
+     * {@code /actuator/prometheus} and {@code /actuator/health} skip the JWT check because port 8081
+     * is not exposed through the tunnel, so only on-VM processes (Alloy, the systemd healthcheck)
+     * can reach them.
      */
     @Bean
     @Order(0)
-    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     SecurityFilterChain managementSecurityFilterChain(
         final HttpSecurity http,
         final RequestIdFilter requestIdFilter
-    ) throws Exception {
+    ) {
         final JwtDecoder decoder = cloudflareAccessJwtDecoderProvider.getIfAvailable();
         http
             .securityMatcher(request ->
@@ -148,11 +153,10 @@ public final class SecurityConfig {
      */
     @Bean
     @Order(1)
-    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     SecurityFilterChain docsSecurityFilterChain(
         final HttpSecurity http,
         final RequestIdFilter requestIdFilter
-    ) throws Exception {
+    ) {
         http
             .securityMatcher(DOCS_PATHS)
             .cors(Customizer.withDefaults())
@@ -174,13 +178,12 @@ public final class SecurityConfig {
     /** Catch-all chain: stateless, JWT-authenticated, rate-limited, strict CSP. */
     @Bean
     @Order(2)
-    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     SecurityFilterChain apiSecurityFilterChain(
         final HttpSecurity http,
         final JwtAuthenticationFilter jwtAuthenticationFilter,
         final RateLimitFilter rateLimitFilter,
         final RequestIdFilter requestIdFilter
-    ) throws Exception {
+    ) {
         http
             .cors(Customizer.withDefaults())
             // NOTE(csrf): bearer JWT + SameSite=Strict refresh cookie. lgtm[java/spring-disabled-csrf-protection]
@@ -194,6 +197,7 @@ public final class SecurityConfig {
                 .contentSecurityPolicy(csp -> csp.policyDirectives(API_CSP)))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(PUBLIC_PATHS).permitAll()
+                .requestMatchers(HttpMethod.GET, PUBLIC_CATALOG_GET_PATHS).permitAll()
                 .anyRequest().authenticated())
             .exceptionHandling(handling -> handling
                 .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))

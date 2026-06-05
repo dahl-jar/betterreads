@@ -1,13 +1,18 @@
 package com.betterreads.auth;
 
+import com.betterreads.support.ContainerizedTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
+
 import com.betterreads.auth.entity.User;
 import com.betterreads.auth.jwt.JwtIssuer;
 import com.betterreads.auth.ratelimit.RateLimitFilter;
 import com.betterreads.auth.repository.UserRepository;
 import com.betterreads.mail.outbox.MailOutboxRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -16,7 +21,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.TestPropertySource;
@@ -24,8 +28,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.security.web.FilterChainProxy;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.Duration;
@@ -49,8 +51,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "auth.refresh-cookie.secure=true",
     "mail.outbox.worker-enabled=false"
 })
-@SuppressWarnings("PMD.TooManyStaticImports")
-class AuthIntegrationTest {
+class AuthIntegrationTest extends ContainerizedTest {
+
+    @Container
+    @ServiceConnection
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
 
     private static final String REGISTER_URL = "/api/v1/auth/register";
 
@@ -135,10 +140,6 @@ class AuthIntegrationTest {
 
     private static final String LONG_PASSWORD_73_BYTES =
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-
-    @Container
-    @ServiceConnection
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17");
 
     @Autowired
     private WebApplicationContext webApplicationContext;
@@ -327,7 +328,7 @@ class AuthIntegrationTest {
                     post(REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content(registerBody))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-            final String apiToken = objectMapper.readTree(registerResponse).get("accessToken").asText();
+            final String apiToken = objectMapper.readTree(registerResponse).get("accessToken").asString();
 
             mockMvc.perform(get(ME_URL).header(AUTH_HEADER, BEARER_PREFIX + apiToken))
                 .andExpect(status().isOk())
@@ -533,7 +534,7 @@ class AuthIntegrationTest {
 
     private String registerPayload(
         final String username, final String email, final String password
-    ) throws JsonProcessingException {
+    ) {
         final ObjectNode node = objectMapper.createObjectNode();
         node.put(FIELD_USERNAME, username);
         node.put(FIELD_EMAIL, email);
@@ -543,7 +544,7 @@ class AuthIntegrationTest {
 
     private String loginPayload(
         final String identifier, final String password
-    ) throws JsonProcessingException {
+    ) {
         final ObjectNode node = objectMapper.createObjectNode();
         node.put(FIELD_IDENTIFIER, identifier);
         node.put(FIELD_PASSWORD, password);

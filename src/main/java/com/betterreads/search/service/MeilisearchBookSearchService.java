@@ -1,51 +1,85 @@
 package com.betterreads.search.service;
 
+import com.betterreads.common.util.LogSanitizer;
 import com.betterreads.search.config.MeilisearchProperties;
 import com.betterreads.search.dto.BookSearchDocument;
 import com.betterreads.search.dto.BookSearchResult;
 import com.meilisearch.sdk.Client;
-import jakarta.annotation.PostConstruct;
+import com.meilisearch.sdk.Index;
+import com.meilisearch.sdk.SearchRequest;
+import com.meilisearch.sdk.exceptions.MeilisearchException;
+import com.meilisearch.sdk.model.SearchResult;
 import java.util.Collection;
-import java.util.Objects;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.ObjectMapper;
 
 /**
- * Meilisearch-backed implementation of {@link BookSearchService}.
+ * Meilisearch-backed {@link BookSearchService}.
  *
- * <p>TODO(implementer): method bodies throw {@code UnsupportedOperationException}
- * until the SDK calls land. See {@code BookSearchService} Javadoc for the contract.
+ * <p>A search failure returns an empty result so a Meilisearch outage degrades search rather than
+ * failing the request; index and remove failures propagate so a background write is never lost
+ * silently.
  */
 @Service
 @RequiredArgsConstructor
 public class MeilisearchBookSearchService implements BookSearchService {
 
-    private static final String NOT_IMPLEMENTED = "not yet implemented";
+    private static final Logger LOG = LoggerFactory.getLogger(MeilisearchBookSearchService.class);
 
     private final Client client;
+
     private final MeilisearchProperties props;
 
-    /**
-     * Fail-fast assertion that DI wired the client and properties.
-     */
-    @PostConstruct
-    void assertWired() {
-        Objects.requireNonNull(client, "Meilisearch client must be wired");
-        Objects.requireNonNull(props, "MeilisearchProperties must be wired");
-    }
+    private final ObjectMapper objectMapper;
 
     @Override
+    @Cacheable(cacheNames = "searchResults", cacheManager = "searchCacheManager",
+        unless = "#result.totalHits() == 0")
     public BookSearchResult search(final String query, final int offset, final int limit) {
-        throw new UnsupportedOperationException(NOT_IMPLEMENTED);
+        try {
+            final SearchRequest request = new SearchRequest(query).setOffset(offset).setLimit(limit);
+            final SearchResult result = (SearchResult) booksIndex().search(request);
+            final List<BookSearchDocument> hits = result.getHits().stream()
+                .map(hit -> objectMapper.convertValue(hit, BookSearchDocument.class))
+                .toList();
+            return new BookSearchResult(hits, result.getEstimatedTotalHits(), offset, limit);
+        } catch (MeilisearchException ex) {
+            LOG.warn("search.query failed, returning no results query={} ({})",
+                LogSanitizer.forLog(query), ex.getClass().getSimpleName());
+            return new BookSearchResult(List.of(), 0, offset, limit);
+        }
     }
 
     @Override
     public void index(final Collection<BookSearchDocument> documents) {
-        throw new UnsupportedOperationException(NOT_IMPLEMENTED);
+        if (documents.isEmpty()) {
+            return;
+        }
+        try {
+            final String json = objectMapper.writeValueAsString(documents);
+            final Index index = booksIndex();
+            index.waitForTask(index.addDocuments(json, BookSearchDocument.PRIMARY_KEY).getTaskUid());
+        } catch (MeilisearchException ex) {
+            throw new SearchIndexException("indexing " + documents.size() + " books failed", ex);
+        }
     }
 
     @Override
     public void remove(final String bookId) {
-        throw new UnsupportedOperationException(NOT_IMPLEMENTED);
+        try {
+            final Index index = booksIndex();
+            index.waitForTask(index.deleteDocument(bookId).getTaskUid());
+        } catch (MeilisearchException ex) {
+            throw new SearchIndexException("removing book " + bookId + " from the index failed", ex);
+        }
+    }
+
+    private Index booksIndex() {
+        return client.index(props.indexName());
     }
 }

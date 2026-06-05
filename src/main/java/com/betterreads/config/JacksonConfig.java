@@ -1,11 +1,10 @@
 package com.betterreads.config;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import org.springframework.boot.autoconfigure.jackson.Jackson2ObjectMapperBuilderCustomizer;
+import org.springframework.boot.jackson.autoconfigure.JsonMapperBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import tools.jackson.databind.DeserializationFeature;
 
 /**
  * Jackson defaults.
@@ -17,12 +16,10 @@ import org.springframework.context.annotation.Configuration;
 public class JacksonConfig {
 
     @Bean
-    Jackson2ObjectMapperBuilderCustomizer jacksonCustomizer() {
+    JsonMapperBuilderCustomizer jacksonCustomizer() {
         return builder -> builder
-            .featuresToDisable(
-                DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,
-                SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-            .serializationInclusion(JsonInclude.Include.NON_NULL)
-            .findModulesViaServiceLoader(true);
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .changeDefaultPropertyInclusion(value -> value.withValueInclusion(JsonInclude.Include.NON_NULL))
+            .findAndAddModules();
     }
 }

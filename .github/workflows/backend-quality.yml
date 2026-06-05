@@ -53,6 +53,7 @@ jobs:
       - name: OWASP dependency-check
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+          GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx5g
         run: ./gradlew dependencyCheckAnalyze
 
       - name: Upload static analysis reports

@@ -9,7 +9,7 @@ The currently-implemented module is `auth`. The same shape is enforced by ArchUn
 ## Stack
 
 - Java 25
-- Spring Boot 3.5
+- Spring Boot 4.0
 - Spring Web, Spring Data JPA, Spring Security (resource server for Cloudflare Access JWT validation)
 - PostgreSQL 17
 - Caffeine cache

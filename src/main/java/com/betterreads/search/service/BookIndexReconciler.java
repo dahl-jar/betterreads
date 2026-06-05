@@ -1,39 +1,43 @@
 package com.betterreads.search.service;
 
-import jakarta.annotation.PostConstruct;
-import java.util.Objects;
+import java.util.List;
+
+import com.betterreads.catalog.repository.BookRepository;
+import com.betterreads.search.dto.BookSearchDocument;
+import com.betterreads.search.mapper.BookSearchDocumentMapper;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Pushes the canonical book set from Postgres into the Meilisearch index.
+ * Pushes the full catalog into the Meilisearch index nightly.
  *
- * <p>Postgres is the source of truth; the index is a derived view. The
- * reconciler is safe to re-run at any cadence because documents are upserted
- * by id.
- *
- * <p>TODO(implementer): {@link #reconcile()} body is not implemented.
+ * <p>Safe to re-run at any cadence because documents are upserted by id. This is the floor that
+ * heals any book the per-promotion index hook missed, for example after a Meilisearch outage.
  */
 @Component
 @RequiredArgsConstructor
 public class BookIndexReconciler {
 
+    private static final Logger LOG = LoggerFactory.getLogger(BookIndexReconciler.class);
+
+    private final BookRepository books;
+
+    private final BookSearchDocumentMapper mapper;
+
     private final BookSearchService searchService;
 
-    /**
-     * Fail-fast assertion that DI wired the search service.
-     */
-    @PostConstruct
-    void assertWired() {
-        Objects.requireNonNull(searchService, "BookSearchService must be wired");
-    }
-
-    /**
-     * Reconciles the entire catalog into the search index.
-     */
+    /** Indexes every catalog book. */
     @Scheduled(cron = "0 30 3 * * *")
+    @Transactional(readOnly = true)
     public void reconcile() {
-        throw new UnsupportedOperationException("not yet implemented");
+        final List<BookSearchDocument> documents = books.findAllBy().stream()
+            .map(mapper::toDocument)
+            .toList();
+        searchService.index(documents);
+        LOG.info("search.reconcile indexed {} books", documents.size());
     }
 }

@@ -1,5 +1,11 @@
 package com.betterreads.auth;
 
+import com.betterreads.support.ContainerizedTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
+
 import com.betterreads.auth.entity.User;
 import com.betterreads.auth.passwordreset.PasswordResetService;
 import com.betterreads.auth.token.EmailToken;
@@ -9,9 +15,9 @@ import com.betterreads.auth.refresh.RefreshTokenRepository;
 import com.betterreads.auth.repository.UserRepository;
 import com.betterreads.mail.outbox.MailOutbox;
 import com.betterreads.mail.outbox.MailOutboxRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import jakarta.servlet.http.Cookie;
 
@@ -25,7 +31,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -33,7 +39,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.FilterChainProxy;
@@ -42,8 +47,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -71,8 +74,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "mail.app-base-url=https://test.example.com",
     "mail.outbox.worker-enabled=false"
 })
-@SuppressWarnings({"PMD.ExcessiveImports", "PMD.CouplingBetweenObjects"})
-class PasswordResetIntegrationTest {
+@SuppressWarnings("PMD.ExcessiveImports")
+class PasswordResetIntegrationTest extends ContainerizedTest {
+
+    @Container
+    @ServiceConnection
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
 
     private static final String FORGOT_URL = "/api/v1/auth/forgot-password";
 
@@ -107,10 +114,6 @@ class PasswordResetIntegrationTest {
     private static final int CONCURRENT_THREADS = 16;
 
     private static final int CONCURRENT_TIMEOUT_SECONDS = 10;
-
-    @Container
-    @ServiceConnection
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17");
 
     @Autowired
     private WebApplicationContext webApplicationContext;
@@ -391,22 +394,20 @@ class PasswordResetIntegrationTest {
             });
     }
 
-    private String forgotPayload(final String email) throws JsonProcessingException {
+    private String forgotPayload(final String email) {
         final ObjectNode node = objectMapper.createObjectNode();
         node.put(FIELD_EMAIL, email);
         return objectMapper.writeValueAsString(node);
     }
 
-    private String resetPayload(final String token, final String newPassword)
-        throws JsonProcessingException {
+    private String resetPayload(final String token, final String newPassword) {
         final ObjectNode node = objectMapper.createObjectNode();
         node.put(FIELD_TOKEN, token);
         node.put(FIELD_NEW_PASSWORD, newPassword);
         return objectMapper.writeValueAsString(node);
     }
 
-    private String loginPayload(final String identifier, final String password)
-        throws JsonProcessingException {
+    private String loginPayload(final String identifier, final String password) {
         final ObjectNode node = objectMapper.createObjectNode();
         node.put(FIELD_IDENTIFIER, identifier);
         node.put(FIELD_PASSWORD, password);
@@ -424,8 +425,8 @@ class PasswordResetIntegrationTest {
     private String payloadField(final MailOutbox row, final String field) {
         try {
             final JsonNode node = objectMapper.readTree(row.getPayload());
-            return node.path(field).asText();
-        } catch (final JsonProcessingException ex) {
+            return node.path(field).asString();
+        } catch (final JacksonException ex) {
             throw new IllegalStateException("malformed outbox payload", ex);
         }
     }

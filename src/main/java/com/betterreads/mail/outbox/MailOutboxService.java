@@ -1,13 +1,12 @@
 package com.betterreads.mail.outbox;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import java.time.Instant;
 import java.util.Map;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Entry point for queuing outbound email.
@@ -58,7 +57,7 @@ public class MailOutboxService {
     private String serialize(final Map<String, Object> payload) {
         try {
             return objectMapper.writeValueAsString(payload);
-        } catch (final JsonProcessingException ex) {
+        } catch (final JacksonException ex) {
             throw new IllegalStateException("failed to serialize outbox payload", ex);
         }
     }
