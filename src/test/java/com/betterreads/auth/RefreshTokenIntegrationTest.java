@@ -1,13 +1,18 @@
 package com.betterreads.auth;
 
+import com.betterreads.support.ContainerizedTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
+
 import com.betterreads.auth.entity.User;
 import com.betterreads.auth.ratelimit.RateLimitFilter;
 import com.betterreads.auth.refresh.RefreshTokenRepository;
 import com.betterreads.auth.repository.UserRepository;
 import com.betterreads.mail.outbox.MailOutboxRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import jakarta.servlet.http.Cookie;
 
@@ -21,7 +26,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.FilterChainProxy;
@@ -30,8 +34,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -55,8 +57,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "auth.refresh-cookie.secure=true",
     "mail.outbox.worker-enabled=false"
 })
-@SuppressWarnings("PMD.TooManyStaticImports")
-class RefreshTokenIntegrationTest {
+class RefreshTokenIntegrationTest extends ContainerizedTest {
+
+    @Container
+    @ServiceConnection
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
 
     private static final String LOGIN_URL = "/api/v1/auth/login";
 
@@ -87,10 +92,6 @@ class RefreshTokenIntegrationTest {
     private static final String FIELD_IDENTIFIER = "identifier";
 
     private static final long REFRESH_TTL_SECONDS = 30L * 24 * 60 * 60;
-
-    @Container
-    @ServiceConnection
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17");
 
     @Autowired
     private WebApplicationContext webApplicationContext;
@@ -302,8 +303,7 @@ class RefreshTokenIntegrationTest {
             });
     }
 
-    private String registerPayload(final String username, final String email, final String password)
-        throws JsonProcessingException {
+    private String registerPayload(final String username, final String email, final String password) {
         final ObjectNode node = objectMapper.createObjectNode();
         node.put(FIELD_USERNAME, username);
         node.put(FIELD_EMAIL, email);
@@ -311,8 +311,7 @@ class RefreshTokenIntegrationTest {
         return objectMapper.writeValueAsString(node);
     }
 
-    private String loginPayload(final String identifier, final String password)
-        throws JsonProcessingException {
+    private String loginPayload(final String identifier, final String password) {
         final ObjectNode node = objectMapper.createObjectNode();
         node.put(FIELD_IDENTIFIER, identifier);
         node.put(FIELD_PASSWORD, password);

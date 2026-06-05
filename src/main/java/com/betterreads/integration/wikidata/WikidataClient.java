@@ -1,10 +1,10 @@
 package com.betterreads.integration.wikidata;
 
-import com.betterreads.catalog.service.BookSourceClient;
-import com.betterreads.catalog.service.SourceBook;
+import com.betterreads.catalog.service.source.BookSourceClient;
+import com.betterreads.catalog.service.source.SourceBook;
 import java.util.Optional;
 
-/** Wikidata boundary over the SPARQL endpoint and the REST entity API. */
+/** Wikidata client over the SPARQL endpoint and the REST entity API. */
 public interface WikidataClient extends BookSourceClient {
 
     /**

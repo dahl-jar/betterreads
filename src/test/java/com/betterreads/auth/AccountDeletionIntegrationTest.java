@@ -1,5 +1,11 @@
 package com.betterreads.auth;
 
+import com.betterreads.support.ContainerizedTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
+
 import com.betterreads.auth.deletion.AccountDeletionSweep;
 import com.betterreads.auth.emailverification.EmailVerificationService;
 import com.betterreads.auth.passwordreset.PasswordResetService;
@@ -9,9 +15,8 @@ import com.betterreads.auth.repository.UserRepository;
 import com.betterreads.auth.token.EmailToken;
 import com.betterreads.auth.token.EmailTokenRepository;
 import com.betterreads.mail.outbox.MailOutboxRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import jakarta.servlet.http.Cookie;
 
@@ -26,7 +31,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.web.FilterChainProxy;
@@ -35,8 +39,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -71,12 +73,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "mail.app-base-url=https://test.example.com",
     "mail.outbox.worker-enabled=false"
 })
-@SuppressWarnings({
-    "PMD.ExcessiveImports",
-    "PMD.TooManyStaticImports",
-    "PMD.TooManyMethods"
-})
-class AccountDeletionIntegrationTest {
+@SuppressWarnings({"PMD.TooManyMethods", "PMD.ExcessiveImports"})
+class AccountDeletionIntegrationTest extends ContainerizedTest {
+
+    @Container
+    @ServiceConnection
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
 
     private static final String REGISTER_URL = "/api/v1/auth/register";
 
@@ -117,10 +119,6 @@ class AccountDeletionIntegrationTest {
     private static final long IN_GRACE_HOURS_AGO = 1L;
 
     private static final long PAST_GRACE_HOURS_AGO = 7L;
-
-    @Container
-    @ServiceConnection
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17");
 
     @Autowired
     private WebApplicationContext webApplicationContext;
@@ -387,7 +385,7 @@ class AccountDeletionIntegrationTest {
             .andExpect(status().isOk())
             .andReturn();
         final String body = result.getResponse().getContentAsString();
-        final String accessToken = objectMapper.readTree(body).at("/accessToken").asText();
+        final String accessToken = objectMapper.readTree(body).at("/accessToken").asString();
         final String setCookie = result.getResponse().getHeader(SET_COOKIE_HEADER);
         if (setCookie == null) {
             throw new IllegalStateException("login response is missing the Set-Cookie header");
@@ -442,8 +440,7 @@ class AccountDeletionIntegrationTest {
         return count == null ? 0 : count;
     }
 
-    private String registerPayload(final String username, final String email, final String password)
-        throws JsonProcessingException {
+    private String registerPayload(final String username, final String email, final String password) {
         final ObjectNode node = objectMapper.createObjectNode();
         node.put(FIELD_USERNAME, username);
         node.put(FIELD_EMAIL, email);
@@ -451,15 +448,14 @@ class AccountDeletionIntegrationTest {
         return objectMapper.writeValueAsString(node);
     }
 
-    private String loginPayload(final String identifier, final String password)
-        throws JsonProcessingException {
+    private String loginPayload(final String identifier, final String password) {
         final ObjectNode node = objectMapper.createObjectNode();
         node.put(FIELD_IDENTIFIER, identifier);
         node.put(FIELD_PASSWORD, password);
         return objectMapper.writeValueAsString(node);
     }
 
-    private String forgotPayload(final String email) throws JsonProcessingException {
+    private String forgotPayload(final String email) {
         final ObjectNode node = objectMapper.createObjectNode();
         node.put(FIELD_EMAIL, email);
         return objectMapper.writeValueAsString(node);

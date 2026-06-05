@@ -33,4 +33,4 @@ FROM email_verification_token;
 -- The old tables are kept for one deploy cycle so the documented rollback path
 -- (mv app.jar.previous app.jar) can boot the previous jar, which still maps the
 -- legacy entities and would otherwise fail Hibernate ddl-auto: validate.
--- A follow-up migration (V17) drops them once the new jar has been verified live.
+-- A later migration drops them once the new jar is verified live.

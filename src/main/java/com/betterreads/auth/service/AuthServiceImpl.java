@@ -1,5 +1,6 @@
 package com.betterreads.auth.service;
 
+import com.betterreads.auth.Emails;
 import com.betterreads.auth.dto.AuthResponse;
 import com.betterreads.auth.dto.LoginRequest;
 import com.betterreads.auth.dto.RegisterRequest;
@@ -15,7 +16,7 @@ import com.betterreads.common.crypto.PasswordByteLimit;
 import com.betterreads.common.exception.BusinessRuleException;
 import com.betterreads.common.util.LogSanitizer;
 
-import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -78,7 +79,7 @@ class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public TokenPair register(final RegisterRequest request) {
-        final String normalizedEmail = normalizeEmail(request.email());
+        final String normalizedEmail = Emails.normalize(request.email());
         PasswordByteLimit.check(request.password());
 
         if (userRepository.existsByUsername(request.username())) {
@@ -91,7 +92,7 @@ class AuthServiceImpl implements AuthService {
         final User user = new User();
         user.setUsername(request.username());
         user.setEmail(normalizedEmail);
-        user.setPasswordHash(passwordEncoder.encode(request.password()));
+        user.setPasswordHash(Objects.requireNonNull(passwordEncoder.encode(request.password())));
 
         final User saved;
         try {
@@ -107,15 +108,11 @@ class AuthServiceImpl implements AuthService {
         return buildTokenPair(saved);
     }
 
-    private static String normalizeEmail(final String email) {
-        return email.trim().toLowerCase(Locale.ROOT);
-    }
-
     @Override
     @Transactional
     public TokenPair login(final LoginRequest request) {
         final String identifier = request.identifier().trim();
-        final String normalizedEmailIdentifier = normalizeEmail(identifier);
+        final String normalizedEmailIdentifier = Emails.normalize(identifier);
         final User user = userRepository.findByUsername(identifier)
             .or(() -> userRepository.findByEmail(normalizedEmailIdentifier))
             .orElseThrow(() -> {

@@ -1,10 +1,10 @@
 package com.betterreads.integration.loc;
 
-import com.betterreads.catalog.service.BookSourceClient;
-import com.betterreads.catalog.service.SourceBook;
+import com.betterreads.catalog.service.source.BookSourceClient;
+import com.betterreads.catalog.service.source.SourceBook;
 import java.util.Optional;
 
-/** Library of Congress linked data service boundary (JSON-LD over {@code id.loc.gov}). */
+/** Library of Congress catalog client over the SRU endpoint ({@code lx2.loc.gov:210/lcdb}). */
 public interface LocClient extends BookSourceClient {
 
     /**
