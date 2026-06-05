@@ -66,6 +66,12 @@ class MeilisearchBookSearchServiceIntegrationTest extends ContainerizedTest {
 
     private static final String COMMON_QUERY = "the";
 
+    private static final String LOTR_SERIES = "The Lord of the Rings";
+
+    private static final String SERIES_QUERY = "lord of the rings";
+
+    private static final int LOTR_VOLUMES = 3;
+
     static final GenericContainer<?> MEILISEARCH = new GenericContainer<>(
             DockerImageName.parse("getmeili/meilisearch:v1.11"))
         .withExposedPorts(MEILISEARCH_PORT)
@@ -95,10 +101,10 @@ class MeilisearchBookSearchServiceIntegrationTest extends ContainerizedTest {
     void indexCorpus() {
         cacheManager.getCache("searchResults").clear();
         searchService.index(List.of(
-            doc("1", HOBBIT_TITLE, TOLKIEN),
-            doc("2", "The Fellowship of the Ring", TOLKIEN),
-            doc("3", "The Two Towers", TOLKIEN),
-            doc("4", "The Return of the King", TOLKIEN)));
+            doc("1", HOBBIT_TITLE, TOLKIEN, null),
+            doc("2", "The Fellowship of the Ring", TOLKIEN, LOTR_SERIES),
+            doc("3", "The Two Towers", TOLKIEN, LOTR_SERIES),
+            doc("4", "The Return of the King", TOLKIEN, LOTR_SERIES)));
     }
 
     @Nested
@@ -126,6 +132,17 @@ class MeilisearchBookSearchServiceIntegrationTest extends ContainerizedTest {
         }
 
         @Test
+        @DisplayName("finds a series' volumes by the series name")
+        void findsBySeriesName() {
+            final BookSearchResult result = searchService.search(SERIES_QUERY, 0, FULL_PAGE);
+
+            assertThat(result.hits())
+                .hasSize(LOTR_VOLUMES)
+                .extracting(BookSearchDocument::bookId)
+                .containsExactlyInAnyOrder("2", "3", "4");
+        }
+
+        @Test
         @DisplayName("slices the hits by offset and limit with the full total")
         void pages() {
             final BookSearchResult firstPage = searchService.search(COMMON_QUERY, 0, PAGE_SIZE);
@@ -145,7 +162,7 @@ class MeilisearchBookSearchServiceIntegrationTest extends ContainerizedTest {
         @Test
         @DisplayName("drops the removed book from later results")
         void removesFromIndex() {
-            searchService.index(List.of(doc("99", "Silmarillion", TOLKIEN)));
+            searchService.index(List.of(doc("99", "Silmarillion", TOLKIEN, null)));
 
             searchService.remove("99");
 
@@ -154,8 +171,15 @@ class MeilisearchBookSearchServiceIntegrationTest extends ContainerizedTest {
         }
     }
 
-    private static BookSearchDocument doc(final String id, final String title, final String author) {
-        return new BookSearchDocument(
-            id, title, null, List.of(author), List.of(), "en", FIXTURE_YEAR, FIXTURE_POPULARITY);
+    private static BookSearchDocument doc(
+        final String id, final String title, final String author, final String seriesName) {
+        return BookSearchDocument.builder(id)
+            .title(title)
+            .seriesName(seriesName)
+            .authors(List.of(author))
+            .language("en")
+            .publicationYear(FIXTURE_YEAR)
+            .popularityScore(FIXTURE_POPULARITY)
+            .build();
     }
 }

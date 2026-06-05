@@ -27,6 +27,8 @@ class BookSearchDocumentMapperTest {
 
     private static final String MISTBORN_TITLE = "Mistborn";
 
+    private static final String SERIES = "Mistborn Era One";
+
     private static final String LANGUAGE = "en";
 
     private static final int YEAR = 2006;
@@ -46,6 +48,7 @@ class BookSearchDocumentMapperTest {
     void mapsFields() {
         final Book book = book(MISTBORN_KEY, builder -> builder
             .title(MISTBORN_TITLE)
+            .seriesName(SERIES)
             .language(LANGUAGE)
             .publicationYear(YEAR)
             .rawSubjects(List.of(SUBJECT)));
@@ -56,9 +59,10 @@ class BookSearchDocumentMapperTest {
             .extracting(
                 BookSearchDocument::bookId,
                 BookSearchDocument::title,
+                BookSearchDocument::seriesName,
                 BookSearchDocument::language,
                 BookSearchDocument::publicationYear)
-            .containsExactly(MISTBORN_KEY, MISTBORN_TITLE, LANGUAGE, YEAR);
+            .containsExactly(MISTBORN_KEY, MISTBORN_TITLE, SERIES, LANGUAGE, YEAR);
         assertThat(document.authors()).containsExactly(AUTHOR);
         assertThat(document.subjects()).containsExactly(SUBJECT);
     }

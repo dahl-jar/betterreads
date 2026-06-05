@@ -29,7 +29,7 @@ public class MeilisearchIndexInitializer implements ApplicationRunner {
 
     private static final String PUBLICATION_YEAR = "publicationYear";
 
-    private static final String[] SEARCHABLE = {"title", "subtitle", "authors", "subjects"};
+    private static final String[] SEARCHABLE = {"title", "subtitle", "seriesName", "authors", "subjects"};
 
     private static final String[] SORTABLE = {"popularityScore", PUBLICATION_YEAR};
 

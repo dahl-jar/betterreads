@@ -18,15 +18,16 @@ public class BookSearchDocumentMapper {
 
     /** Builds the search document for the given book. */
     public BookSearchDocument toDocument(final Book book) {
-        return new BookSearchDocument(
-            book.getDedupKey(),
-            book.getTitle(),
-            book.getSubtitle(),
-            book.getAuthors().stream().map(Author::getName).sorted().toList(),
-            book.getSubjects().stream().map(BookSubject::getSubject).toList(),
-            book.getLanguage(),
-            book.getFirstPublishYear(),
-            popularityScore(book));
+        return BookSearchDocument.builder(book.getDedupKey())
+            .title(book.getTitle())
+            .subtitle(book.getSubtitle())
+            .seriesName(book.getSeriesName())
+            .authors(book.getAuthors().stream().map(Author::getName).sorted().toList())
+            .subjects(book.getSubjects().stream().map(BookSubject::getSubject).toList())
+            .language(book.getLanguage())
+            .publicationYear(book.getFirstPublishYear())
+            .popularityScore(popularityScore(book))
+            .build();
     }
 
     private static double popularityScore(final Book book) {
