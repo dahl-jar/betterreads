@@ -110,6 +110,11 @@ class SearchQueryCacheIntegrationTest extends ContainerizedTest {
     }
 
     private static BookSearchDocument doc(final String id, final String title) {
-        return new BookSearchDocument(id, title, null, List.of(), List.of(), "en", FIRST_YEAR, POPULARITY);
+        return BookSearchDocument.builder(id)
+            .title(title)
+            .language("en")
+            .publicationYear(FIRST_YEAR)
+            .popularityScore(POPULARITY)
+            .build();
     }
 }
