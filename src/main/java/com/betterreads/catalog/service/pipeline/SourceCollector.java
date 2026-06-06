@@ -30,9 +30,8 @@ import org.springframework.web.reactive.function.client.WebClientException;
  *
  * <p>The seed's own discovery source is skipped; the rest run in two waves, the show-field sources
  * first and the low-yield sources (awards, authority cross-references) second, with the sources in a
- * wave fetched concurrently. Both waves run so the per-field priority merge sees every source. A
- * source that fails (5xx, network error, or timeout) is dropped for this book and the merge proceeds
- * with the rest, so one flaky source does not sink a candidate or the surrounding batch.
+ * wave fetched concurrently. Both waves always run. A source that fails (5xx, network error, or
+ * timeout) is dropped for this book and the merge proceeds with the remaining sources.
  */
 @Component
 public class SourceCollector {
@@ -70,10 +69,10 @@ public class SourceCollector {
     /**
      * Fetches every source for the seed, wave by wave, and returns the merge with the matches.
      *
-     * <p>Both waves always run so the per-field priority merge sees every source and the enrichment
-     * fields (rating, awards, full genre, page count, author identity) the show bar does not require
-     * still land. The waves order the fetches by latency, not by a stop condition: the fast
-     * show-field sources first, the slow ones after, each wave fetched concurrently.
+     * <p>Both waves always run, so the merge sees every source, including the enrichment fields the
+     * show bar does not require (rating, awards, full genre, page count, author identity). The waves
+     * order the fetches by latency, not by a stop condition: the fast show-field sources first, the
+     * slow ones after, each wave fetched concurrently.
      */
     public MergedBook collectFor(final SourceBook seed) {
         final List<SourceBook> found = new ArrayList<>();
@@ -97,9 +96,9 @@ public class SourceCollector {
     }
 
     /**
-     * Waits up to one timeout for the whole wave, then cancels whatever is still running, so the wave
-     * costs one timeout total rather than one per stalled source. A failed source is harvested as
-     * empty by {@link #completedValue}; the rest still merge.
+     * Waits up to one timeout for the whole wave, then cancels whatever is still running. One timeout
+     * covers the wave, not one per source. A failed source is harvested as empty by
+     * {@link #completedValue}; the rest still merge.
      */
     @SuppressWarnings("PMD.DoNotUseThreads")
     private static void awaitWave(final List<CompletableFuture<Optional<SourceBook>>> calls) {

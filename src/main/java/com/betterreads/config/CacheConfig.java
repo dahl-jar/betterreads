@@ -24,10 +24,9 @@ import tools.jackson.databind.ObjectMapper;
  * Two caches with different homes: promoted book detail in Redis, and a short-lived in-process cache
  * for search results.
  *
- * <p>Book detail is Redis-backed so every replica shares it; it is written once at promotion and
+ * <p>Book detail is Redis-backed, shared across replicas. It is written once at promotion and
  * evicted on re-enrichment, with a TTL backstop and the cluster {@code allkeys-lru} cap bounding
- * growth. Search results stay in Caffeine with a short TTL so a burst of identical queries reuses one
- * Meilisearch call without holding volatile result lists in Redis.
+ * growth. Search results stay in Caffeine with a short TTL, in-process and not in Redis.
  */
 @Configuration
 @EnableCaching

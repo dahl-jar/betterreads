@@ -117,8 +117,8 @@ class GlobalExceptionHandler {
     /**
      * Maps an unsupported HTTP method to {@code 405} with an {@code Allow} header.
      *
-     * <p>Without this handler the default falls through to the catch-all {@code 500}, which is
-     * wrong for a client error and pollutes 5xx alerting.
+     * <p>Without this handler the default falls through to the catch-all {@code 500}, turning a
+     * client error into a server error in the 5xx metrics.
      */
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ApiErrorResponse> handleMethodNotSupported(
@@ -146,8 +146,8 @@ class GlobalExceptionHandler {
     /**
      * Maps an unsupported {@code Content-Type} to {@code 415}.
      *
-     * <p>Without this handler the default falls through to {@code 500}, which is wrong for a
-     * client error.
+     * <p>Without this handler the default falls through to {@code 500}, turning a client error into
+     * a server error.
      */
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     public ResponseEntity<ApiErrorResponse> handleMediaTypeNotSupported(
@@ -180,8 +180,7 @@ class GlobalExceptionHandler {
 
     /**
      * Lets an SSE stream that times out close quietly. The response is already committed as
-     * {@code text/event-stream}, so serializing an error body onto it fails; the stream just ends and
-     * the client reconnects or falls back to a plain detail read.
+     * {@code text/event-stream}, so serializing an error body onto it would fail.
      */
     @ExceptionHandler(AsyncRequestTimeoutException.class)
     @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)

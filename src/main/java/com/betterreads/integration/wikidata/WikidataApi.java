@@ -18,7 +18,7 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * Wikidata entity search and entity fetch.
  *
- * <p>4xx resolves to empty; 5xx and network failures propagate so the caller can retry.
+ * <p>4xx resolves to empty; 5xx and network failures propagate.
  */
 @Component
 public class WikidataApi {

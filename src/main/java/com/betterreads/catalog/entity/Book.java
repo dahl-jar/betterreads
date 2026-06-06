@@ -184,8 +184,8 @@ public class Book {
     }
 
     /**
-     * Sets the public key once, to the first present source identifier in the staging order, so the
-     * key stays stable even when a later source supplies a higher-precedence id.
+     * Sets the public key once, to the first present source identifier in the staging order. A later
+     * source supplying a higher-precedence id does not change it.
      *
      * @throws IllegalArgumentException if the source carries no identifier to key the book on
      */

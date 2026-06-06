@@ -13,7 +13,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  *
  * <p>Shared by the enrichment and discovery clients: both issue the same query shape and need the
  * same 4xx-to-empty / 5xx-propagates contract, differing only in the CQL and record schema. 4xx
- * resolves to empty; 5xx and network failures propagate so the caller can retry.
+ * resolves to empty; 5xx and network failures propagate.
  */
 @Component
 public class LocSru {

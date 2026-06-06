@@ -8,7 +8,7 @@ import org.jspecify.annotations.Nullable;
  * Book detail returned by {@code GET /api/v1/books/{key}}.
  *
  * <p>{@code complete} is true for a promoted catalog book and false for a staging seed served while
- * enrichment is still running, so the client knows whether the missing fields will fill in.
+ * enrichment is still running.
  *
  * @param key the lookup key, a source identifier shared with search results
  * @param complete true when the book is promoted, false when it is still a staging seed

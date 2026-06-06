@@ -1,6 +1,6 @@
 # How to back up and restore Postgres
 
-Postgres holds all persistent state: user accounts, reviews, collections. A daily CronJob dumps the database, encrypts it, and uploads to Cloudflare R2. This runbook covers operating it.
+Postgres holds all persistent state: user accounts and the catalog. A daily CronJob dumps the database, encrypts it, and uploads to Cloudflare R2. This runbook covers operating it.
 
 ## What ends up in the bucket
 
@@ -17,7 +17,7 @@ The CronJob reads its credentials from the `betterreads-backup` sealed secret. P
 - An R2 token with Object Read & Write, scoped to the backups bucket. Save the Access Key ID and Secret Access Key when R2 shows them; they appear once.
 - The bucket name and the R2 S3 endpoint.
 
-Seal them with `projects/betterreads/seal-backup.sh` (it reads the values from env vars, never writes them in plaintext), commit the sealed output, and let Argo apply it.
+Seal them with the backup sealing script, which reads the values from env vars and never writes them in plaintext, then commit the sealed output and let Argo apply it.
 
 Add the R2 lifecycle rule so old backups expire:
 

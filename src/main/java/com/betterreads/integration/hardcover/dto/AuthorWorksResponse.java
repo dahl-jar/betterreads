@@ -8,8 +8,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * Hardcover author works response.
  *
- * <p>Chain: {@code data.authors[].contributions[].book}, ordered by readers so the headline titles
- * come first.
+ * <p>Chain: {@code data.authors[].contributions[].book}, ordered by readers.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record AuthorWorksResponse(@Nullable Data data) {

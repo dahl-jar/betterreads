@@ -23,9 +23,7 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Meilisearch-backed {@link BookSearchService}.
  *
- * <p>A search failure returns an empty result so a Meilisearch outage degrades search rather than
- * failing the request; index and remove failures propagate so a background write is never lost
- * silently.
+ * <p>A search failure returns an empty result. Index and remove failures propagate.
  */
 @Service
 @RequiredArgsConstructor

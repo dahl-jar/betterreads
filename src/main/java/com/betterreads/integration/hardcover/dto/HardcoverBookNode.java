@@ -10,10 +10,9 @@ import tools.jackson.databind.annotation.JsonNaming;
 /**
  * A {@code books} node from a Hardcover series or author enumeration.
  *
- * <p>Carries the fields both enumerations read so the seed arrives with what Hardcover already
- * knows: title, rating, year, cover, description, language, and authors. {@code canonicalId} differs
- * from {@code id} on a translation or alternate edition; {@code language} can be null on an edition
- * that exists but has none set.
+ * <p>Carries the fields both enumerations read: title, rating, year, cover, description, language,
+ * and authors. {@code canonicalId} differs from {@code id} on a translation or alternate edition;
+ * {@code language} can be null on an edition that exists but has none set.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonNaming(SnakeCaseStrategy.class)

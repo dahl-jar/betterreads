@@ -19,8 +19,8 @@ import org.springframework.stereotype.Component;
  *
  * <p>The enumeration lists every edition and translation at each position. One volume survives per
  * integer position 1 to the series' primary book count: the most-read English canonical single book
- * at that position. Each surviving volume carries the fields the enumeration returned, so the seed
- * needs no further Hardcover call. Positions with no qualifying book are dropped.
+ * at that position. Each surviving volume carries the fields the enumeration returned. Positions with
+ * no qualifying book are dropped.
  */
 @Component
 public class HardcoverSeriesMapper {

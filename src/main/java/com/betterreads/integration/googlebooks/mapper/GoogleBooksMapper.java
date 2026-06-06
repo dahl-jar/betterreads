@@ -21,8 +21,8 @@ import org.springframework.stereotype.Component;
  * <p>{@code pageCount} is {@code 0} on reprints where Google has metadata but no real page
  * count, so it is nulled. {@code industryIdentifiers} sometimes carries only an {@code ISBN_10},
  * never synthesized into an ISBN-13. {@code description} ships with embedded HTML
- * ({@code <p>}, {@code <b>}, {@code <i>}, {@code <br>}), stripped before persistence so the
- * tags do not leak into rendered catalog text. {@code categories} are reduced to canonical genres
+ * ({@code <p>}, {@code <b>}, {@code <i>}, {@code <br>}), stripped before persistence.
+ * {@code categories} are reduced to canonical genres
  * like the other sources. Rating is not mapped; only Hardcover supplies a trustworthy rating.
  */
 @Component
@@ -69,9 +69,8 @@ public class GoogleBooksMapper {
     /**
      * Returns the edition's thumbnail as an https URL, or null when Google supplies none.
      *
-     * <p>The cover is the one Google attaches to this specific edition, so an English volume carries
-     * its English cover. Google serves the thumbnail over http, upgraded to https so it loads on an
-     * https page without a mixed-content block.
+     * <p>The cover is the one Google attaches to this specific edition. Google serves the thumbnail
+     * over http, upgraded to https so it loads on an https page without a mixed-content block.
      */
     static @Nullable String coverUrl(final @Nullable ImageLinks imageLinks) {
         if (imageLinks == null) {

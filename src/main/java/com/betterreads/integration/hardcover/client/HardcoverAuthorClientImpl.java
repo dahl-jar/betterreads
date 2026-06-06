@@ -23,11 +23,10 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 /**
  * Hardcover author client.
  *
- * <p>An Author search can return a co-author credit ahead of the author themselves, so the candidate
- * is the hit with the most books rather than the first. The chosen author id drives the works
- * enumeration, ordered by readers so the headline titles come first. A 401 means the token expired
- * or was revoked and resolves to empty; other 4xx resolve to empty; 5xx and network failures
- * propagate.
+ * <p>An Author search can return a co-author credit ahead of the author themselves. The candidate is
+ * the hit with the most books. The chosen author id drives the works enumeration, ordered by readers.
+ * A 401 means the token expired or was revoked and resolves to empty; other 4xx resolve to empty; 5xx
+ * and network failures propagate.
  */
 @Component
 public class HardcoverAuthorClientImpl implements HardcoverAuthorClient {

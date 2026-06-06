@@ -10,7 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Serves book detail for the read endpoint, preferring the promoted catalog book and falling back
- * to the staging seed so a just-staged book is still readable while enrichment runs.
+ * to the staging seed.
  *
  * <p>Only the promoted branch is cached; a seed is served straight from the database because it
  * changes as enrichment fills it.

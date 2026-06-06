@@ -33,7 +33,7 @@ Argo CD keeps deployment history. Roll the workload back to the previous Replica
 kubectl rollout undo deploy/betterreads -n betterreads
 ```
 
-To pin to a known-good image instead, set the `sha-<commit>` tag in the manifests repo's `kustomization.yaml` and let Argo sync. Reverting the CI deploy commit has the same effect, and keeps Git as the source of truth.
+To pin to a known-good image instead, set the `sha-<commit>` tag in the manifests repo's `kustomization.yaml` and let Argo sync. Reverting the CI deploy commit has the same effect.
 
 ## Changing config
 

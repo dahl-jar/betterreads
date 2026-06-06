@@ -14,8 +14,8 @@ import org.springframework.stereotype.Component;
  *
  * <p>The contributions arrive ordered by readers. A book survives when it is the canonical work, has
  * an English edition, and its title is a single book rather than a boxed set. Each surviving book
- * carries the fields the enumeration returned, so the seed needs no further Hardcover call. Order is
- * preserved and the list is capped at {@link #MAX_BOOKS}.
+ * carries the fields the enumeration returned. Order is preserved and the list is capped at
+ * {@link #MAX_BOOKS}.
  */
 @Component
 public class HardcoverAuthorMapper {

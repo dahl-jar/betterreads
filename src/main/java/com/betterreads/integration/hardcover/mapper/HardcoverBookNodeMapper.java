@@ -16,9 +16,9 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>A node qualifies only when it is the canonical English work and not an edition variant: not an
  * audiobook, deluxe or illustrated edition, boxed set, omnibus, split part, or single comic issue. A
- * qualifying node carries forward everything the enumeration returned, so the staged seed needs no
- * further Hardcover call. The series mapper adds the series name and position to the returned
- * builder; the author mapper applies the book's own featured series.
+ * qualifying node carries forward everything the enumeration returned. The series mapper adds the
+ * series name and position to the returned builder; the author mapper applies the book's own featured
+ * series.
  */
 final class HardcoverBookNodeMapper {
 

@@ -15,11 +15,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
- * Indexes a book into Meilisearch after its promotion commits, so it becomes searchable within
- * seconds instead of at the next nightly reconcile.
+ * Indexes a book into Meilisearch after its promotion commits.
  *
- * <p>Runs after commit so an indexing failure never rolls back the promotion and the committed row
- * is visible to the read. An index outage drops this one book until the reconcile heals it.
+ * <p>Runs after commit, so an indexing failure does not roll back the promotion and the committed
+ * row is visible to the read. An index outage drops this one book until the nightly reconcile picks
+ * it up.
  */
 @Component
 @RequiredArgsConstructor

@@ -10,10 +10,9 @@ import org.springframework.web.reactive.function.client.WebClient;
 /**
  * Builds the Hardcover {@link WebClient} with explicit connect and response timeouts.
  *
- * <p>The token is sent as {@code Authorization: Bearer <token>} only when one is configured, so the
- * context starts without a token and the client returns empty rather than sending a malformed header.
- * The token is stripped of surrounding whitespace, so a secret sealed with a trailing newline still
- * yields a header value the HTTP client accepts.
+ * <p>The token is sent as {@code Authorization: Bearer <token>} only when one is configured; without
+ * one the client returns empty. The token is stripped of surrounding whitespace, so a secret sealed
+ * with a trailing newline still yields a header value the HTTP client accepts.
  */
 @Configuration
 public class HardcoverWebClientConfig {
