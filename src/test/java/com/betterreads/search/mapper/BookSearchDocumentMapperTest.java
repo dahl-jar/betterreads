@@ -31,6 +31,8 @@ class BookSearchDocumentMapperTest {
 
     private static final String LANGUAGE = "en";
 
+    private static final String COVER_URL = "https://covers.openlibrary.org/b/id/1-L.jpg";
+
     private static final int YEAR = 2006;
 
     private static final int THOUSAND_RATINGS = 999;
@@ -50,6 +52,7 @@ class BookSearchDocumentMapperTest {
             .title(MISTBORN_TITLE)
             .seriesName(SERIES)
             .language(LANGUAGE)
+            .coverUrl(COVER_URL)
             .publicationYear(YEAR)
             .rawSubjects(List.of(SUBJECT)));
 
@@ -61,8 +64,9 @@ class BookSearchDocumentMapperTest {
                 BookSearchDocument::title,
                 BookSearchDocument::seriesName,
                 BookSearchDocument::language,
+                BookSearchDocument::coverUrl,
                 BookSearchDocument::publicationYear)
-            .containsExactly(MISTBORN_KEY, MISTBORN_TITLE, SERIES, LANGUAGE, YEAR);
+            .containsExactly(MISTBORN_KEY, MISTBORN_TITLE, SERIES, LANGUAGE, COVER_URL, YEAR);
         assertThat(document.authors()).containsExactly(AUTHOR);
         assertThat(document.subjects()).containsExactly(SUBJECT);
     }

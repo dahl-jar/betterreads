@@ -25,6 +25,7 @@ public class BookSearchDocumentMapper {
             .authors(book.getAuthors().stream().map(Author::getName).sorted().toList())
             .subjects(book.getSubjects().stream().map(BookSubject::getSubject).toList())
             .language(book.getLanguage())
+            .coverUrl(book.getCoverUrl())
             .publicationYear(book.getFirstPublishYear())
             .popularityScore(popularityScore(book))
             .build();
