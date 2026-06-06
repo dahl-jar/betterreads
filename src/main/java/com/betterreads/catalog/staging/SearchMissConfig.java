@@ -10,11 +10,13 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
- * Wires the off-thread executor and the {@link SearchMissStager} for staging search misses.
+ * Wires the off-thread executor and the {@link SearchMissStager} that resolves a search query's
+ * series and author into the catalog.
  *
  * <p>The pool caps at {@code MAX_POOL} threads and the queue at {@code QUEUE_CAPACITY}; once both are
- * full the reject policy discards further work. A flood of misses stays within fixed thread and
- * memory limits, dropping the overflow.
+ * full the reject policy discards further work, so a flood of queries stays within fixed thread and
+ * memory limits. The 24-hour dedup window keeps every query resolving at most once a day, so staging
+ * on every search rather than only on a miss does not multiply external calls.
  */
 @Configuration
 public class SearchMissConfig {
@@ -31,7 +33,7 @@ public class SearchMissConfig {
 
     private static final int SOURCE_FETCH_QUEUE_CAPACITY = 100;
 
-    private static final Duration DEDUP_WINDOW = Duration.ofMinutes(10);
+    private static final Duration DEDUP_WINDOW = Duration.ofHours(24);
 
     /** Bounded executor that runs the staging fan-out for search misses. */
     // PMD.DoNotUseThreads: Spring manages this bounded executor's lifecycle and thread pool.

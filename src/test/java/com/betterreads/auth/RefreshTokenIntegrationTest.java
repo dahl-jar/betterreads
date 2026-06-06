@@ -149,7 +149,7 @@ class RefreshTokenIntegrationTest extends ContainerizedTest {
                 .andReturn();
 
             assertThat(result.getResponse().getHeader(SET_COOKIE_HEADER))
-                .as("SameSite attribute must be Strict on the raw Set-Cookie header")
+                .as("the configured SameSite (Strict by default) is written to the raw Set-Cookie header")
                 .containsIgnoringCase("samesite=strict");
         }
 

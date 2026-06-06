@@ -154,6 +154,28 @@ class MeilisearchBookSearchServiceIntegrationTest extends ContainerizedTest {
         }
 
         @Test
+        @DisplayName("a typo cross-match to a different author scores too low and is dropped")
+        void dropsTypoCrossMatchToAnotherAuthor() {
+            final String sandersonId = "sand";
+            final String andersonId = "ande";
+            searchService.index(List.of(
+                doc(sandersonId, "Mistborn", "Brandon Sanderson", null),
+                doc(andersonId, "Dune: House Atreides", "Kevin J. Anderson", null)));
+            try {
+                final BookSearchResult result = searchService.search("sanderson", 0, FULL_PAGE);
+
+                assertThat(result.hits())
+                    .as("'sanderson' fuzzy-matches 'Anderson', but that hit scores below the "
+                        + "threshold, so only the real author's book is returned")
+                    .extracting(BookSearchDocument::bookId)
+                    .containsExactly(sandersonId);
+            } finally {
+                searchService.remove(sandersonId);
+                searchService.remove(andersonId);
+            }
+        }
+
+        @Test
         @DisplayName("slices the hits by offset and limit with the full total")
         void pages() {
             final BookSearchResult firstPage = searchService.search(COMMON_QUERY, 0, PAGE_SIZE);

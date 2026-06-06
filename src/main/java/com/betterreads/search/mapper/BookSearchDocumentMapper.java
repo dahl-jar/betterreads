@@ -22,6 +22,7 @@ public class BookSearchDocumentMapper {
             .title(book.getTitle())
             .subtitle(book.getSubtitle())
             .seriesName(book.getSeriesName())
+            .seriesPosition(book.getSeriesPosition())
             .authors(book.getAuthors().stream().map(Author::getName).sorted().toList())
             .subjects(book.getSubjects().stream().map(BookSubject::getSubject).toList())
             .language(book.getLanguage())

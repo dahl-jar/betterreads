@@ -6,9 +6,14 @@ import java.util.Optional;
 import com.betterreads.catalog.entity.Book;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
 /** Persistence for {@link Book}. */
 public interface BookRepository extends JpaRepository<Book, Long> {
+
+    /** Returns the distinct non-null series names in the catalog, for the daily re-resolve walk. */
+    @Query("SELECT DISTINCT b.seriesName FROM Book b WHERE b.seriesName IS NOT NULL")
+    List<String> findDistinctSeriesNames();
 
     /**
      * Returns the book with the given dedup key, with authors and subjects fetched.

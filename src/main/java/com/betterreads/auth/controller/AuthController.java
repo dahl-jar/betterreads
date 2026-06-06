@@ -45,8 +45,10 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Authentication endpoints. {@code me} requires a valid access JWT; the rest are public.
  *
- * <p>The refresh token is sent in the {@value #COOKIE_NAME} {@code HttpOnly} cookie so
- * frontend JavaScript cannot read it, and {@code SameSite=Strict} blocks cross-site POSTs.
+ * <p>The refresh token is sent in the {@value #COOKIE_NAME} {@code HttpOnly} cookie so frontend
+ * JavaScript cannot read it. The cookie's SameSite and Secure attributes are configured per
+ * environment so a same-origin deployment can use {@code Strict} while a split apex/API deployment
+ * uses {@code None} with {@code Secure}.
  */
 @RestController
 @RequestMapping(AuthController.COOKIE_PATH)
@@ -56,8 +58,6 @@ class AuthController {
     static final String COOKIE_NAME = "br_refresh";
 
     static final String COOKIE_PATH = "/api/v1/auth";
-
-    private static final String SAME_SITE_STRICT = "Strict";
 
     private final AuthService authService;
 
@@ -259,7 +259,7 @@ class AuthController {
         return ResponseCookie.from(COOKIE_NAME, value)
             .httpOnly(true)
             .secure(cookieProperties.secure())
-            .sameSite(SAME_SITE_STRICT)
+            .sameSite(cookieProperties.sameSite())
             .path(COOKIE_PATH)
             .maxAge(refreshLifetime)
             .build();
@@ -269,7 +269,7 @@ class AuthController {
         return ResponseCookie.from(COOKIE_NAME, "")
             .httpOnly(true)
             .secure(cookieProperties.secure())
-            .sameSite(SAME_SITE_STRICT)
+            .sameSite(cookieProperties.sameSite())
             .path(COOKIE_PATH)
             .maxAge(0)
             .build();

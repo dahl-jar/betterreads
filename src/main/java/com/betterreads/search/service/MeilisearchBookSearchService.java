@@ -33,6 +33,13 @@ public class MeilisearchBookSearchService implements BookSearchService {
 
     private static final Logger LOG = LoggerFactory.getLogger(MeilisearchBookSearchService.class);
 
+    /**
+     * Drops hits below this relevance score, which removes typo cross-matches: a query like
+     * "sanderson" fuzzy-matches "Anderson" but scores far lower (~0.03 vs ~0.74 for the real author),
+     * so the threshold keeps the genuine matches and cuts the noise.
+     */
+    private static final double RANKING_SCORE_THRESHOLD = 0.4;
+
     private final Client client;
 
     private final MeilisearchProperties props;
@@ -52,7 +59,8 @@ public class MeilisearchBookSearchService implements BookSearchService {
             final SearchRequest request = new SearchRequest(query)
                 .setOffset(offset)
                 .setLimit(limit)
-                .setMatchingStrategy(MatchingStrategy.ALL);
+                .setMatchingStrategy(MatchingStrategy.ALL)
+                .setRankingScoreThreshold(RANKING_SCORE_THRESHOLD);
             final SearchResult result = (SearchResult) booksIndex().search(request);
             final List<BookSearchDocument> hits = result.getHits().stream()
                 .map(hit -> objectMapper.convertValue(hit, BookSearchDocument.class))
