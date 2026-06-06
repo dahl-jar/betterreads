@@ -19,7 +19,8 @@ public record VolumeInfo(
     @Nullable List<String> categories,
     @Nullable Double averageRating,
     @Nullable Integer ratingsCount,
-    @Nullable String description
+    @Nullable String description,
+    @Nullable ImageLinks imageLinks
 ) {
 
     public VolumeInfo {

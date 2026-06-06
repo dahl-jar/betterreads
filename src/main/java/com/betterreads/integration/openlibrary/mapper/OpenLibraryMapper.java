@@ -26,6 +26,8 @@ public class OpenLibraryMapper {
 
     private static final String WORKS_PREFIX = "/works/";
 
+    private static final String ENGLISH_LANGUAGE = "eng";
+
     private static final String DESCRIPTION_VALUE_KEY = "value";
 
     /**
@@ -97,10 +99,17 @@ public class OpenLibraryMapper {
         return CatalogGenres.reduceToCanonical(subjects, MAX_SUBJECTS);
     }
 
+    /**
+     * Returns the work's language, preferring English when the work has an English edition.
+     *
+     * <p>OpenLibrary lists every language a work has editions in, in no useful order, so a work with
+     * an English edition can still list a translation first. English is the catalog's language for
+     * such a work; only a work with no English edition keeps its first listed language.
+     */
     private static @Nullable String firstLanguage(final @Nullable List<String> languages) {
         if (languages == null || languages.isEmpty()) {
             return null;
         }
-        return languages.get(0);
+        return languages.contains(ENGLISH_LANGUAGE) ? ENGLISH_LANGUAGE : languages.get(0);
     }
 }
