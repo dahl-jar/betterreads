@@ -59,6 +59,14 @@
         <Bug pattern="EI_EXPOSE_REP2"/>
         <Class name="com.betterreads.auth.ratelimit.RateLimitFilter"/>
     </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Package name="com.betterreads.catalog.read.sse"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.betterreads.catalog.controller.BookController"/>
+    </Match>
 
     <!--
       EI_EXPOSE_REP / EI_EXPOSE_REP2 on JPA entities. Hibernate tracks the live collection

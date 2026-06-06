@@ -7,13 +7,13 @@ import com.betterreads.catalog.repository.BookRepository;
 import com.betterreads.catalog.repository.PendingBookRepository;
 import com.betterreads.catalog.service.source.BookFieldSource;
 import com.betterreads.catalog.service.pipeline.PendingBookService;
-import com.betterreads.catalog.service.pipeline.RequiredFieldsCheck;
 import com.betterreads.catalog.service.source.SourceAuthor;
 import com.betterreads.catalog.service.source.SourceBook;
 import com.betterreads.catalog.service.pipeline.SourceCollector;
 import com.betterreads.catalog.service.source.SourceMerger;
 import com.betterreads.search.dto.BookSearchDocument;
 import com.betterreads.search.dto.BookSearchResult;
+import com.betterreads.search.dto.SearchOutcome;
 import com.betterreads.search.service.BookSearchService;
 import com.betterreads.search.service.SearchIndexException;
 import com.betterreads.support.ContainerizedTest;
@@ -113,7 +113,7 @@ class PromotionIndexOutageIntegrationTest extends ContainerizedTest {
         @Bean
         @Primary
         SourceCollector noNetworkSourceCollector(final SourceMerger merger) {
-            return new SourceCollector(merger, new RequiredFieldsCheck(), List.of());
+            return new SourceCollector(merger, List.of(), Runnable::run);
         }
     }
 
@@ -134,6 +134,11 @@ class PromotionIndexOutageIntegrationTest extends ContainerizedTest {
         @Override
         public BookSearchResult search(final String query, final int offset, final int limit) {
             return new BookSearchResult(List.of(), 0, offset, limit);
+        }
+
+        @Override
+        public SearchOutcome searchOutcome(final String query, final int offset, final int limit) {
+            return new SearchOutcome(search(query, offset, limit), false);
         }
 
         @Override

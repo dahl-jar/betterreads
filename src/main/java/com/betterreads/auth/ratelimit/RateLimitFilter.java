@@ -60,6 +60,8 @@ public final class RateLimitFilter extends OncePerRequestFilter {
 
     private static final String BOOK_DETAIL_PREFIX = "/api/v1/books/";
 
+    private static final String EVENT_STREAM_SUFFIX = "/events";
+
     private static final String FORWARDED_FOR_HEADER = "X-Forwarded-For";
 
     private static final String CF_CONNECTING_IP_HEADER = "CF-Connecting-IP";
@@ -69,6 +71,8 @@ public final class RateLimitFilter extends OncePerRequestFilter {
     private final Map<String, Endpoint> endpoints;
 
     private final Endpoint detailEndpoint;
+
+    private final Endpoint eventStreamEndpoint;
 
     private final List<CidrRange> trustedProxies;
 
@@ -90,6 +94,9 @@ public final class RateLimitFilter extends OncePerRequestFilter {
         this.endpoints = buildEndpoints(properties);
         this.detailEndpoint = endpoint(HttpMethod.GET, "book-detail", properties.searchCapacity(),
             properties.searchRefillTokens(), properties.searchRefillSeconds());
+        this.eventStreamEndpoint = endpoint(HttpMethod.GET, "event-stream",
+            properties.eventStreamCapacity(),
+            properties.eventStreamRefillTokens(), properties.eventStreamRefillSeconds());
         this.trustedProxies = parseCidrs(properties.trustedProxies());
         this.proxyManager = proxyManager;
         this.redis = redis;
@@ -138,6 +145,7 @@ public final class RateLimitFilter extends OncePerRequestFilter {
         final List<String> prefixes = new ArrayList<>();
         endpoints.values().forEach(e -> prefixes.add(e.keyPrefix()));
         prefixes.add(detailEndpoint.keyPrefix());
+        prefixes.add(eventStreamEndpoint.keyPrefix());
         prefixes.forEach(prefix -> {
             final List<String> keys = redis.sync().keys(prefix + ":*");
             if (!keys.isEmpty()) {
@@ -188,11 +196,10 @@ public final class RateLimitFilter extends OncePerRequestFilter {
         if (exact != null && exact.method().matches(request.getMethod())) {
             return exact;
         }
-        if (detailEndpoint.method().matches(request.getMethod())
-            && uri.startsWith(BOOK_DETAIL_PREFIX)) {
-            return detailEndpoint;
+        if (!uri.startsWith(BOOK_DETAIL_PREFIX) || !HttpMethod.GET.matches(request.getMethod())) {
+            return null;
         }
-        return null;
+        return uri.endsWith(EVENT_STREAM_SUFFIX) ? eventStreamEndpoint : detailEndpoint;
     }
 
     /** The HTTP method and Redis key prefix that isolate one endpoint's buckets, plus its recipe. */
