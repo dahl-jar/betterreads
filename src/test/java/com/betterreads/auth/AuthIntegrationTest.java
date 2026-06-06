@@ -96,6 +96,10 @@ class AuthIntegrationTest extends ContainerizedTest {
 
     private static final String MIXED_CASE_EMAIL = "Alice@Example.COM";
 
+    private static final String LOWERCASE_USERNAME = "joe";
+
+    private static final String MIXED_CASE_USERNAME = "Joe";
+
     private static final String RETRY_AFTER_HEADER = "Retry-After";
 
     private static final String XFF_HEADER = "X-Forwarded-For";
@@ -249,6 +253,24 @@ class AuthIntegrationTest extends ContainerizedTest {
                 .isEqualTo(DEFAULT_EMAIL);
         }
 
+        @Test
+        void rejectsUsernameDifferingOnlyByCaseWithConflict() throws Exception {
+            seedUser(LOWERCASE_USERNAME, DEFAULT_EMAIL, DEFAULT_PASSWORD);
+            final String body = registerPayload(MIXED_CASE_USERNAME, OTHER_EMAIL, DEFAULT_PASSWORD);
+
+            mockMvc.perform(post(REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isConflict());
+        }
+
+        @Test
+        void preservesUsernameCaseOnRegister() throws Exception {
+            final String body = registerPayload(MIXED_CASE_USERNAME, DEFAULT_EMAIL, DEFAULT_PASSWORD);
+
+            mockMvc.perform(post(REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath(JSON_USER_USERNAME).value(MIXED_CASE_USERNAME));
+        }
+
         @ParameterizedTest(name = "rejects {0} body with 400")
         @CsvSource({
             "truncated, '{\"username\": \"alice\"'",
@@ -279,6 +301,17 @@ class AuthIntegrationTest extends ContainerizedTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(JSON_TOKEN).isNotEmpty())
                 .andExpect(jsonPath(JSON_USER_USERNAME).value(DEFAULT_USERNAME));
+        }
+
+        @Test
+        void succeedsWithUsernameInDifferentCase() throws Exception {
+            seedUser(LOWERCASE_USERNAME, OTHER_EMAIL, DEFAULT_PASSWORD);
+            final String body = loginPayload(MIXED_CASE_USERNAME, DEFAULT_PASSWORD);
+
+            mockMvc.perform(post(LOGIN_URL).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_TOKEN).isNotEmpty())
+                .andExpect(jsonPath(JSON_USER_USERNAME).value(LOWERCASE_USERNAME));
         }
 
         @Test
