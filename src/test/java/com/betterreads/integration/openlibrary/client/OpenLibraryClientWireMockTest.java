@@ -54,6 +54,8 @@ class OpenLibraryClientWireMockTest {
 
     private static final int HOBBIT_FIRST_PUBLISHED = 1937;
 
+    private static final int NINETEEN_EIGHTY_FOUR_FIRST_PUBLISHED = 1949;
+
     private static final String SEARCH_PATH = "/search.json";
 
     private static final String HOBBIT_WORK_PATH = "/works/OL27482W.json";
@@ -183,6 +185,34 @@ class OpenLibraryClientWireMockTest {
                 .as("the returned title 'Some Unrelated Sequel' does not contain the query, so the "
                     + "client must not return the drift match")
                 .isEmpty();
+        }
+
+        @Test
+        @DisplayName("picks the earliest-year title match, not the first hit, when hit 0 is an adaptation")
+        void picksCanonicalEarliestYear() {
+            final String multiHitJson = """
+                {"numFound": 4, "docs": [
+                  {"key": "/works/OL_ADAPT", "title": "1984 (adaptation)", "first_publish_year": 2003},
+                  {"key": "/works/OL_REPRINT", "title": "1984", "first_publish_year": 2021},
+                  {"key": "/works/OL_CANON", "title": "1984", "first_publish_year": 1949},
+                  {"key": "/works/OL_OTHER", "title": "1984", "first_publish_year": 1984}
+                ]}
+                """;
+            WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH)).willReturn(json(multiHitJson)));
+            WIREMOCK.stubFor(get(urlPathEqualTo("/works/OL_CANON.json"))
+                .willReturn(json("{\"key\": \"/works/OL_CANON\", \"description\": \"A dystopia.\"}")));
+
+            final Optional<SourceBook> result = client.fetchByTitleAuthor("1984", "George Orwell");
+
+            assertThat(result)
+                .as("the adaptation drifts and is skipped; among the real '1984' works the original "
+                    + "1949 edition wins, not the 2021 reprint that ranks first")
+                .isPresent()
+                .get()
+                .satisfies(book -> {
+                    assertThat(book.openLibraryWorkKey()).isEqualTo("OL_CANON");
+                    assertThat(book.publicationYear()).isEqualTo(NINETEEN_EIGHTY_FOUR_FIRST_PUBLISHED);
+                });
         }
 
         @Test

@@ -64,6 +64,7 @@ final class HardcoverBookNodeMapper {
             && ENGLISH.equals(language(node))
             && !isAudiobook(node)
             && !Boolean.TRUE.equals(node.isPartialBook())
+            && !isCompilation(node)
             && !isOmnibus(node)
             && !EDITION_VARIANT.matcher(title).find()
             && SingleBookFilter.isSingleBook(title)
@@ -74,6 +75,21 @@ final class HardcoverBookNodeMapper {
     private static boolean isOmnibus(final HardcoverBookNode node) {
         final Integer category = node.bookCategoryId();
         return category != null && category == COLLECTION_CATEGORY;
+    }
+
+    /**
+     * Returns true for a prose bind-up of two or more works, such as "Animal Farm and 1984".
+     *
+     * <p>Hardcover sets {@code compilation} on a graphic-novel volume too, where it means collected
+     * issues that form one book, so a graphic novel is left to {@link #isSingleComicIssue} and only a
+     * prose compilation is rejected here.
+     */
+    private static boolean isCompilation(final HardcoverBookNode node) {
+        if (!Boolean.TRUE.equals(node.compilation())) {
+            return false;
+        }
+        final Integer category = node.bookCategoryId();
+        return category == null || category != GRAPHIC_NOVEL_CATEGORY;
     }
 
     private static boolean isAudiobook(final HardcoverBookNode node) {

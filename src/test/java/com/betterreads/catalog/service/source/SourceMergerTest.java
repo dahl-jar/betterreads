@@ -140,6 +140,44 @@ class SourceMergerTest {
         }
 
         @Test
+        @DisplayName("the discovery seed's year wins over a later edition another source resolved")
+        void seedYearWinsOverEditionDrift() {
+            final SourceBook hardcoverSeed = SourceBook.builder(BookFieldSource.HARDCOVER)
+                .title(TITLE)
+                .publicationYear(ORIGINAL_YEAR)
+                .build();
+            final SourceBook openLibrary = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+                .title(TITLE)
+                .publicationYear(REPRINT_YEAR)
+                .build();
+
+            final MergedBook merged = merger.merge(hardcoverSeed, List.of(hardcoverSeed, openLibrary));
+
+            assertThat(merged.book().publicationYear())
+                .as("the seed resolved the work; OpenLibrary's title fetch drifted to a reprint, so "
+                    + "the seed year wins despite OpenLibrary leading the year chain")
+                .isEqualTo(ORIGINAL_YEAR);
+        }
+
+        @Test
+        @DisplayName("with no seed year the year chain still resolves the year")
+        void seedWithoutYearFallsBackToChain() {
+            final SourceBook hardcoverSeed = SourceBook.builder(BookFieldSource.HARDCOVER)
+                .title(TITLE)
+                .build();
+            final SourceBook openLibrary = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+                .title(TITLE)
+                .publicationYear(ORIGINAL_YEAR)
+                .build();
+
+            final MergedBook merged = merger.merge(hardcoverSeed, List.of(hardcoverSeed, openLibrary));
+
+            assertThat(merged.book().publicationYear())
+                .as("the seed carried no year, so the chain picks OpenLibrary's")
+                .isEqualTo(ORIGINAL_YEAR);
+        }
+
+        @Test
         @DisplayName("rating comes only from Hardcover")
         void ratingComesFromHardcover() {
             final SourceBook google = SourceBook.builder(BookFieldSource.GOOGLE_BOOKS)

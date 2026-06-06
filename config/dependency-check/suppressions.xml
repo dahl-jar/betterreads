@@ -19,7 +19,7 @@
     </suppress>
     <suppress>
         <notes><![CDATA[
-            plexus-utils 3.3.0 is a build-tool transitive, not on runtimeClasspath, so
+            plexus-utils 3.3.0 is a build-tool transitive that stays on the build classpath, so
             CVE-2025-67030 cannot run in the application.
         ]]></notes>
         <packageUrl regex="true">^pkg:maven/org\.codehaus\.plexus/plexus-utils@3\.3\.0$</packageUrl>
@@ -27,8 +27,8 @@
     </suppress>
     <suppress>
         <notes><![CDATA[
-            Rhino 1.7.15 is pulled by the dependency-check plugin's own RetireJS analyzer, not by
-            the application, so CVE-2025-66453 cannot run in the application.
+            Rhino 1.7.15 is pulled only by the dependency-check plugin's own RetireJS analyzer, so
+            CVE-2025-66453 cannot run in the application.
         ]]></notes>
         <packageUrl regex="true">^pkg:maven/org\.mozilla/rhino@1\.7\.15$</packageUrl>
         <cve>CVE-2025-66453</cve>

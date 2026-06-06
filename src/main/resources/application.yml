@@ -121,6 +121,9 @@ auth:
     search-capacity: 30
     search-refill-tokens: 10
     search-refill-seconds: 10
+    event-stream-capacity: 10
+    event-stream-refill-tokens: 1
+    event-stream-refill-seconds: 30
     bucket-ttl-seconds: 900
     trusted-proxies: ${AUTH_TRUSTED_PROXIES:}
 

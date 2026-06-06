@@ -67,6 +67,18 @@ class CatalogSearchServiceIntegrationTest extends ContainerizedTest {
 
     private static final String NO_MATCH = "a title hardcover has no series for";
 
+    private static final String STANDALONE_QUERY = "nineteen eighty-four orwell";
+
+    private static final String CANONICAL_TITLE = "Nineteen Eighty-Four";
+
+    private static final String CANONICAL_KEY = "OL1168083W";
+
+    private static final int CANONICAL_YEAR = 1949;
+
+    private static final int LATER_EDITION_YEAR = 2003;
+
+    private static final int FALLBACK_SEARCH_LIMIT = 5;
+
     private static final int FIRST_POSITION = 1;
 
     private static final int SECOND_POSITION = 2;
@@ -129,12 +141,17 @@ class CatalogSearchServiceIntegrationTest extends ContainerizedTest {
         when(seriesClient.fetchSeries(SERIES_QUERY)).thenReturn(Optional.of(wheelOfTime()));
         when(seriesClient.fetchSeries(NO_MATCH)).thenReturn(Optional.empty());
         when(authorClient.fetchAuthorWorks(SANDERSON)).thenReturn(Optional.of(sandersonWorks()));
+        when(openLibraryClient.source()).thenReturn(BookFieldSource.OPEN_LIBRARY);
         when(openLibraryClient.fetchByTitleAuthor(anyString(), anyString()))
             .thenAnswer(invocation -> openLibraryHit(invocation.getArgument(0)));
         when(openLibraryClient.search(anyString(), anyInt())).thenReturn(List.of());
+        when(hardcoverClient.source()).thenReturn(BookFieldSource.HARDCOVER);
         when(hardcoverClient.fetchByTitleAuthor(anyString(), anyString())).thenReturn(Optional.empty());
+        when(googleBooksClient.source()).thenReturn(BookFieldSource.GOOGLE_BOOKS);
         when(googleBooksClient.fetchByTitleAuthor(anyString(), anyString())).thenReturn(Optional.empty());
+        when(wikidataClient.source()).thenReturn(BookFieldSource.WIKIDATA);
         when(wikidataClient.fetchByTitleAuthor(anyString(), anyString())).thenReturn(Optional.empty());
+        when(locClient.source()).thenReturn(BookFieldSource.LOC);
         when(locClient.fetchByTitleAuthor(anyString(), anyString())).thenReturn(Optional.empty());
     }
 
@@ -163,6 +180,24 @@ class CatalogSearchServiceIntegrationTest extends ContainerizedTest {
         return SourceBook.builder(BookFieldSource.HARDCOVER)
             .title(title)
             .authors(SourceAuthor.ofNames(List.of(SANDERSON)))
+            .build();
+    }
+
+    private static List<SourceBook> noisyStandaloneHits() {
+        return List.of(
+            standaloneHit("SparkNotes for 1984", "OLsparkW", LATER_EDITION_YEAR),
+            standaloneHit("1984 (adaptation)", "OLadaptW", LATER_EDITION_YEAR),
+            standaloneHit("Animal Farm / Nineteen Eighty-Four", "OLcomboW", LATER_EDITION_YEAR),
+            standaloneHit(CANONICAL_TITLE, "OLreprintW", LATER_EDITION_YEAR),
+            standaloneHit(CANONICAL_TITLE, CANONICAL_KEY, CANONICAL_YEAR));
+    }
+
+    private static SourceBook standaloneHit(final String title, final String key, final int year) {
+        return SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+            .openLibraryWorkKey(key)
+            .title(title)
+            .publicationYear(year)
+            .authors(SourceAuthor.ofNames(List.of("George Orwell")))
             .build();
     }
 
@@ -211,5 +246,22 @@ class CatalogSearchServiceIntegrationTest extends ContainerizedTest {
         assertThat(pendingBooks.count())
             .as("each of the author's books stages as its own candidate")
             .isEqualTo(AUTHOR_BOOK_COUNT);
+    }
+
+    @Test
+    @DisplayName("a free-form query longer than the title still stages the canonical work")
+    void standaloneFallbackStagesCanonicalWork() {
+        when(openLibraryClient.search(STANDALONE_QUERY, FALLBACK_SEARCH_LIMIT))
+            .thenReturn(noisyStandaloneHits());
+
+        searchService.searchAndStage(STANDALONE_QUERY);
+
+        assertThat(pendingBooks.findAll())
+            .as("the study guide, adaptation, combo, and 2021 reprint are rejected, leaving the 1949 work")
+            .singleElement()
+            .satisfies(staged -> {
+                assertThat(staged.getOpenLibraryWorkKey()).isEqualTo(CANONICAL_KEY);
+                assertThat(staged.getFirstPublishYear()).isEqualTo(CANONICAL_YEAR);
+            });
     }
 }

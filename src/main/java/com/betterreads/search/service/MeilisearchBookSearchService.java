@@ -4,6 +4,7 @@ import com.betterreads.common.util.LogSanitizer;
 import com.betterreads.search.config.MeilisearchProperties;
 import com.betterreads.search.dto.BookSearchDocument;
 import com.betterreads.search.dto.BookSearchResult;
+import com.betterreads.search.dto.SearchOutcome;
 import com.meilisearch.sdk.Client;
 import com.meilisearch.sdk.Index;
 import com.meilisearch.sdk.SearchRequest;
@@ -38,20 +39,27 @@ public class MeilisearchBookSearchService implements BookSearchService {
     private final ObjectMapper objectMapper;
 
     @Override
-    @Cacheable(cacheNames = "searchResults", cacheManager = "searchCacheManager",
-        unless = "#result.totalHits() == 0")
     public BookSearchResult search(final String query, final int offset, final int limit) {
+        return searchOutcome(query, offset, limit).result();
+    }
+
+    @Override
+    @Cacheable(cacheNames = "searchResults", cacheManager = "searchCacheManager",
+        unless = "#result.degraded() || #result.result().totalHits() == 0")
+    public SearchOutcome searchOutcome(final String query, final int offset, final int limit) {
         try {
             final SearchRequest request = new SearchRequest(query).setOffset(offset).setLimit(limit);
             final SearchResult result = (SearchResult) booksIndex().search(request);
             final List<BookSearchDocument> hits = result.getHits().stream()
                 .map(hit -> objectMapper.convertValue(hit, BookSearchDocument.class))
                 .toList();
-            return new BookSearchResult(hits, result.getEstimatedTotalHits(), offset, limit);
+            final BookSearchResult page =
+                new BookSearchResult(hits, result.getEstimatedTotalHits(), offset, limit);
+            return new SearchOutcome(page, false);
         } catch (MeilisearchException ex) {
             LOG.warn("search.query failed, returning no results query={} ({})",
                 LogSanitizer.forLog(query), ex.getClass().getSimpleName());
-            return new BookSearchResult(List.of(), 0, offset, limit);
+            return new SearchOutcome(new BookSearchResult(List.of(), 0, offset, limit), true);
         }
     }
 

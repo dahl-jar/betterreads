@@ -14,7 +14,9 @@ import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 
 import java.time.Instant;
 import java.util.List;
@@ -174,6 +176,17 @@ class GlobalExceptionHandler {
                         List.of()
                 )
         );
+    }
+
+    /**
+     * Lets an SSE stream that times out close quietly. The response is already committed as
+     * {@code text/event-stream}, so serializing an error body onto it fails; the stream just ends and
+     * the client reconnects or falls back to a plain detail read.
+     */
+    @ExceptionHandler(AsyncRequestTimeoutException.class)
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    public void handleAsyncTimeout(final AsyncRequestTimeoutException exception) {
+        LOG.debug("async stream timed out, closing quietly");
     }
 
     @ExceptionHandler(Exception.class)

@@ -233,6 +233,23 @@ class HardcoverSeriesClientWireMockTest {
 
             assertThat(client.fetchSeries(QUERY)).isEmpty();
         }
+
+        @Test
+        @DisplayName("a zero-book container series is rejected so a standalone title is not staged as a series")
+        void zeroBookSeriesRejected() {
+            final String zeroBookSeries = """
+                {"data": {"search": {"results": {"hits": [
+                  {"document": {"id": "999", "name": "George Orwell - 1984",
+                    "author_name": "George Orwell", "primary_books_count": 0, "readers_count": 0}}
+                ]}}}}
+                """;
+            WIREMOCK.stubFor(post(urlPathEqualTo(GRAPHQL_PATH)).withRequestBody(containing(SEARCH_MARKER))
+                .willReturn(json(zeroBookSeries)));
+
+            assertThat(client.fetchSeries(QUERY))
+                .as("a 0-book 'series' is a container, not a real series, so it must not resolve")
+                .isEmpty();
+        }
     }
 
     @Nested

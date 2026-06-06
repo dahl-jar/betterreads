@@ -70,6 +70,18 @@ public class SourceMerger {
 
     /** Merges the given books into one, or throws when no source carries a title. */
     public MergedBook merge(final List<SourceBook> sources) {
+        return merge(null, sources);
+    }
+
+    /**
+     * Merges the given books into one, preferring the discovery seed's year.
+     *
+     * <p>The seed is the source that resolved the work itself (the Hardcover series or author hit),
+     * while the other sources resolve an edition by title or ISBN and drift to a reprint year. When
+     * the seed carries a year it wins over {@link #YEAR_CHAIN}; otherwise the chain resolves the year.
+     * A later refresh can replace it with an ISBN-resolved first-publication year.
+     */
+    public MergedBook merge(final @Nullable SourceBook seed, final List<SourceBook> sources) {
         final Map<BookFieldSource, SourceBook> bySource = new EnumMap<>(BookFieldSource.class);
         for (final SourceBook source : sources) {
             bySource.put(source.source(), source);
@@ -84,11 +96,21 @@ public class SourceMerger {
             title,
             pick(bySource, DESCRIPTION_CHAIN, SourceMerger::usableDescription, SourceBook::description),
             pick(bySource, COVER_CHAIN, SourceMerger::usableText, SourceBook::coverUrl),
-            pick(bySource, YEAR_CHAIN, SourceBook::publicationYear),
+            resolveYear(seed, bySource),
             unionSubjects(bySource));
 
         final SourceBook merged = assemble(bySource, sources, resolved);
         return new MergedBook(merged, resolved.provenance(), resolved.subjects().sources());
+    }
+
+    private static @Nullable Winner<Integer> resolveYear(
+        final @Nullable SourceBook seed,
+        final Map<BookFieldSource, SourceBook> bySource
+    ) {
+        if (seed != null && seed.publicationYear() != null) {
+            return new Winner<>(seed.publicationYear(), seed.source());
+        }
+        return pick(bySource, YEAR_CHAIN, SourceBook::publicationYear);
     }
 
     private static SourceBook assemble(

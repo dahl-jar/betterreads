@@ -1,6 +1,8 @@
 package com.betterreads.search.controller;
 
+import com.betterreads.catalog.service.pipeline.SearchMissStager;
 import com.betterreads.search.dto.BookSearchResult;
+import com.betterreads.search.dto.SearchOutcome;
 import com.betterreads.search.service.BookSearchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
@@ -29,8 +31,14 @@ public class BookSearchController {
 
     private final BookSearchService searchService;
 
+    private final SearchMissStager searchMissStager;
+
     /**
      * Returns books matching the query, ordered by relevance.
+     *
+     * <p>A query with no local hit triggers off-thread staging of the external book so a later
+     * search finds it; the current empty result returns right away while enrichment runs in the
+     * background.
      */
     @GetMapping("/books")
     @Operation(summary = "Search the book catalog")
@@ -39,6 +47,10 @@ public class BookSearchController {
         @RequestParam(value = "offset", defaultValue = "0") @Min(0) final int offset,
         @RequestParam(value = "limit", defaultValue = "20") @Min(1) @Max(50) final int limit
     ) {
-        return searchService.search(query, offset, limit);
+        final SearchOutcome outcome = searchService.searchOutcome(query, offset, limit);
+        if (!outcome.degraded() && outcome.result().totalHits() == 0) {
+            searchMissStager.stage(query);
+        }
+        return outcome.result();
     }
 }

@@ -40,6 +40,9 @@ public record RateLimitProperties(
     @Positive long searchCapacity,
     @Positive long searchRefillTokens,
     @Positive long searchRefillSeconds,
+    @Positive long eventStreamCapacity,
+    @Positive long eventStreamRefillTokens,
+    @Positive long eventStreamRefillSeconds,
     @Positive long bucketTtlSeconds,
     @NotNull List<String> trustedProxies
 ) {
