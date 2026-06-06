@@ -5,7 +5,9 @@ import com.betterreads.catalog.service.source.SingleBookFilter;
 import com.betterreads.catalog.service.source.SourceBook;
 import com.betterreads.catalog.service.source.SourceSeries;
 import com.betterreads.catalog.service.source.SourceSeriesVolume;
+import com.betterreads.common.util.TextMatch;
 
+import java.util.Comparator;
 import java.util.Optional;
 
 import com.betterreads.integration.hardcover.HardcoverAuthorClient;
@@ -55,11 +57,20 @@ public class CatalogSearchService {
         this.pendingBookService = pendingBookService;
     }
 
-    /** Stages a candidate for each volume of the matching series, or one for a standalone book. */
+    /**
+     * Resolves a miss to a series, an author, or a standalone book and stages what it finds.
+     *
+     * <p>A series query stages each volume; an author query stages each of the author's books; a
+     * title query stages the one standalone hit. The order goes from most specific to least so a
+     * series or author name is expanded rather than collapsed to a single title fallback.
+     */
     public void searchAndStage(final String query) {
         final Optional<SourceSeries> series = seriesClient.fetchSeries(query);
         if (series.isPresent()) {
             stageSeries(series.get());
+            return;
+        }
+        if (stageAuthor(query)) {
             return;
         }
         stageStandalone(query);
@@ -67,8 +78,16 @@ public class CatalogSearchService {
 
     /** Stages a candidate for each book of the matching author. */
     public void searchAuthorAndStage(final String query) {
-        authorClient.fetchAuthorWorks(query)
-            .ifPresent(works -> works.books().forEach(this::stage));
+        stageAuthor(query);
+    }
+
+    private boolean stageAuthor(final String query) {
+        return authorClient.fetchAuthorWorks(query)
+            .map(works -> {
+                works.books().forEach(this::stage);
+                return true;
+            })
+            .orElse(false);
     }
 
     private void stageSeries(final SourceSeries series) {
@@ -79,16 +98,24 @@ public class CatalogSearchService {
 
     private void stageStandalone(final String query) {
         openLibraryClient.search(query, FALLBACK_SEARCH_LIMIT).stream()
-            .filter(hit -> hit.title() != null && SingleBookFilter.isSingleBook(hit.title()))
-            .findFirst()
+            .filter(hit -> hit.title() != null
+                && TextMatch.titleWithinQuery(hit.title(), query)
+                && SingleBookFilter.isSingleBook(hit.title()))
+            .min(Comparator.comparing(CatalogSearchService::publishYearOrMax))
             .ifPresent(this::stage);
+    }
+
+    private static int publishYearOrMax(final SourceBook hit) {
+        return hit.publicationYear() == null ? Integer.MAX_VALUE : hit.publicationYear();
     }
 
     private void stage(final SourceBook seed) {
         try {
             final MergedBook merged = sourceCollector.collectFor(seed);
-            if (merged.book().dedupKey() != null) {
+            final String dedupKey = merged.book().dedupKey();
+            if (dedupKey != null) {
                 pendingBookService.stage(merged);
+                pendingBookService.promoteNow(dedupKey, merged);
             }
         } catch (DataAccessException ex) {
             LOG.warn("catalog.search staging failed for source {} ({}), skipping it",

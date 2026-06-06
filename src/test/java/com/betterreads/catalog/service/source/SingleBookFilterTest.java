@@ -31,14 +31,37 @@ class SingleBookFilterTest {
         assertThat(SingleBookFilter.isSingleBook(title)).isFalse();
     }
 
+    @ParameterizedTest(name = "\"{0}\" is not a single book")
+    @CsvSource({
+        "'1984 (adaptation)'",
+        "'Pride and Prejudice [adaptation]'",
+        "'Animal Farm / Nineteen Eighty-Four'",
+        "'The Great Gatsby / The Last Tycoon'",
+        "'SparkNotes for 1984'",
+        "'Spark Notes Animal Farm'",
+        "'CliffsNotes on Huxley''s Brave New World'",
+        "'Brave New World: A Study Guide'",
+        "'Summary of Dune'",
+        "'Analysis of Fahrenheit 451'"
+    })
+    @DisplayName("an adaptation, slash-combo, or study aid is rejected")
+    void rejectsAdaptationsCombosAndStudyAids(final String title) {
+        assertThat(SingleBookFilter.isSingleBook(title)).isFalse();
+    }
+
     @ParameterizedTest(name = "\"{0}\" is a single book")
     @CsvSource({
         "'The Eye of the World'",
         "'A Crown of Swords (The Wheel of Time, Book 7)'",
         "'New Spring'",
-        "'The Great Hunt'"
+        "'The Great Hunt'",
+        "'Pride and Prejudice'",
+        "'Crime and Punishment'",
+        "'Sense and Sensibility'",
+        "'Brave New World Revisited'",
+        "'Notes from Underground'"
     })
-    @DisplayName("a single novel, including a numbered series volume, is kept")
+    @DisplayName("a single novel, including titles with conjunctions, is kept")
     void keepsSingleNovels(final String title) {
         assertThat(SingleBookFilter.isSingleBook(title)).isTrue();
     }

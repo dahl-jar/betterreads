@@ -88,10 +88,10 @@ class SearchQueryCacheIntegrationTest extends ContainerizedTest {
     @DisplayName("a repeated identical query reuses the first result")
     void cachesIdenticalQuery() {
         searchService.index(List.of(doc("1", DUNE_TITLE)));
-        final BookSearchResult first = searchService.search(DUNE_QUERY, 0, FULL_PAGE);
+        final BookSearchResult first = searchService.searchOutcome(DUNE_QUERY, 0, FULL_PAGE).result();
 
         searchService.remove("1");
-        final BookSearchResult repeat = searchService.search(DUNE_QUERY, 0, FULL_PAGE);
+        final BookSearchResult repeat = searchService.searchOutcome(DUNE_QUERY, 0, FULL_PAGE).result();
 
         assertThat(first.hits()).extracting(BookSearchDocument::bookId).containsExactly("1");
         assertThat(repeat.hits()).extracting(BookSearchDocument::bookId).containsExactly("1");
@@ -101,10 +101,11 @@ class SearchQueryCacheIntegrationTest extends ContainerizedTest {
     @DisplayName("a different page is a separate cache entry")
     void differentPageMisses() {
         searchService.index(List.of(doc("1", DUNE_TITLE)));
-        searchService.search(DUNE_QUERY, 0, FULL_PAGE);
+        searchService.searchOutcome(DUNE_QUERY, 0, FULL_PAGE);
 
         searchService.remove("1");
-        final BookSearchResult nextPage = searchService.search(DUNE_QUERY, FULL_PAGE, FULL_PAGE);
+        final BookSearchResult nextPage =
+            searchService.searchOutcome(DUNE_QUERY, FULL_PAGE, FULL_PAGE).result();
 
         assertThat(nextPage.hits()).isEmpty();
     }

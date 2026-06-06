@@ -32,8 +32,8 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  * on the GraphQL query text.
  *
  * <p>The works payload puts each filter rule on its own row: a translation is a non-canonical
- * edition, a foreign edition is non-English, an anthology fails the single-book check, and the
- * remaining rows arrive in descending reader order.
+ * edition, a foreign edition is non-English, an anthology fails the single-book check, a bind-up
+ * carries the compilation flag, and the remaining rows arrive in descending reader order.
  */
 @SpringBootTest(
     classes = {
@@ -90,6 +90,9 @@ class HardcoverAuthorClientWireMockTest {
               "default_physical_edition": {"language": {"language": "German"}}}},
             {"book": {"id": 4, "title": "Dangerous Women (Boxed Set)", "users_count": 30,
               "canonical_id": null,
+              "default_physical_edition": {"language": {"language": "English"}}}},
+            {"book": {"id": 6, "title": "Mistborn & The Stormlight Archive", "users_count": 9000,
+              "canonical_id": null, "book_category_id": 1, "compilation": true,
               "default_physical_edition": {"language": {"language": "English"}}}},
             {"book": {"id": 5, "title": "The Way of Kings", "users_count": 7897,
               "canonical_id": null,
@@ -176,6 +179,20 @@ class HardcoverAuthorClientWireMockTest {
             assertThat(works.books())
                 .extracting(SourceBook::title)
                 .containsExactly(MISTBORN, "The Way of Kings");
+        }
+
+        @Test
+        @DisplayName("a compilation bind-up is dropped even with more readers than a real single book")
+        void dropsCompilationBindUp() {
+            stubSearchAndEnum();
+
+            final SourceAuthorWorks works = client.fetchAuthorWorks(QUERY).orElseThrow();
+
+            assertThat(works.books())
+                .extracting(SourceBook::title)
+                .as("the bind-up has 9000 readers, above The Way of Kings, so reader order alone "
+                    + "would rank it second; the compilation flag is what excludes it")
+                .doesNotContain("Mistborn & The Stormlight Archive");
         }
 
         @Test
