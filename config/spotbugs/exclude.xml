@@ -67,6 +67,18 @@
         <Bug pattern="EI_EXPOSE_REP2"/>
         <Class name="com.betterreads.catalog.controller.BookController"/>
     </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.betterreads.collections.controller.ShelfController"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.betterreads.collections.service.ShelfServiceImpl"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.betterreads.collections.service.ShelfWriter"/>
+    </Match>
 
     <!--
       EI_EXPOSE_REP / EI_EXPOSE_REP2 on JPA entities. Hibernate tracks the live collection
@@ -140,6 +152,16 @@
     <Match>
         <Bug pattern="CRLF_INJECTION_LOGS"/>
         <Class name="com.betterreads.catalog.service.pipeline.CatalogSearchService"/>
+    </Match>
+
+    <!--
+      CRLF_INJECTION_LOGS on the shelf upsert retry warn. The line logs only userId and bookId, both
+      Long. FindSecBugs taints the whole log call because the method also receives the bookKey String
+      from the HTTP path, but neither logged value is that string or can carry CRLF.
+    -->
+    <Match>
+        <Bug pattern="CRLF_INJECTION_LOGS"/>
+        <Class name="com.betterreads.collections.service.ShelfServiceImpl"/>
     </Match>
 
     <!--

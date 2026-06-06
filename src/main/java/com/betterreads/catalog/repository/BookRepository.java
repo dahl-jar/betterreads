@@ -1,5 +1,6 @@
 package com.betterreads.catalog.repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -27,6 +28,10 @@ public interface BookRepository extends JpaRepository<Book, Long> {
     /** Returns every book with authors and subjects fetched, for the search reconcile walk. */
     @EntityGraph(attributePaths = {"authors", "subjects"})
     List<Book> findAllBy();
+
+    /** Returns the books with the given ids, authors fetched, for mapping a shelf in one query. */
+    @EntityGraph(attributePaths = "authors")
+    List<Book> findByBookIdIn(Collection<Long> bookIds);
 
     /** Returns the book with the given Google Books volume id, with authors and subjects fetched. */
     @EntityGraph(attributePaths = {"authors", "subjects"})
