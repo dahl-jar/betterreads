@@ -1,111 +1,22 @@
 # Project structure
 
-## Spring Boot package layout
+Spring Boot, organised by feature. Each feature module owns its `controller`, `service`, `repository`, `entity`, `dto`, and `mapper` subpackages; a module only carries the subpackages it needs.
 
 ```text
 com.betterreads
+  auth/           registration, login, JWT issuing, refresh-token rotation, account deletion, email verification, password reset
+  catalog/        book entity, the source merger, staging, promotion, scheduled refresh, the book-detail read path and its SSE stream
+  search/         Meilisearch client, index reconciler, the search endpoint
+  integration/    one package per external source: loc, wikidata, googlebooks, openlibrary, hardcover
+  mail/           transactional outbox and the worker that delivers queued mail
+  operations/     Cloudflare Access audience validation for the management port
+  common/         exception handling, web filters, crypto, shared DTOs and utilities
+  config/         security, CORS, caching, OpenAPI, metrics, Jackson
   BetterReadsApplication
-  config/
-    SecurityConfig
-    WebClientConfig
-    CacheConfig
-    JacksonConfig
-  common/
-    dto/
-    exception/
-    mapper/
-    util/
-  auth/
-    controller/
-    service/
-    dto/
-    entity/
-    repository/
-  catalog/
-    controller/
-    service/
-    dto/
-      SearchResultDto
-      BookDetailDto
-      TrendingBookDto
-    entity/
-      Book
-      Author
-      BookSubject
-    repository/
-    mapper/
-  reviews/
-    controller/
-    service/
-    dto/
-    entity/
-      Review
-    repository/
-  collections/
-    controller/
-    service/
-    dto/
-    entity/
-      UserBookCollection
-      ReadingStatus
-    repository/
-  clubs/
-    controller/
-    service/
-    dto/
-    entity/
-      BookClub
-      BookClubMembership
-      ClubPost
-      ClubComment
-    repository/
-  feed/
-    controller/
-    service/
-    dto/
-    entity/
-      ActivityEvent
-      FeedItem
-    repository/
-  recommendations/
-    controller/
-    service/
-    dto/
-      RecommendationDto
-    entity/
-      UserBookInteraction
-      UserRecommendation
-      SimilarBook
-    repository/
-  search/
-    controller/
-    service/
-    dto/
-      SearchRequestDto
-      SearchResponseDto
-    repository/
-  integration/
-    openlibrary/
-      client/
-        OpenLibraryClient
-      dto/
-      mapper/
-      service/
-        OpenLibraryCatalogService
-  jobs/
-    TrendingSyncJob
-    MetadataEnrichmentJob
-    RecommendationRefreshJob
-    SearchIndexRefreshJob
 ```
 
-Rules for this structure:
-- controllers should only depend on services and DTOs
-- repositories stay inside their feature modules
-- OpenLibrary code stays isolated under `integration/openlibrary`
-- recommendation persistence stays in `recommendations`
-- search-specific indexing logic stays in `search`
-- background scheduled work stays in `jobs`
+Rules enforced by ArchUnit (`src/test/java/com/betterreads/ArchitectureRules.java`):
 
-## ML / recommendation service
-The ML and recommendation training pipeline lives in a separate `ml-api` repository. It connects to the same PostgreSQL database to read interaction data and write back computed recommendations.
+- Controllers depend on services and DTOs, never on repositories.
+- JPA entities do not cross the API boundary; DTO records do.
+- Each external source stays isolated under `integration/<vendor>/`; source-shaped types do not reach catalog or search logic.

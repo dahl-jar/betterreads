@@ -63,7 +63,7 @@ kubectl exec -n betterreads postgres-0 -- psql -U betterreads -d betterreads_res
 kubectl exec -n betterreads postgres-0 -- dropdb -U betterreads betterreads_restore
 ```
 
-If the counts and `max(created_at)` look right, the drill passed. Note the date in `.local/CHANGELOG.md`.
+If the counts and `max(created_at)` look right, the drill passed. Note the date somewhere durable.
 
 ## Real disaster recovery
 
