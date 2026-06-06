@@ -104,20 +104,23 @@ class SourceMergerTest {
         }
 
         @Test
-        @DisplayName("cover comes from OpenLibrary before Hardcover")
-        void coverPrefersOpenLibrary() {
-            final SourceBook openLibrary = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+        @DisplayName("cover comes from Google's edition before OpenLibrary's work-level cover")
+        void coverPrefersGoogleOverOpenLibrary() {
+            final SourceBook google = SourceBook.builder(BookFieldSource.GOOGLE_BOOKS)
                 .title(TITLE)
                 .coverUrl(COVER_URL)
                 .build();
-            final SourceBook hardcover = SourceBook.builder(BookFieldSource.HARDCOVER)
+            final SourceBook openLibrary = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
                 .title(TITLE)
-                .coverUrl("https://assets.hardcover.app/dune.jpg")
+                .coverUrl("https://covers.openlibrary.org/b/id/2-L.jpg")
                 .build();
 
-            final MergedBook merged = merger.merge(List.of(hardcover, openLibrary));
+            final MergedBook merged = merger.merge(List.of(openLibrary, google));
 
-            assertThat(merged.book().coverUrl()).isEqualTo(COVER_URL);
+            assertThat(merged.book().coverUrl())
+                .as("Google keys the cover to the edition's language; OpenLibrary's work-level "
+                    + "cover can be a foreign edition, so Google wins")
+                .isEqualTo(COVER_URL);
         }
 
         @Test

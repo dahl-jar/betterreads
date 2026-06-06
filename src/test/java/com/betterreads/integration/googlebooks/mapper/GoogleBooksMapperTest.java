@@ -7,6 +7,7 @@ import java.util.Objects;
 import java.util.function.UnaryOperator;
 
 import com.betterreads.catalog.service.source.SourceBook;
+import com.betterreads.integration.googlebooks.dto.ImageLinks;
 import com.betterreads.integration.googlebooks.dto.IndustryIdentifier;
 import com.betterreads.integration.googlebooks.dto.Volume;
 import com.betterreads.integration.googlebooks.dto.VolumeInfo;
@@ -74,6 +75,25 @@ class GoogleBooksMapperTest {
     }
 
     @Test
+    @DisplayName("maps the edition's thumbnail to an https cover")
+    void mapsThumbnailToHttpsCover() {
+        final SourceBook book = mapWith(info -> withImageLinks(info,
+            new ImageLinks("http://books.google.com/books/content?id=x&img=1&zoom=1", null)));
+
+        assertThat(book.coverUrl())
+            .as("the http thumbnail is upgraded to https so it loads on an https page")
+            .isEqualTo("https://books.google.com/books/content?id=x&img=1&zoom=1");
+    }
+
+    @Test
+    @DisplayName("no image links leaves the cover null so another source can supply it")
+    void noImageLinksLeavesCoverNull() {
+        final SourceBook book = mapWith(info -> info);
+
+        assertThat(book.coverUrl()).isNull();
+    }
+
+    @Test
     @DisplayName("stripHtml drops the tag set Google ships and decodes entities the reader would see")
     void stripsRealGoogleDescriptionMarkup() {
         final String input = "<p><b><i>The Eye of the World</i></b><br>"
@@ -122,7 +142,7 @@ class GoogleBooksMapperTest {
     private SourceBook mapWith(final UnaryOperator<VolumeInfo> customize) {
         final VolumeInfo base = new VolumeInfo(
             "Dune", null, List.of("Frank Herbert"), "1965", "Ace", 412, "en",
-            null, null, 4.5, 9000, "A desert planet.");
+            null, null, 4.5, 9000, "A desert planet.", null);
         return Objects.requireNonNull(mapper.toSourceBook(new Volume("gb-1", customize.apply(base))));
     }
 
@@ -130,6 +150,13 @@ class GoogleBooksMapperTest {
         return new VolumeInfo(
             info.title(), info.subtitle(), info.authors(), info.publishedDate(), info.publisher(),
             info.pageCount(), info.language(), info.industryIdentifiers(), categories,
-            info.averageRating(), info.ratingsCount(), info.description());
+            info.averageRating(), info.ratingsCount(), info.description(), info.imageLinks());
+    }
+
+    private static VolumeInfo withImageLinks(final VolumeInfo info, final ImageLinks imageLinks) {
+        return new VolumeInfo(
+            info.title(), info.subtitle(), info.authors(), info.publishedDate(), info.publisher(),
+            info.pageCount(), info.language(), info.industryIdentifiers(), info.categories(),
+            info.averageRating(), info.ratingsCount(), info.description(), imageLinks);
     }
 }

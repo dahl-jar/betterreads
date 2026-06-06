@@ -8,6 +8,7 @@ import com.betterreads.catalog.service.source.BookFieldSource;
 import com.betterreads.catalog.service.source.CatalogGenres;
 import com.betterreads.catalog.service.source.SourceAuthor;
 import com.betterreads.catalog.service.source.SourceBook;
+import com.betterreads.integration.googlebooks.dto.ImageLinks;
 import com.betterreads.integration.googlebooks.dto.IndustryIdentifier;
 import com.betterreads.integration.googlebooks.dto.Volume;
 import com.betterreads.integration.googlebooks.dto.VolumeInfo;
@@ -33,6 +34,10 @@ public class GoogleBooksMapper {
 
     private static final String ISBN_13_TYPE = "ISBN_13";
 
+    private static final String HTTP_PREFIX = "http://";
+
+    private static final String HTTPS_PREFIX = "https://";
+
     private static final int MAX_SUBJECTS = 25;
 
     /** Returns the {@link SourceBook} projection of a Google Books volume, or null if unmappable. */
@@ -51,6 +56,7 @@ public class GoogleBooksMapper {
             .publisher(info.publisher())
             .pageCount(nullIfZero(info.pageCount()))
             .language(info.language())
+            .coverUrl(coverUrl(info.imageLinks()))
             .authors(SourceAuthor.ofNames(info.authors()))
             .rawSubjects(info.categories() == null ? null : canonicalSubjects(info.categories()))
             .build();
@@ -58,6 +64,27 @@ public class GoogleBooksMapper {
 
     static List<String> canonicalSubjects(final @Nullable List<String> categories) {
         return CatalogGenres.reduceToCanonical(categories, MAX_SUBJECTS);
+    }
+
+    /**
+     * Returns the edition's thumbnail as an https URL, or null when Google supplies none.
+     *
+     * <p>The cover is the one Google attaches to this specific edition, so an English volume carries
+     * its English cover. Google serves the thumbnail over http, upgraded to https so it loads on an
+     * https page without a mixed-content block.
+     */
+    static @Nullable String coverUrl(final @Nullable ImageLinks imageLinks) {
+        if (imageLinks == null) {
+            return null;
+        }
+        final String thumbnail = imageLinks.thumbnail() == null
+            ? imageLinks.smallThumbnail() : imageLinks.thumbnail();
+        if (thumbnail == null || thumbnail.isBlank()) {
+            return null;
+        }
+        return thumbnail.startsWith(HTTP_PREFIX)
+            ? HTTPS_PREFIX + thumbnail.substring(HTTP_PREFIX.length())
+            : thumbnail;
     }
 
     static @Nullable String findIsbn13(final @Nullable List<IndustryIdentifier> identifiers) {

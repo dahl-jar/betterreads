@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
 
+import com.betterreads.catalog.service.source.SourceBook;
+import com.betterreads.integration.openlibrary.dto.SearchDoc;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -42,6 +44,50 @@ class OpenLibraryMapperTest {
     private static final String THE_ONE_RING = "the one ring";
 
     private static final String HOBBIT_WORK_KEY = "OL27482W";
+
+    private static final int FIXTURE_YEAR = 2014;
+
+    private static final String ENGLISH = "eng";
+
+    private static final String FRENCH = "fre";
+
+    private final OpenLibraryMapper mapper = new OpenLibraryMapper();
+
+    @Nested
+    @DisplayName("language")
+    class Language {
+
+        @Test
+        @DisplayName("English is chosen from a multi-language work even when it is not listed first")
+        void prefersEnglishFromMultiLanguageList() {
+            final SearchDoc doc = languageDoc(List.of("spa", "tur", ENGLISH, "pol"));
+
+            final SourceBook book = mapper.toSourceBook(doc, null);
+
+            assertThat(book).isNotNull();
+            assertThat(book.language())
+                .as("OpenLibrary lists the languages a work has editions in; the English one is "
+                    + "the catalog's language even when Spanish is listed first")
+                .isEqualTo(ENGLISH);
+        }
+
+        @Test
+        @DisplayName("with no English edition the first listed language is kept")
+        void keepsFirstWhenNoEnglish() {
+            final SearchDoc doc = languageDoc(List.of(FRENCH, "deu"));
+
+            final SourceBook book = mapper.toSourceBook(doc, null);
+
+            assertThat(book).isNotNull();
+            assertThat(book.language()).isEqualTo(FRENCH);
+        }
+
+        private SearchDoc languageDoc(final List<String> languages) {
+            return new SearchDoc(
+                "/works/OL1W", "A Book", null, List.of("An Author"), FIXTURE_YEAR, null, null,
+                languages);
+        }
+    }
 
     @Nested
     @DisplayName("coerceDescription (string | {type,value} | null)")
