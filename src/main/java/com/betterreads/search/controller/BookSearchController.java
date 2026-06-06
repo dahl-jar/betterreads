@@ -29,6 +29,8 @@ import org.springframework.web.bind.annotation.RestController;
 @SecurityRequirements
 public class BookSearchController {
 
+    private static final int MAX_PAGE_SIZE = 100;
+
     private final BookSearchService searchService;
 
     private final SearchMissStager searchMissStager;
@@ -36,19 +38,22 @@ public class BookSearchController {
     /**
      * Returns books matching the query, ordered by relevance.
      *
-     * <p>A query with no local hit triggers off-thread staging of the external book so a later
-     * search finds it; the current empty result returns right away while enrichment runs in the
-     * background.
+     * <p>The first page of every successful search also resolves the query's series and author in the
+     * background, so a query that returns only a few hits (such as an author whose catalog is mostly
+     * unstaged) still fills in the rest for a later search. The stager dedupes per query, so a
+     * paginated or repeated search resolves the query at most once per dedup window. A degraded
+     * search (Meilisearch down) does not trigger it, and only the first page does so a "load more"
+     * fetch is not a fresh trigger.
      */
     @GetMapping("/books")
     @Operation(summary = "Search the book catalog")
     public BookSearchResult search(
         @RequestParam("q") @NotBlank @Size(max = 200) final String query,
         @RequestParam(value = "offset", defaultValue = "0") @Min(0) final int offset,
-        @RequestParam(value = "limit", defaultValue = "20") @Min(1) @Max(50) final int limit
+        @RequestParam(value = "limit", defaultValue = "20") @Min(1) @Max(MAX_PAGE_SIZE) final int limit
     ) {
         final SearchOutcome outcome = searchService.searchOutcome(query, offset, limit);
-        if (!outcome.degraded() && outcome.result().totalHits() == 0) {
+        if (!outcome.degraded() && offset == 0) {
             searchMissStager.stage(query);
         }
         return outcome.result();

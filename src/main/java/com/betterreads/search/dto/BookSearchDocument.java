@@ -10,6 +10,8 @@ import org.jspecify.annotations.Nullable;
  * @param title book title
  * @param subtitle book subtitle if any
  * @param seriesName name of the series the book belongs to, if any
+ * @param seriesPosition the book's position within its series, so a client can group a series in
+ *     reading order
  * @param authors author display names
  * @param subjects BISAC subjects assigned by the catalog mapper
  * @param language ISO 639-1 code
@@ -22,6 +24,7 @@ public record BookSearchDocument(
     String title,
     @Nullable String subtitle,
     @Nullable String seriesName,
+    @Nullable Integer seriesPosition,
     List<String> authors,
     List<String> subjects,
     @Nullable String language,
@@ -64,6 +67,7 @@ public record BookSearchDocument(
         private String title = "";
         private @Nullable String subtitle;
         private @Nullable String seriesName;
+        private @Nullable Integer seriesPosition;
         private List<String> authors = List.of();
         private List<String> subjects = List.of();
         private @Nullable String language;
@@ -87,6 +91,11 @@ public record BookSearchDocument(
 
         public Builder seriesName(final @Nullable String value) {
             this.seriesName = value;
+            return this;
+        }
+
+        public Builder seriesPosition(final @Nullable Integer value) {
+            this.seriesPosition = value;
             return this;
         }
 
@@ -122,8 +131,8 @@ public record BookSearchDocument(
 
         public BookSearchDocument build() {
             return new BookSearchDocument(
-                bookId, title, subtitle, seriesName, authors, subjects, language, coverUrl,
-                publicationYear, popularityScore);
+                bookId, title, subtitle, seriesName, seriesPosition, authors, subjects, language,
+                coverUrl, publicationYear, popularityScore);
         }
     }
 }
