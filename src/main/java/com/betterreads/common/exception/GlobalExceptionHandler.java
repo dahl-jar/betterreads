@@ -13,6 +13,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -108,6 +109,27 @@ class GlobalExceptionHandler {
                 new ApiErrorResponse(
                         HttpStatus.BAD_REQUEST.value(),
                         message,
+                        Instant.now(),
+                        List.of()
+                )
+        );
+    }
+
+    /**
+     * Maps a query or path parameter that does not convert to its target type to {@code 400}.
+     *
+     * <p>An unparseable enum or number in the request (for example {@code ?status=UNKNOWN}) is a
+     * client error. Without this handler it falls to the catch-all {@code 500}.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiErrorResponse> handleTypeMismatch(
+            final MethodArgumentTypeMismatchException exception) {
+        LOG.warn("Parameter type mismatch: name={}", LogSanitizer.forLog(exception.getName()));
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                new ApiErrorResponse(
+                        HttpStatus.BAD_REQUEST.value(),
+                        "Invalid request parameter",
                         Instant.now(),
                         List.of()
                 )
