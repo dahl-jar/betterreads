@@ -1,5 +1,6 @@
 package com.betterreads.integration.openlibrary.client;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -43,6 +44,8 @@ public class OpenLibraryClientImpl implements OpenLibraryClient {
 
     private static final String LIMIT_PARAM = "limit";
 
+    private static final int CANDIDATE_LIMIT = 10;
+
     private static final String FIELDS_PARAM = "fields";
 
     private static final String SEARCH_4XX_LOG = "OpenLibrary search returned 4xx status={}";
@@ -74,8 +77,10 @@ public class OpenLibraryClientImpl implements OpenLibraryClient {
 
     @Override
     public Optional<SourceBook> fetchByTitleAuthor(final String title, final String author) {
-        return firstMatch(builder -> builder.queryParam("title", title).queryParam("author", author))
+        return candidates(builder -> builder.queryParam("title", title).queryParam("author", author))
+            .stream()
             .filter(doc -> titleMatches(doc, title))
+            .min(Comparator.comparing(OpenLibraryClientImpl::publishYearOrMax))
             .flatMap(this::enrichAndMap);
     }
 
@@ -150,6 +155,36 @@ public class OpenLibraryClientImpl implements OpenLibraryClient {
         }
     }
 
+    private List<SearchDoc> candidates(final Consumer<UriBuilder> queryCustomizer) {
+        try {
+            final SearchResponse response = openLibraryWebClient.get()
+                .uri(builder -> {
+                    builder.path(SEARCH_PATH)
+                        .queryParam(LIMIT_PARAM, CANDIDATE_LIMIT)
+                        .queryParam(FIELDS_PARAM, SEARCH_FIELDS);
+                    queryCustomizer.accept(builder);
+                    return builder.build();
+                })
+                .retrieve()
+                .bodyToMono(SearchResponse.class)
+                .block();
+            if (response == null || response.docs() == null) {
+                return List.of();
+            }
+            return response.docs();
+        } catch (WebClientResponseException ex) {
+            if (ex.getStatusCode().is4xxClientError()) {
+                LOG.debug(SEARCH_4XX_LOG, ex.getStatusCode().value());
+                return List.of();
+            }
+            throw ex;
+        }
+    }
+
+    private static int publishYearOrMax(final SearchDoc doc) {
+        return doc.firstPublishYear() == null ? Integer.MAX_VALUE : doc.firstPublishYear();
+    }
+
     private @Nullable WorkDetail fetchWork(final String workKey) {
         try {
             return openLibraryWebClient.get()
@@ -167,21 +202,9 @@ public class OpenLibraryClientImpl implements OpenLibraryClient {
         }
     }
 
-    /**
-     * Returns true if the returned title equals the query or the query is the more specific string.
-     *
-     * <p>A title that extends the query is a different work and is rejected:
-     * {@code "the sandman - overture"} does not match a query of {@code "the sandman"}.
-     */
     private static boolean titleMatches(final SearchDoc doc, final String queryTitle) {
         final String docTitle = doc.title();
-        if (docTitle == null) {
-            return false;
-        }
-        final String trimmedDoc = docTitle.trim();
-        final String trimmedQuery = queryTitle.trim();
-        return trimmedDoc.equalsIgnoreCase(trimmedQuery)
-            || TextMatch.containsIgnoreCase(trimmedQuery, trimmedDoc);
+        return docTitle != null && TextMatch.titleWithinQuery(docTitle, queryTitle);
     }
 
     private static @Nullable String stripWorksPrefix(final @Nullable String key) {

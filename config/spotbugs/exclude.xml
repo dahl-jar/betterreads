@@ -143,13 +143,14 @@
     </Match>
 
     <!--
-      IMPROPER_UNICODE on the OpenLibrary title-drift guard. FindSecBugs flags any case-insensitive
-      comparison as a Unicode case-folding risk. The comparison here is two book titles for a
-      best-effort drift check, not a security token or authorization decision, so a Unicode
-      collision has no exploitable consequence. Case-insensitive title matching is intended.
+      IMPROPER_UNICODE on the shared title-versus-query comparison. FindSecBugs flags any
+      case-insensitive comparison as a Unicode case-folding risk. The comparison here is a book
+      title against a free-form search query for a best-effort drift check, used by the OpenLibrary
+      client and the standalone-fallback staging; it is not a security token or authorization
+      decision, so a Unicode collision has no exploitable consequence.
     -->
     <Match>
         <Bug pattern="IMPROPER_UNICODE"/>
-        <Class name="com.betterreads.integration.openlibrary.client.OpenLibraryClientImpl"/>
+        <Class name="com.betterreads.common.util.TextMatch"/>
     </Match>
 </FindBugsFilter>
