@@ -16,10 +16,9 @@ public interface OpenLibraryClient extends BookSourceClient {
     Optional<SourceBook> fetchByWorkKey(String workKey);
 
     /**
-     * Returns up to {@code limit} books matching the query, each a distinct work, for catalog
-     * search. Unlike the resolve-one fetches, this keeps every hit so a series query returns its
-     * volumes. The results carry only the search-level fields; description and subjects come from
-     * later per-book enrichment.
+     * Returns up to {@code limit} books matching the query, each a distinct work, so a series
+     * query keeps all its volumes. The results carry only the search-level fields; description and
+     * subjects come from later per-book enrichment.
      */
     List<SourceBook> search(String query, int limit);
 }

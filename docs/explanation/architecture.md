@@ -4,7 +4,7 @@
 
 Spring Boot, organised by feature. Each feature module owns its `controller`, `service`, `repository`, `entity`, `dto`, and `mapper` subpackages. External-API integrations live under `integration/<vendor>/`. Cross-cutting concerns (`common/exception`, `common/web`, `common/util`) sit at the top level.
 
-The currently-implemented module is `auth`. The same shape is enforced by ArchUnit for any future feature module.
+The feature modules are `auth`, `catalog`, and `search`, with five source integrations under `integration/` (Library of Congress, Wikidata, Google Books, OpenLibrary, Hardcover) and a transactional mail outbox under `mail`. ArchUnit enforces the same shape across all of them.
 
 ## Stack
 
@@ -12,8 +12,10 @@ The currently-implemented module is `auth`. The same shape is enforced by ArchUn
 - Spring Boot 4.0
 - Spring Web, Spring Data JPA, Spring Security (resource server for Cloudflare Access JWT validation)
 - PostgreSQL 17
-- Caffeine cache
-- WebClient for external HTTP
+- Meilisearch for full-text catalog search
+- Redis for the book-detail cache and shared rate-limit buckets
+- Caffeine for in-process caches
+- WebClient for the five source integrations
 - Flyway for migrations
 - Testcontainers for integration tests
 - JJWT for app-issued tokens, Bucket4j for rate limiting
@@ -33,7 +35,7 @@ Spring Data JPA repositories. Read paths use derived query methods or `@Query` w
 
 ## Background work
 
-Long-running and request-path-unfriendly work belongs in scheduled jobs (`@Scheduled`) or a dedicated job runner. The current codebase has no scheduled jobs because the only feature module is `auth`, where every operation is synchronous and bounded.
+Long-running and request-path-unfriendly work runs in scheduled jobs (`@Scheduled`): a mail outbox worker drains queued mail, an hourly sweep hard-deletes accounts past their grace window, a promoter moves staging books to the catalog once they are complete, a refresh job re-pulls stale catalog data, and a reconciler keeps the Meilisearch index in step with the database. Request handlers stay synchronous and bounded; anything slower is queued for one of these.
 
 ## Testing
 

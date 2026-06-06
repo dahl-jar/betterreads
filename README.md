@@ -6,11 +6,15 @@ Backend service for BetterReads, a book tracking app. Spring Boot on Java 25, Po
 
 The first version of BetterReads was a school project: a Thymeleaf app that called OpenLibrary on every page load, used Spring's default session auth, and let Hibernate auto-create the schema. The original code is at [dahl-jar/legacy-betterreads](https://github.com/dahl-jar/legacy-betterreads).
 
-This is a rebuild. The backend is a headless JSON API. Auth uses short-lived access JWTs and refresh tokens that rotate on every use, with replay detection. Schema changes go through Flyway, and the runtime database role has no DDL privileges. Production runs on a single-node Kubernetes cluster behind a Cloudflare Tunnel, deployed by Argo CD.
+This is a rebuild. The backend is a headless JSON API; a separate web client consumes it. Auth uses short-lived access JWTs and refresh tokens that rotate on every use, with replay detection.
+
+The catalog is the core of it. A book is assembled from five external sources, Library of Congress, Wikidata, Google Books, OpenLibrary, and Hardcover, taking each field from the most reliable source that has it. Incomplete books sit in a staging table until enough fields are filled to promote them. Search runs on Meilisearch, not the database, so a typo still finds the book.
+
+Schema changes go through Flyway, and the runtime database role has no DDL privileges. Production runs on a single-node Kubernetes cluster behind a Cloudflare Tunnel, deployed by Argo CD.
 
 ## Stack
 
-Java 25 · Spring Boot 4.0 · Postgres 17 · Flyway · Caffeine · WebClient · JJWT · Bucket4j · Gradle 9 (Kotlin DSL)
+Java 25 · Spring Boot 4.0 · Postgres 17 · Meilisearch · Redis · Flyway · Caffeine · WebClient · JJWT · Bucket4j · Gradle 9 (Kotlin DSL)
 
 ## Prerequisites
 
@@ -58,7 +62,7 @@ docker compose -f docker/docker-compose.yml --env-file .env down -v   # stop and
 
 ## Architecture
 
-Controller calls service, service calls repository. Each feature package has its own controller, service, repository, entity, dto, and mapper subpackages. DTOs at the API are records, JPA entities never leave the service layer. OpenLibrary code is isolated under `integration/openlibrary/`. ArchUnit enforces the layering. See [docs/explanation/architecture.md](docs/explanation/architecture.md).
+Controller calls service, service calls repository. Each feature package has its own controller, service, repository, entity, dto, and mapper subpackages. DTOs at the API are records, JPA entities never leave the service layer. Each external source has its own client, DTOs, and mapper under `integration/<vendor>/`, so source-shaped types never reach the catalog logic. ArchUnit enforces the layering. See [docs/explanation/architecture.md](docs/explanation/architecture.md).
 
 ## Deployment
 
