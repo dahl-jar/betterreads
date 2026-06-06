@@ -13,6 +13,7 @@ import org.jspecify.annotations.Nullable;
  * @param authors author display names
  * @param subjects BISAC subjects assigned by the catalog mapper
  * @param language ISO 639-1 code
+ * @param coverUrl cover image URL, so a result grid renders the cover without a per-hit detail fetch
  * @param publicationYear year of original publication
  * @param popularityScore tie-breaker for sort, 0 if unknown
  */
@@ -24,6 +25,7 @@ public record BookSearchDocument(
     List<String> authors,
     List<String> subjects,
     @Nullable String language,
+    @Nullable String coverUrl,
     @Nullable Integer publicationYear,
     double popularityScore
 ) {
@@ -65,6 +67,7 @@ public record BookSearchDocument(
         private List<String> authors = List.of();
         private List<String> subjects = List.of();
         private @Nullable String language;
+        private @Nullable String coverUrl;
         private @Nullable Integer publicationYear;
         private double popularityScore;
 
@@ -102,6 +105,11 @@ public record BookSearchDocument(
             return this;
         }
 
+        public Builder coverUrl(final @Nullable String value) {
+            this.coverUrl = value;
+            return this;
+        }
+
         public Builder publicationYear(final @Nullable Integer value) {
             this.publicationYear = value;
             return this;
@@ -114,8 +122,8 @@ public record BookSearchDocument(
 
         public BookSearchDocument build() {
             return new BookSearchDocument(
-                bookId, title, subtitle, seriesName, authors, subjects, language, publicationYear,
-                popularityScore);
+                bookId, title, subtitle, seriesName, authors, subjects, language, coverUrl,
+                publicationYear, popularityScore);
         }
     }
 }
