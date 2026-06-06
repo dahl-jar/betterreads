@@ -6,78 +6,120 @@ import com.betterreads.catalog.service.source.MergedBook;
 import com.betterreads.catalog.service.source.SourceBook;
 import com.betterreads.catalog.service.source.SourceMerger;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.stream.Stream;
 
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClientException;
 
 /**
- * Fetches the sources a staged book still needs and merges them into one.
+ * Fetches the other sources for a staged book and merges them into one.
  *
- * <p>The seed already carries its discovery source's fields, so that source is not fetched again.
- * The rest are tried in priority order and the fan-out stops as soon as the book has the fields
- * needed to show it, so a well-covered book costs one or two calls instead of one per source. A
- * source that fails (5xx or network error) is dropped for this book and the merge proceeds with the
- * rest, so one flaky source does not sink a candidate or the surrounding batch.
+ * <p>The seed's own discovery source is skipped; the rest run in two waves, the show-field sources
+ * first and the low-yield sources (awards, authority cross-references) second, with the sources in a
+ * wave fetched concurrently. Both waves run so the per-field priority merge sees every source. A
+ * source that fails (5xx, network error, or timeout) is dropped for this book and the merge proceeds
+ * with the rest, so one flaky source does not sink a candidate or the surrounding batch.
  */
 @Component
 public class SourceCollector {
 
     private static final Logger LOG = LoggerFactory.getLogger(SourceCollector.class);
 
+    private static final Duration PER_CALL_TIMEOUT = Duration.ofSeconds(30);
+
     /**
-     * Fetch order. Sources that fill the show fields in one call come first; the low-yield sources
-     * (awards, authority cross-references) come last, so the gate-stop skips them for books that are
-     * already showable.
+     * Fetch waves, ordered by latency. The first wave holds the sources that fill the show fields
+     * fast; the second holds the slower, low-yield sources.
      */
-    private static final List<BookFieldSource> FETCH_ORDER = List.of(
-        BookFieldSource.GOOGLE_BOOKS,
-        BookFieldSource.OPEN_LIBRARY,
-        BookFieldSource.HARDCOVER,
-        BookFieldSource.LOC,
-        BookFieldSource.WIKIDATA);
+    private static final List<List<BookFieldSource>> WAVES = List.of(
+        List.of(BookFieldSource.GOOGLE_BOOKS, BookFieldSource.OPEN_LIBRARY),
+        List.of(BookFieldSource.HARDCOVER, BookFieldSource.LOC, BookFieldSource.WIKIDATA));
+
+    private static final List<BookFieldSource> FETCH_ORDER = WAVES.stream().flatMap(List::stream).toList();
 
     private final SourceMerger merger;
 
-    private final RequiredFieldsCheck requiredFields;
-
     private final List<BookSourceClient> sourceClients;
+
+    private final Executor executor;
 
     public SourceCollector(
         final SourceMerger merger,
-        final RequiredFieldsCheck requiredFields,
-        final List<BookSourceClient> sourceClients
+        final List<BookSourceClient> sourceClients,
+        @Qualifier("sourceFetchExecutor") final Executor sourceFetchExecutor
     ) {
         this.merger = merger;
-        this.requiredFields = requiredFields;
         this.sourceClients = order(sourceClients);
+        this.executor = sourceFetchExecutor;
     }
 
-    /** Fetches the needed sources for the seed and returns the merge of the seed and the matches. */
+    /**
+     * Fetches every source for the seed, wave by wave, and returns the merge with the matches.
+     *
+     * <p>Both waves always run so the per-field priority merge sees every source and the enrichment
+     * fields (rating, awards, full genre, page count, author identity) the show bar does not require
+     * still land. The waves order the fetches by latency, not by a stop condition: the fast
+     * show-field sources first, the slow ones after, each wave fetched concurrently.
+     */
     public MergedBook collectFor(final SourceBook seed) {
         final List<SourceBook> found = new ArrayList<>();
         found.add(seed);
-        MergedBook merged = merger.merge(found);
-        for (final BookSourceClient client : sourceClients) {
-            if (requiredFields.check(merged.book()).isReady()) {
-                break;
-            }
-            if (client.source() == seed.source()) {
-                continue;
-            }
-            final Optional<SourceBook> hit = fetch(client, seed);
-            if (hit.isPresent()) {
-                found.add(hit.get());
-                merged = merger.merge(found);
-            }
+        for (final List<BookFieldSource> wave : WAVES) {
+            found.addAll(fetchWave(wave, seed));
         }
-        return merged;
+        return merger.merge(seed, found);
+    }
+
+    private List<SourceBook> fetchWave(final List<BookFieldSource> wave, final SourceBook seed) {
+        final List<CompletableFuture<Optional<SourceBook>>> calls = sourceClients.stream()
+            .filter(client -> client.source() != null && wave.contains(client.source()))
+            .filter(client -> client.source() != seed.source())
+            .map(client -> CompletableFuture.supplyAsync(() -> fetch(client, seed), executor))
+            .toList();
+        awaitWave(calls);
+        return calls.stream()
+            .flatMap(SourceCollector::completedValue)
+            .toList();
+    }
+
+    /**
+     * Waits up to one timeout for the whole wave, then cancels whatever is still running, so the wave
+     * costs one timeout total rather than one per stalled source. A failed source is harvested as
+     * empty by {@link #completedValue}; the rest still merge.
+     */
+    @SuppressWarnings("PMD.DoNotUseThreads")
+    private static void awaitWave(final List<CompletableFuture<Optional<SourceBook>>> calls) {
+        try {
+            CompletableFuture.allOf(calls.toArray(CompletableFuture[]::new))
+                .get(PER_CALL_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (TimeoutException ex) {
+            calls.forEach(call -> call.cancel(true));
+        } catch (ExecutionException ex) {
+            LOG.warn("catalog.collect a source fetch failed ({})", ex.getClass().getSimpleName());
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private static Stream<SourceBook> completedValue(final CompletableFuture<Optional<SourceBook>> call) {
+        if (!call.isDone() || call.isCompletedExceptionally() || call.isCancelled()) {
+            return Stream.empty();
+        }
+        return call.getNow(Optional.empty()).stream();
     }
 
     private static List<BookSourceClient> order(final List<BookSourceClient> clients) {
@@ -98,7 +140,10 @@ public class SourceCollector {
         try {
             final String isbn = seed.isbn13();
             if (isbn != null) {
-                return client.fetchByIsbn(isbn);
+                final Optional<SourceBook> byIsbn = client.fetchByIsbn(isbn);
+                if (byIsbn.isPresent()) {
+                    return byIsbn;
+                }
             }
             return fetchByTitleAuthor(client, seed);
         } catch (WebClientException ex) {

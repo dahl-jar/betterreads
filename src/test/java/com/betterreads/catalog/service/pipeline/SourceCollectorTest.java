@@ -11,6 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Executor;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -42,6 +43,10 @@ class SourceCollectorTest {
 
     private static final String SERIES = "Dune Saga";
 
+    private static final Executor SAME_THREAD = Runnable::run;
+
+    private static final String OL_WORK_KEY = "OL1W";
+
     @Test
     @DisplayName("fetches every source by ISBN and merges them with the seed")
     void collectsAllSourcesByIsbn() {
@@ -56,8 +61,7 @@ class SourceCollectorTest {
             .averageRating(HARDCOVER_RATING)
             .build();
         final SourceCollector collector = new SourceCollector(new SourceMerger(),
-            new RequiredFieldsCheck(),
-            List.of(stubByIsbn(BookFieldSource.HARDCOVER, ISBN, hardcoverHit)));
+            List.of(stubByIsbn(BookFieldSource.HARDCOVER, ISBN, hardcoverHit)), SAME_THREAD);
 
         final MergedBook merged = collector.collectFor(seed);
 
@@ -71,7 +75,7 @@ class SourceCollectorTest {
     @DisplayName("falls back to title and author when the seed has no ISBN")
     void collectsByTitleAuthorWhenNoIsbn() {
         final SourceBook seed = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
-            .openLibraryWorkKey("OL1W")
+            .openLibraryWorkKey(OL_WORK_KEY)
             .title(TITLE)
             .authors(SourceAuthor.ofNames(List.of(AUTHOR)))
             .build();
@@ -80,7 +84,7 @@ class SourceCollectorTest {
             .awards(List.of(HUGO))
             .build();
         final SourceCollector collector = new SourceCollector(new SourceMerger(),
-            new RequiredFieldsCheck(), List.of(stubByTitleAuthor(TITLE, AUTHOR, wikidataHit)));
+            List.of(stubByTitleAuthor(TITLE, AUTHOR, wikidataHit)), SAME_THREAD);
 
         final MergedBook merged = collector.collectFor(seed);
 
@@ -97,8 +101,7 @@ class SourceCollectorTest {
             .title(TITLE)
             .build();
         final SourceCollector collector = new SourceCollector(new SourceMerger(),
-            new RequiredFieldsCheck(),
-            List.of(stubByIsbn(BookFieldSource.HARDCOVER, "other-isbn", null)));
+            List.of(stubByIsbn(BookFieldSource.HARDCOVER, "other-isbn", null)), SAME_THREAD);
 
         final MergedBook merged = collector.collectFor(seed);
 
@@ -119,7 +122,7 @@ class SourceCollectorTest {
             .seriesPosition(YEAR)
             .build();
         final SourceCollector collector = new SourceCollector(new SourceMerger(),
-            new RequiredFieldsCheck(), List.of(failingByTitleAuthor(BookFieldSource.HARDCOVER)));
+            List.of(failingByTitleAuthor(BookFieldSource.HARDCOVER)), SAME_THREAD);
 
         final MergedBook merged = collector.collectFor(seed);
 
@@ -132,10 +135,10 @@ class SourceCollectorTest {
     }
 
     @Test
-    @DisplayName("a seed that already has the show fields calls no source at all")
-    void stopsWhenGatePasses() {
-        final SourceBook seed = SourceBook.builder(BookFieldSource.HARDCOVER)
-            .hardcoverId(HARDCOVER_ID)
+    @DisplayName("enriches a showable seed with later-wave fields it lacks")
+    void enrichesShowableSeed() {
+        final SourceBook seed = SourceBook.builder(BookFieldSource.GOOGLE_BOOKS)
+            .googleBooksVolumeId("gb1")
             .isbn13(ISBN)
             .title(TITLE)
             .authors(SourceAuthor.ofNames(List.of(AUTHOR)))
@@ -143,16 +146,49 @@ class SourceCollectorTest {
             .coverUrl("https://example.com/c.jpg")
             .publicationYear(YEAR)
             .build();
+        final SourceBook wikidataHit = SourceBook.builder(BookFieldSource.WIKIDATA)
+            .title(TITLE)
+            .awards(List.of(HUGO))
+            .build();
         final SourceCollector collector = new SourceCollector(new SourceMerger(),
-            new RequiredFieldsCheck(), List.of(
-                failingByTitleAuthor(BookFieldSource.GOOGLE_BOOKS),
-                failingByTitleAuthor(BookFieldSource.OPEN_LIBRARY)));
+            List.of(stubByTitleAuthor(BookFieldSource.WIKIDATA, TITLE, AUTHOR, wikidataHit)), SAME_THREAD);
 
         final MergedBook merged = collector.collectFor(seed);
 
-        assertThat(merged.book().title())
-            .as("the seed is already showable, so no enrichment source is called")
-            .isEqualTo(TITLE);
+        assertThat(merged.book().awards())
+            .as("a showable seed still runs the enrichment wave so Wikidata awards land")
+            .containsExactly(HUGO);
+    }
+
+    @Test
+    @DisplayName("runs both waves: a first-wave ISBN and a second-wave rating both reach the book")
+    void runsBothWaves() {
+        final SourceBook seed = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+            .openLibraryWorkKey(OL_WORK_KEY)
+            .title(TITLE)
+            .authors(SourceAuthor.ofNames(List.of(AUTHOR)))
+            .build();
+        final SourceBook googleHit = SourceBook.builder(BookFieldSource.GOOGLE_BOOKS)
+            .isbn13(ISBN)
+            .title(TITLE)
+            .build();
+        final SourceBook hardcoverHit = SourceBook.builder(BookFieldSource.HARDCOVER)
+            .title(TITLE)
+            .averageRating(HARDCOVER_RATING)
+            .build();
+        final SourceCollector collector = new SourceCollector(new SourceMerger(),
+            List.of(
+                stubByTitleAuthor(BookFieldSource.GOOGLE_BOOKS, TITLE, AUTHOR, googleHit),
+                stubByTitleAuthor(BookFieldSource.HARDCOVER, TITLE, AUTHOR, hardcoverHit)), SAME_THREAD);
+
+        final MergedBook merged = collector.collectFor(seed);
+
+        assertThat(merged.book())
+            .as("the first-wave ISBN and the second-wave rating both merge into the book")
+            .satisfies(book -> {
+                assertThat(book.isbn13()).isEqualTo(ISBN);
+                assertThat(book.averageRating()).isEqualTo(HARDCOVER_RATING);
+            });
     }
 
     @Test
@@ -167,9 +203,9 @@ class SourceCollectorTest {
             .averageRating(HARDCOVER_RATING)
             .build();
         final SourceCollector collector = new SourceCollector(new SourceMerger(),
-            new RequiredFieldsCheck(), List.of(
+            List.of(
                 failingByIsbn(BookFieldSource.GOOGLE_BOOKS),
-                stubByIsbn(BookFieldSource.HARDCOVER, ISBN, hardcoverHit)));
+                stubByIsbn(BookFieldSource.HARDCOVER, ISBN, hardcoverHit)), SAME_THREAD);
 
         final MergedBook merged = collector.collectFor(seed);
 
