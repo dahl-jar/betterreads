@@ -15,7 +15,7 @@ import org.jspecify.annotations.Nullable;
  * @param authors author display names
  * @param subjects BISAC subjects assigned by the catalog mapper
  * @param language ISO 639-1 code
- * @param coverUrl cover image URL, so a result grid renders the cover without a per-hit detail fetch
+ * @param coverUrl cover image URL
  * @param publicationYear year of original publication
  * @param popularityScore tie-breaker for sort, 0 if unknown
  */

@@ -18,7 +18,7 @@ public final class TextMatch {
      *
      * <p>A query carrying the author or extra words ("the martian weir") matches the canonical title
      * ("The Martian"); a title that extends the query ("The Sandman - Overture" for "the sandman")
-     * does not, so search drift is rejected.
+     * does not.
      */
     public static boolean titleWithinQuery(final String title, final String query) {
         final String trimmedTitle = title.trim();

@@ -19,8 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Persists external metadata into the local catalog. Identity per source comes from the
- * source-specific id column on {@code book}, so the upsert is a lookup-then-save in a single
- * transaction. Writing a book evicts its cached detail so a refreshed book is never served stale.
+ * source-specific id column on {@code book}; the upsert is a lookup-then-save in a single
+ * transaction. Writing a book evicts its cached detail.
  */
 @Service
 public class CatalogServiceImpl implements CatalogService {

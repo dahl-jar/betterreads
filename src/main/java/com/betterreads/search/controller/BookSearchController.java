@@ -38,12 +38,10 @@ public class BookSearchController {
     /**
      * Returns books matching the query, ordered by relevance.
      *
-     * <p>The first page of every successful search also resolves the query's series and author in the
-     * background, so a query that returns only a few hits (such as an author whose catalog is mostly
-     * unstaged) still fills in the rest for a later search. The stager dedupes per query, so a
-     * paginated or repeated search resolves the query at most once per dedup window. A degraded
-     * search (Meilisearch down) does not trigger it, and only the first page does so a "load more"
-     * fetch is not a fresh trigger.
+     * <p>The first page of every successful search resolves the query's series and author in the
+     * background and stages what it finds. The stager dedupes per query, resolving a paginated or
+     * repeated query at most once per dedup window. A degraded search (Meilisearch down) and any
+     * page past the first do not trigger it.
      */
     @GetMapping("/books")
     @Operation(summary = "Search the book catalog")

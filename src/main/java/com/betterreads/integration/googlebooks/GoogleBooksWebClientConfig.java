@@ -12,9 +12,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 /**
  * Builds the Google Books {@link WebClient} with explicit connect and response timeouts.
  *
- * <p>The API key is appended on every outbound request by an exchange filter rather than
- * baked into a default URI, so the key is not visible in {@code WebClient} debug logs that
- * print the base URI on construction.
+ * <p>The API key is appended on every outbound request by an exchange filter. It is kept out of the
+ * default URI, which {@code WebClient} prints in debug logs on construction.
  */
 @Configuration
 public class GoogleBooksWebClientConfig {

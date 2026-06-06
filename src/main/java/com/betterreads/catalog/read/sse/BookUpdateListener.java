@@ -10,8 +10,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 /**
  * Pushes the filled-in book to any open detail-page stream after its promotion commits.
  *
- * <p>Runs after commit so the read sees the committed row. A detail page opened on the cold book
- * receives the {@code book-updated} event and patches its missing sections in place.
+ * <p>Runs after commit, so the read sees the committed row.
  */
 @Component
 public class BookUpdateListener {

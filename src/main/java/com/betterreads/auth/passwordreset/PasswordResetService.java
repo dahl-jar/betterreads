@@ -27,9 +27,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Issues and consumes single-use password-reset tokens.
  *
- * <p>Only the HMAC-SHA256 hash is stored. A successful reset revokes every refresh token for
- * the user so other devices are signed out. The request side returns {@code 204} for both
- * known and unknown emails so the response cannot be used to enumerate accounts.
+ * <p>Only the HMAC-SHA256 hash is stored. A successful reset revokes every refresh token for the
+ * user. The request side returns {@code 204} for both known and unknown emails; the response does
+ * not reveal whether an account exists.
  */
 @Service
 public class PasswordResetService {

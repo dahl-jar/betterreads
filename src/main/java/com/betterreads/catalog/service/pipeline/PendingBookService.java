@@ -66,8 +66,7 @@ public class PendingBookService {
     }
 
     /**
-     * Promotes an already-collected candidate at once, so a search-miss book reaches {@code book}
-     * within seconds instead of waiting for the next scheduled poll.
+     * Promotes an already-collected candidate at once, ahead of the next scheduled poll.
      *
      * <p>The merge is the collected, enriched view, so promotion reuses it without re-fetching the
      * sources. The promote runs in its own transaction in {@link PendingBookPromoter}, after the

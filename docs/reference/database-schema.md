@@ -1,139 +1,159 @@
 # Database schema
 
-## Interactions and recommendations
+PostgreSQL 17. The schema is managed by Flyway migrations under `src/main/resources/db/migration/`; this page describes the current state after the latest migration. All primary keys are `bigint` identity columns. All timestamps are `timestamptz`.
 
-Collect user behavior from day one so recommendations can start simple and improve later.
+## Users
 
-### Core interaction table
-
-```sql
-create table user_book_interaction (
-  interaction_id bigserial primary key,
-  user_id bigint not null,
-  book_id bigint not null,
-  event_type varchar(50) not null,
-  event_source varchar(50),
-  weight numeric(10,2) not null,
-  metadata jsonb,
-  created_at timestamptz not null default now(),
-  foreign key (user_id) references app_user(user_id) on delete cascade,
-  foreign key (book_id) references book(book_id)
-);
-```
-
-`event_type` values:
-- `viewed`, `searched`, `saved`, `want_to_read`, `currently_reading`, `finished`, `dropped`, `rated`, `reviewed`, `commented`, `club_joined`, `club_posted`
-
-`event_source` values:
-- `search`, `book_page`, `collection`, `review`, `club`, `feed`
-
-Starter weights:
-- viewed = 1.0
-- saved = 2.0
-- currently_reading = 3.0
-- finished = 4.0
-- rated_5 = 5.0
-- rated_1 = -3.0
-- reviewed = 4.0
-
-Weights can be tuned over time.
-
-### Aggregated interaction table
+### app_user
 
 ```sql
-create table user_book_signal (
-  user_id bigint not null,
-  book_id bigint not null,
-  total_weight numeric(10,2) not null,
-  view_count integer not null default 0,
-  last_event_at timestamptz not null,
-  primary key (user_id, book_id),
-  foreign key (user_id) references app_user(user_id) on delete cascade,
-  foreign key (book_id) references book(book_id)
-);
+user_id           bigserial primary key,
+username          varchar(50) not null unique,
+email             text not null unique,
+password_hash     text not null,
+display_name      varchar(100),
+avatar_url        text,
+bio               text,
+email_verified_at timestamptz,
+deleted_at        timestamptz,
+created_at        timestamptz not null default now(),
+updated_at        timestamptz not null default now()
 ```
 
-Refreshed by background jobs from raw interaction data.
+`password_hash` is a BCrypt hash, length-checked at 60. `email` is length-capped at 254. `deleted_at` set marks a soft-deleted account during its grace window; `email_verified_at` set marks a confirmed email.
 
-### Recommendation result table
+## Catalog
 
-Stores precomputed recommendations so the Java API only reads and serves them.
+### book
 
 ```sql
-create table user_recommendation (
-  recommendation_id bigserial primary key,
-  user_id bigint not null,
-  book_id bigint not null,
-  score numeric(10,4) not null,
-  rank_position integer not null,
-  reason varchar(255),
-  model_version varchar(100),
-  generated_at timestamptz not null default now(),
-  expires_at timestamptz,
-  foreign key (user_id) references app_user(user_id) on delete cascade,
-  foreign key (book_id) references book(book_id),
-  unique (user_id, book_id, model_version)
-);
+book_id                bigserial primary key,
+title                  text not null,
+subtitle               text,
+description            text,
+cover_id               integer,
+cover_url              text,
+first_publish_year     integer,
+isbn                   varchar(20),
+page_count             integer,
+language               varchar(10),
+average_rating         numeric(3,2),
+rating_count           integer default 0,
+series_name            text,
+series_position        integer,
+open_library_work_key  text unique,
+google_books_volume_id text unique,
+hardcover_id           text unique,
+loc_lccn               text unique,
+wikidata_qid           text unique,
+dedup_key              text not null unique,
+created_at             timestamptz not null default now(),
+updated_at             timestamptz not null default now()
 ```
 
-`reason` values:
-- `similar_users`, `similar_books`, `same_genre`, `club_activity`, `trending_in_network`, `hybrid_ranked`
+Each external source has its own unique id column. `dedup_key` coalesces them (ISBN, OpenLibrary work key, Google Books volume id, Hardcover id, LoC LCCN, Wikidata QID) into one stable key. `isbn` is constrained to null or 10/13 digits without hyphens. A GIN trigram index on `title` backs fuzzy lookups.
 
-### Similar books
+### author
 
 ```sql
-create table similar_book (
-  book_id bigint not null,
-  similar_book_id bigint not null,
-  similarity_score numeric(10,4) not null,
-  reason varchar(100),
-  generated_at timestamptz not null default now(),
-  primary key (book_id, similar_book_id),
-  foreign key (book_id) references book(book_id),
-  foreign key (similar_book_id) references book(book_id)
-);
+author_id        bigserial primary key,
+name             text not null unique,
+open_library_key text unique,
+wikidata_qid     text unique,
+bio              text,
+birth_date       varchar(50),
+photo_id         integer,
+photo_url        text,
+created_at       timestamptz not null default now(),
+updated_at       timestamptz not null default now()
 ```
 
-Powers "because you read this", "similar books", and fallback recommendations for new users.
+A GIN trigram index on `name` backs author-name matching.
 
-### Activity feed
+### book_author, book_subject, book_award
 
 ```sql
-create table activity_event (
-  activity_id bigserial primary key,
-  actor_user_id bigint,
-  target_user_id bigint,
-  book_id bigint,
-  club_id bigint,
-  event_type varchar(50) not null,
-  payload jsonb,
-  created_at timestamptz not null default now(),
-  foreign key (actor_user_id) references app_user(user_id) on delete set null,
-  foreign key (book_id) references book(book_id)
-);
+book_author  (book_id, author_id)  primary key (book_id, author_id)
+book_subject (book_subject_id, book_id, subject)
+book_award   (book_award_id, book_id, award)
 ```
 
-Event storage stays separate from rendered feed items. A `feed_item` table can be materialized later if needed. `actor_user_id` is nullable: when the referenced user is hard-deleted, the row is retained and `actor_user_id` is set to `null` instead of the event being cascade-deleted.
+All three reference `book(book_id)` with `on delete cascade`. `book_author` also references `author(author_id)` with `on delete cascade`.
 
-## Account deletion and foreign keys
+### pending_book
 
-The hourly account-deletion sweep removes soft-deleted users by issuing `DELETE FROM app_user`. The user-scoped tables in this section use `on delete cascade`, so deleting the parent row removes the dependent rows in the same statement. `activity_event` uses `on delete set null` on `actor_user_id`: the row is retained and the actor reference becomes `null`. Auth-side tables (`refresh_token`, `email_token`, `review`, `collection`) also cascade.
-
-### Indexes
+Staging table for books that have not yet met the show bar. Carries the same external id columns and metadata as `book`, plus per-field source columns (`title_source`, `description_source`, `cover_source`, `publication_year_source`, `subjects_sources`) and staging state:
 
 ```sql
-create index idx_user_book_interaction_user_time
-  on user_book_interaction(user_id, created_at desc);
-
-create index idx_user_book_interaction_book_time
-  on user_book_interaction(book_id, created_at desc);
-
-create index idx_user_book_interaction_event_type
-  on user_book_interaction(event_type);
-
-create index idx_user_recommendation_user_rank
-  on user_recommendation(user_id, rank_position);
-
-create index idx_similar_book_score
-  on similar_book(book_id, similarity_score desc);
+status          text not null default 'PENDING',  -- PENDING | PROMOTED | INCOMPLETE_FINAL
+missing_fields  text,
+attempt_count   integer not null default 0,
+first_seen_at   timestamptz not null default now(),
+last_attempt_at timestamptz,
+dedup_key       text not null unique
 ```
+
+A row is keyed by `dedup_key` and promoted into `book` once it carries every required field.
+
+## Authentication
+
+### refresh_token
+
+```sql
+refresh_token_id bigint generated always as identity primary key,
+user_id          bigint not null references app_user(user_id) on delete cascade,
+token_hash       text not null unique,
+issued_at        timestamptz not null default now(),
+expires_at       timestamptz not null,
+revoked_at       timestamptz,
+replaced_by      bigint references refresh_token(refresh_token_id) on delete set null
+```
+
+Only the HMAC-SHA256 hash is stored. `replaced_by` links a rotated token to its successor. A partial index covers active tokens (`where revoked_at is null`).
+
+### email_token
+
+```sql
+email_token_id bigint generated always as identity primary key,
+user_id        bigint not null references app_user(user_id) on delete cascade,
+purpose        text not null,  -- PASSWORD_RESET | EMAIL_VERIFICATION
+token_hash     text not null unique,
+issued_at      timestamptz not null default now(),
+expires_at     timestamptz not null,
+consumed_at    timestamptz
+```
+
+One table for both password-reset and email-verification tokens. Two partial unique indexes hold at most one active token per user per purpose (`where consumed_at is null`).
+
+### mail_outbox
+
+```sql
+mail_outbox_id  bigint generated always as identity primary key,
+template        text not null,  -- password_reset | email_verification
+recipient       text not null,
+payload         jsonb not null,
+created_at      timestamptz not null default now(),
+sent_at         timestamptz,
+failed_at       timestamptz,
+attempt_count   int not null default 0,
+next_attempt_at timestamptz not null default now(),
+last_error      text
+```
+
+A row is enqueued in the same transaction as the user action and delivered by the outbox worker. A partial index covers pending rows (`where sent_at is null and failed_at is null`).
+
+## Account deletion
+
+`app_user.deleted_at` marks a soft delete. The hourly sweep hard-deletes rows past the grace window with `DELETE FROM app_user`. User-scoped tables cascade: `refresh_token`, `email_token`, `review`, `user_book_collection`, `user_book_interaction`, `user_book_signal`, `user_recommendation`. `activity_event.actor_user_id` uses `on delete set null`, retaining the event with a null actor.
+
+## Tables not yet wired to a feature
+
+Earlier migrations (V3-V6) created tables for reviews, collections, interactions, recommendations, similar books, and an activity feed. They exist in the database but no shipped code reads or writes them yet:
+
+- `review` (user_id, book_id, rating, title, body), unique per user and book
+- `user_book_collection` (user_id, book_id, status, started_at, finished_at, notes), unique per user and book
+- `user_book_interaction` (user_id, book_id, event_type, weight, metadata)
+- `user_book_signal` (user_id, book_id, total_weight, view_count, last_event_at)
+- `user_recommendation` (user_id, book_id, score, rank_position, reason, model_version)
+- `similar_book` (book_id, similar_book_id, similarity_score, reason)
+- `activity_event` (actor_user_id, target_user_id, book_id, event_type, payload)

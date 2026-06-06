@@ -8,7 +8,9 @@ The first version of BetterReads was a school project: a Thymeleaf app that call
 
 This is a rebuild. The backend is a headless JSON API; a separate web client consumes it. Auth uses short-lived access JWTs and refresh tokens that rotate on every use, with replay detection.
 
-The catalog is the core of it. A book is assembled from five external sources, Library of Congress, Wikidata, Google Books, OpenLibrary, and Hardcover, taking each field from the most reliable source that has it. Incomplete books sit in a staging table until enough fields are filled to promote them. Search runs on Meilisearch, not the database, so a typo still finds the book.
+A catalog book is assembled from five sources: Library of Congress, Wikidata, Google Books, OpenLibrary, and Hardcover. Each field has its own source priority. Title resolves from Google Books first, authors from OpenLibrary first, rating and series from Hardcover, awards from Wikidata. Subjects are merged across all five. A book is shown only once it has a title, an author, a cover, a description, a publication year, and an ISBN; until then it stays in a staging table while the remaining sources are fetched.
+
+Search runs on Meilisearch with typo tolerance and a relevance-score floor that drops weak fuzzy matches. A Meilisearch outage returns an empty result rather than failing the request.
 
 Schema changes go through Flyway, and the runtime database role has no DDL privileges. Production runs on a single-node Kubernetes cluster behind a Cloudflare Tunnel, deployed by Argo CD.
 

@@ -24,9 +24,9 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  * Hardcover series client.
  *
  * <p>A Series search ranks by relevance, not series size, and a parody or fan series can outrank the
- * real one, so the candidate is the hit with the most readers rather than the first. The chosen
- * series id then drives the volume enumeration. A 401 means the token expired or was revoked and
- * resolves to empty; other 4xx resolve to empty; 5xx and network failures propagate.
+ * real one. The candidate is the hit with the most readers. The chosen series id then drives the
+ * volume enumeration. A 401 means the token expired or was revoked and resolves to empty; other 4xx
+ * resolve to empty; 5xx and network failures propagate.
  */
 @Component
 public class HardcoverSeriesClientImpl implements HardcoverSeriesClient {

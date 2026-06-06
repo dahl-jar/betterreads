@@ -28,10 +28,9 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  * Hardcover GraphQL client.
  *
  * <p>One search call resolves a book; the hit document already carries every field. Hardcover ranks
- * by relevance, not edition quality, so the canonical work is the hit with the most reads rather
- * than the first one, and {@link #titleMatches} rejects a pick that drifted off the query. A 401
- * means the token expired or was revoked and resolves to empty; other 4xx resolve to empty; 5xx and
- * network failures propagate.
+ * by relevance, not edition quality. The canonical work is the hit with the most reads, and
+ * {@link #titleMatches} rejects a pick that drifted off the query. A 401 means the token expired or
+ * was revoked and resolves to empty; other 4xx resolve to empty; 5xx and network failures propagate.
  */
 @Component
 public class HardcoverClientImpl implements HardcoverClient {
