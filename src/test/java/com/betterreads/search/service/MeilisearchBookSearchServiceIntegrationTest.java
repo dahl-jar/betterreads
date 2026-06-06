@@ -143,6 +143,17 @@ class MeilisearchBookSearchServiceIntegrationTest extends ContainerizedTest {
         }
 
         @Test
+        @DisplayName("a multi-word query needs every word, so a book sharing only a common word is not returned")
+        void requiresEveryQueryWord() {
+            final BookSearchResult result = searchService.search("the hobbit dragons", 0, FULL_PAGE);
+
+            assertThat(result.hits())
+                .as("'The Hobbit' has 'the' and 'hobbit' but not 'dragons', so the all-words "
+                    + "strategy drops it rather than matching on the shared word")
+                .isEmpty();
+        }
+
+        @Test
         @DisplayName("slices the hits by offset and limit with the full total")
         void pages() {
             final BookSearchResult firstPage = searchService.search(COMMON_QUERY, 0, PAGE_SIZE);

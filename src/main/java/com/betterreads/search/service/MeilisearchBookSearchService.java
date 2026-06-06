@@ -9,6 +9,7 @@ import com.meilisearch.sdk.Client;
 import com.meilisearch.sdk.Index;
 import com.meilisearch.sdk.SearchRequest;
 import com.meilisearch.sdk.exceptions.MeilisearchException;
+import com.meilisearch.sdk.model.MatchingStrategy;
 import com.meilisearch.sdk.model.SearchResult;
 import java.util.Collection;
 import java.util.List;
@@ -48,7 +49,10 @@ public class MeilisearchBookSearchService implements BookSearchService {
         unless = "#result.degraded() || #result.result().totalHits() == 0")
     public SearchOutcome searchOutcome(final String query, final int offset, final int limit) {
         try {
-            final SearchRequest request = new SearchRequest(query).setOffset(offset).setLimit(limit);
+            final SearchRequest request = new SearchRequest(query)
+                .setOffset(offset)
+                .setLimit(limit)
+                .setMatchingStrategy(MatchingStrategy.ALL);
             final SearchResult result = (SearchResult) booksIndex().search(request);
             final List<BookSearchDocument> hits = result.getHits().stream()
                 .map(hit -> objectMapper.convertValue(hit, BookSearchDocument.class))

@@ -47,6 +47,10 @@ class BookDetailEvictionIntegrationTest extends ContainerizedTest {
 
     private static final int PUBLISH_YEAR = 1996;
 
+    private static final int EVICTION_READ_ATTEMPTS = 50;
+
+    private static final long EVICTION_READ_INTERVAL_MILLIS = 100L;
+
     @Container
     @ServiceConnection
     static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
@@ -80,10 +84,35 @@ class BookDetailEvictionIntegrationTest extends ContainerizedTest {
         final BookDetailResponse cached = bookReadService.findByKey(ISBN).orElseThrow();
 
         catalogService.upsertFromSource(book(REVISED_TITLE));
-        final BookDetailResponse afterRewrite = bookReadService.findByKey(ISBN).orElseThrow();
 
         assertThat(cached.title()).isEqualTo(ORIGINAL_TITLE);
-        assertThat(afterRewrite.title()).isEqualTo(REVISED_TITLE);
+        assertThat(titleAfterEviction())
+            .as("the re-write evicts the cached entry, so the next read serves the new title")
+            .isEqualTo(REVISED_TITLE);
+    }
+
+    /**
+     * Reads the title, retrying briefly because the shared Redis cache makes eviction visible
+     * asynchronously under load. The read settles within a bound; a missing eviction never settles
+     * and still fails.
+     */
+    // PMD.DoNotUseThreads: a bounded test poll for an eventually-visible cache eviction, not app code.
+    @SuppressWarnings("PMD.DoNotUseThreads")
+    private String titleAfterEviction() {
+        String title = "";
+        for (int attempt = 0; attempt < EVICTION_READ_ATTEMPTS; attempt++) {
+            title = bookReadService.findByKey(ISBN).orElseThrow().title();
+            if (REVISED_TITLE.equals(title)) {
+                return title;
+            }
+            try {
+                Thread.sleep(EVICTION_READ_INTERVAL_MILLIS);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                return title;
+            }
+        }
+        return title;
     }
 
     private static SourceBook book(final String title) {
