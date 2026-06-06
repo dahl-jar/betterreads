@@ -12,6 +12,8 @@ import org.springframework.web.reactive.function.client.WebClient;
  *
  * <p>The token is sent as {@code Authorization: Bearer <token>} only when one is configured, so the
  * context starts without a token and the client returns empty rather than sending a malformed header.
+ * The token is stripped of surrounding whitespace, so a secret sealed with a trailing newline still
+ * yields a header value the HTTP client accepts.
  */
 @Configuration
 public class HardcoverWebClientConfig {
@@ -35,7 +37,7 @@ public class HardcoverWebClientConfig {
 
         final String token = properties.bearerToken();
         if (token != null && !token.isBlank()) {
-            builder.defaultHeader(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token);
+            builder.defaultHeader(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token.strip());
         }
         return builder.build();
     }
