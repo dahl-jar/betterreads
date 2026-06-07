@@ -10,7 +10,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClientException;
 
 /**
@@ -41,8 +40,14 @@ public class CatalogRefreshService {
         this.catalogSearch = catalogSearch;
     }
 
-    /** Re-resolves every known author and series, staging any new books they now have. */
-    @Transactional(readOnly = true)
+    /**
+     * Re-resolves every known author and series, staging any new books they now have.
+     *
+     * <p>Not transactional: this reads the author and series names, then each {@code stage} call opens
+     * its own read-write transaction for the insert. A read-only transaction here would join the
+     * staging inserts and Postgres would reject them ({@code 25006 cannot execute INSERT in a
+     * read-only transaction}), poisoning the rest of the run.
+     */
     public void refreshKnownAuthorsAndSeries() {
         final List<String> authorNames = authors.findAll().stream().map(Author::getName).toList();
         final List<String> seriesNames = books.findDistinctSeriesNames();

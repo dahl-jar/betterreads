@@ -23,6 +23,8 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  * the collector fetches the remaining sources for that book and merges them, so a candidate staged
  * from one search hit gains the rating, description, and other fields it needs to show.
  */
+// PMD.TooManyMethods: one test method plus a stub client per source-failure mode; splitting would scatter the stubs.
+@SuppressWarnings("PMD.TooManyMethods")
 class SourceCollectorTest {
 
     private static final String ISBN = "9780441013593";
