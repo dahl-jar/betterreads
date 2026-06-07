@@ -30,8 +30,9 @@ import org.springframework.web.reactive.function.client.WebClientException;
  *
  * <p>The seed's own discovery source is skipped; the rest run in two waves, the show-field sources
  * first and the low-yield sources (awards, authority cross-references) second, with the sources in a
- * wave fetched concurrently. Both waves always run. A source that fails (5xx, network error, or
- * timeout) is dropped for this book and the merge proceeds with the remaining sources.
+ * wave fetched concurrently. Both waves always run. A source that fails (5xx, network error,
+ * timeout, or an unexpected exception while parsing its response) is dropped for this book and the
+ * merge proceeds with the remaining sources.
  */
 @Component
 public class SourceCollector {
@@ -108,7 +109,8 @@ public class SourceCollector {
         } catch (TimeoutException ex) {
             calls.forEach(call -> call.cancel(true));
         } catch (ExecutionException ex) {
-            LOG.warn("catalog.collect a source fetch failed ({})", ex.getClass().getSimpleName());
+            final Throwable cause = ex.getCause() == null ? ex : ex.getCause();
+            LOG.warn("catalog.collect a source fetch threw {}", cause.getClass().getSimpleName(), cause);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
         }

@@ -214,12 +214,44 @@ class SourceCollectorTest {
             .isEqualTo(HARDCOVER_RATING);
     }
 
+    @Test
+    @DisplayName("a source that throws a non-WebClient exception is dropped; the others still merge")
+    void isolatesNonWebClientFailure() {
+        final SourceBook seed = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+            .isbn13(ISBN)
+            .title(TITLE)
+            .build();
+        final SourceBook hardcoverHit = SourceBook.builder(BookFieldSource.HARDCOVER)
+            .isbn13(ISBN)
+            .averageRating(HARDCOVER_RATING)
+            .build();
+        final SourceCollector collector = new SourceCollector(new SourceMerger(),
+            List.of(
+                throwingByIsbn(BookFieldSource.GOOGLE_BOOKS),
+                stubByIsbn(BookFieldSource.HARDCOVER, ISBN, hardcoverHit)), SAME_THREAD);
+
+        final MergedBook merged = collector.collectFor(seed);
+
+        assertThat(merged.book().averageRating())
+            .as("a runtime exception from one source is contained; the rest still enrich the book")
+            .isEqualTo(HARDCOVER_RATING);
+    }
+
     private static BookSourceClient failingByIsbn(final BookFieldSource source) {
         return new StubClient(source) {
             @Override
             public Optional<SourceBook> fetchByIsbn(final String isbn) {
                 throw WebClientResponseException.create(
                     HTTP_SERVER_ERROR, "Service Unavailable", HttpHeaders.EMPTY, new byte[0], null);
+            }
+        };
+    }
+
+    private static BookSourceClient throwingByIsbn(final BookFieldSource source) {
+        return new StubClient(source) {
+            @Override
+            public Optional<SourceBook> fetchByIsbn(final String isbn) {
+                throw new IllegalStateException("malformed response from " + source);
             }
         };
     }
