@@ -25,4 +25,15 @@ public record GoogleBooksProperties(
     String apiKey,
     @Positive int connectTimeout,
     @Positive int readTimeout
-) { }
+) {
+
+    /**
+     * Trims the key so a secret stored with a trailing newline does not reach the request as
+     * {@code key=...\n}, which the URI builder rejects on every Google Books call.
+     */
+    public GoogleBooksProperties {
+        if (apiKey != null) {
+            apiKey = apiKey.trim();
+        }
+    }
+}
