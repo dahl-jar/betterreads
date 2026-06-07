@@ -10,6 +10,13 @@ import reactor.netty.http.client.HttpClient;
 /** Builds {@link WebClient.Builder} instances with explicit connect and response timeouts. */
 public final class WebClients {
 
+    /**
+     * A single Hardcover series enumeration or Wikidata entity document runs to a few hundred
+     * kilobytes, past the 256 KB default decode buffer, so the in-memory limit is raised to 4 MB
+     * for every source.
+     */
+    private static final int MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
+
     private WebClients() {
     }
 
@@ -28,6 +35,7 @@ public final class WebClients {
 
         return WebClient.builder()
             .baseUrl(baseUrl)
-            .clientConnector(new ReactorClientHttpConnector(httpClient));
+            .clientConnector(new ReactorClientHttpConnector(httpClient))
+            .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(MAX_RESPONSE_BYTES));
     }
 }

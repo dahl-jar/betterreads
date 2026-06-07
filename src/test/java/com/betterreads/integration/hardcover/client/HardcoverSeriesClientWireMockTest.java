@@ -15,6 +15,8 @@ import com.betterreads.integration.hardcover.HardcoverWebClientConfig;
 import com.betterreads.integration.hardcover.mapper.HardcoverSeriesMapper;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -55,6 +57,12 @@ class HardcoverSeriesClientWireMockTest {
     private static final int HTTP_UNAUTHORIZED = 401;
 
     private static final int HTTP_SERVER_ERROR = 503;
+
+    private static final int DEFAULT_DECODE_BUFFER_BYTES = 256 * 1024;
+
+    private static final int LARGE_SERIES_VOLUME_COUNT = 400;
+
+    private static final int VOLUME_PADDING_WORDS = 80;
 
     private static final String GRAPHQL_PATH = "/v1/graphql";
 
@@ -360,5 +368,36 @@ class HardcoverSeriesClientWireMockTest {
             assertThatThrownBy(() -> client.fetchSeries(QUERY))
                 .isInstanceOf(WebClientResponseException.class);
         }
+
+        @Test
+        @DisplayName("a long series whose body passes the 256 KB default decode buffer still resolves")
+        void largeEnumerationBodyResolves() {
+            final String largeEnum = enumWithManyVolumes(LARGE_SERIES_VOLUME_COUNT);
+            assertThat(largeEnum.length())
+                .as("the body must pass the 256 KB default to prove the raised buffer is in effect")
+                .isGreaterThan(DEFAULT_DECODE_BUFFER_BYTES);
+            stub(SEARCH_JSON, largeEnum);
+
+            final SourceSeries series = client.fetchSeries(QUERY).orElseThrow();
+
+            assertThat(series.name()).isEqualTo(SERIES_NAME);
+        }
+    }
+
+    private static String enumWithManyVolumes(final int count) {
+        final String rows = IntStream.rangeClosed(1, count)
+            .mapToObj(HardcoverSeriesClientWireMockTest::volumeRow)
+            .collect(Collectors.joining(","));
+        return "{\"data\": {\"series\": [{\"id\": 1097, \"name\": \"The Wheel of Time\","
+            + " \"primary_books_count\": " + count + ", \"book_series\": [" + rows + "]}]}}";
+    }
+
+    private static String volumeRow(final int position) {
+        final String description = "padding ".repeat(VOLUME_PADDING_WORDS);
+        return "{\"position\": " + position + ", \"book\": {\"title\": \"Volume " + position
+            + "\", \"users_count\": 1, \"description\": \"" + description
+            + "\", \"default_physical_edition\": {\"reading_format\": {\"format\": \"Read\"},"
+            + " \"language\": {\"language\": \"English\"}},"
+            + " \"contributions\": [{\"author\": {\"name\": \"Robert Jordan\"}}]}}";
     }
 }
