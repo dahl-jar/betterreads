@@ -17,6 +17,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.dao.QueryTimeoutException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 /**
  * Verifies the search-miss stager delegates each fresh query to staging once and drops a repeat of
@@ -25,6 +27,8 @@ import org.springframework.dao.QueryTimeoutException;
 class SearchMissStagerTest {
 
     private static final Duration DEDUP_WINDOW = Duration.ofMinutes(10);
+
+    private static final int HTTP_BAD_GATEWAY = 502;
 
     private static final Executor SAME_THREAD = Runnable::run;
 
@@ -68,6 +72,16 @@ class SearchMissStagerTest {
     @DisplayName("swallows a staging failure so the caller is never affected")
     void swallowsStagingFailure() {
         doThrow(new QueryTimeoutException("source timed out")).when(catalogSearch).searchAndStage(DUNE);
+
+        assertThatCode(() -> stager.stage(DUNE)).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("swallows an upstream 5xx from a source so a degraded source never reaches the caller")
+    void swallowsUpstreamServerError() {
+        final WebClientResponseException badGateway = WebClientResponseException.create(
+            HTTP_BAD_GATEWAY, "Bad Gateway", HttpHeaders.EMPTY, new byte[0], null);
+        doThrow(badGateway).when(catalogSearch).searchAndStage(DUNE);
 
         assertThatCode(() -> stager.stage(DUNE)).doesNotThrowAnyException();
     }
