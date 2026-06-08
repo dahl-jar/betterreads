@@ -5,6 +5,10 @@ import com.betterreads.catalog.entity.Book;
 import com.betterreads.catalog.repository.BookRepository;
 import com.betterreads.support.ContainerizedTest;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.postgresql.PostgreSQLContainer;
@@ -135,6 +139,18 @@ class ShelvesIntegrationTest extends ContainerizedTest {
 
     private static final String READING_NOTE = "still going";
 
+    private static final String RATED_KEY = "OL27448W";
+
+    private static final String RATED_TITLE = "The Way of Kings";
+
+    private static final BigDecimal RATED_AVERAGE = new BigDecimal("4.50");
+
+    private static final String JSON_ADDED_AT = "$.addedAt";
+
+    private static final String JSON_AVERAGE_RATING = "$.averageRating";
+
+    private static final String JSON_MY_RATING = "$.myRating";
+
     @Autowired
     private WebApplicationContext webApplicationContext;
 
@@ -168,6 +184,7 @@ class ShelvesIntegrationTest extends ContainerizedTest {
         rateLimitFilter.reset();
         seedBook(DUNE_KEY, DUNE_TITLE);
         seedBook(HOBBIT_KEY, HOBBIT_TITLE);
+        seedRatedBook(RATED_KEY, RATED_TITLE, RATED_AVERAGE);
     }
 
     @Nested
@@ -435,6 +452,56 @@ class ShelvesIntegrationTest extends ContainerizedTest {
         }
     }
 
+    @Nested
+    @DisplayName("Shelf response fields")
+    class ShelfResponseFields {
+
+        @Test
+        void shelvingABookRecordsTheDateItWasAdded() throws Exception {
+            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final LocalDate today = LocalDate.now(ZoneOffset.UTC);
+
+            final ResultActions response = putStatus(token, DUNE_KEY, WANT_TO_READ);
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_ADDED_AT).value(today.toString()));
+        }
+
+        @Test
+        void averageRatingCarriesTheBooksCommunityRating() throws Exception {
+            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+
+            final ResultActions response = putStatus(token, RATED_KEY, WANT_TO_READ);
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_AVERAGE_RATING).value(RATED_AVERAGE.doubleValue()));
+        }
+
+        @Test
+        void averageRatingIsAbsentWhenTheBookHasNoCommunityRating() throws Exception {
+            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+
+            final ResultActions response = putStatus(token, DUNE_KEY, WANT_TO_READ);
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_AVERAGE_RATING).doesNotExist());
+        }
+
+        @Test
+        void myRatingIsAbsentUntilTheReaderRatesTheBook() throws Exception {
+            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+
+            final ResultActions response = putStatus(token, RATED_KEY, WANT_TO_READ);
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_MY_RATING).doesNotExist());
+        }
+    }
+
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     private ResultActions putStatus(final String token, final String key, final String value)
         throws Exception {
@@ -475,9 +542,15 @@ class ShelvesIntegrationTest extends ContainerizedTest {
     }
 
     private void seedBook(final String key, final String title) {
+        seedRatedBook(key, title, null);
+    }
+
+    private void seedRatedBook(final String key, final String title,
+        final @Nullable BigDecimal averageRating) {
         final Book book = new Book();
         book.setTitle(title);
         book.setDedupKey(key);
+        book.setAverageRating(averageRating);
         bookRepository.save(book);
     }
 

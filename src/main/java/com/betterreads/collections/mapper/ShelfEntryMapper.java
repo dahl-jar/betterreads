@@ -11,7 +11,11 @@ import org.springframework.stereotype.Component;
 @Component
 public class ShelfEntryMapper {
 
-    /** Combines the shelf state from {@code entry} with the book summary from {@code book}. */
+    /**
+     * Combines the shelf state from {@code entry} with the book summary from {@code book}.
+     *
+     * <p>{@code myRating} is always null: there is no per-user rating store yet.
+     */
     public ShelfEntryResponse toResponse(final ShelfEntry entry, final Book book) {
         return new ShelfEntryResponse(
             book.getDedupKey(),
@@ -22,6 +26,9 @@ public class ShelfEntryMapper {
             entry.isFavorite(),
             entry.getStartedAt(),
             entry.getFinishedAt(),
-            entry.getNotes());
+            entry.getNotes(),
+            entry.getCreatedAt().toLocalDate(),
+            book.getAverageRating(),
+            null);
     }
 }
