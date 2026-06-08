@@ -78,7 +78,7 @@ public class ReviewWriter {
         final BigDecimal average = aggregate.average() == null
             ? null
             : BigDecimal.valueOf(aggregate.average()).setScale(RATING_SCALE, RoundingMode.HALF_UP);
-        locked.applyCommunityRating(average, (int) aggregate.count());
+        locked.applyCommunityAggregate(average, (int) aggregate.count());
         books.save(locked);
     }
 

@@ -42,7 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Verifies the review and rating flow end-to-end: post a review, edit it on a second submit, rate
  * without prose, list a book's reviews and the caller's own, and the community-rating recompute that
- * makes user ratings take over {@code book.average_rating} from the external seed.
+ * aggregates user ratings into {@code book.community_average} while the source rating stays put.
  *
  * <p>Reviews are asserted through the JSON the endpoints return. Books are seeded into {@code book}
  * with a known dedup key; users register and log in for a real access JWT.
@@ -102,6 +102,12 @@ class ReviewsIntegrationTest extends ContainerizedTest {
 
     private static final int THREE_STARS = 3;
 
+    private static final int ONE_STAR = 1;
+
+    private static final int STAR_BUCKETS = 5;
+
+    private static final double AVERAGE_OF_FIVE_AND_THREE = 4.0;
+
     private static final int RATING_BELOW_RANGE = 0;
 
     private static final int RATING_ABOVE_RANGE = 6;
@@ -121,6 +127,16 @@ class ReviewsIntegrationTest extends ContainerizedTest {
     private static final String JSON_LENGTH = "$.data.length()";
 
     private static final String JSON_FIRST_RATING = "$.data[0].rating";
+
+    private static final String JSON_COMMUNITY_AVERAGE = "$.data.average";
+
+    private static final String JSON_COMMUNITY_COUNT = "$.data.count";
+
+    private static final String JSON_DISTRIBUTION_LENGTH = "$.data.distribution.length()";
+
+    private static final String JSON_FIRST_BUCKET_COUNT = "$.data.distribution[0].count";
+
+    private static final String UNKNOWN_BOOK_KEY = "OL000000W";
 
     private static final String BOOKS_PATH = "/api/v1/books/";
 
@@ -233,7 +249,7 @@ class ReviewsIntegrationTest extends ContainerizedTest {
         void reviewingAnUnknownBookReturns404() throws Exception {
             final String token = registerAndLogin(DARROW, DARROW_EMAIL);
 
-            final ResultActions response = putReview(token, "OL000000W", FIVE_STARS, null, null);
+            final ResultActions response = putReview(token, UNKNOWN_BOOK_KEY, FIVE_STARS, null, null);
 
             response.andExpect(status().isNotFound());
         }
@@ -310,9 +326,7 @@ class ReviewsIntegrationTest extends ContainerizedTest {
         @Test
         void deletingWithoutAReviewLeavesTheExternalRatingIntact() throws Exception {
             final String token = registerAndLogin(DARROW, DARROW_EMAIL);
-            jdbcTemplate.update(
-                "UPDATE book SET average_rating = ?, rating_count = ? WHERE dedup_key = ?",
-                new java.math.BigDecimal(EXTERNAL_RATING), EXTERNAL_RATING_COUNT, DUNE_KEY);
+            seedSourceRating(DUNE_KEY);
 
             mockMvc.perform(delete(reviewUrl(DUNE_KEY)).header(AUTH_HEADER, BEARER_PREFIX + token))
                 .andExpect(status().isNoContent());
@@ -328,7 +342,7 @@ class ReviewsIntegrationTest extends ContainerizedTest {
     class CommunityRating {
 
         @Test
-        void aUserRatingBecomesTheBooksAverage() throws Exception {
+        void userRatingsAggregateIntoTheCommunityRating() throws Exception {
             final String darrowToken = registerAndLogin(DARROW, DARROW_EMAIL);
             final String goblinToken = registerAndLogin(GOBLIN, GOBLIN_EMAIL);
             putReview(darrowToken, DUNE_KEY, FIVE_STARS, null, null);
@@ -336,12 +350,24 @@ class ReviewsIntegrationTest extends ContainerizedTest {
 
             final Book book = bookRepository.findByDedupKey(DUNE_KEY).orElseThrow();
 
-            assertThat(book.getAverageRating()).isEqualByComparingTo("4.00");
-            assertThat(book.getRatingCount()).isEqualTo(2);
+            assertThat(book.getCommunityAverage()).isEqualByComparingTo("4.00");
+            assertThat(book.getCommunityCount()).isEqualTo(2);
         }
 
         @Test
-        void cascadeDeletingAReviewRecomputesTheBooksRating() throws Exception {
+        void aUserRatingLeavesTheSourceRatingUntouched() throws Exception {
+            seedSourceRating(DUNE_KEY);
+            final String darrowToken = registerAndLogin(DARROW, DARROW_EMAIL);
+            putReview(darrowToken, DUNE_KEY, FIVE_STARS, null, null);
+
+            final Book book = bookRepository.findByDedupKey(DUNE_KEY).orElseThrow();
+
+            assertThat(book.getAverageRating()).isEqualByComparingTo(EXTERNAL_RATING);
+            assertThat(book.getRatingCount()).isEqualTo(EXTERNAL_RATING_COUNT);
+        }
+
+        @Test
+        void cascadeDeletingAReviewRecomputesTheCommunityRating() throws Exception {
             final String darrowToken = registerAndLogin(DARROW, DARROW_EMAIL);
             final String goblinToken = registerAndLogin(GOBLIN, GOBLIN_EMAIL);
             putReview(darrowToken, DUNE_KEY, FIVE_STARS, null, null);
@@ -350,8 +376,65 @@ class ReviewsIntegrationTest extends ContainerizedTest {
             jdbcTemplate.update("DELETE FROM review WHERE rating = ?", THREE_STARS);
 
             final Book book = bookRepository.findByDedupKey(DUNE_KEY).orElseThrow();
-            assertThat(book.getAverageRating()).isEqualByComparingTo("5.00");
-            assertThat(book.getRatingCount()).isEqualTo(1);
+            assertThat(book.getCommunityAverage()).isEqualByComparingTo("5.00");
+            assertThat(book.getCommunityCount()).isEqualTo(1);
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /books/{key}/community-rating")
+    class CommunityRatingEndpoint {
+
+        @Test
+        void reportsTheAverageCountAndPerStarBreakdown() throws Exception {
+            final String darrowToken = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String goblinToken = registerAndLogin(GOBLIN, GOBLIN_EMAIL);
+            putReview(darrowToken, DUNE_KEY, FIVE_STARS, null, null);
+            putReview(goblinToken, DUNE_KEY, THREE_STARS, null, null);
+
+            final ResultActions response = getCommunityRating(DUNE_KEY);
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_COMMUNITY_AVERAGE).value(AVERAGE_OF_FIVE_AND_THREE))
+                .andExpect(jsonPath(JSON_COMMUNITY_COUNT).value(2))
+                .andExpect(jsonPath("$.data.distribution[0].star").value(FIVE_STARS))
+                .andExpect(jsonPath(JSON_FIRST_BUCKET_COUNT).value(1))
+                .andExpect(jsonPath("$.data.distribution[2].star").value(THREE_STARS))
+                .andExpect(jsonPath("$.data.distribution[2].count").value(1))
+                .andExpect(jsonPath("$.data.distribution[1].count").value(0));
+        }
+
+        @Test
+        void zeroFillsEveryStarAndCoversAllFiveBuckets() throws Exception {
+            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            putReview(token, DUNE_KEY, FIVE_STARS, null, null);
+
+            final ResultActions response = getCommunityRating(DUNE_KEY);
+
+            response
+                .andExpect(jsonPath(JSON_DISTRIBUTION_LENGTH).value(STAR_BUCKETS))
+                .andExpect(jsonPath("$.data.distribution[4].star").value(ONE_STAR))
+                .andExpect(jsonPath("$.data.distribution[4].count").value(0));
+        }
+
+        @Test
+        void anUnratedBookReportsNoAverageAndEmptyBuckets() throws Exception {
+            final ResultActions response = getCommunityRating(DUNE_KEY);
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_COMMUNITY_AVERAGE).doesNotExist())
+                .andExpect(jsonPath(JSON_COMMUNITY_COUNT).value(0))
+                .andExpect(jsonPath(JSON_DISTRIBUTION_LENGTH).value(STAR_BUCKETS))
+                .andExpect(jsonPath(JSON_FIRST_BUCKET_COUNT).value(0));
+        }
+
+        @Test
+        void anUnknownBookReturns404() throws Exception {
+            final ResultActions response = getCommunityRating(UNKNOWN_BOOK_KEY);
+
+            response.andExpect(status().isNotFound());
         }
     }
 
@@ -369,6 +452,11 @@ class ReviewsIntegrationTest extends ContainerizedTest {
         return mockMvc.perform(get(bookReviewsUrl(key)));
     }
 
+    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
+    private ResultActions getCommunityRating(final String key) throws Exception {
+        return mockMvc.perform(get(BOOKS_PATH + key + "/community-rating"));
+    }
+
     private static String bookReviewsUrl(final String key) {
         return BOOKS_PATH + key + "/reviews";
     }
@@ -382,6 +470,12 @@ class ReviewsIntegrationTest extends ContainerizedTest {
         book.setTitle(title);
         book.setDedupKey(key);
         bookRepository.save(book);
+    }
+
+    private void seedSourceRating(final String key) {
+        jdbcTemplate.update(
+            "UPDATE book SET average_rating = ?, rating_count = ? WHERE dedup_key = ?",
+            new java.math.BigDecimal(EXTERNAL_RATING), EXTERNAL_RATING_COUNT, key);
     }
 
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")

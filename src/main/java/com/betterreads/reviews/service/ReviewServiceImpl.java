@@ -4,17 +4,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import com.betterreads.catalog.entity.Book;
 import com.betterreads.catalog.repository.BookRepository;
 import com.betterreads.common.dto.PageQuery;
 import com.betterreads.common.exception.ResourceNotFoundException;
 import com.betterreads.common.util.ConflictRetry;
+import com.betterreads.reviews.dto.CommunityRatingResponse;
 import com.betterreads.reviews.dto.ReviewPage;
 import com.betterreads.reviews.dto.ReviewResponse;
+import com.betterreads.reviews.dto.StarCount;
 import com.betterreads.reviews.dto.UpsertReviewRequest;
 import com.betterreads.reviews.entity.Review;
 import com.betterreads.reviews.mapper.ReviewMapper;
+import com.betterreads.reviews.repository.RatingBucket;
 import com.betterreads.reviews.repository.ReviewRepository;
 
 import org.slf4j.Logger;
@@ -30,6 +34,10 @@ public class ReviewServiceImpl implements ReviewService {
     private static final Logger LOG = LoggerFactory.getLogger(ReviewServiceImpl.class);
 
     private static final int MAX_UPSERT_ATTEMPTS = 3;
+
+    private static final int HIGHEST_STAR = 5;
+
+    private static final int LOWEST_STAR = 1;
 
     private final ReviewRepository reviews;
 
@@ -93,6 +101,20 @@ public class ReviewServiceImpl implements ReviewService {
             .map(review -> mapper.toResponse(review, keyOf(review, booksById)))
             .toList();
         return new ReviewPage(responses, found.getTotalElements(), page.getOffset(), page.getLimit());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CommunityRatingResponse communityRating(final String bookKey) {
+        final Book book = requireBook(bookKey);
+        final Map<Integer, Long> countByStar = reviews.countByStarForBook(book.getBookId()).stream()
+            .collect(Collectors.toMap(RatingBucket::star, RatingBucket::count));
+        final List<StarCount> distribution = IntStream.iterate(
+                HIGHEST_STAR, star -> star >= LOWEST_STAR, star -> star - 1)
+            .mapToObj(star -> new StarCount(star, countByStar.getOrDefault(star, 0L)))
+            .toList();
+        return new CommunityRatingResponse(
+            book.getCommunityAverage(), book.getCommunityCount(), distribution);
     }
 
     private static String keyOf(final Review review, final Map<Long, Book> booksById) {
