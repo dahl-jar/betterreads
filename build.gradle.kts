@@ -252,6 +252,10 @@ tasks.withType<Test> {
 	useJUnitPlatform()
 	finalizedBy(tasks.jacocoTestReport)
 
+	// ArchUnit builds an in-memory class graph over the whole application, which overflows the
+	// default fork heap as the suite grows. Give the test JVM room so the architecture rules run.
+	maxHeapSize = "2g"
+
 	// Disable @Scheduled jobs during tests. Without these, the mail-outbox worker and the
 	// account-deletion sweep tick on a shared scheduler thread and can race the Testcontainers
 	// Postgres shutdown at the end of an integration test, producing a noisy 30s Hikari timeout

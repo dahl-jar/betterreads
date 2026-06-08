@@ -1,6 +1,5 @@
 package com.betterreads.common.exception;
 
-import com.betterreads.common.dto.ApiErrorResponse;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
@@ -8,6 +7,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
@@ -31,46 +31,58 @@ class GlobalExceptionHandlerTest {
 
     private static final String BINDING_TARGET = "request";
 
+    private static final String ERRORS = "errors";
+
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
 
     @Nested
     class WhenResourceNotFound {
 
         @Test
-        void returnsNotFoundStatus() {
-            final ResponseEntity<ApiErrorResponse> response = handler.handleNotFound(
+        void statusDrivesNotFound() {
+            final ProblemDetail problem = handler.handleNotFound(
                     new ResourceNotFoundException(BOOK_NOT_FOUND));
 
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            assertThat(problem.getStatus()).isEqualTo(HttpStatus.NOT_FOUND.value());
         }
 
         @Test
-        void returnsExceptionMessageInBody() {
-            final ResponseEntity<ApiErrorResponse> response = handler.handleNotFound(
+        void detailCarriesTheExceptionMessage() {
+            final ProblemDetail problem = handler.handleNotFound(
                     new ResourceNotFoundException(BOOK_NOT_FOUND));
 
-            assertThat(response.getBody()).extracting(ApiErrorResponse::message).isEqualTo(BOOK_NOT_FOUND);
+            assertThat(problem.getDetail()).isEqualTo(BOOK_NOT_FOUND);
         }
-
     }
 
     @Nested
     class WhenValidationFails {
 
         @Test
-        void returnsBadRequestStatus() throws NoSuchMethodException {
-            final ResponseEntity<ApiErrorResponse> response = handler.handleValidation(buildValidationException());
+        void statusDrivesBadRequest() throws NoSuchMethodException {
+            final ProblemDetail problem = handler.handleValidation(buildValidationException());
 
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+            assertThat(problem.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
         }
 
         @Test
-        void returnsAllFieldErrors() throws NoSuchMethodException {
-            final ResponseEntity<ApiErrorResponse> response = handler.handleValidation(buildValidationException());
+        void errorsExtensionListsEveryFieldError() throws NoSuchMethodException {
+            final ProblemDetail problem = handler.handleValidation(buildValidationException());
 
-            assertThat(response.getBody())
-                    .extracting(ApiErrorResponse::fieldErrors, as(LIST))
+            assertThat(problem.getProperties())
+                    .extractingByKey(ERRORS, as(LIST))
                     .hasSize(2);
+        }
+    }
+
+    @Nested
+    class WhenForbidden {
+
+        @Test
+        void statusDrivesForbidden() {
+            final ProblemDetail problem = handler.handleForbidden(new ForbiddenException("not yours"));
+
+            assertThat(problem.getStatus()).isEqualTo(HttpStatus.FORBIDDEN.value());
         }
     }
 
@@ -78,33 +90,31 @@ class GlobalExceptionHandlerTest {
     class WhenBusinessRuleViolated {
 
         @Test
-        void returnsConflictStatus() {
-            final ResponseEntity<ApiErrorResponse> response = handler.handleBusinessRule(
+        void statusDrivesConflict() {
+            final ProblemDetail problem = handler.handleBusinessRule(
                     new BusinessRuleException(BUSINESS_RULE_MESSAGE));
 
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+            assertThat(problem.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
         }
-
     }
 
     @Nested
     class WhenUnexpectedErrorOccurs {
 
         @Test
-        void returnsInternalServerErrorStatus() {
-            final ResponseEntity<ApiErrorResponse> response = handler.handleUnexpected(
-                    new RuntimeException(UNEXPECTED_ERROR));
+        void statusDrivesInternalServerError() {
+            final ProblemDetail problem = handler.handleUnexpected(new RuntimeException(UNEXPECTED_ERROR));
 
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+            assertThat(problem.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
         }
 
         @Test
-        void returnsGenericMessageWithoutExposingDetails() {
-            final ResponseEntity<ApiErrorResponse> response = handler.handleUnexpected(
-                    new RuntimeException(UNEXPECTED_ERROR));
+        void detailDoesNotExposeInternals() {
+            final ProblemDetail problem = handler.handleUnexpected(new RuntimeException(UNEXPECTED_ERROR));
 
-            assertThat(response.getBody()).extracting(ApiErrorResponse::message)
-                    .isEqualTo("An unexpected error occurred");
+            assertThat(problem.getDetail())
+                    .isEqualTo("An unexpected error occurred")
+                    .doesNotContain(UNEXPECTED_ERROR);
         }
     }
 
@@ -112,8 +122,8 @@ class GlobalExceptionHandlerTest {
     class WhenMethodNotAllowed {
 
         @Test
-        void returns405Status() {
-            final ResponseEntity<ApiErrorResponse> response = handler.handleMethodNotSupported(
+        void statusDrives405() {
+            final ResponseEntity<ProblemDetail> response = handler.handleMethodNotSupported(
                     new HttpRequestMethodNotSupportedException(HttpMethod.GET.name(), List.of(HttpMethod.POST.name())));
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
@@ -121,7 +131,7 @@ class GlobalExceptionHandlerTest {
 
         @Test
         void exposesAllowHeaderWithSupportedMethods() {
-            final ResponseEntity<ApiErrorResponse> response = handler.handleMethodNotSupported(
+            final ResponseEntity<ProblemDetail> response = handler.handleMethodNotSupported(
                     new HttpRequestMethodNotSupportedException(HttpMethod.GET.name(), List.of(HttpMethod.POST.name())));
 
             assertThat(response.getHeaders().get(HttpHeaders.ALLOW)).contains(HttpMethod.POST.name());
@@ -132,11 +142,11 @@ class GlobalExceptionHandlerTest {
     class WhenContentTypeNotSupported {
 
         @Test
-        void returns415Status() {
-            final ResponseEntity<ApiErrorResponse> response = handler.handleMediaTypeNotSupported(
+        void statusDrives415() {
+            final ProblemDetail problem = handler.handleMediaTypeNotSupported(
                     new HttpMediaTypeNotSupportedException(MediaType.TEXT_PLAIN, List.of(MediaType.APPLICATION_JSON)));
 
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+            assertThat(problem.getStatus()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE.value());
         }
     }
 
@@ -147,7 +157,7 @@ class GlobalExceptionHandlerTest {
 
         final MethodParameter methodParameter = new MethodParameter(
                 WhenValidationFails.class.getDeclaredMethod(
-                        "returnsBadRequestStatus"), -1);
+                        "statusDrivesBadRequest"), -1);
         return new MethodArgumentNotValidException(methodParameter, bindingResult);
     }
 }

@@ -67,11 +67,11 @@ class BookDetailIntegrationTest extends ContainerizedTest {
 
     private static final String BOOK_PATH = "/api/v1/books/{key}";
 
-    private static final String TITLE_PATH = "$.title";
+    private static final String TITLE_PATH = "$.data.title";
 
-    private static final String AUTHORS_PATH = "$.authors[0]";
+    private static final String AUTHORS_PATH = "$.data.authors[0]";
 
-    private static final String COMPLETE_PATH = "$.complete";
+    private static final String COMPLETE_PATH = "$.data.complete";
 
     private static final String DETAIL_CACHE = "bookDetails";
 
@@ -130,7 +130,7 @@ class BookDetailIntegrationTest extends ContainerizedTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(TITLE_PATH).value(TITLE))
                 .andExpect(jsonPath(AUTHORS_PATH).value(AUTHOR))
-                .andExpect(jsonPath("$.firstPublishYear").value(YEAR))
+                .andExpect(jsonPath("$.data.firstPublishYear").value(YEAR))
                 .andExpect(jsonPath(COMPLETE_PATH).value(true));
         }
 
@@ -144,7 +144,7 @@ class BookDetailIntegrationTest extends ContainerizedTest {
                 .andExpect(jsonPath(TITLE_PATH).value(TITLE))
                 .andExpect(jsonPath(AUTHORS_PATH).value(AUTHOR))
                 .andExpect(jsonPath(COMPLETE_PATH).value(false))
-                .andExpect(jsonPath("$.description").doesNotExist());
+                .andExpect(jsonPath("$.data.description").doesNotExist());
         }
 
         @Test
