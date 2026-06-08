@@ -2,6 +2,7 @@ package com.betterreads.collections.dto;
 
 import com.betterreads.collections.entity.ReadingStatus;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -20,6 +21,9 @@ import org.jspecify.annotations.Nullable;
  * @param startedAt the date reading began, null when unset
  * @param finishedAt the date reading finished, null when unset
  * @param notes the user's private note, null when unset
+ * @param addedAt the date the book was added to the shelf
+ * @param averageRating the book's community rating, null when no source supplied one
+ * @param myRating the reader's own 1-5 rating, null until the reader rates the book
  */
 public record ShelfEntryResponse(
     String key,
@@ -30,7 +34,10 @@ public record ShelfEntryResponse(
     boolean favorite,
     @Nullable LocalDate startedAt,
     @Nullable LocalDate finishedAt,
-    @Nullable String notes
+    @Nullable String notes,
+    LocalDate addedAt,
+    @Nullable BigDecimal averageRating,
+    @Nullable Integer myRating
 ) {
 
     public ShelfEntryResponse {

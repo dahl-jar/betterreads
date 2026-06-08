@@ -132,6 +132,10 @@ public class ShelfEntry {
         return status;
     }
 
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
+
     public boolean isFavorite() {
         return favorite;
     }
