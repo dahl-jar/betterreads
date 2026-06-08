@@ -61,4 +61,18 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
         WHERE r.bookId = :bookId AND r.rating IS NOT NULL
         """)
     RatingAggregate aggregateRatingForBook(@Param("bookId") Long bookId);
+
+    /**
+     * Returns the review count at each star rating present for a book.
+     *
+     * <p>Only stars with at least one review appear; a star with no reviews is absent from the
+     * result, not a zero row, so the caller zero-fills the missing stars.
+     */
+    @Query("""
+        SELECT new com.betterreads.reviews.repository.RatingBucket(r.rating, COUNT(r))
+        FROM Review r
+        WHERE r.bookId = :bookId AND r.rating IS NOT NULL
+        GROUP BY r.rating
+        """)
+    List<RatingBucket> countByStarForBook(@Param("bookId") Long bookId);
 }

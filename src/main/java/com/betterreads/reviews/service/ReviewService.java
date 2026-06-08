@@ -1,6 +1,7 @@
 package com.betterreads.reviews.service;
 
 import com.betterreads.common.dto.PageQuery;
+import com.betterreads.reviews.dto.CommunityRatingResponse;
 import com.betterreads.reviews.dto.ReviewPage;
 import com.betterreads.reviews.dto.ReviewResponse;
 import com.betterreads.reviews.dto.UpsertReviewRequest;
@@ -19,4 +20,7 @@ public interface ReviewService {
 
     /** Returns a page of the caller's reviews across all books, newest edit first. */
     ReviewPage listOwn(Long userId, PageQuery page);
+
+    /** Returns the book's community rating: the average, count, and per-star breakdown. */
+    CommunityRatingResponse communityRating(String bookKey);
 }

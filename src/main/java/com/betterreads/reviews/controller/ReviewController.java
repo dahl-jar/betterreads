@@ -3,6 +3,7 @@ package com.betterreads.reviews.controller;
 import org.springframework.http.ProblemDetail;
 import com.betterreads.common.dto.PageQuery;
 import com.betterreads.common.web.AuthenticatedBookErrorResponses;
+import com.betterreads.reviews.dto.CommunityRatingResponse;
 import com.betterreads.reviews.dto.ReviewPage;
 import com.betterreads.reviews.dto.ReviewResponse;
 import com.betterreads.reviews.dto.UpsertReviewRequest;
@@ -50,6 +51,16 @@ public class ReviewController {
         @PathVariable final String key,
         @Valid @ParameterObject final PageQuery page) {
         return reviewService.listForBook(key, page);
+    }
+
+    /** Returns the book's community rating: the average, count, and per-star breakdown. */
+    @GetMapping("/api/v1/books/{key}/community-rating")
+    @Operation(summary = "Get a book's community rating breakdown")
+    @ApiResponse(responseCode = "200", description = "The community rating")
+    @ApiResponse(responseCode = "404", description = "No book with that key",
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    public CommunityRatingResponse communityRating(@PathVariable final String key) {
+        return reviewService.communityRating(key);
     }
 
     /** Creates or edits the caller's review of the book. */

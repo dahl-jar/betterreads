@@ -111,8 +111,12 @@ public class Book {
     @Nullable
     private Integer ratingCount;
 
-    @Column(name = "community_rated", nullable = false)
-    private boolean communityRated;
+    @Column(name = "community_average", precision = 3, scale = 2)
+    @Nullable
+    private BigDecimal communityAverage;
+
+    @Column(name = "community_count", nullable = false)
+    private int communityCount;
 
     @Column(name = "series_name")
     @Nullable
@@ -208,9 +212,9 @@ public class Book {
     /**
      * Fills source ids and the rating and series fields without overwriting a set value with null.
      *
-     * <p>The external rating is skipped once {@code communityRated} is set: the first user review
-     * hands {@code averageRating} and {@code ratingCount} to the reader community, and a later
-     * enrichment pass must not overwrite their aggregate with the external one.
+     * <p>The source rating lives in {@code averageRating} and {@code ratingCount} and the reader
+     * rating in {@code communityAverage} and {@code communityCount}, so enrichment refreshes the
+     * source rating freely without touching the reader aggregate.
      */
     private void accrueFrom(final SourceBook source) {
         this.googleBooksVolumeId = coalesce(source.googleBooksVolumeId(), this.googleBooksVolumeId);
@@ -218,10 +222,8 @@ public class Book {
         this.hardcoverId = coalesce(source.hardcoverId(), this.hardcoverId);
         this.locLccn = coalesce(source.locLccn(), this.locLccn);
         this.wikidataQid = coalesce(source.wikidataQid(), this.wikidataQid);
-        if (!this.communityRated) {
-            this.averageRating = coalesce(toRating(source.averageRating()), this.averageRating);
-            this.ratingCount = coalesce(source.ratingCount(), this.ratingCount);
-        }
+        this.averageRating = coalesce(toRating(source.averageRating()), this.averageRating);
+        this.ratingCount = coalesce(source.ratingCount(), this.ratingCount);
         this.seriesName = coalesce(source.seriesName(), this.seriesName);
         this.seriesPosition = coalesce(source.seriesPosition(), this.seriesPosition);
     }
@@ -435,20 +437,24 @@ public class Book {
         this.ratingCount = ratingCount;
     }
 
-    public boolean isCommunityRated() {
-        return communityRated;
+    @Nullable
+    public BigDecimal getCommunityAverage() {
+        return communityAverage;
+    }
+
+    public int getCommunityCount() {
+        return communityCount;
     }
 
     /**
-     * Sets the rating to the reader-community aggregate and marks the book community-rated, so a
-     * later enrichment pass leaves the rating columns alone.
+     * Sets the reader-community rating, leaving the source rating columns untouched.
      *
+     * @param average the mean of user ratings, null when no rated review remains
      * @param count the number of user ratings, zero when the last rating was removed
      */
-    public void applyCommunityRating(@Nullable final BigDecimal average, final int count) {
-        this.averageRating = average;
-        this.ratingCount = count;
-        this.communityRated = true;
+    public void applyCommunityAggregate(@Nullable final BigDecimal average, final int count) {
+        this.communityAverage = average;
+        this.communityCount = count;
     }
 
     @Nullable

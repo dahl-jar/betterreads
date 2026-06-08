@@ -22,7 +22,7 @@ import org.jspecify.annotations.Nullable;
  * @param finishedAt the date reading finished, null when unset
  * @param notes the user's private note, null when unset
  * @param addedAt the date the book was added to the shelf
- * @param averageRating the book's community rating, null when no source supplied one
+ * @param averageRating the book's source rating, null when no source supplied one
  * @param myRating the reader's own 1-5 rating, null until the reader rates the book
  */
 public record ShelfEntryResponse(
