@@ -17,13 +17,11 @@ import com.betterreads.collections.mapper.ShelfEntryMapper;
 import com.betterreads.collections.repository.ShelfEntryRepository;
 import com.betterreads.common.exception.InvalidRequestException;
 import com.betterreads.common.exception.ResourceNotFoundException;
+import com.betterreads.common.util.ConflictRetry;
 
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataAccessException;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,15 +41,19 @@ public class ShelfServiceImpl implements ShelfService {
 
     private final ShelfWriter writer;
 
+    private final ShelfRatings ratings;
+
     public ShelfServiceImpl(
         final ShelfEntryRepository entries,
         final BookRepository books,
         final ShelfEntryMapper mapper,
-        final ShelfWriter writer) {
+        final ShelfWriter writer,
+        final ShelfRatings ratings) {
         this.entries = entries;
         this.books = books;
         this.mapper = mapper;
         this.writer = writer;
+        this.ratings = ratings;
     }
 
     @Override
@@ -71,25 +73,15 @@ public class ShelfServiceImpl implements ShelfService {
      * <p>Concurrent writes to the same user and book conflict two ways: two first touches both insert
      * and the loser hits the {@code (user_id, book_id)} unique constraint, and two writes to an
      * existing row both bump the {@code @Version} and the loser hits an optimistic-lock failure.
-     * Both are transient: the row the winner wrote is there to read on the next attempt, so the write
-     * retries up to {@value #MAX_UPSERT_ATTEMPTS} times. Each attempt needs a fresh transaction
-     * because the conflict rolls the previous one back, so the write runs in {@link ShelfWriter}, a
-     * separate bean reached through the Spring proxy.
+     * {@link ConflictRetry} re-runs the write in {@link ShelfWriter}'s fresh transaction for both.
      */
     private ShelfEntryResponse upsert(
         final Long userId, final String bookKey, final Consumer<ShelfEntry> change) {
         final Book book = requireBook(bookKey);
-        DataAccessException lastConflict = null;
-        for (int attempt = 1; attempt <= MAX_UPSERT_ATTEMPTS; attempt++) {
-            try {
-                return writer.applyToShelf(userId, book, change);
-            } catch (final DataIntegrityViolationException | OptimisticLockingFailureException conflict) {
-                lastConflict = conflict;
-                LOG.warn("collection.upsert conflict, retrying attempt={} userId={} bookId={}",
-                    attempt, userId, book.getBookId());
-            }
-        }
-        throw lastConflict;
+        final Integer myRating = ratings.forBook(userId, book.getBookId());
+        return ConflictRetry.retryOnConflict(MAX_UPSERT_ATTEMPTS, LOG,
+            "collection.upsert conflict, retrying userId=" + userId + " bookId=" + book.getBookId(),
+            () -> writer.applyToShelf(userId, book, change, myRating));
     }
 
     @Override
@@ -119,26 +111,29 @@ public class ShelfServiceImpl implements ShelfService {
         final List<ShelfEntry> shelf = status == null
             ? entries.findByUserIdOrderByCreatedAtDesc(userId)
             : entries.findByUserIdAndStatusOrderByCreatedAtDesc(userId, status);
-        final Map<Long, Book> booksById = books.findByBookIdIn(
-                shelf.stream().map(ShelfEntry::getBookId).toList())
-            .stream()
+        final List<Long> bookIds = shelf.stream().map(ShelfEntry::getBookId).toList();
+        final Map<Long, Book> booksById = books.findByBookIdIn(bookIds).stream()
             .collect(Collectors.toMap(Book::getBookId, Function.identity()));
+        final Map<Long, Integer> ratingsByBookId = ratings.forBooks(userId, bookIds);
         return shelf.stream()
-            .map(entry -> resolveAndMap(entry, booksById))
+            .map(entry -> resolveAndMap(entry, booksById, ratingsByBookId))
             .toList();
     }
 
     private ShelfEntryResponse saveAndMap(final ShelfEntry entry, final Book book) {
-        return mapper.toResponse(entries.save(entry), book);
+        return mapper.toResponse(
+            entries.save(entry), book, ratings.forBook(entry.getUserId(), book.getBookId()));
     }
 
-    private ShelfEntryResponse resolveAndMap(final ShelfEntry entry, final Map<Long, Book> booksById) {
+    private ShelfEntryResponse resolveAndMap(
+        final ShelfEntry entry, final Map<Long, Book> booksById,
+        final Map<Long, Integer> ratingsByBookId) {
         final Book book = booksById.get(entry.getBookId());
         if (book == null) {
             throw new IllegalStateException(
                 "shelf row references a missing book bookId=" + entry.getBookId());
         }
-        return mapper.toResponse(entry, book);
+        return mapper.toResponse(entry, book, ratingsByBookId.get(entry.getBookId()));
     }
 
     private Book requireBook(final String bookKey) {

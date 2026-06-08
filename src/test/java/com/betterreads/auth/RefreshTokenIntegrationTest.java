@@ -159,8 +159,8 @@ class RefreshTokenIntegrationTest extends ContainerizedTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(registerPayload(USERNAME, EMAIL, PASSWORD)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.refreshToken").doesNotExist())
-                .andExpect(jsonPath("$.accessToken").isNotEmpty());
+                .andExpect(jsonPath("$.data.refreshToken").doesNotExist())
+                .andExpect(jsonPath("$.data.accessToken").isNotEmpty());
         }
     }
 

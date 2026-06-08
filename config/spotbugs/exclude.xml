@@ -69,6 +69,10 @@
     </Match>
     <Match>
         <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.betterreads.catalog.service.read.CatalogServiceImpl"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
         <Class name="com.betterreads.collections.controller.ShelfController"/>
     </Match>
     <Match>
@@ -78,6 +82,46 @@
     <Match>
         <Bug pattern="EI_EXPOSE_REP2"/>
         <Class name="com.betterreads.collections.service.ShelfWriter"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.betterreads.collections.service.ShelfRatings"/>
+    </Match>
+
+    <!--
+      EI_EXPOSE_REP2 on the review service, its writer, and controller. Same rationale as the
+      shelf beans above: each holds Spring-managed singleton repositories, the mapper, and the
+      writer, none mutated after construction. A defensive copy is meaningless for these.
+    -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.betterreads.reviews.service.ReviewServiceImpl"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.betterreads.reviews.service.ReviewWriter"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.betterreads.reviews.controller.ReviewController"/>
+    </Match>
+
+    <!--
+      EI_EXPOSE_REP2 on the comment service and controller. Same rationale as the shelf and review
+      beans above: Spring-managed singleton repositories and the mapper, never mutated after
+      construction. A defensive copy is meaningless for these.
+    -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.betterreads.comments.service.CommentServiceImpl"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.betterreads.comments.controller.CommentController"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.betterreads.comments.service.CommentResponseAssembler"/>
     </Match>
 
     <!--
@@ -155,13 +199,14 @@
     </Match>
 
     <!--
-      CRLF_INJECTION_LOGS on the shelf upsert retry warn. The line logs only userId and bookId, both
-      Long. FindSecBugs taints the whole log call because the method also receives the bookKey String
-      from the HTTP path, but neither logged value is that string or can carry CRLF.
+      CRLF_INJECTION_LOGS on the shared upsert-retry warn. The shelf and review services build the
+      log event from userId and bookId, both Long, and pass it as the event String. FindSecBugs
+      taints the parameter because it cannot see the callers only pass machine-built strings; no
+      external value reaches the log, so none can carry CRLF.
     -->
     <Match>
         <Bug pattern="CRLF_INJECTION_LOGS"/>
-        <Class name="com.betterreads.collections.service.ShelfServiceImpl"/>
+        <Class name="com.betterreads.common.util.ConflictRetry"/>
     </Match>
 
     <!--

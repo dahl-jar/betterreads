@@ -111,6 +111,9 @@ public class Book {
     @Nullable
     private Integer ratingCount;
 
+    @Column(name = "community_rated", nullable = false)
+    private boolean communityRated;
+
     @Column(name = "series_name")
     @Nullable
     private String seriesName;
@@ -202,15 +205,23 @@ public class Book {
                 "book has no source identifier to key on; cannot promote a book with no id"));
     }
 
-    /** Fills source ids and the rating and series fields without overwriting a set value with null. */
+    /**
+     * Fills source ids and the rating and series fields without overwriting a set value with null.
+     *
+     * <p>The external rating is skipped once {@code communityRated} is set: the first user review
+     * hands {@code averageRating} and {@code ratingCount} to the reader community, and a later
+     * enrichment pass must not overwrite their aggregate with the external one.
+     */
     private void accrueFrom(final SourceBook source) {
         this.googleBooksVolumeId = coalesce(source.googleBooksVolumeId(), this.googleBooksVolumeId);
         this.openLibraryWorkKey = coalesce(source.openLibraryWorkKey(), this.openLibraryWorkKey);
         this.hardcoverId = coalesce(source.hardcoverId(), this.hardcoverId);
         this.locLccn = coalesce(source.locLccn(), this.locLccn);
         this.wikidataQid = coalesce(source.wikidataQid(), this.wikidataQid);
-        this.averageRating = coalesce(toRating(source.averageRating()), this.averageRating);
-        this.ratingCount = coalesce(source.ratingCount(), this.ratingCount);
+        if (!this.communityRated) {
+            this.averageRating = coalesce(toRating(source.averageRating()), this.averageRating);
+            this.ratingCount = coalesce(source.ratingCount(), this.ratingCount);
+        }
         this.seriesName = coalesce(source.seriesName(), this.seriesName);
         this.seriesPosition = coalesce(source.seriesPosition(), this.seriesPosition);
     }
@@ -422,6 +433,22 @@ public class Book {
 
     public void setRatingCount(@Nullable final Integer ratingCount) {
         this.ratingCount = ratingCount;
+    }
+
+    public boolean isCommunityRated() {
+        return communityRated;
+    }
+
+    /**
+     * Sets the rating to the reader-community aggregate and marks the book community-rated, so a
+     * later enrichment pass leaves the rating columns alone.
+     *
+     * @param count the number of user ratings, zero when the last rating was removed
+     */
+    public void applyCommunityRating(@Nullable final BigDecimal average, final int count) {
+        this.averageRating = average;
+        this.ratingCount = count;
+        this.communityRated = true;
     }
 
     @Nullable

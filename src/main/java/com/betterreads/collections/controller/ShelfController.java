@@ -8,7 +8,7 @@ import com.betterreads.collections.dto.ShelfEntryResponse;
 import com.betterreads.collections.dto.UpdateEntryRequest;
 import com.betterreads.collections.entity.ReadingStatus;
 import com.betterreads.collections.service.ShelfService;
-import com.betterreads.common.dto.ApiErrorResponse;
+import org.springframework.http.ProblemDetail;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -51,7 +51,7 @@ public class ShelfController {
     @Operation(summary = "List the current user's shelf")
     @ApiResponse(responseCode = "200", description = "The shelf, newest first")
     @ApiResponse(responseCode = "401", description = "Missing or invalid access token",
-        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     public List<ShelfEntryResponse> list(
         @AuthenticationPrincipal final Long userId,
         @RequestParam(name = "status", required = false) final @Nullable ReadingStatus status) {
@@ -63,11 +63,11 @@ public class ShelfController {
     @Operation(summary = "Set the shelf status for a book")
     @ApiResponse(responseCode = "200", description = "The updated shelf entry")
     @ApiResponse(responseCode = "400", description = "Unknown status value",
-        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(responseCode = "401", description = "Missing or invalid access token",
-        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(responseCode = "404", description = "No book with that key",
-        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     public ShelfEntryResponse changeStatus(
         @AuthenticationPrincipal final Long userId,
         @PathVariable final String key,
@@ -80,9 +80,9 @@ public class ShelfController {
     @Operation(summary = "Set the favorite flag for a book")
     @ApiResponse(responseCode = "200", description = "The updated shelf entry")
     @ApiResponse(responseCode = "401", description = "Missing or invalid access token",
-        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(responseCode = "404", description = "No book with that key",
-        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     public ShelfEntryResponse markFavorite(
         @AuthenticationPrincipal final Long userId,
         @PathVariable final String key,
@@ -95,11 +95,11 @@ public class ShelfController {
     @Operation(summary = "Update reading dates and note")
     @ApiResponse(responseCode = "200", description = "The updated shelf entry")
     @ApiResponse(responseCode = "400", description = "Finished date before started date",
-        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(responseCode = "401", description = "Missing or invalid access token",
-        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(responseCode = "404", description = "Book is not on the shelf",
-        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     public ShelfEntryResponse update(
         @AuthenticationPrincipal final Long userId,
         @PathVariable final String key,
@@ -112,7 +112,7 @@ public class ShelfController {
     @Operation(summary = "Remove a book from the shelf")
     @ApiResponse(responseCode = "204", description = "Book removed or already absent")
     @ApiResponse(responseCode = "401", description = "Missing or invalid access token",
-        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     public ResponseEntity<Void> remove(
         @AuthenticationPrincipal final Long userId,
         @PathVariable final String key) {

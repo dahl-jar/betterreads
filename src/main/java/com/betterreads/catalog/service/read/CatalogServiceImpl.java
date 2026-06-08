@@ -11,6 +11,9 @@ import com.betterreads.catalog.entity.Author;
 import com.betterreads.catalog.entity.Book;
 import com.betterreads.catalog.repository.AuthorRepository;
 import com.betterreads.catalog.repository.BookRepository;
+
+import jakarta.persistence.EntityManager;
+
 import org.jspecify.annotations.Nullable;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -29,22 +32,38 @@ public class CatalogServiceImpl implements CatalogService {
 
     private final AuthorRepository authorRepository;
 
+    private final EntityManager entityManager;
+
     public CatalogServiceImpl(
         final BookRepository bookRepository,
-        final AuthorRepository authorRepository
+        final AuthorRepository authorRepository,
+        final EntityManager entityManager
     ) {
         this.bookRepository = bookRepository;
         this.authorRepository = authorRepository;
+        this.entityManager = entityManager;
     }
 
+    /**
+     * Persists external metadata, locking an existing book row and refreshing it so enrichment sees
+     * and keeps a user-owned rating that a concurrent review committed between the lookup and save.
+     */
     @Override
     @Transactional
     @CacheEvict(cacheNames = "bookDetails", key = "#result.dedupKey")
     public Book upsertFromSource(final SourceBook source) {
-        final Book book = findExistingForSource(source).orElseGet(Book::new);
+        final Book book = findExistingForSource(source)
+            .map(this::lockAndRefresh)
+            .orElseGet(Book::new);
         book.applyFrom(source);
         attachAuthors(book, source.authors());
         return bookRepository.save(book);
+    }
+
+    private Book lockAndRefresh(final Book existing) {
+        final Book locked = bookRepository.findForUpdate(existing.getBookId()).orElse(existing);
+        entityManager.refresh(locked);
+        return locked;
     }
 
     private Optional<Book> findExistingForSource(final SourceBook source) {

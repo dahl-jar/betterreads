@@ -115,15 +115,15 @@ class ShelvesIntegrationTest extends ContainerizedTest {
 
     private static final String STATUS_FIELD = "status";
 
-    private static final String JSON_STATUS = "$.status";
+    private static final String JSON_STATUS = "$.data.status";
 
-    private static final String JSON_FAVORITE = "$.favorite";
+    private static final String JSON_FAVORITE = "$.data.favorite";
 
-    private static final String JSON_STARTED = "$.startedAt";
+    private static final String JSON_STARTED = "$.data.startedAt";
 
-    private static final String JSON_FINISHED = "$.finishedAt";
+    private static final String JSON_FINISHED = "$.data.finishedAt";
 
-    private static final String JSON_LENGTH = "$.length()";
+    private static final String JSON_LENGTH = "$.data.length()";
 
     private static final String STATUS_SUFFIX = "/status";
 
@@ -133,7 +133,7 @@ class ShelvesIntegrationTest extends ContainerizedTest {
 
     private static final String NOTE = "reread before the film";
 
-    private static final String JSON_NOTES = "$.notes";
+    private static final String JSON_NOTES = "$.data.notes";
 
     private static final String BAD_STATUS = "NOT_A_STATUS";
 
@@ -145,11 +145,15 @@ class ShelvesIntegrationTest extends ContainerizedTest {
 
     private static final BigDecimal RATED_AVERAGE = new BigDecimal("4.50");
 
-    private static final String JSON_ADDED_AT = "$.addedAt";
+    private static final int GIVEN_RATING = 4;
 
-    private static final String JSON_AVERAGE_RATING = "$.averageRating";
+    private static final String JSON_ADDED_AT = "$.data.addedAt";
 
-    private static final String JSON_MY_RATING = "$.myRating";
+    private static final String JSON_AVERAGE_RATING = "$.data.averageRating";
+
+    private static final String JSON_MY_RATING = "$.data.myRating";
+
+    private static final String JSON_FIRST_MY_RATING = "$.data[0].myRating";
 
     @Autowired
     private WebApplicationContext webApplicationContext;
@@ -178,6 +182,7 @@ class ShelvesIntegrationTest extends ContainerizedTest {
             .addFilter(springSecurityFilterChain)
             .build();
         jdbcTemplate.update("DELETE FROM user_book_collection");
+        jdbcTemplate.update("DELETE FROM review");
         jdbcTemplate.update("DELETE FROM book_author");
         jdbcTemplate.update("DELETE FROM book");
         jdbcTemplate.update("DELETE FROM app_user");
@@ -199,8 +204,8 @@ class ShelvesIntegrationTest extends ContainerizedTest {
 
             response
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.key").value(DUNE_KEY))
-                .andExpect(jsonPath("$.title").value(DUNE_TITLE))
+                .andExpect(jsonPath("$.data.key").value(DUNE_KEY))
+                .andExpect(jsonPath("$.data.title").value(DUNE_TITLE))
                 .andExpect(jsonPath(JSON_STATUS).value(WANT_TO_READ))
                 .andExpect(jsonPath(JSON_FAVORITE).value(false));
         }
@@ -215,7 +220,7 @@ class ShelvesIntegrationTest extends ContainerizedTest {
             final ResultActions shelf = getShelf(token, null);
             shelf
                 .andExpect(jsonPath(JSON_LENGTH).value(1))
-                .andExpect(jsonPath("$[0].status").value(CURRENTLY_READING));
+                .andExpect(jsonPath("$.data[0].status").value(CURRENTLY_READING));
         }
 
         @Test
@@ -422,7 +427,7 @@ class ShelvesIntegrationTest extends ContainerizedTest {
             response
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(JSON_LENGTH).value(1))
-                .andExpect(jsonPath("$[0].key").value(DUNE_KEY));
+                .andExpect(jsonPath("$.data[0].key").value(DUNE_KEY));
         }
 
         @Test
@@ -491,7 +496,7 @@ class ShelvesIntegrationTest extends ContainerizedTest {
         }
 
         @Test
-        void myRatingIsAbsentUntilTheReaderRatesTheBook() throws Exception {
+        void unratedBookHasNoRatingOnTheShelf() throws Exception {
             final String token = registerAndLogin(DARROW, DARROW_EMAIL);
 
             final ResultActions response = putStatus(token, RATED_KEY, WANT_TO_READ);
@@ -499,6 +504,33 @@ class ShelvesIntegrationTest extends ContainerizedTest {
             response
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(JSON_MY_RATING).doesNotExist());
+        }
+
+        @Test
+        void ratedBookShowsTheRatingOnTheShelf() throws Exception {
+            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            putStatus(token, RATED_KEY, WANT_TO_READ);
+            rateBook(token, RATED_KEY, GIVEN_RATING);
+
+            final ResultActions shelf = getShelf(token, null);
+
+            shelf
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_FIRST_MY_RATING).value(GIVEN_RATING));
+        }
+
+        @Test
+        void oneUsersRatingIsInvisibleToAnother() throws Exception {
+            final String darrowToken = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String goblinToken = registerAndLogin(GOBLIN, GOBLIN_EMAIL);
+            rateBook(darrowToken, RATED_KEY, GIVEN_RATING);
+            putStatus(goblinToken, RATED_KEY, WANT_TO_READ);
+
+            final ResultActions goblinShelf = getShelf(goblinToken, null);
+
+            goblinShelf
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_FIRST_MY_RATING).doesNotExist());
         }
     }
 
@@ -541,6 +573,21 @@ class ShelvesIntegrationTest extends ContainerizedTest {
         return mockMvc.perform(request);
     }
 
+    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
+    private ResultActions rateBook(final String token, final String key, final int rating)
+        throws Exception {
+        return mockMvc.perform(put("/api/v1/books/" + key + "/reviews/me")
+            .header(AUTH_HEADER, BEARER_PREFIX + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(ratingPayload(rating)));
+    }
+
+    private String ratingPayload(final int rating) {
+        final ObjectNode node = objectMapper.createObjectNode();
+        node.put("rating", rating);
+        return objectMapper.writeValueAsString(node);
+    }
+
     private void seedBook(final String key, final String title) {
         seedRatedBook(key, title, null);
     }
@@ -566,12 +613,12 @@ class ShelvesIntegrationTest extends ContainerizedTest {
             .andExpect(status().isOk())
             .andReturn();
         final String body = login.getResponse().getContentAsString();
-        return objectMapper.readTree(body).at("/accessToken").asString();
+        return objectMapper.readTree(body).at("/data/accessToken").asString();
     }
 
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
-    private String readJson(final ResultActions actions, final String pointer) throws Exception {
-        final String jsonPointer = pointer.replace("$.", "/");
+    private String readJson(final ResultActions actions, final String jsonPath) throws Exception {
+        final String jsonPointer = jsonPath.substring(1).replace('.', '/');
         final String body = actions.andReturn().getResponse().getContentAsString();
         return objectMapper.readTree(body).at(jsonPointer).asString();
     }

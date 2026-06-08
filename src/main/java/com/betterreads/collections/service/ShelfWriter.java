@@ -8,14 +8,12 @@ import com.betterreads.collections.entity.ShelfEntry;
 import com.betterreads.collections.mapper.ShelfEntryMapper;
 import com.betterreads.collections.repository.ShelfEntryRepository;
 
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Transactional write for the shelf upsert, in its own bean so each attempt runs in a fresh
- * transaction reached through the Spring proxy. {@link ShelfServiceImpl#changeStatus} retries on a
- * concurrent-insert conflict, and the retry needs a transaction the rolled-back first attempt did
- * not poison.
+ * The shelf upsert write, in its own bean so the retry gets a fresh transaction per attempt.
  */
 @Component
 public class ShelfWriter {
@@ -30,17 +28,18 @@ public class ShelfWriter {
     }
 
     /**
-     * Loads the user's entry for the book or opens a new one, applies {@code change}, and flushes.
+     * Applies {@code change} to the user's entry, creating the row on first touch.
      *
-     * <p>{@code saveAndFlush} so a duplicate-key conflict from a concurrent first touch is thrown
-     * here, inside this transaction, where the caller can catch it and retry, rather than at commit.
+     * <p>{@code saveAndFlush} surfaces a duplicate-key conflict inside the transaction, where the
+     * caller can retry it, before commit hides it.
      */
     @Transactional
     public ShelfEntryResponse applyToShelf(
-        final Long userId, final Book book, final Consumer<ShelfEntry> change) {
+        final Long userId, final Book book, final Consumer<ShelfEntry> change,
+        final @Nullable Integer myRating) {
         final ShelfEntry entry = entries.findByUserIdAndBookId(userId, book.getBookId())
             .orElseGet(() -> new ShelfEntry(userId, book.getBookId()));
         change.accept(entry);
-        return mapper.toResponse(entries.saveAndFlush(entry), book);
+        return mapper.toResponse(entries.saveAndFlush(entry), book, myRating);
     }
 }

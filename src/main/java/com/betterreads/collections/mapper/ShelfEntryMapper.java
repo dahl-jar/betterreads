@@ -5,6 +5,7 @@ import com.betterreads.catalog.entity.Book;
 import com.betterreads.collections.dto.ShelfEntryResponse;
 import com.betterreads.collections.entity.ShelfEntry;
 
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /** Builds a {@link ShelfEntryResponse} from a shelf row and its book. */
@@ -14,9 +15,10 @@ public class ShelfEntryMapper {
     /**
      * Combines the shelf state from {@code entry} with the book summary from {@code book}.
      *
-     * <p>{@code myRating} is always null: there is no per-user rating store yet.
+     * @param myRating the reader's own rating for the book, null when they have not rated it
      */
-    public ShelfEntryResponse toResponse(final ShelfEntry entry, final Book book) {
+    public ShelfEntryResponse toResponse(
+        final ShelfEntry entry, final Book book, final @Nullable Integer myRating) {
         return new ShelfEntryResponse(
             book.getDedupKey(),
             book.getTitle(),
@@ -29,6 +31,6 @@ public class ShelfEntryMapper {
             entry.getNotes(),
             entry.getCreatedAt().toLocalDate(),
             book.getAverageRating(),
-            null);
+            myRating);
     }
 }

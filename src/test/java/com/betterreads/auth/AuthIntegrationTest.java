@@ -84,15 +84,15 @@ class AuthIntegrationTest extends ContainerizedTest {
 
     private static final String BEARER_PREFIX = "Bearer ";
 
-    private static final String JSON_TOKEN = "$.accessToken";
+    private static final String JSON_TOKEN = "$.data.accessToken";
 
-    private static final String JSON_USER_USERNAME = "$.user.username";
+    private static final String JSON_USER_USERNAME = "$.data.user.username";
 
-    private static final String JSON_USER_EMAIL = "$.user.email";
+    private static final String JSON_USER_EMAIL = "$.data.user.email";
 
-    private static final String JSON_USERNAME = "$.username";
+    private static final String JSON_USERNAME = "$.data.username";
 
-    private static final String JSON_EMAIL = "$.email";
+    private static final String JSON_EMAIL = "$.data.email";
 
     private static final String MIXED_CASE_EMAIL = "Alice@Example.COM";
 
@@ -361,7 +361,8 @@ class AuthIntegrationTest extends ContainerizedTest {
                     post(REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content(registerBody))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-            final String apiToken = objectMapper.readTree(registerResponse).get("accessToken").asString();
+            final String apiToken =
+                objectMapper.readTree(registerResponse).get("data").get("accessToken").asString();
 
             mockMvc.perform(get(ME_URL).header(AUTH_HEADER, BEARER_PREFIX + apiToken))
                 .andExpect(status().isOk())

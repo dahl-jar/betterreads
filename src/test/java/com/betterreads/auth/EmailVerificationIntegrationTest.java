@@ -159,7 +159,7 @@ class EmailVerificationIntegrationTest extends ContainerizedTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(registerPayload(USERNAME, EMAIL, PASSWORD)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.user.emailVerified").value(false));
+                .andExpect(jsonPath("$.data.user.emailVerified").value(false));
 
             assertThat(userRepository.findByEmail(EMAIL))
                 .as("registration leaves email_verified_at null until the link is clicked")

@@ -1,5 +1,7 @@
 package com.betterreads.search.dto;
 
+import com.betterreads.common.dto.Paged;
+
 import java.util.List;
 
 /**
@@ -15,7 +17,7 @@ public record BookSearchResult(
     long totalHits,
     int offset,
     int limit
-) {
+) implements Paged<BookSearchDocument> {
 
     public BookSearchResult {
         hits = List.copyOf(hits);
@@ -24,5 +26,15 @@ public record BookSearchResult(
     @Override
     public List<BookSearchDocument> hits() {
         return List.copyOf(hits);
+    }
+
+    @Override
+    public List<BookSearchDocument> items() {
+        return hits();
+    }
+
+    @Override
+    public long total() {
+        return totalHits;
     }
 }

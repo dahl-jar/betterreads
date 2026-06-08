@@ -1,17 +1,17 @@
 package com.betterreads.common.exception;
 
-import com.betterreads.common.dto.ApiErrorResponse;
-import com.betterreads.common.dto.ApiErrorResponse.FieldError;
 import com.betterreads.common.util.LogSanitizer;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import jakarta.validation.ConstraintViolationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -21,98 +21,90 @@ import org.springframework.web.context.request.async.AsyncRequestTimeoutExceptio
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Maps exceptions to {@link ApiErrorResponse}.
+ * Maps exceptions to RFC 9457 {@link ProblemDetail} responses, served as
+ * {@code application/problem+json}. A validation failure carries an {@code errors} extension member
+ * listing the offending fields; every problem carries a {@code timestamp} extension for log
+ * correlation.
  *
  * <p>4xx outcomes log at WARN; the catch-all 500 logs at ERROR with stack trace.
  */
+// PMD.TooManyMethods: one handler per exception type is inherent to an exception-mapping advice.
+@SuppressWarnings("PMD.TooManyMethods")
 @RestControllerAdvice
 class GlobalExceptionHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<ApiErrorResponse> handleNotFound(final ResourceNotFoundException exception) {
-        LOG.warn("Resource not found: {}", LogSanitizer.forLog(Objects.requireNonNullElse(exception.getMessage(), "")));
+    private static final String TIMESTAMP = "timestamp";
 
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
-                new ApiErrorResponse(
-                        HttpStatus.NOT_FOUND.value(),
-                        Objects.requireNonNullElse(exception.getMessage(), "Resource not found"),
-                        Instant.now(),
-                        List.of()
-                )
-        );
+    private static final String ERRORS = "errors";
+
+    private static final String MALFORMED_BODY = "Malformed request body";
+
+    private static final String INVALID_PARAMETER = "Invalid request parameter";
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ProblemDetail handleNotFound(final ResourceNotFoundException exception) {
+        LOG.warn("Resource not found: {}", LogSanitizer.forLog(messageOf(exception, "")));
+        return problem(HttpStatus.NOT_FOUND, messageOf(exception, "Resource not found"));
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    public ProblemDetail handleForbidden(final ForbiddenException exception) {
+        LOG.warn("Forbidden: {}", LogSanitizer.forLog(messageOf(exception, "")));
+        return problem(HttpStatus.FORBIDDEN, messageOf(exception, "Forbidden"));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ApiErrorResponse> handleValidation(final MethodArgumentNotValidException exception) {
-        final List<FieldError> fieldErrors = exception.getBindingResult()
+    public ProblemDetail handleValidation(final MethodArgumentNotValidException exception) {
+        final List<Map<String, String>> fieldErrors = exception.getBindingResult()
                 .getFieldErrors()
                 .stream()
-                .map(error -> new FieldError(error.getField(), error.getDefaultMessage()))
+                .map(error -> Map.of(
+                        "field", error.getField(),
+                        "message", Objects.requireNonNullElse(error.getDefaultMessage(), "")))
                 .toList();
 
         LOG.warn("Validation failed: {} field errors", fieldErrors.size());
 
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                new ApiErrorResponse(
-                        HttpStatus.BAD_REQUEST.value(),
-                        "Validation failed",
-                        Instant.now(),
-                        fieldErrors
-                )
-        );
+        final ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, "Validation failed");
+        problem.setProperty(ERRORS, fieldErrors);
+        return problem;
     }
 
     @ExceptionHandler(BusinessRuleException.class)
-    public ResponseEntity<ApiErrorResponse> handleBusinessRule(final BusinessRuleException exception) {
-        LOG.warn("Business rule violation: {}",
-                LogSanitizer.forLog(Objects.requireNonNullElse(exception.getMessage(), "")));
-
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(
-                new ApiErrorResponse(
-                        HttpStatus.CONFLICT.value(),
-                        Objects.requireNonNullElse(exception.getMessage(), "Business rule violation"),
-                        Instant.now(),
-                        List.of()
-                )
-        );
+    public ProblemDetail handleBusinessRule(final BusinessRuleException exception) {
+        LOG.warn("Business rule violation: {}", LogSanitizer.forLog(messageOf(exception, "")));
+        return problem(HttpStatus.CONFLICT, messageOf(exception, "Business rule violation"));
     }
 
     @ExceptionHandler(InvalidRequestException.class)
-    public ResponseEntity<ApiErrorResponse> handleInvalidRequest(final InvalidRequestException exception) {
-        LOG.warn("Invalid request: {}",
-                LogSanitizer.forLog(Objects.requireNonNullElse(exception.getMessage(), "")));
-
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                new ApiErrorResponse(
-                        HttpStatus.BAD_REQUEST.value(),
-                        Objects.requireNonNullElse(exception.getMessage(), "Invalid request"),
-                        Instant.now(),
-                        List.of()
-                )
-        );
+    public ProblemDetail handleInvalidRequest(final InvalidRequestException exception) {
+        LOG.warn("Invalid request: {}", LogSanitizer.forLog(messageOf(exception, "")));
+        return problem(HttpStatus.BAD_REQUEST, messageOf(exception, "Invalid request"));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ApiErrorResponse> handleUnreadableMessage(final HttpMessageNotReadableException exception) {
-        final String message = "Malformed request body";
-        LOG.warn(message);
+    public ProblemDetail handleUnreadableMessage(final HttpMessageNotReadableException exception) {
+        LOG.warn(MALFORMED_BODY);
+        return problem(HttpStatus.BAD_REQUEST, MALFORMED_BODY);
+    }
 
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                new ApiErrorResponse(
-                        HttpStatus.BAD_REQUEST.value(),
-                        message,
-                        Instant.now(),
-                        List.of()
-                )
-        );
+    /**
+     * Maps a request parameter that violates a {@code @Min}/{@code @Max} bound (for example a
+     * {@code limit=0} that would divide by zero in paging) to {@code 400}.
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ProblemDetail handleParameterValidation(final ConstraintViolationException exception) {
+        LOG.warn("Request parameter validation failed");
+        return problem(HttpStatus.BAD_REQUEST, INVALID_PARAMETER);
     }
 
     /**
@@ -122,18 +114,9 @@ class GlobalExceptionHandler {
      * client error. Without this handler it falls to the catch-all {@code 500}.
      */
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    public ResponseEntity<ApiErrorResponse> handleTypeMismatch(
-            final MethodArgumentTypeMismatchException exception) {
+    public ProblemDetail handleTypeMismatch(final MethodArgumentTypeMismatchException exception) {
         LOG.warn("Parameter type mismatch: name={}", LogSanitizer.forLog(exception.getName()));
-
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                new ApiErrorResponse(
-                        HttpStatus.BAD_REQUEST.value(),
-                        "Invalid request parameter",
-                        Instant.now(),
-                        List.of()
-                )
-        );
+        return problem(HttpStatus.BAD_REQUEST, INVALID_PARAMETER);
     }
 
     /**
@@ -143,7 +126,7 @@ class GlobalExceptionHandler {
      * client error into a server error in the 5xx metrics.
      */
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
-    public ResponseEntity<ApiErrorResponse> handleMethodNotSupported(
+    public ResponseEntity<ProblemDetail> handleMethodNotSupported(
             final HttpRequestMethodNotSupportedException exception) {
         LOG.warn("Method not allowed: method={}",
                 LogSanitizer.forLog(Objects.requireNonNullElse(exception.getMethod(), "")));
@@ -157,12 +140,7 @@ class GlobalExceptionHandler {
         if (!allowed.isEmpty()) {
             builder.header(HttpHeaders.ALLOW, allowed.toArray(String[]::new));
         }
-        return builder.body(new ApiErrorResponse(
-                HttpStatus.METHOD_NOT_ALLOWED.value(),
-                "Method not allowed",
-                Instant.now(),
-                List.of()
-        ));
+        return builder.body(problem(HttpStatus.METHOD_NOT_ALLOWED, "Method not allowed"));
     }
 
     /**
@@ -172,32 +150,16 @@ class GlobalExceptionHandler {
      * a server error.
      */
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
-    public ResponseEntity<ApiErrorResponse> handleMediaTypeNotSupported(
-            final HttpMediaTypeNotSupportedException exception) {
+    public ProblemDetail handleMediaTypeNotSupported(final HttpMediaTypeNotSupportedException exception) {
         final MediaType received = exception.getContentType();
         LOG.warn("Unsupported content type: contentType={}",
                 LogSanitizer.forLog(received == null ? "" : received.toString()));
-
-        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(
-                new ApiErrorResponse(
-                        HttpStatus.UNSUPPORTED_MEDIA_TYPE.value(),
-                        "Unsupported media type",
-                        Instant.now(),
-                        List.of()
-                )
-        );
+        return problem(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Unsupported media type");
     }
 
     @ExceptionHandler(BadCredentialsException.class)
-    public ResponseEntity<ApiErrorResponse> handleBadCredentials(final BadCredentialsException exception) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
-                new ApiErrorResponse(
-                        HttpStatus.UNAUTHORIZED.value(),
-                        "Invalid credentials",
-                        Instant.now(),
-                        List.of()
-                )
-        );
+    public ProblemDetail handleBadCredentials(final BadCredentialsException exception) {
+        return problem(HttpStatus.UNAUTHORIZED, "Invalid credentials");
     }
 
     /**
@@ -211,17 +173,19 @@ class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiErrorResponse> handleUnexpected(final Exception exception) {
+    public ProblemDetail handleUnexpected(final Exception exception) {
         LOG.error("Unexpected error", exception);
-
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                new ApiErrorResponse(
-                        HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                        "An unexpected error occurred",
-                        Instant.now(),
-                        List.of()
-                )
-        );
+        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred");
     }
 
+    private static ProblemDetail problem(final HttpStatus status, final String detail) {
+        final ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
+        problem.setTitle(status.getReasonPhrase());
+        problem.setProperty(TIMESTAMP, Instant.now());
+        return problem;
+    }
+
+    private static String messageOf(final Exception exception, final String fallback) {
+        return Objects.requireNonNullElse(exception.getMessage(), fallback);
+    }
 }

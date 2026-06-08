@@ -385,7 +385,7 @@ class AccountDeletionIntegrationTest extends ContainerizedTest {
             .andExpect(status().isOk())
             .andReturn();
         final String body = result.getResponse().getContentAsString();
-        final String accessToken = objectMapper.readTree(body).at("/accessToken").asString();
+        final String accessToken = objectMapper.readTree(body).at("/data/accessToken").asString();
         final String setCookie = result.getResponse().getHeader(SET_COOKIE_HEADER);
         if (setCookie == null) {
             throw new IllegalStateException("login response is missing the Set-Cookie header");

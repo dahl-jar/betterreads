@@ -39,6 +39,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * another's budget. {@code X-Forwarded-For} is only read from trusted-proxy CIDRs so a
  * direct caller cannot spoof the IP. An empty bucket returns 429 with {@code Retry-After}.
  */
+// PMD.CyclomaticComplexity: endpoint dispatch plus IP/CIDR parsing; each method stays simple.
+@SuppressWarnings("PMD.CyclomaticComplexity")
 @Component
 public final class RateLimitFilter extends OncePerRequestFilter {
 
@@ -60,7 +62,12 @@ public final class RateLimitFilter extends OncePerRequestFilter {
 
     private static final String BOOK_DETAIL_PREFIX = "/api/v1/books/";
 
+    private static final List<String> PUBLIC_READ_PREFIXES = List.of(
+        BOOK_DETAIL_PREFIX, "/api/v1/reviews/", "/api/v1/comments/");
+
     private static final String EVENT_STREAM_SUFFIX = "/events";
+
+    private static final String COMMENTS_SUFFIX = "/comments";
 
     private static final String FORWARDED_FOR_HEADER = "X-Forwarded-For";
 
@@ -73,6 +80,8 @@ public final class RateLimitFilter extends OncePerRequestFilter {
     private final Endpoint detailEndpoint;
 
     private final Endpoint eventStreamEndpoint;
+
+    private final Endpoint commentWriteEndpoint;
 
     private final List<CidrRange> trustedProxies;
 
@@ -97,6 +106,9 @@ public final class RateLimitFilter extends OncePerRequestFilter {
         this.eventStreamEndpoint = endpoint(HttpMethod.GET, "event-stream",
             properties.eventStreamCapacity(),
             properties.eventStreamRefillTokens(), properties.eventStreamRefillSeconds());
+        this.commentWriteEndpoint = endpoint(HttpMethod.POST, "comment-write",
+            properties.searchCapacity(),
+            properties.searchRefillTokens(), properties.searchRefillSeconds());
         this.trustedProxies = parseCidrs(properties.trustedProxies());
         this.proxyManager = proxyManager;
         this.redis = redis;
@@ -146,6 +158,7 @@ public final class RateLimitFilter extends OncePerRequestFilter {
         endpoints.values().forEach(e -> prefixes.add(e.keyPrefix()));
         prefixes.add(detailEndpoint.keyPrefix());
         prefixes.add(eventStreamEndpoint.keyPrefix());
+        prefixes.add(commentWriteEndpoint.keyPrefix());
         prefixes.forEach(prefix -> {
             final List<String> keys = redis.sync().keys(prefix + ":*");
             if (!keys.isEmpty()) {
@@ -196,7 +209,11 @@ public final class RateLimitFilter extends OncePerRequestFilter {
         if (exact != null && exact.method().matches(request.getMethod())) {
             return exact;
         }
-        if (!uri.startsWith(BOOK_DETAIL_PREFIX) || !HttpMethod.GET.matches(request.getMethod())) {
+        if (HttpMethod.POST.matches(request.getMethod())) {
+            return uri.endsWith(COMMENTS_SUFFIX) ? commentWriteEndpoint : null;
+        }
+        final boolean publicRead = PUBLIC_READ_PREFIXES.stream().anyMatch(uri::startsWith);
+        if (!HttpMethod.GET.matches(request.getMethod()) || !publicRead) {
             return null;
         }
         return uri.endsWith(EVENT_STREAM_SUFFIX) ? eventStreamEndpoint : detailEndpoint;
