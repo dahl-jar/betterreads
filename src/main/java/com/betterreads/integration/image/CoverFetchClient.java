@@ -9,6 +9,7 @@ import com.betterreads.common.util.LogSanitizer;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.buffer.DataBufferLimitException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
@@ -20,8 +21,8 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  *
  * <p>Redirects are followed manually, with each hop's target re-checked by {@link CoverUrlGuard}, so
  * an OpenLibrary cover that 302s to its CDN still resolves while a redirect to a private address is
- * refused. A 4xx, an unsafe target, or too many hops resolves to empty so a dead cover link leaves
- * the book on its external URL; 5xx and network errors propagate as {@link
+ * refused. A 4xx, an unsafe target, too many hops, or a body over {@code cover-fetch.max-bytes}
+ * resolves to empty; 5xx and network errors propagate as {@link
  * org.springframework.web.reactive.function.client.WebClientException} for the caller to skip.
  */
 @Component
@@ -71,6 +72,10 @@ public class CoverFetchClient implements CoverFetcher {
                 return Hop.done(Optional.empty());
             }
             throw ex;
+        } catch (DataBufferLimitException oversized) {
+            LOG.warn("image.fetch cover body over the download limit, skipped url={}",
+                LogSanitizer.forLog(url));
+            return Hop.done(Optional.empty());
         }
     }
 

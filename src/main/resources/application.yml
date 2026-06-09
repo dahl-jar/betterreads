@@ -200,6 +200,7 @@ minio:
 cover-fetch:
   connect-timeout: ${COVER_FETCH_CONNECT_TIMEOUT:5000}
   read-timeout: ${COVER_FETCH_READ_TIMEOUT:10000}
+  max-bytes: ${COVER_FETCH_MAX_BYTES:16777216}
 
 images:
   public-base-url: ${IMAGES_PUBLIC_BASE_URL:${SPRINGDOC_PUBLIC_URL:http://localhost:8080}}

@@ -8,7 +8,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.Optional;
 
 import com.betterreads.catalog.service.source.FetchedImage;
-import com.betterreads.common.web.WebClients;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -27,6 +26,12 @@ class CoverFetchClientWireMockTest {
     private static final int CONNECT_TIMEOUT_MS = 2000;
 
     private static final int READ_TIMEOUT_MS = 5000;
+
+    private static final int MAX_FETCH_BYTES = 8 * 1024 * 1024;
+
+    private static final int PAST_DEFAULT_BUFFER_BYTES = 5 * 1024 * 1024;
+
+    private static final int OVER_LIMIT_BYTES = MAX_FETCH_BYTES + 1;
 
     private static final int HTTP_OK = 200;
 
@@ -54,9 +59,10 @@ class CoverFetchClientWireMockTest {
     void startServer() {
         wireMock = new WireMockServer(0);
         wireMock.start();
+        final CoverFetchProperties properties =
+            new CoverFetchProperties(CONNECT_TIMEOUT_MS, READ_TIMEOUT_MS, MAX_FETCH_BYTES);
         client = new CoverFetchClient(
-            WebClients.builderWithTimeouts(baseUrl(), CONNECT_TIMEOUT_MS, READ_TIMEOUT_MS).build(),
-            allowAllGuard());
+            new CoverFetchWebClientConfig(properties).coverFetchWebClient(), allowAllGuard());
     }
 
     @BeforeEach
@@ -123,6 +129,37 @@ class CoverFetchClientWireMockTest {
         final Optional<FetchedImage> fetched = client.fetch(baseUrl() + COVER_PATH);
 
         assertThat(fetched).get().extracting(FetchedImage::bytes).isEqualTo(JPEG);
+    }
+
+    @Test
+    @DisplayName("a cover past the sources' default decode buffer still downloads")
+    void coverPastDefaultBufferDownloads() {
+        wireMock.stubFor(get(urlPathEqualTo(COVER_PATH)).willReturn(aResponse()
+            .withStatus(HTTP_OK)
+            .withHeader(CONTENT_TYPE_HEADER, JPEG_TYPE)
+            .withBody(new byte[PAST_DEFAULT_BUFFER_BYTES])));
+
+        final Optional<FetchedImage> fetched = client.fetch(baseUrl() + COVER_PATH);
+
+        assertThat(fetched)
+            .as("the cover client's own byte limit applies, not the shared source default")
+            .get()
+            .satisfies(image -> assertThat(image.bytes()).hasSize(PAST_DEFAULT_BUFFER_BYTES));
+    }
+
+    @Test
+    @DisplayName("a cover over the configured byte limit resolves to empty")
+    void coverOverLimitIsEmpty() {
+        wireMock.stubFor(get(urlPathEqualTo(COVER_PATH)).willReturn(aResponse()
+            .withStatus(HTTP_OK)
+            .withHeader(CONTENT_TYPE_HEADER, JPEG_TYPE)
+            .withBody(new byte[OVER_LIMIT_BYTES])));
+
+        final Optional<FetchedImage> fetched = client.fetch(baseUrl() + COVER_PATH);
+
+        assertThat(fetched)
+            .as("an oversized cover is skipped, it must not error the request")
+            .isEmpty();
     }
 
     @Test
