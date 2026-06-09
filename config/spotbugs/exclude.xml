@@ -89,6 +89,24 @@
     </Match>
 
     <!--
+      EI_EXPOSE_REP2 on the description sources and the shared rate limiter. Same rationale as the
+      service beans above: each holds Spring-managed singletons (the WebClient, the WikidataApi, the
+      Redis ProxyManager), never mutated after construction and shared by design.
+    -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.betterreads.common.ratelimit.DistributedRateLimiter"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.betterreads.integration.itunes.ItunesApi"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.betterreads.integration.wikipedia.WikipediaApi"/>
+    </Match>
+
+    <!--
       EI_EXPOSE_REP2 on the review service, its writer, and controller. Same rationale as the
       shelf beans above: each holds Spring-managed singleton repositories, the mapper, and the
       writer, none mutated after construction. A defensive copy is meaningless for these.
@@ -197,6 +215,10 @@
         <Bug pattern="CRLF_INJECTION_LOGS"/>
         <Class name="com.betterreads.catalog.service.pipeline.CatalogSearchService"/>
     </Match>
+    <Match>
+        <Bug pattern="CRLF_INJECTION_LOGS"/>
+        <Class name="com.betterreads.catalog.service.pipeline.DescriptionSelector"/>
+    </Match>
 
     <!--
       CRLF_INJECTION_LOGS on the shared upsert-retry warn. The shelf and review services build the
@@ -219,5 +241,21 @@
     <Match>
         <Bug pattern="IMPROPER_UNICODE"/>
         <Class name="com.betterreads.common.util.TextMatch"/>
+    </Match>
+
+    <!--
+      REDOS on the description-cleaning patterns. Every quantifier in these regexes is possessive
+      (++, *+), which by definition does no backtracking, so catastrophic backtracking is impossible.
+      FindSecBugs does not model possessive quantifiers and flags the nested character classes
+      anyway. The patterns only ever run over a bounded book description (capped well under 3 KB by
+      the quality check), so even a greedy form would be safe.
+    -->
+    <Match>
+        <Bug pattern="REDOS"/>
+        <Class name="com.betterreads.catalog.service.source.DescriptionCleaner"/>
+    </Match>
+    <Match>
+        <Bug pattern="REDOS"/>
+        <Class name="com.betterreads.catalog.service.source.DescriptionQuality"/>
     </Match>
 </FindBugsFilter>

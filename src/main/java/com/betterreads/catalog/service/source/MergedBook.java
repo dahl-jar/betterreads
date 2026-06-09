@@ -44,4 +44,12 @@ public record MergedBook(
     public MergedBook withBook(final SourceBook replacement) {
         return new MergedBook(replacement, fieldSources, subjectSources);
     }
+
+    /** Returns a copy with the book replaced and {@link BookField#DESCRIPTION} attributed to {@code source}. */
+    public MergedBook withDescription(final SourceBook replacement, final BookFieldSource source) {
+        final Map<BookField, BookFieldSource> updated = new EnumMap<>(BookField.class);
+        updated.putAll(fieldSources);
+        updated.put(BookField.DESCRIPTION, source);
+        return new MergedBook(replacement, updated, subjectSources);
+    }
 }

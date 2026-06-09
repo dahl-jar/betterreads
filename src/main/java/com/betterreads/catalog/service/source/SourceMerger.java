@@ -1,8 +1,7 @@
 package com.betterreads.catalog.service.source;
 
-import com.betterreads.catalog.service.pipeline.RequiredFieldsCheck;
-
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -94,7 +93,7 @@ public class SourceMerger {
         }
         final Resolved resolved = new Resolved(
             title,
-            pick(bySource, DESCRIPTION_CHAIN, SourceMerger::usableDescription, SourceBook::description),
+            pickBestDescription(bySource),
             pick(bySource, COVER_CHAIN, SourceMerger::usableText, SourceBook::coverUrl),
             resolveYear(seed, bySource),
             unionSubjects(bySource));
@@ -195,8 +194,27 @@ public class SourceMerger {
         return !value.isBlank();
     }
 
-    private static boolean usableDescription(final String value) {
-        return value.strip().length() >= RequiredFieldsCheck.MIN_DESCRIPTION_LENGTH;
+    /**
+     * Picks the highest-quality description across the chain and returns it cleaned of markup.
+     *
+     * <p>A source's raw description is assessed by {@link DescriptionQuality}; a dump, a stub, or
+     * boilerplate scores as unusable and is skipped. The chain is walked in priority order so a score
+     * tie breaks toward the higher-priority source.
+     */
+    private static @Nullable Winner<String> pickBestDescription(
+        final Map<BookFieldSource, SourceBook> bySource
+    ) {
+        return DESCRIPTION_CHAIN.stream()
+            .map(bySource::get)
+            .filter(book -> book != null && book.description() != null)
+            .map(book -> new Scored(book.source(), DescriptionQuality.assess(book.description())))
+            .filter(scored -> scored.assessment().usable())
+            .max(Comparator.comparingInt(scored -> scored.assessment().score()))
+            .map(scored -> new Winner<>(scored.assessment().cleaned(), scored.source()))
+            .orElse(null);
+    }
+
+    private record Scored(BookFieldSource source, DescriptionQuality.Assessment assessment) {
     }
 
     private static <T> boolean nonEmpty(final List<T> value) {

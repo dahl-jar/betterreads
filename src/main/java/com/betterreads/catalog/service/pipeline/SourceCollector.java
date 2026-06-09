@@ -55,15 +55,19 @@ public class SourceCollector {
 
     private final List<BookSourceClient> sourceClients;
 
+    private final DescriptionSelector descriptionSelector;
+
     private final Executor executor;
 
     public SourceCollector(
         final SourceMerger merger,
         final List<BookSourceClient> sourceClients,
+        final DescriptionSelector descriptionSelector,
         @Qualifier("sourceFetchExecutor") final Executor sourceFetchExecutor
     ) {
         this.merger = merger;
         this.sourceClients = order(sourceClients);
+        this.descriptionSelector = descriptionSelector;
         this.executor = sourceFetchExecutor;
     }
 
@@ -73,7 +77,8 @@ public class SourceCollector {
      * <p>Both waves always run, so the merge sees every source, including the enrichment fields the
      * show bar does not require (rating, awards, full genre, page count, author identity). The waves
      * order the fetches by latency, not by a stop condition: the fast show-field sources first, the
-     * slow ones after, each wave fetched concurrently.
+     * slow ones after, each wave fetched concurrently. The merge is then enriched with a stronger
+     * description from Wikipedia or Apple Books when one beats the merged sources'.
      */
     public MergedBook collectFor(final SourceBook seed) {
         final List<SourceBook> found = new ArrayList<>();
@@ -81,7 +86,7 @@ public class SourceCollector {
         for (final List<BookFieldSource> wave : WAVES) {
             found.addAll(fetchWave(wave, seed));
         }
-        return merger.merge(seed, found);
+        return descriptionSelector.withBestDescription(merger.merge(seed, found));
     }
 
     private List<SourceBook> fetchWave(final List<BookFieldSource> wave, final SourceBook seed) {
