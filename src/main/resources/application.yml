@@ -138,6 +138,9 @@ betterreads:
       poll-enabled: ${CATALOG_STAGING_POLL_ENABLED:true}
     refresh:
       enabled: ${CATALOG_REFRESH_ENABLED:true}
+    description-backfill:
+      enabled: ${CATALOG_DESCRIPTION_BACKFILL_ENABLED:true}
+      full-sweep: ${CATALOG_DESCRIPTION_FULL_SWEEP:false}
   cache:
     book-detail-ttl: ${BOOK_DETAIL_CACHE_TTL:PT24H}
 
@@ -168,6 +171,17 @@ wikidata:
   base-url: ${WIKIDATA_BASE_URL:https://www.wikidata.org}
   connect-timeout: ${WIKIDATA_CONNECT_TIMEOUT:5000}
   read-timeout: ${WIKIDATA_READ_TIMEOUT:10000}
+
+wikipedia:
+  base-url: ${WIKIPEDIA_BASE_URL:https://en.wikipedia.org}
+  connect-timeout: ${WIKIPEDIA_CONNECT_TIMEOUT:5000}
+  read-timeout: ${WIKIPEDIA_READ_TIMEOUT:10000}
+
+itunes:
+  base-url: ${ITUNES_BASE_URL:https://itunes.apple.com}
+  connect-timeout: ${ITUNES_CONNECT_TIMEOUT:5000}
+  read-timeout: ${ITUNES_READ_TIMEOUT:10000}
+  rate-per-minute: ${ITUNES_RATE_PER_MINUTE:12}
 
 meilisearch:
   host: ${MEILISEARCH_HOST:http://localhost:7700}

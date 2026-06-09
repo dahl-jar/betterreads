@@ -8,5 +8,7 @@ public enum BookFieldSource {
     GOOGLE_BOOKS,
     LOC,
     WIKIDATA,
-    HARDCOVER
+    HARDCOVER,
+    WIKIPEDIA,
+    ITUNES
 }

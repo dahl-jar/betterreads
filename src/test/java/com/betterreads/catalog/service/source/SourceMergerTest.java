@@ -251,8 +251,14 @@ class SourceMergerTest {
     }
 
     @Nested
-    @DisplayName("description floor")
+    @DisplayName("description quality")
     class Description {
+
+        private static final String BOLD = "***";
+
+        private static final String REAL_PROSE =
+            "A desert planet holds the universe's only source of the spice melange, and the boy "
+            + "Paul Atreides must master it to survive the war over Arrakis.";
 
         @Test
         @DisplayName("Google boilerplate under the floor yields to OpenLibrary's real prose")
@@ -263,14 +269,85 @@ class SourceMergerTest {
                 .build();
             final SourceBook openLibrary = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
                 .title(TITLE)
-                .description("A desert planet holds the universe's only source of the spice melange.")
+                .description(REAL_PROSE)
                 .build();
 
             final MergedBook merged = merger.merge(List.of(google, openLibrary));
 
             assertThat(merged.book().description())
-                .as("a description under the 20-char floor is skipped so the next source's prose is used")
+                .as("a stub is skipped so the next source's prose is used")
                 .startsWith("A desert planet");
+        }
+
+        @Test
+        @DisplayName("the higher-quality description wins over a lower-priority source's thinner one")
+        void higherQualityWinsOverChainOrder() {
+            final SourceBook google = SourceBook.builder(BookFieldSource.GOOGLE_BOOKS)
+                .title(TITLE)
+                .description("A short but passable blurb about a desert planet and its spice.")
+                .build();
+            final SourceBook openLibrary = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+                .title(TITLE)
+                .description(REAL_PROSE)
+                .build();
+
+            final MergedBook merged = merger.merge(List.of(google, openLibrary));
+
+            assertThat(merged.book().description())
+                .as("the best-scoring description wins")
+                .isEqualTo(REAL_PROSE);
+        }
+
+        @Test
+        @DisplayName("a quality tie breaks toward the higher-priority source in the chain")
+        void tieBreaksTowardHigherPrioritySource() {
+            final SourceBook google = SourceBook.builder(BookFieldSource.GOOGLE_BOOKS)
+                .title(TITLE)
+                .description(REAL_PROSE)
+                .build();
+            final SourceBook openLibrary = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+                .title(TITLE)
+                .description(REAL_PROSE)
+                .build();
+
+            final MergedBook merged = merger.merge(List.of(openLibrary, google));
+
+            assertThat(merged.provenanceOf(BookField.DESCRIPTION))
+                .as("Google outranks OpenLibrary in the description chain, so it wins an equal-quality tie")
+                .isEqualTo(BookFieldSource.GOOGLE_BOOKS);
+        }
+
+        @Test
+        @DisplayName("the stored description is stripped of Markdown markup")
+        void storedDescriptionIsCleaned() {
+            final SourceBook openLibrary = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+                .title(TITLE)
+                .description(BOLD + REAL_PROSE + BOLD)
+                .build();
+
+            final MergedBook merged = merger.merge(List.of(openLibrary));
+
+            assertThat(merged.book().description()).isEqualTo(REAL_PROSE);
+        }
+
+        @Test
+        @DisplayName("a catalog wiki dump is rejected so a clean source is used instead")
+        void wikiDumpYieldsToCleanSource() {
+            final SourceBook google = SourceBook.builder(BookFieldSource.GOOGLE_BOOKS)
+                .title(TITLE)
+                .description("Tolkien's epic ushered in a new age.\n\n**Contains**\n\n"
+                    + " - The Fellowship of the Ring\n - The Two Towers\n - The Return of the King")
+                .build();
+            final SourceBook openLibrary = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+                .title(TITLE)
+                .description(REAL_PROSE)
+                .build();
+
+            final MergedBook merged = merger.merge(List.of(google, openLibrary));
+
+            assertThat(merged.book().description())
+                .as("a heading-plus-bulleted-list dump is skipped for clean prose")
+                .isEqualTo(REAL_PROSE);
         }
     }
 

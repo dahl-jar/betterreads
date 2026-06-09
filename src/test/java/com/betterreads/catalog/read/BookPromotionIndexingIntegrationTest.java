@@ -6,6 +6,7 @@ import static org.awaitility.Awaitility.await;
 import com.betterreads.catalog.repository.BookRepository;
 import com.betterreads.catalog.repository.PendingBookRepository;
 import com.betterreads.catalog.service.source.BookFieldSource;
+import com.betterreads.catalog.service.pipeline.DescriptionSelector;
 import com.betterreads.catalog.service.pipeline.PendingBookService;
 import com.betterreads.catalog.service.source.SourceAuthor;
 import com.betterreads.catalog.service.source.SourceBook;
@@ -141,7 +142,7 @@ class BookPromotionIndexingIntegrationTest extends ContainerizedTest {
         @Bean
         @Primary
         SourceCollector noNetworkSourceCollector(final SourceMerger merger) {
-            return new SourceCollector(merger, List.of(), Runnable::run);
+            return new SourceCollector(merger, List.of(), new DescriptionSelector(List.of()), Runnable::run);
         }
     }
 }

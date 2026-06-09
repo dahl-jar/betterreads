@@ -63,7 +63,8 @@ class SourceCollectorTest {
             .averageRating(HARDCOVER_RATING)
             .build();
         final SourceCollector collector = new SourceCollector(new SourceMerger(),
-            List.of(stubByIsbn(BookFieldSource.HARDCOVER, ISBN, hardcoverHit)), SAME_THREAD);
+            List.of(stubByIsbn(BookFieldSource.HARDCOVER, ISBN, hardcoverHit)),
+            new DescriptionSelector(List.of()), SAME_THREAD);
 
         final MergedBook merged = collector.collectFor(seed);
 
@@ -86,7 +87,8 @@ class SourceCollectorTest {
             .awards(List.of(HUGO))
             .build();
         final SourceCollector collector = new SourceCollector(new SourceMerger(),
-            List.of(stubByTitleAuthor(TITLE, AUTHOR, wikidataHit)), SAME_THREAD);
+            List.of(stubByTitleAuthor(TITLE, AUTHOR, wikidataHit)),
+            new DescriptionSelector(List.of()), SAME_THREAD);
 
         final MergedBook merged = collector.collectFor(seed);
 
@@ -103,7 +105,8 @@ class SourceCollectorTest {
             .title(TITLE)
             .build();
         final SourceCollector collector = new SourceCollector(new SourceMerger(),
-            List.of(stubByIsbn(BookFieldSource.HARDCOVER, "other-isbn", null)), SAME_THREAD);
+            List.of(stubByIsbn(BookFieldSource.HARDCOVER, "other-isbn", null)),
+            new DescriptionSelector(List.of()), SAME_THREAD);
 
         final MergedBook merged = collector.collectFor(seed);
 
@@ -124,7 +127,8 @@ class SourceCollectorTest {
             .seriesPosition(YEAR)
             .build();
         final SourceCollector collector = new SourceCollector(new SourceMerger(),
-            List.of(failingByTitleAuthor(BookFieldSource.HARDCOVER)), SAME_THREAD);
+            List.of(failingByTitleAuthor(BookFieldSource.HARDCOVER)),
+            new DescriptionSelector(List.of()), SAME_THREAD);
 
         final MergedBook merged = collector.collectFor(seed);
 
@@ -153,7 +157,8 @@ class SourceCollectorTest {
             .awards(List.of(HUGO))
             .build();
         final SourceCollector collector = new SourceCollector(new SourceMerger(),
-            List.of(stubByTitleAuthor(BookFieldSource.WIKIDATA, TITLE, AUTHOR, wikidataHit)), SAME_THREAD);
+            List.of(stubByTitleAuthor(BookFieldSource.WIKIDATA, TITLE, AUTHOR, wikidataHit)),
+            new DescriptionSelector(List.of()), SAME_THREAD);
 
         final MergedBook merged = collector.collectFor(seed);
 
@@ -181,7 +186,8 @@ class SourceCollectorTest {
         final SourceCollector collector = new SourceCollector(new SourceMerger(),
             List.of(
                 stubByTitleAuthor(BookFieldSource.GOOGLE_BOOKS, TITLE, AUTHOR, googleHit),
-                stubByTitleAuthor(BookFieldSource.HARDCOVER, TITLE, AUTHOR, hardcoverHit)), SAME_THREAD);
+                stubByTitleAuthor(BookFieldSource.HARDCOVER, TITLE, AUTHOR, hardcoverHit)),
+            new DescriptionSelector(List.of()), SAME_THREAD);
 
         final MergedBook merged = collector.collectFor(seed);
 
@@ -207,7 +213,8 @@ class SourceCollectorTest {
         final SourceCollector collector = new SourceCollector(new SourceMerger(),
             List.of(
                 failingByIsbn(BookFieldSource.GOOGLE_BOOKS),
-                stubByIsbn(BookFieldSource.HARDCOVER, ISBN, hardcoverHit)), SAME_THREAD);
+                stubByIsbn(BookFieldSource.HARDCOVER, ISBN, hardcoverHit)),
+            new DescriptionSelector(List.of()), SAME_THREAD);
 
         final MergedBook merged = collector.collectFor(seed);
 
@@ -230,7 +237,8 @@ class SourceCollectorTest {
         final SourceCollector collector = new SourceCollector(new SourceMerger(),
             List.of(
                 throwingByIsbn(BookFieldSource.GOOGLE_BOOKS),
-                stubByIsbn(BookFieldSource.HARDCOVER, ISBN, hardcoverHit)), SAME_THREAD);
+                stubByIsbn(BookFieldSource.HARDCOVER, ISBN, hardcoverHit)),
+            new DescriptionSelector(List.of()), SAME_THREAD);
 
         final MergedBook merged = collector.collectFor(seed);
 

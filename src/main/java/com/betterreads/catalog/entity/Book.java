@@ -132,6 +132,10 @@ public class Book {
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
 
+    @Nullable
+    @Column(name = "description_checked_at")
+    private OffsetDateTime descriptionCheckedAt;
+
     @ManyToMany
     @JoinTable(
         name = "book_author",
