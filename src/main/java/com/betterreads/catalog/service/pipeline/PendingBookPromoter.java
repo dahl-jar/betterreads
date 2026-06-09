@@ -1,5 +1,8 @@
 package com.betterreads.catalog.service.pipeline;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+
 import com.betterreads.catalog.service.read.CatalogService;
 import com.betterreads.catalog.service.source.MergedBook;
 
@@ -26,6 +29,12 @@ public class PendingBookPromoter {
 
     private static final String STATUS_PROMOTED = "PROMOTED";
 
+    private static final String STATUS_DUPLICATE = "DUPLICATE";
+
+    private static final String STATUS_INCOMPLETE_FINAL = "INCOMPLETE_FINAL";
+
+    static final int MAX_ATTEMPTS = 30;
+
     private final PendingBookRepository pendingBooks;
 
     private final CatalogService catalogService;
@@ -50,6 +59,15 @@ public class PendingBookPromoter {
         this.events = events;
     }
 
+    /** Marks the candidate a duplicate of an existing row, ending its promotion retries. */
+    @Transactional
+    public void markDuplicate(final String dedupKey) {
+        pendingBooks.findByDedupKey(dedupKey).ifPresent(row -> {
+            row.setStatus(STATUS_DUPLICATE);
+            pendingBooks.save(row);
+        });
+    }
+
     /** Re-applies the collected merge to the candidate and promotes it when it is ready to show. */
     @Transactional
     public void promote(final String dedupKey, final MergedBook collected) {
@@ -65,7 +83,16 @@ public class PendingBookPromoter {
             events.publishEvent(new BookPromotedEvent(promoted.getDedupKey()));
         } else {
             row.setMissingFields(mapper.join(missing.missing()));
+            recordAttempt(row);
         }
         pendingBooks.save(row);
+    }
+
+    private static void recordAttempt(final PendingBook row) {
+        row.setAttemptCount(row.getAttemptCount() + 1);
+        row.setLastAttemptAt(OffsetDateTime.now(ZoneOffset.UTC));
+        if (row.getAttemptCount() >= MAX_ATTEMPTS) {
+            row.setStatus(STATUS_INCOMPLETE_FINAL);
+        }
     }
 }

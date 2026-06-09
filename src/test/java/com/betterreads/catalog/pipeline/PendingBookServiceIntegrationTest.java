@@ -89,9 +89,24 @@ class PendingBookServiceIntegrationTest extends ContainerizedTest {
 
     private static final String GENRE = "science fiction";
 
+    private static final String COVER_URL = "https://covers.openlibrary.org/b/id/1-L.jpg";
+
+    private static final String DESCRIPTION =
+        "A desert planet holds the universe's only source of the spice melange.";
+
+    private static final String SECOND_EDITION_ISBN = "9780345298591";
+
+    private static final String SEQUEL_ISBN = "9780441172696";
+
+    private static final String SEQUEL_TITLE = "Dune Messiah";
+
     private static final String STATUS_PENDING = "PENDING";
 
     private static final String STATUS_PROMOTED = "PROMOTED";
+
+    private static final String STATUS_DUPLICATE = "DUPLICATE";
+
+    private static final String STATUS_INCOMPLETE_FINAL = "INCOMPLETE_FINAL";
 
     private static final int STAGING_THREADS = 4;
 
@@ -327,6 +342,57 @@ class PendingBookServiceIntegrationTest extends ContainerizedTest {
     }
 
     @Test
+    @DisplayName("a candidate colliding with a promoted work is retired and the poll reaches the rest")
+    void collidingCandidateIsRetiredAndPollContinues() {
+        pendingBookService.stage(merger.merge(List.of(completeDune())));
+        pendingBookService.promoteReady();
+        pendingBookService.stage(merger.merge(List.of(secondEditionDune())));
+        pendingBookService.stage(merger.merge(List.of(duneMessiah())));
+        OPEN_LIBRARY_RESPONSE.set(openLibrarySecondEditionResolvingDunesWork());
+
+        pendingBookService.promoteReady();
+
+        assertThat(pendingBooks.findByDedupKey(SECOND_EDITION_ISBN))
+            .as("the second edition resolves a work key another row owns; no retry changes that")
+            .get()
+            .satisfies(row -> assertThat(row.getStatus()).isEqualTo(STATUS_DUPLICATE));
+        assertThat(books.findByDedupKey(SEQUEL_ISBN))
+            .as("the candidate behind the colliding one must still be promoted")
+            .isPresent();
+    }
+
+    @Test
+    @DisplayName("an attempted candidate is not collected again until the retry window passes")
+    void attemptedCandidateWaitsForTheRetryWindow() {
+        pendingBookService.stage(merger.merge(List.of(sparseDune())));
+        pendingBookService.promoteReady();
+
+        OPEN_LIBRARY_RESPONSE.set(openLibraryCompleteDune());
+        pendingBookService.promoteReady();
+
+        assertThat(pendingBooks.findByIsbn13(ISBN))
+            .as("the candidate was attempted moments ago, so the poll must skip it this cycle")
+            .get()
+            .satisfies(row -> assertThat(row.getStatus()).isEqualTo(STATUS_PENDING));
+    }
+
+    @Test
+    @DisplayName("re-staging a retired candidate revives it for promotion")
+    void restagingRevivesRetiredCandidate() {
+        pendingBookService.stage(merger.merge(List.of(sparseDune())));
+        final PendingBook retired = pendingBooks.findByIsbn13(ISBN).orElseThrow();
+        retired.setStatus(STATUS_INCOMPLETE_FINAL);
+        pendingBooks.save(retired);
+
+        pendingBookService.stage(merger.merge(List.of(completeDune())));
+        pendingBookService.promoteReady();
+
+        assertThat(books.findByOpenLibraryWorkKey(OL_KEY))
+            .as("a re-discovered candidate must rejoin the poll and promote")
+            .isPresent();
+    }
+
+    @Test
     @DisplayName("an upsert without authors keeps the stored authors")
     void upsertWithoutAuthorsKeepsStoredAuthors() {
         catalogService.upsertFromSource(completeDune());
@@ -390,6 +456,49 @@ class PendingBookServiceIntegrationTest extends ContainerizedTest {
             .build();
     }
 
+    private static SourceBook openLibraryCompleteDune() {
+        return SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+            .isbn13(ISBN)
+            .title(TITLE)
+            .authors(SourceAuthor.ofNames(List.of(AUTHOR)))
+            .coverUrl(COVER_URL)
+            .description(DESCRIPTION)
+            .publicationYear(YEAR)
+            .build();
+    }
+
+    private static SourceBook secondEditionDune() {
+        return SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+            .isbn13(SECOND_EDITION_ISBN)
+            .title(TITLE)
+            .authors(SourceAuthor.ofNames(List.of(AUTHOR)))
+            .coverUrl("https://covers.openlibrary.org/b/id/2-L.jpg")
+            .description(DESCRIPTION)
+            .publicationYear(YEAR)
+            .build();
+    }
+
+    private static SourceBook openLibrarySecondEditionResolvingDunesWork() {
+        return SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+            .isbn13(SECOND_EDITION_ISBN)
+            .openLibraryWorkKey(OL_KEY)
+            .title(TITLE)
+            .authors(SourceAuthor.ofNames(List.of(AUTHOR)))
+            .build();
+    }
+
+    private static SourceBook duneMessiah() {
+        return SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+            .isbn13(SEQUEL_ISBN)
+            .title(SEQUEL_TITLE)
+            .authors(SourceAuthor.ofNames(List.of(AUTHOR)))
+            .coverUrl("https://covers.openlibrary.org/b/id/3-L.jpg")
+            .description("Twelve years after his victory, Paul Atreides rules as emperor of the known universe.")
+            .publicationYear(YEAR)
+            .rawSubjects(List.of(GENRE))
+            .build();
+    }
+
     private static SourceBook hardcoverDune() {
         return SourceBook.builder(BookFieldSource.HARDCOVER)
             .isbn13(ISBN)
@@ -418,8 +527,8 @@ class PendingBookServiceIntegrationTest extends ContainerizedTest {
             .openLibraryWorkKey(OL_KEY)
             .title(TITLE)
             .authors(SourceAuthor.ofNames(List.of(authorNames)))
-            .coverUrl("https://covers.openlibrary.org/b/id/1-L.jpg")
-            .description("A desert planet holds the universe's only source of the spice melange.")
+            .coverUrl(COVER_URL)
+            .description(DESCRIPTION)
             .publicationYear(YEAR)
             .rawSubjects(List.of(GENRE))
             .build();
@@ -480,7 +589,7 @@ class PendingBookServiceIntegrationTest extends ContainerizedTest {
                 throw WebClientResponseException.create(
                     HTTP_SERVER_ERROR, "Service Unavailable", HttpHeaders.EMPTY, new byte[0], null);
             }
-            return ISBN.equals(isbn) ? Optional.of(book) : Optional.empty();
+            return isbn.equals(book.isbn13()) ? Optional.of(book) : Optional.empty();
         }
 
         @Override
