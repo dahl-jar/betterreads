@@ -451,6 +451,79 @@ class SourceMergerTest {
     }
 
     @Nested
+    @DisplayName("staged seed fallback")
+    class StagedSeed {
+
+        private static final String AUTHOR = "Frank Herbert";
+
+        private static final String STALE_AUTHOR = "Valka";
+
+        private static final String COMICS = "comics";
+
+        @Test
+        @DisplayName("a live source's authors win over the staged ones")
+        void liveAuthorsWinOverStaged() {
+            final SourceBook staged = stagedDune();
+            final SourceBook openLibrary = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+                .title(TITLE)
+                .authors(SourceAuthor.ofNames(List.of(AUTHOR)))
+                .build();
+
+            final MergedBook merged = merger.merge(staged, List.of(staged, openLibrary));
+
+            assertThat(merged.book().authors())
+                .as("OpenLibrary resolved, so the staged author list yields to it")
+                .extracting(SourceAuthor::name)
+                .containsExactly(AUTHOR);
+        }
+
+        @Test
+        @DisplayName("a merge where only the staged seed resolves keeps everything but the series")
+        void stagedOnlyMergeKeepsEverythingButSeries() {
+            final SourceBook staged = stagedDune();
+
+            final MergedBook merged = merger.merge(staged, List.of(staged));
+
+            assertThat(merged.book()).satisfies(book -> {
+                assertThat(book.title()).isEqualTo(TITLE);
+                assertThat(book.authors())
+                    .extracting(SourceAuthor::name)
+                    .containsExactly(AUTHOR, STALE_AUTHOR);
+                assertThat(book.rawSubjects()).containsExactly(COMICS);
+                assertThat(book.seriesName())
+                    .as("a stored series is never its own authority, so the staged tag is dropped")
+                    .isNull();
+            });
+        }
+
+        @Test
+        @DisplayName("staged subjects yield to a live source's subjects")
+        void stagedSubjectsYieldToLiveSubjects() {
+            final SourceBook staged = stagedDune();
+            final SourceBook openLibrary = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+                .title(TITLE)
+                .rawSubjects(List.of(SCIENCE_FICTION))
+                .build();
+
+            final MergedBook merged = merger.merge(staged, List.of(staged, openLibrary));
+
+            assertThat(merged.book().rawSubjects())
+                .as("a live source carries subjects, so the staged ones are not unioned in")
+                .containsExactly(SCIENCE_FICTION);
+        }
+
+        private static SourceBook stagedDune() {
+            return SourceBook.builder(BookFieldSource.STAGED)
+                .title(TITLE)
+                .authors(SourceAuthor.ofNames(List.of(AUTHOR, STALE_AUTHOR)))
+                .rawSubjects(List.of(COMICS))
+                .seriesName(SERIES)
+                .seriesPosition(WIKIDATA_VOLUME)
+                .build();
+        }
+    }
+
+    @Nested
     @DisplayName("provenance and identity")
     class Provenance {
 

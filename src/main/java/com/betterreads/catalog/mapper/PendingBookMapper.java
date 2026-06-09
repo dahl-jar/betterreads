@@ -61,12 +61,17 @@ public class PendingBookMapper {
         row.setSubjectsSources(joinSources(merged.subjectSources()));
     }
 
-    /** Rebuilds a {@link SourceBook} from the row for the required-field check and promotion. */
+    /**
+     * Rebuilds a {@link SourceBook} from the row for the required-field check and promotion.
+     *
+     * <p>The book is stamped {@code STAGED}, so a collect fetches every live source and the stored
+     * values yield to fresh ones instead of standing in for a real source.
+     */
     public SourceBook toSourceBook(final PendingBook row) {
         final List<String> subjects = splitField(row.getSubjects(), Function.identity());
         final List<String> awards = splitField(row.getAwards(), Function.identity());
         final List<SourceAuthor> authors = splitField(row.getAuthors(), SourceAuthor::ofName);
-        return SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+        return SourceBook.builder(BookFieldSource.STAGED)
             .isbn13(row.getIsbn13())
             .openLibraryWorkKey(row.getOpenLibraryWorkKey())
             .googleBooksVolumeId(row.getGoogleBooksVolumeId())

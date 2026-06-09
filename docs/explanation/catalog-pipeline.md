@@ -38,6 +38,8 @@ Each field has its own source list. The first source on the list with a value fo
 
 The year has one exception. When a book is found through a discovery seed (a Hardcover series or author hit) that has a year, the seed's year wins, because the other sources look the book up by title or ISBN and can land on a reprint.
 
+A book collected again after staging brings its stored values along as a last resort: they sit at the end of every list, so any live answer replaces them, and a collect where every source is down keeps the book whole instead of dropping fields. Stored subjects count only when no live source carries any. The rating is restored separately when Hardcover misses, and a stored series is never reused, so a wrong series label clears on the next live answer.
+
 ## Flow
 
 A book enters from a search that found no local match, or from the daily new-release job. Either way it starts as a seed `SourceBook` from one source. The seed then goes through:
