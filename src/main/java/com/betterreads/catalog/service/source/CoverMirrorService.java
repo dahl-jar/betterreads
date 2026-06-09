@@ -17,15 +17,12 @@ import org.springframework.web.reactive.function.client.WebClientException;
  *
  * <p>The fetched bytes are re-encoded to a clean JPEG by {@link CoverImageProcessor}, which rejects
  * anything that is not a decodable image, so an HTML error page or a disguised payload is dropped
- * rather than served later as a cover. An oversized download is rejected before decoding. An
- * already-stored cover is left in place. A fetch, decode, or storage failure leaves the book
- * un-mirrored and returns empty without throwing, so the read path keeps falling back to the
- * external URL.
+ * rather than served later as a cover. An already-stored cover is left in place. A fetch, decode,
+ * or storage failure leaves the book un-mirrored and returns empty without throwing, so the read
+ * path keeps falling back to the external URL.
  */
 @Service
 public class CoverMirrorService {
-
-    static final int MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
     private static final Logger LOG = LoggerFactory.getLogger(CoverMirrorService.class);
 
@@ -64,7 +61,6 @@ public class CoverMirrorService {
                 return Optional.of(key);
             }
             return fetcher.fetch(coverUrl)
-                .filter(CoverMirrorService::withinSizeCap)
                 .flatMap(image -> processor.toCleanJpeg(image.bytes()))
                 .map(jpeg -> storeJpeg(key, jpeg));
         } catch (WebClientException | ImageStoreException ex) {
@@ -77,10 +73,5 @@ public class CoverMirrorService {
     private String storeJpeg(final String key, final byte[] jpeg) {
         store.put(key, jpeg, MediaType.IMAGE_JPEG_VALUE);
         return key;
-    }
-
-    private static boolean withinSizeCap(final FetchedImage image) {
-        final int length = image.bytes().length;
-        return length > 0 && length <= MAX_IMAGE_BYTES;
     }
 }
