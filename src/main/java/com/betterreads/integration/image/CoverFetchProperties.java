@@ -10,10 +10,12 @@ import org.springframework.validation.annotation.Validated;
  *
  * @param connectTimeout TCP connect timeout in milliseconds
  * @param readTimeout per-response read timeout in milliseconds
+ * @param maxBytes largest accepted cover body in bytes; a larger download resolves to no cover
  */
 @Validated
 @ConfigurationProperties(prefix = "cover-fetch")
 public record CoverFetchProperties(
     @Positive int connectTimeout,
-    @Positive int readTimeout
+    @Positive int readTimeout,
+    @Positive int maxBytes
 ) { }
