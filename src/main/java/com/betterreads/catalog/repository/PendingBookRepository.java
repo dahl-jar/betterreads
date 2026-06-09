@@ -1,5 +1,6 @@
 package com.betterreads.catalog.repository;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -37,6 +38,8 @@ public interface PendingBookRepository extends JpaRepository<PendingBook, Long> 
 
     Optional<PendingBook> findByWikidataQid(String wikidataQid);
 
-    /** Returns candidates in the given status, oldest first, for the promotion poll. */
-    List<PendingBook> findByStatusOrderByFirstSeenAtAsc(String status);
+    /** Returns PENDING candidates not attempted since {@code cutoff}, oldest first, for the poll. */
+    @Query("SELECT p FROM PendingBook p WHERE p.status = 'PENDING' "
+        + "AND (p.lastAttemptAt IS NULL OR p.lastAttemptAt < :cutoff) ORDER BY p.firstSeenAt ASC")
+    List<PendingBook> findPendingNotAttemptedSince(@Param("cutoff") OffsetDateTime cutoff);
 }

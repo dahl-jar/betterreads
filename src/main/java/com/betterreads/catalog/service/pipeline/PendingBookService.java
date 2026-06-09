@@ -3,11 +3,18 @@ package com.betterreads.catalog.service.pipeline;
 import com.betterreads.catalog.service.source.MergedBook;
 import com.betterreads.catalog.service.source.SourceBook;
 
+import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import com.betterreads.catalog.entity.PendingBook;
 import com.betterreads.catalog.mapper.PendingBookMapper;
 import com.betterreads.catalog.repository.PendingBookRepository;
+import com.betterreads.common.util.LogSanitizer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,7 +31,13 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class PendingBookService {
 
+    private static final Logger LOG = LoggerFactory.getLogger(PendingBookService.class);
+
     private static final String STATUS_PENDING = "PENDING";
+
+    private static final String STATUS_INCOMPLETE_FINAL = "INCOMPLETE_FINAL";
+
+    private static final Duration RETRY_INTERVAL = Duration.ofHours(24);
 
     private final PendingBookRepository pendingBooks;
 
@@ -62,7 +75,15 @@ public class PendingBookService {
         final PendingBook row = pendingBooks.findByDedupKey(dedupKey).orElseThrow(
             () -> new IllegalStateException("reserved pending row vanished for dedupKey=" + dedupKey));
         mapper.applyTo(row, merged);
+        reviveIfRetired(row);
         pendingBooks.save(row);
+    }
+
+    private static void reviveIfRetired(final PendingBook row) {
+        if (STATUS_INCOMPLETE_FINAL.equals(row.getStatus())) {
+            row.setStatus(STATUS_PENDING);
+            row.setAttemptCount(0);
+        }
     }
 
     /**
@@ -90,19 +111,38 @@ public class PendingBookService {
     }
 
     private List<String> pendingKeys() {
-        return pendingBooks.findByStatusOrderByFirstSeenAtAsc(STATUS_PENDING).stream()
+        final OffsetDateTime cutoff = OffsetDateTime.now(ZoneOffset.UTC).minus(RETRY_INTERVAL);
+        return pendingBooks.findPendingNotAttemptedSince(cutoff).stream()
             .map(PendingBook::getDedupKey)
             .toList();
     }
 
+    /**
+     * Collects and promotes one candidate, absorbing its failure so the poll reaches the rest.
+     *
+     * <p>An integrity violation means the candidate resolves a source id another row already owns,
+     * which no retry changes, so it is retired as a duplicate. Any other failure leaves the
+     * candidate PENDING for the next poll.
+     */
+    // Checkstyle.IllegalCatch + PMD.AvoidCatchingGenericException: one candidate must not stop the poll
+    @SuppressWarnings({"checkstyle:IllegalCatch", "PMD.AvoidCatchingGenericException"})
     private void collectAndPromote(final String dedupKey) {
         final PendingBook row = pendingBooks.findByDedupKey(dedupKey).orElse(null);
         if (row == null) {
             return;
         }
-        final SourceBook staged = mapper.toSourceBook(row);
-        final MergedBook collected = sourceCollector.collectFor(staged);
-        promoter.promote(dedupKey, keepStagedRating(collected, staged));
+        try {
+            final SourceBook staged = mapper.toSourceBook(row);
+            final MergedBook collected = sourceCollector.collectFor(staged);
+            promoter.promote(dedupKey, keepStagedRating(collected, staged));
+        } catch (DataIntegrityViolationException collision) {
+            LOG.warn("catalog.staging candidate duplicates an existing row, retired dedupKey={}",
+                LogSanitizer.forLog(dedupKey));
+            promoter.markDuplicate(dedupKey);
+        } catch (RuntimeException ex) {
+            LOG.warn("catalog.staging promotion failed, candidate retries next poll dedupKey={} ({})",
+                LogSanitizer.forLog(dedupKey), ex.getClass().getSimpleName());
+        }
     }
 
     /**
