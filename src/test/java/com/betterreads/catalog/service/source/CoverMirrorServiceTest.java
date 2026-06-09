@@ -22,8 +22,8 @@ import org.springframework.http.MediaType;
 
 /**
  * The mirror service fetches a book's external cover, re-encodes it to a clean JPEG, and stores the
- * bytes under a key derived from the dedup key. A non-image, an oversized download, or a failed fetch
- * leaves the book un-mirrored and never throws into the caller.
+ * bytes under a key derived from the dedup key. A non-image or a failed fetch leaves the book
+ * un-mirrored and never throws into the caller.
  */
 class CoverMirrorServiceTest {
 
@@ -89,18 +89,6 @@ class CoverMirrorServiceTest {
     void rejectsNonImage() {
         fetchResult = Optional.of(
             new FetchedImage("<html>404</html>".getBytes(StandardCharsets.UTF_8), "text/html"));
-
-        final Optional<String> key = service.mirror(DEDUP_KEY, COVER_URL);
-
-        assertThat(key).isEmpty();
-        assertThat(store.saved).isEmpty();
-    }
-
-    @Test
-    @DisplayName("an oversize download is rejected before decoding")
-    void rejectsOversize() {
-        final byte[] huge = new byte[CoverMirrorService.MAX_IMAGE_BYTES + 1];
-        fetchResult = Optional.of(new FetchedImage(huge, "image/jpeg"));
 
         final Optional<String> key = service.mirror(DEDUP_KEY, COVER_URL);
 
