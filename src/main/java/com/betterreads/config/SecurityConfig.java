@@ -70,7 +70,8 @@ public final class SecurityConfig {
         "/api/v1/search/**",
         "/api/v1/books/**",
         "/api/v1/reviews/**",
-        "/api/v1/comments/**"
+        "/api/v1/comments/**",
+        "/api/v1/images/**"
     };
 
     private static final String[] PUBLIC_PATHS = {
@@ -105,12 +106,11 @@ public final class SecurityConfig {
     }
 
     /**
-     * Filter chain for the actuator endpoints, matched on port 8081.
+     * Filter chain for the actuator endpoints on the management port.
      *
      * <p>Requires a Cloudflare Access JWT when a decoder is configured; otherwise {@code permitAll}.
-     * {@code /actuator/prometheus} and {@code /actuator/health} skip the JWT check because port 8081
-     * is not exposed through the tunnel, so only on-VM processes (Alloy, the systemd healthcheck)
-     * can reach them.
+     * {@code /actuator/prometheus} and {@code /actuator/health} skip the JWT check because the
+     * management port is not publicly reachable.
      */
     @Bean
     @Order(0)

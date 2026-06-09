@@ -20,7 +20,7 @@ Full-text search over the catalog, backed by Meilisearch. `q` is required, `offs
       "authors": ["Frank Herbert"],
       "subjects": ["Fiction", "Science fiction"],
       "language": "en",
-      "coverUrl": "https://covers.openlibrary.org/b/id/12345-L.jpg",
+      "coverUrl": "https://api.betterreadsapp.com/api/v1/images/covers/9780441172719",
       "publicationYear": 1965,
       "popularityScore": 4.21
     }
@@ -47,7 +47,7 @@ Returns one book. `key` is a source identifier shared with search results (`book
   "subtitle": null,
   "authors": ["Frank Herbert"],
   "description": "...",
-  "coverUrl": "https://covers.openlibrary.org/b/id/12345-L.jpg",
+  "coverUrl": "https://api.betterreadsapp.com/api/v1/images/covers/9780441172719",
   "firstPublishYear": 1965,
   "isbn": "9780441172719",
   "pageCount": 412,
@@ -67,14 +67,50 @@ Returns one book. `key` is a source identifier shared with search results (`book
 
 Server-sent events for the same book. A complete book sends one `book-updated` event with the full detail and closes. A seed keeps the stream open until enrichment promotes the book, then sends the filled-in detail as a single `book-updated` event and closes.
 
+## Cover image
+
+`GET /api/v1/images/covers/{key}`
+
+Returns the book's cover image bytes. `key` is the same book key. The image is served from object storage; the first request for an unstored cover downloads the source image, re-encodes it to a size-capped JPEG, stores it, and returns it. Responds with a long-lived `Cache-Control` and an `ETag`, so a matching `If-None-Match` gets 304. Returns 404 when the book has no cover. The book detail and search `coverUrl` point at this endpoint.
+
+## Reviews and community rating
+
+A reader has at most one review per book. Reviews are public reads; writing one needs auth.
+
+- `GET /api/v1/books/{key}/reviews`: a page of reviews for the book.
+- `PUT /api/v1/books/{key}/reviews/me`: create or replace the caller's review (rating 1-5, optional text).
+- `DELETE /api/v1/books/{key}/reviews/me`: remove the caller's review.
+- `GET /api/v1/me/reviews`: the caller's own reviews across books.
+- `GET /api/v1/books/{key}/community-rating`: the BetterReads community average, count, and per-star distribution.
+
+The community rating is the average of BetterReads reviews. The source rating (`averageRating`/`ratingCount` on book detail) comes from the external catalogs and is a separate number; a review never changes it. A review write recomputes the community average in the same transaction.
+
+## Comments
+
+Comments thread under a review, with one level of replies.
+
+- `POST /api/v1/books/{key}/comments` and `GET /api/v1/books/{key}/comments`: book-level comments.
+- `POST /api/v1/reviews/{reviewId}/comments` and `GET /api/v1/reviews/{reviewId}/comments`: comments on a review.
+- `GET /api/v1/comments/{commentId}/replies`: replies to a comment.
+- `DELETE /api/v1/comments/{commentId}`: remove the caller's comment.
+
+## Bookshelf
+
+A reader's shelf is their per-book reading state. All shelf endpoints need auth and live under `/api/v1/me/books`.
+
+- `PUT /api/v1/me/books/{key}/status`: set reading status (want to read, currently reading, finished, dropped). Adds the book to the shelf if absent.
+- `PUT /api/v1/me/books/{key}/favorite`: mark or unmark a favorite.
+- `PATCH /api/v1/me/books/{key}`: update shelf fields (notes, start and finish dates).
+- `DELETE /api/v1/me/books/{key}`: remove the book from the shelf.
+
 ## Auth
 
-All auth endpoints live under `/api/v1/auth`. Access tokens are HS256 JWTs with a 2-hour lifetime, returned in the JSON body and sent on later requests as `Authorization: Bearer`. Refresh tokens are opaque and travel only in the `br_refresh` cookie: `HttpOnly`, `Secure`, scoped to `/api/v1/auth`, with a 30-day lifetime. Each successful refresh rotates the cookie value and invalidates the previous one. Replaying an already-rotated refresh token revokes every active token for that user.
+All auth endpoints live under `/api/v1/auth`. A short-lived access token is returned in the JSON body and sent on later requests as `Authorization: Bearer`. A refresh token travels only in the `br_refresh` cookie (`HttpOnly`, `Secure`). Each refresh rotates the cookie and invalidates the previous one; replaying a rotated refresh token revokes the account's active tokens.
 
-`register` and `login` (both POST, no auth) create the session and set the cookie. `refresh` and `logout` (POST, `br_refresh` cookie, no body) rotate the cookie or clear it. `GET /me` returns the current user from the access JWT; `DELETE /me` deletes the account.
+`register` and `login` (both POST, no auth) create the session and set the cookie. `refresh` and `logout` (POST, cookie, no body) rotate the cookie or clear it. `GET /me` returns the current user; `DELETE /me` deletes the account.
 
-`forgot-password` (POST, no auth) returns 204 whether or not the email matches an account. When the email matches, an outbox row is queued and a worker delivers the reset link. `reset-password` consumes the token, replaces the password, and revokes every refresh token for the account. Reset tokens are single-use and expire after 15 minutes; the same 400 covers unknown, expired, and already-consumed tokens.
+`forgot-password` and `resend-verification` (POST, no auth) respond the same for any email, matched or not. When the email matches, the mail is queued and delivered by the outbox worker.
 
-`register` enqueues a verification mail in the same transaction as the user insert, and the response carries `emailVerified: false` until the link is clicked. `verify-email` consumes the token and sets `email_verified_at`; replaying the same successful token returns 204. A token superseded by a later `resend-verification` returns 400, and the account stays unverified until the new link is clicked. Verification tokens are single-use and expire after 24 hours; the same 400 covers unknown, expired, and superseded tokens. `resend-verification` returns 204 for unknown emails, already-verified accounts, and the success case alike.
+`reset-password` and `verify-email` consume a single-use, time-limited token. An unknown, expired, consumed, or superseded token all return the same error.
 
-`DELETE /me` soft-deletes the authenticated user, revokes every active refresh token, marks any outstanding password-reset and verification tokens consumed, and clears the `br_refresh` cookie. The response is 204. The row stays in `app_user` during a 30-day grace window, holding the email and username slots; after that an hourly scheduled sweep removes the row and Postgres foreign keys cascade to the user-scoped tables. Once the soft-delete commits, `GET /me` and `POST /refresh` return 401, login with the same credentials returns 401, and `forgot-password` for the same address enqueues no mail. A second `DELETE /me` from the same access JWT also returns 204. The access JWT stays valid until natural expiry; with every refresh token revoked, no fresh access token can be issued.
+`DELETE /me` soft-deletes the account, revokes its active tokens, voids any outstanding reset and verification tokens, and clears the cookie. The row holds the email and username slots through a grace window, then a scheduled sweep removes it and the user-scoped tables cascade. After deletion, authenticated reads and refresh fail, and `forgot-password` for the address queues no mail.

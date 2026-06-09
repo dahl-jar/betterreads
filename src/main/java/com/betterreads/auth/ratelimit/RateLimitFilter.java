@@ -63,7 +63,7 @@ public final class RateLimitFilter extends OncePerRequestFilter {
     private static final String BOOK_DETAIL_PREFIX = "/api/v1/books/";
 
     private static final List<String> PUBLIC_READ_PREFIXES = List.of(
-        BOOK_DETAIL_PREFIX, "/api/v1/reviews/", "/api/v1/comments/");
+        BOOK_DETAIL_PREFIX, "/api/v1/reviews/", "/api/v1/comments/", "/api/v1/images/");
 
     private static final String EVENT_STREAM_SUFFIX = "/events";
 

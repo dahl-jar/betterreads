@@ -10,15 +10,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.betterreads.catalog.repository.BookRepository;
 import com.betterreads.catalog.repository.PendingBookRepository;
 import com.betterreads.catalog.service.source.BookFieldSource;
+import com.betterreads.catalog.service.source.BookSourceClient;
 import com.betterreads.catalog.service.source.MergedBook;
 import com.betterreads.catalog.service.pipeline.DescriptionSelector;
 import com.betterreads.catalog.service.pipeline.PendingBookService;
@@ -26,6 +29,9 @@ import com.betterreads.catalog.service.source.SourceAuthor;
 import com.betterreads.catalog.service.source.SourceBook;
 import com.betterreads.catalog.service.pipeline.SourceCollector;
 import com.betterreads.catalog.service.source.SourceMerger;
+import org.jspecify.annotations.Nullable;
+import org.springframework.http.HttpHeaders;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -44,6 +50,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * a candidate with every required field is promoted into {@code book}; an incomplete one stays
  * staged and never reaches {@code book}.
  */
+// PMD.TooManyMethods, PMD.ExcessiveImports: a staging and promotion suite with a controllable source stub.
+@SuppressWarnings({"PMD.TooManyMethods", "PMD.ExcessiveImports"})
 @SpringBootTest
 @Testcontainers
 @TestPropertySource(properties = {
@@ -76,6 +84,11 @@ class PendingBookServiceIntegrationTest extends ContainerizedTest {
 
     private static final int STAGING_THREADS = 4;
 
+    private static final int HTTP_SERVER_ERROR = 503;
+
+    private static final AtomicReference<@Nullable SourceBook> HARDCOVER_RESPONSE =
+        new AtomicReference<>();
+
     @Autowired
     private PendingBookService pendingBookService;
 
@@ -88,10 +101,14 @@ class PendingBookServiceIntegrationTest extends ContainerizedTest {
     @Autowired
     private BookRepository books;
 
+    @Autowired
+    private SourceCollector sourceCollector;
+
     @BeforeEach
     void clearCatalog() {
         pendingBooks.deleteAll();
         books.deleteAll();
+        HARDCOVER_RESPONSE.set(null);
     }
 
     @Test
@@ -197,14 +214,15 @@ class PendingBookServiceIntegrationTest extends ContainerizedTest {
     }
 
     @Test
-    @DisplayName("promotion keeps the Hardcover series and rating the candidate was staged with")
-    void promotionKeepsSeriesAndRating() {
-        pendingBookService.stage(merger.merge(List.of(completeDune(), hardcoverDune())));
+    @DisplayName("promotion takes the series and rating from the Hardcover source the collect fetches")
+    void promotionTakesSeriesAndRatingFromHardcover() {
+        HARDCOVER_RESPONSE.set(hardcoverDune());
+        pendingBookService.stage(merger.merge(List.of(completeDune())));
 
         pendingBookService.promoteReady();
 
         assertThat(books.findByOpenLibraryWorkKey(OL_KEY))
-            .as("the staged series and rating must survive promotion into book")
+            .as("Hardcover supplies the series and rating on the collect, so they reach the book")
             .get()
             .satisfies(book -> {
                 assertThat(book.getSeriesName()).isEqualTo(TITLE);
@@ -213,12 +231,68 @@ class PendingBookServiceIntegrationTest extends ContainerizedTest {
             });
     }
 
+    @Test
+    @DisplayName("re-promotion clears a stale series when the Hardcover source now reports none")
+    void rePromotionClearsStaleSeriesWhenSourceHasNone() {
+        HARDCOVER_RESPONSE.set(hardcoverDune());
+        pendingBookService.stage(merger.merge(List.of(completeDune())));
+        pendingBookService.promoteReady();
+
+        HARDCOVER_RESPONSE.set(hardcoverDuneWithoutSeries());
+        rePromote();
+
+        assertThat(books.findByOpenLibraryWorkKey(OL_KEY))
+            .as("Hardcover resolved and reported no series, so the stale label is cleared")
+            .get()
+            .satisfies(book -> {
+                assertThat(book.getSeriesName()).isNull();
+                assertThat(book.getSeriesPosition()).isNull();
+            });
+    }
+
+    @Test
+    @DisplayName("re-promotion keeps a real series when Hardcover fails, even though Wikidata resolves empty")
+    void rePromotionKeepsSeriesWhenHardcoverFails() {
+        HARDCOVER_RESPONSE.set(hardcoverDune());
+        pendingBookService.stage(merger.merge(List.of(completeDune())));
+        pendingBookService.promoteReady();
+
+        HARDCOVER_RESPONSE.set(null);
+        rePromote();
+
+        assertThat(books.findByOpenLibraryWorkKey(OL_KEY))
+            .as("Hardcover did not resolve, so the existing series is kept")
+            .get()
+            .satisfies(book -> {
+                assertThat(book.getSeriesName()).isEqualTo(TITLE);
+                assertThat(book.getSeriesPosition()).isEqualTo(SERIES_POSITION);
+            });
+    }
+
+    /**
+     * Re-promotes the staged book the way the nightly refresh does: collect the sources for the
+     * staged seed, then promote at once. The staging poll only promotes PENDING rows, so a book
+     * already promoted is re-promoted through this path, not {@link PendingBookService#promoteReady}.
+     */
+    private void rePromote() {
+        final MergedBook collected = sourceCollector.collectFor(completeDune());
+        pendingBookService.promoteNow(ISBN, collected);
+    }
+
     private static SourceBook hardcoverDune() {
         return SourceBook.builder(BookFieldSource.HARDCOVER)
             .isbn13(ISBN)
             .title(TITLE)
             .seriesName(TITLE)
             .seriesPosition(SERIES_POSITION)
+            .averageRating(RATING)
+            .build();
+    }
+
+    private static SourceBook hardcoverDuneWithoutSeries() {
+        return SourceBook.builder(BookFieldSource.HARDCOVER)
+            .isbn13(ISBN)
+            .title(TITLE)
             .averageRating(RATING)
             .build();
     }
@@ -245,8 +319,9 @@ class PendingBookServiceIntegrationTest extends ContainerizedTest {
     }
 
     /**
-     * Replaces the live source clients with one that returns nothing, so promotion is driven only by
-     * the staged data and the test makes no network calls.
+     * Drives promotion with a single controllable Hardcover stub instead of live network calls. A set
+     * {@link #HARDCOVER_RESPONSE} is returned by ISBN, so the source resolves; a null response throws,
+     * so the source does not resolve and the collect models a transient outage.
      */
     @TestConfiguration
     static class NoNetworkSources {
@@ -254,7 +329,51 @@ class PendingBookServiceIntegrationTest extends ContainerizedTest {
         @Bean
         @Primary
         SourceCollector noNetworkSourceCollector(final SourceMerger merger) {
-            return new SourceCollector(merger, List.of(), new DescriptionSelector(List.of()), Runnable::run);
+            return new SourceCollector(
+                merger, List.of(new ControllableHardcoverClient(), new EmptyWikidataClient()),
+                new DescriptionSelector(List.of()), Runnable::run);
+        }
+    }
+
+    private static final class ControllableHardcoverClient implements BookSourceClient {
+
+        @Override
+        public BookFieldSource source() {
+            return BookFieldSource.HARDCOVER;
+        }
+
+        @Override
+        public Optional<SourceBook> fetchByIsbn(final String isbn) {
+            final SourceBook response = HARDCOVER_RESPONSE.get();
+            if (response == null) {
+                throw WebClientResponseException.create(
+                    HTTP_SERVER_ERROR, "Service Unavailable", HttpHeaders.EMPTY, new byte[0], null);
+            }
+            return ISBN.equals(isbn) ? Optional.of(response) : Optional.empty();
+        }
+
+        @Override
+        public Optional<SourceBook> fetchByTitleAuthor(final String title, final String author) {
+            return Optional.empty();
+        }
+    }
+
+    /** Always resolves with no match, modelling the sparse Wikidata fallback that carries no series. */
+    private static final class EmptyWikidataClient implements BookSourceClient {
+
+        @Override
+        public BookFieldSource source() {
+            return BookFieldSource.WIKIDATA;
+        }
+
+        @Override
+        public Optional<SourceBook> fetchByIsbn(final String isbn) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<SourceBook> fetchByTitleAuthor(final String title, final String author) {
+            return Optional.empty();
         }
     }
 }

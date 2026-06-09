@@ -5,6 +5,9 @@ import static org.assertj.core.api.Assertions.within;
 
 import com.betterreads.catalog.entity.Author;
 import com.betterreads.catalog.entity.Book;
+import com.betterreads.catalog.image.CoverImages;
+import com.betterreads.catalog.image.CoverVersion;
+import com.betterreads.catalog.image.ImageProperties;
 import com.betterreads.catalog.service.source.BookFieldSource;
 import com.betterreads.catalog.service.source.SourceBook;
 import com.betterreads.search.dto.BookSearchDocument;
@@ -35,6 +38,11 @@ class BookSearchDocumentMapperTest {
 
     private static final String COVER_URL = "https://covers.openlibrary.org/b/id/1-L.jpg";
 
+    private static final String API_BASE_URL = "https://api.betterreadsapp.com";
+
+    private static final String SERVED_COVER_URL =
+        API_BASE_URL + "/api/v1/images/covers/hc-1?v=" + CoverVersion.of(COVER_URL);
+
     private static final int YEAR = 2006;
 
     private static final int THOUSAND_RATINGS = 999;
@@ -45,7 +53,8 @@ class BookSearchDocumentMapperTest {
 
     private static final double TOLERANCE = 1e-9;
 
-    private final BookSearchDocumentMapper mapper = new BookSearchDocumentMapper();
+    private final BookSearchDocumentMapper mapper =
+        new BookSearchDocumentMapper(new CoverImages(new ImageProperties(API_BASE_URL)));
 
     @Test
     @DisplayName("maps identity, display, and facet fields onto the document")
@@ -71,7 +80,7 @@ class BookSearchDocumentMapperTest {
                 BookSearchDocument::coverUrl,
                 BookSearchDocument::publicationYear)
             .containsExactly(
-                MISTBORN_KEY, MISTBORN_TITLE, SERIES, SERIES_POSITION, LANGUAGE, COVER_URL, YEAR);
+                MISTBORN_KEY, MISTBORN_TITLE, SERIES, SERIES_POSITION, LANGUAGE, SERVED_COVER_URL, YEAR);
         assertThat(document.authors()).containsExactly(AUTHOR);
         assertThat(document.subjects()).containsExactly(SUBJECT);
     }
@@ -106,6 +115,7 @@ class BookSearchDocumentMapperTest {
             .build();
         final Book book = new Book();
         book.applyFrom(source);
+        book.applySeries(source.seriesName(), source.seriesPosition(), true);
         final Author author = new Author();
         author.setName(AUTHOR);
         book.getAuthors().add(author);

@@ -20,7 +20,7 @@ created_at        timestamptz not null default now(),
 updated_at        timestamptz not null default now()
 ```
 
-`password_hash` is a BCrypt hash, length-checked at 60. `email` is length-capped at 254. `deleted_at` set marks a soft-deleted account during its grace window; `email_verified_at` set marks a confirmed email.
+`password_hash` holds the hashed password. `email` is length-capped. `deleted_at` set marks a soft-deleted account during its grace window; `email_verified_at` set marks a confirmed email.
 
 ## Catalog
 
@@ -33,12 +33,17 @@ subtitle               text,
 description            text,
 cover_id               integer,
 cover_url              text,
+cover_object_key       text,
+cover_checked_at       timestamptz,
+description_checked_at timestamptz,
 first_publish_year     integer,
 isbn                   varchar(20),
 page_count             integer,
 language               varchar(10),
 average_rating         numeric(3,2),
 rating_count           integer default 0,
+community_average      numeric(3,2),
+community_count        integer not null default 0,
 series_name            text,
 series_position        integer,
 open_library_work_key  text unique,
@@ -52,6 +57,8 @@ updated_at             timestamptz not null default now()
 ```
 
 Each external source has its own unique id column. `dedup_key` coalesces them (ISBN, OpenLibrary work key, Google Books volume id, Hardcover id, LoC LCCN, Wikidata QID) into one stable key. `isbn` is constrained to null or 10/13 digits without hyphens. A GIN trigram index on `title` backs fuzzy lookups.
+
+`average_rating` and `rating_count` hold the rating from the external catalogs. `community_average` and `community_count` hold the rating from BetterReads reviews, recomputed on each review write. `cover_url` holds the source cover; `cover_object_key` holds the key of the copy stored in MinIO once mirrored. `cover_checked_at` and `description_checked_at` mark when a backfill last tried that field.
 
 ### author
 
@@ -109,7 +116,7 @@ revoked_at       timestamptz,
 replaced_by      bigint references refresh_token(refresh_token_id) on delete set null
 ```
 
-Only the HMAC-SHA256 hash is stored. `replaced_by` links a rotated token to its successor. A partial index covers active tokens (`where revoked_at is null`).
+`token_hash` holds the hashed token. `replaced_by` links a rotated token to its successor. A partial index covers active tokens (`where revoked_at is null`).
 
 ### email_token
 
@@ -146,12 +153,58 @@ A row is enqueued in the same transaction as the user action and delivered by th
 
 `app_user.deleted_at` marks a soft delete. The hourly sweep hard-deletes rows past the grace window with `DELETE FROM app_user`. User-scoped tables cascade: `refresh_token`, `email_token`, `review`, `user_book_collection`, `user_book_interaction`, `user_book_signal`, `user_recommendation`. `activity_event.actor_user_id` uses `on delete set null`, retaining the event with a null actor.
 
-## Tables not yet wired to a feature
+## Reviews and shelves
 
-Earlier migrations (V3-V6) created tables for reviews, collections, interactions, recommendations, similar books, and an activity feed. They exist in the database but no shipped code reads or writes them yet:
+### review
 
-- `review` (user_id, book_id, rating, title, body), unique per user and book
-- `user_book_collection` (user_id, book_id, status, started_at, finished_at, notes), unique per user and book
+```sql
+review_id  bigserial primary key,
+user_id    bigint not null references app_user(user_id) on delete cascade,
+book_id    bigint not null references book(book_id) on delete cascade,
+rating     integer check (rating >= 1 and rating <= 5),
+title      varchar(255),
+body       text,
+created_at timestamptz not null default now(),
+updated_at timestamptz not null default now()
+```
+
+One review per user per book (unique on `user_id, book_id`). The community rating on `book` is the average of `rating` across a book's reviews.
+
+### comment
+
+```sql
+comment_id        bigserial primary key,
+user_id           bigint not null references app_user(user_id) on delete cascade,
+target_type       varchar(16) not null,  -- BOOK | REVIEW
+target_id         bigint not null,
+parent_comment_id bigint references comment(comment_id) on delete cascade,
+body              text not null,
+created_at        timestamptz not null default now()
+```
+
+`target_type` and `target_id` point a comment at a book or a review. `parent_comment_id` gives one level of replies.
+
+### user_book_collection
+
+```sql
+collection_id bigserial primary key,
+user_id       bigint not null references app_user(user_id) on delete cascade,
+book_id       bigint not null references book(book_id) on delete cascade,
+status        varchar(30) not null,
+favorite      boolean not null default false,
+started_at    date,
+finished_at   date,
+notes         text,
+created_at    timestamptz not null default now(),
+updated_at    timestamptz not null default now()
+```
+
+A reader's shelf row, one per user per book (unique on `user_id, book_id`). `status` is the reading status (want to read, currently reading, finished, dropped). A partial index covers favorites.
+
+## Other tables
+
+These tables exist from earlier migrations (V5-V6):
+
 - `user_book_interaction` (user_id, book_id, event_type, weight, metadata)
 - `user_book_signal` (user_id, book_id, total_weight, view_count, last_event_at)
 - `user_recommendation` (user_id, book_id, score, rank_position, reason, model_version)

@@ -6,19 +6,19 @@ Production runs on a single-node k3s cluster. The Spring Boot app, Postgres, and
 
 ## Workloads
 
-The app runs as a Deployment pulling its image from GHCR. Postgres 17 and Redis 7 run as StatefulSets, each with its own PersistentVolumeClaim on the cluster's local-path storage. All three live in the `betterreads` namespace. Services are cluster-internal; nothing is published to the host network.
+The app runs as a Deployment pulling its image from GHCR. Postgres 17, Redis 7, Meilisearch, and MinIO run as StatefulSets, each with its own PersistentVolumeClaim on the cluster's local-path storage. MinIO holds book covers in the `betterreads-images` bucket, reached by a bucket-scoped app user. All of them live in the `betterreads` namespace. Services are cluster-internal; nothing is published to the host network, so covers reach the browser only through the app.
 
 Flyway creates a separate `betterreads_app` role with CRUD-only privileges. Spring Boot connects as `betterreads_app`; Flyway runs as the migration owner `betterreads`. SQL injection on the runtime path can't drop tables or alter schema.
 
 ## Delivery
 
-CI builds the container image on push to `main`, gated behind the quality check (`./gradlew check`), and pushes it to GHCR tagged with the commit SHA. CI then pins that tag in the manifests repo's Kustomize `images` list and commits. Argo CD watches the manifests repo and reconciles the cluster to match, so a deploy is the Git commit CI just made; Argo applies it and rolls the Deployment. The image tag is a real commit SHA, not a moving `latest`, so the running version always maps back to a known commit.
+CI builds the container image on push to `main`, gated behind the quality check (`./gradlew check`), and pushes it to GHCR tagged with the commit SHA. CI then pins that tag in the manifests repo's Kustomize `images` list and commits. Argo CD watches the manifests repo and reconciles the cluster to match, so a deploy is the Git commit CI just made; Argo applies it and rolls the Deployment. The image tag is the commit SHA, so the running version always maps back to a known commit.
 
 ## Edge
 
 Cloudflare provides DNS, TLS, CDN, and DDoS protection. A `cloudflared` Deployment in the cluster connects out to Cloudflare's edge, so no inbound ports are open on the host. The tunnel routes `api.betterreadsapp.com` to the in-cluster Traefik ingress, which host-routes to the app Service.
 
-Per-endpoint rate limiting lives in the backend via Bucket4j, with Cloudflare CIDRs as trusted proxies for `X-Forwarded-For` resolution.
+Per-endpoint rate limiting lives in the backend via Bucket4j.
 
 ## Observability
 

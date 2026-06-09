@@ -14,9 +14,10 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for the pure helpers inside {@link HardcoverMapper}. Each case targets a shape the
- * live API returned on 2026-05-31: the bulk ISBN-10/ISBN-13 array, the noisy genre list, the
- * float series position, and the rating and vote count.
+ * Unit tests for the pure helpers inside {@link HardcoverMapper}. The Dune cases target shapes the
+ * live API returned on 2026-05-31: the bulk ISBN-10/ISBN-13 array, the noisy genre list, the whole
+ * series position, and the rating and vote count. The series-position cases also cover the null and
+ * sub-volume positions that tag companions and prologues to a series.
  */
 class HardcoverMapperTest {
 
@@ -43,6 +44,8 @@ class HardcoverMapperTest {
     private static final String GENRE_COMICS_RAW = "Comics & Graphic Novels";
 
     private static final String DUNE_TITLE = "Dune";
+
+    private static final String SUN_EATER_SERIES = "The Sun Eater";
 
     private static final String DUNE_HARDCOVER_ID = "312460";
 
@@ -96,10 +99,18 @@ class HardcoverMapperTest {
     @DisplayName("seriesPosition")
     class SeriesPosition {
 
+        private static final double PROLOGUE_POSITION = 0.5;
+
         @Test
-        @DisplayName("the float position 2.0 rounds to the integer 2 the catalog stores")
-        void floatPositionRoundsToInteger() {
+        @DisplayName("the whole-number position 2.0 maps to the integer 2 the catalog stores")
+        void wholeNumberPositionMapsToInteger() {
             assertThat(HardcoverMapper.seriesPosition(2.0)).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("a fractional prologue position is not a volume and maps to null")
+        void fractionalPositionMapsToNull() {
+            assertThat(HardcoverMapper.seriesPosition(PROLOGUE_POSITION)).isNull();
         }
     }
 
@@ -129,6 +140,20 @@ class HardcoverMapperTest {
                 assertThat(book.seriesName()).isEqualTo(DUNE_TITLE);
                 assertThat(book.seriesPosition()).isEqualTo(1);
                 assertThat(book.coverUrl()).isEqualTo(DUNE_COVER_URL);
+            });
+        }
+
+        @Test
+        @DisplayName("a null-position featured series leaves the book unlabelled, not volume null")
+        void nullSeriesPositionCarriesNoSeries() {
+            final HardcoverDocument companion = new HardcoverDocument(
+                DUNE_HARDCOVER_ID, "The World of The Sun Eater", null, 2020, null, null, null, null,
+                null, null, null, null,
+                new FeaturedSeries(null, new FeaturedSeries.Series(SUN_EATER_SERIES)));
+
+            assertThat(mapper.toSourceBook(companion)).satisfies(book -> {
+                assertThat(book.seriesName()).isNull();
+                assertThat(book.seriesPosition()).isNull();
             });
         }
 

@@ -1,6 +1,6 @@
 # How to back up and restore Postgres
 
-Postgres holds all persistent state: user accounts and the catalog. A daily CronJob dumps the database, encrypts it, and uploads to Cloudflare R2. This runbook covers operating it.
+Postgres holds all persistent state: user accounts and the catalog. A daily CronJob dumps the database, encrypts it, and uploads to Cloudflare R2.
 
 ## What ends up in the bucket
 

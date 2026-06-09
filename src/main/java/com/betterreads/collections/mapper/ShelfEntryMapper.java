@@ -2,6 +2,7 @@ package com.betterreads.collections.mapper;
 
 import com.betterreads.catalog.entity.Author;
 import com.betterreads.catalog.entity.Book;
+import com.betterreads.catalog.image.CoverImages;
 import com.betterreads.collections.dto.ShelfEntryResponse;
 import com.betterreads.collections.entity.ShelfEntry;
 
@@ -11,6 +12,12 @@ import org.springframework.stereotype.Component;
 /** Builds a {@link ShelfEntryResponse} from a shelf row and its book. */
 @Component
 public class ShelfEntryMapper {
+
+    private final CoverImages coverImages;
+
+    public ShelfEntryMapper(final CoverImages coverImages) {
+        this.coverImages = coverImages;
+    }
 
     /**
      * Combines the shelf state from {@code entry} with the book summary from {@code book}.
@@ -23,7 +30,7 @@ public class ShelfEntryMapper {
             book.getDedupKey(),
             book.getTitle(),
             book.getAuthors().stream().map(Author::getName).sorted().toList(),
-            book.getCoverUrl(),
+            coverImages.servedUrl(book.getDedupKey(), book.getCoverUrl()),
             entry.getStatus(),
             entry.isFavorite(),
             entry.getStartedAt(),

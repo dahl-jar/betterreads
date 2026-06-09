@@ -5,6 +5,7 @@ import java.util.List;
 import com.betterreads.catalog.dto.BookCardResponse;
 import com.betterreads.catalog.entity.Author;
 import com.betterreads.catalog.entity.Book;
+import com.betterreads.catalog.image.CoverImages;
 import com.betterreads.catalog.repository.BookListRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -22,8 +23,11 @@ public class BookListService {
 
     private final BookListRepository books;
 
-    public BookListService(final BookListRepository books) {
+    private final CoverImages coverImages;
+
+    public BookListService(final BookListRepository books, final CoverImages coverImages) {
         this.books = books;
+        this.coverImages = coverImages;
     }
 
     /** Returns the cards for the given list, capped at {@code limit}. */
@@ -34,15 +38,15 @@ public class BookListService {
             case RECENTLY_ADDED -> books.findRecentlyAdded(page);
             case TOP_RATED -> books.findTopRated(MIN_RATINGS_FOR_TOP_RATED, page);
         };
-        return found.stream().map(BookListService::toCard).toList();
+        return found.stream().map(this::toCard).toList();
     }
 
-    private static BookCardResponse toCard(final Book book) {
+    private BookCardResponse toCard(final Book book) {
         return new BookCardResponse(
             book.getDedupKey(),
             book.getTitle(),
             book.getAuthors().stream().map(Author::getName).sorted().toList(),
-            book.getCoverUrl(),
+            coverImages.servedUrl(book.getDedupKey(), book.getCoverUrl()),
             book.getFirstPublishYear(),
             book.getAverageRating(),
             book.getRatingCount());

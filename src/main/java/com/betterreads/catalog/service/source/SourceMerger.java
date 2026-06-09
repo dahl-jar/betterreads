@@ -22,6 +22,8 @@ import org.springframework.stereotype.Component;
  * priority chain that supplies a value, so a higher-priority source missing a field yields to a
  * lower-priority one that has it. Identifiers are carried from whichever source holds them.
  */
+// PMD.TooManyMethods: an aggregator with one small private picker per field; splitting scatters the trust-order chains.
+@SuppressWarnings("PMD.TooManyMethods")
 @Component
 public class SourceMerger {
 
@@ -99,7 +101,8 @@ public class SourceMerger {
             unionSubjects(bySource));
 
         final SourceBook merged = assemble(bySource, sources, resolved);
-        return new MergedBook(merged, resolved.provenance(), resolved.subjects().sources());
+        return new MergedBook(
+            merged, resolved.provenance(), resolved.subjects().sources(), bySource.keySet());
     }
 
     private static @Nullable Winner<Integer> resolveYear(
@@ -119,6 +122,7 @@ public class SourceMerger {
     ) {
         final Winner<String> title = resolved.title();
         final Subjects subjects = resolved.subjects();
+        final Optional<SourceBook> series = pickSeries(bySource);
         return SourceBook.builder(title.source())
             .title(TitleCleaner.clean(title.value()))
             .subtitle(valueOf(pick(bySource, SUBTITLE_CHAIN, SourceMerger::usableText, SourceBook::subtitle)))
@@ -133,8 +137,8 @@ public class SourceMerger {
             .awards(valueOf(pick(bySource, AWARDS_CHAIN, SourceMerger::nonEmpty, SourceBook::awards)))
             .averageRating(valueOf(pick(bySource, RATING_CHAIN, SourceBook::averageRating)))
             .ratingCount(valueOf(pick(bySource, RATING_CHAIN, SourceBook::ratingCount)))
-            .seriesName(valueOf(pick(bySource, SERIES_CHAIN, SourceMerger::usableText, SourceBook::seriesName)))
-            .seriesPosition(valueOf(pick(bySource, SERIES_CHAIN, SourceBook::seriesPosition)))
+            .seriesName(series.map(SourceBook::seriesName).orElse(null))
+            .seriesPosition(series.map(SourceBook::seriesPosition).orElse(null))
             .isbn13(valueOf(pick(bySource, ISBN_CHAIN, SourceMerger::usableText, SourceBook::isbn13)))
             .googleBooksVolumeId(firstId(sources, SourceBook::googleBooksVolumeId))
             .openLibraryWorkKey(firstId(sources, SourceBook::openLibraryWorkKey))
@@ -170,6 +174,20 @@ public class SourceMerger {
         final Function<SourceBook, T> field
     ) {
         return pick(bySource, chain, value -> true, field);
+    }
+
+    /**
+     * Picks the source whose series tag is a numbered volume: a name and an integer position
+     * together. A source with a name but no position is a companion or guide grouped under the
+     * series, not a volume, so it is skipped and the series stays unset.
+     */
+    private static Optional<SourceBook> pickSeries(final Map<BookFieldSource, SourceBook> bySource) {
+        return SERIES_CHAIN.stream()
+            .map(bySource::get)
+            .filter(book -> book != null
+                && book.seriesName() != null && !book.seriesName().isBlank()
+                && book.seriesPosition() != null)
+            .findFirst();
     }
 
     private static Subjects unionSubjects(final Map<BookFieldSource, SourceBook> bySource) {

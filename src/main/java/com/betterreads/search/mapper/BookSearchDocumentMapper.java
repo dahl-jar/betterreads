@@ -3,6 +3,7 @@ package com.betterreads.search.mapper;
 import com.betterreads.catalog.entity.Author;
 import com.betterreads.catalog.entity.Book;
 import com.betterreads.catalog.entity.BookSubject;
+import com.betterreads.catalog.image.CoverImages;
 import com.betterreads.search.dto.BookSearchDocument;
 import org.springframework.stereotype.Component;
 
@@ -16,6 +17,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class BookSearchDocumentMapper {
 
+    private final CoverImages coverImages;
+
+    public BookSearchDocumentMapper(final CoverImages coverImages) {
+        this.coverImages = coverImages;
+    }
+
     /** Builds the search document for the given book. */
     public BookSearchDocument toDocument(final Book book) {
         return BookSearchDocument.builder(book.getDedupKey())
@@ -26,7 +33,7 @@ public class BookSearchDocumentMapper {
             .authors(book.getAuthors().stream().map(Author::getName).sorted().toList())
             .subjects(book.getSubjects().stream().map(BookSubject::getSubject).toList())
             .language(book.getLanguage())
-            .coverUrl(book.getCoverUrl())
+            .coverUrl(coverImages.servedUrl(book.getDedupKey(), book.getCoverUrl()))
             .publicationYear(book.getFirstPublishYear())
             .popularityScore(popularityScore(book))
             .build();

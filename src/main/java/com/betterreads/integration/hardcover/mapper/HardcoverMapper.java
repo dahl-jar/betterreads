@@ -31,6 +31,7 @@ public class HardcoverMapper {
             return null;
         }
         final FeaturedSeries series = document.featuredSeries();
+        final Integer position = series == null ? null : seriesPosition(series.position());
         return SourceBook.builder(BookFieldSource.HARDCOVER)
             .isbn13(firstIsbn13(document.isbns()))
             .hardcoverId(document.id())
@@ -43,8 +44,8 @@ public class HardcoverMapper {
             .rawSubjects(document.genres() == null ? null : cleanGenres(document.genres()))
             .averageRating(document.rating())
             .ratingCount(document.ratingsCount())
-            .seriesName(seriesName(series))
-            .seriesPosition(series == null ? null : seriesPosition(series.position()))
+            .seriesName(position == null ? null : seriesName(series))
+            .seriesPosition(position)
             .build();
     }
 
@@ -59,8 +60,17 @@ public class HardcoverMapper {
         return CatalogGenres.reduceToCanonical(genres, MAX_GENRES);
     }
 
+    /**
+     * Returns the integer volume number, or null when the position is absent or a sub-volume.
+     *
+     * <p>A whole number is a numbered volume. A fractional position is a prologue or split part
+     * tagged to the series, which is not a volume the catalog stores as book N.
+     */
     static @Nullable Integer seriesPosition(final @Nullable Double position) {
-        return position == null ? null : (int) Math.round(position);
+        if (position == null || Double.compare(position, Math.floor(position)) != 0 || position < 1) {
+            return null;
+        }
+        return position.intValue();
     }
 
     private static @Nullable String coverUrl(final HardcoverDocument document) {
