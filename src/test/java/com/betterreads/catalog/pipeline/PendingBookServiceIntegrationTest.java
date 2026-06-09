@@ -18,8 +18,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.betterreads.catalog.entity.PendingBook;
+import com.betterreads.catalog.mapper.PendingBookMapper;
 import com.betterreads.catalog.repository.BookRepository;
 import com.betterreads.catalog.repository.PendingBookRepository;
+import com.betterreads.catalog.service.read.CatalogService;
 import com.betterreads.catalog.service.source.BookFieldSource;
 import com.betterreads.catalog.service.source.BookSourceClient;
 import com.betterreads.catalog.service.source.MergedBook;
@@ -78,6 +81,14 @@ class PendingBookServiceIntegrationTest extends ContainerizedTest {
 
     private static final String TITLE = "Dune";
 
+    private static final String AUTHOR = "Frank Herbert";
+
+    private static final String STALE_AUTHOR = "Valka";
+
+    private static final String AUTHOR_NAME_FIELD = "name";
+
+    private static final String GENRE = "science fiction";
+
     private static final String STATUS_PENDING = "PENDING";
 
     private static final String STATUS_PROMOTED = "PROMOTED";
@@ -87,6 +98,9 @@ class PendingBookServiceIntegrationTest extends ContainerizedTest {
     private static final int HTTP_SERVER_ERROR = 503;
 
     private static final AtomicReference<@Nullable SourceBook> HARDCOVER_RESPONSE =
+        new AtomicReference<>();
+
+    private static final AtomicReference<@Nullable SourceBook> OPEN_LIBRARY_RESPONSE =
         new AtomicReference<>();
 
     @Autowired
@@ -104,11 +118,18 @@ class PendingBookServiceIntegrationTest extends ContainerizedTest {
     @Autowired
     private SourceCollector sourceCollector;
 
+    @Autowired
+    private CatalogService catalogService;
+
+    @Autowired
+    private PendingBookMapper pendingBookMapper;
+
     @BeforeEach
     void clearCatalog() {
         pendingBooks.deleteAll();
         books.deleteAll();
         HARDCOVER_RESPONSE.set(null);
+        OPEN_LIBRARY_RESPONSE.set(null);
     }
 
     @Test
@@ -269,14 +290,104 @@ class PendingBookServiceIntegrationTest extends ContainerizedTest {
             });
     }
 
+    @Test
+    @DisplayName("re-promotion corrects a stale staged author from a live OpenLibrary fetch")
+    void rePromotionDropsStaleAuthor() {
+        pendingBookService.stage(merger.merge(List.of(duneBy(AUTHOR, STALE_AUTHOR))));
+        pendingBookService.promoteReady();
+
+        OPEN_LIBRARY_RESPONSE.set(openLibraryDune());
+        rePromote();
+
+        assertThat(books.findByOpenLibraryWorkKey(OL_KEY))
+            .as("the live OpenLibrary fetch names one author, so the stale staged one is removed")
+            .get()
+            .satisfies(book -> assertThat(book.getAuthors())
+                .extracting(AUTHOR_NAME_FIELD)
+                .containsExactly(AUTHOR));
+    }
+
+    @Test
+    @DisplayName("a re-promotion with every live source down keeps the staged book intact")
+    void allSourcesDownRePromotionKeepsStagedBook() {
+        pendingBookService.stage(merger.merge(List.of(completeDune())));
+        pendingBookService.promoteReady();
+
+        rePromote();
+
+        assertThat(books.findByOpenLibraryWorkKey(OL_KEY))
+            .as("no live source resolved, so the staged values still promote the book unchanged")
+            .get()
+            .satisfies(book -> {
+                assertThat(book.getTitle()).isEqualTo(TITLE);
+                assertThat(book.getAuthors())
+                    .extracting(AUTHOR_NAME_FIELD)
+                    .containsExactly(AUTHOR);
+            });
+    }
+
+    @Test
+    @DisplayName("an upsert without authors keeps the stored authors")
+    void upsertWithoutAuthorsKeepsStoredAuthors() {
+        catalogService.upsertFromSource(completeDune());
+
+        catalogService.upsertFromSource(sparseDune());
+
+        assertThat(books.findByOpenLibraryWorkKey(OL_KEY))
+            .as("null authors mean the source did not carry the field, so the stored set is kept")
+            .get()
+            .satisfies(book -> assertThat(book.getAuthors())
+                .extracting(AUTHOR_NAME_FIELD)
+                .containsExactly(AUTHOR));
+    }
+
+    @Test
+    @DisplayName("an upsert whose author names are all blank keeps the stored authors")
+    void upsertWithBlankAuthorNamesKeepsStoredAuthors() {
+        catalogService.upsertFromSource(completeDune());
+
+        catalogService.upsertFromSource(duneBy(" "));
+
+        assertThat(books.findByOpenLibraryWorkKey(OL_KEY))
+            .as("a response with no usable author name must not strip the book's authors")
+            .get()
+            .satisfies(book -> assertThat(book.getAuthors())
+                .extracting(AUTHOR_NAME_FIELD)
+                .containsExactly(AUTHOR));
+    }
+
+    @Test
+    @DisplayName("a two-author book comes back with each subject once")
+    void fetchReturnsEachSubjectOnceForTwoAuthorBook() {
+        pendingBookService.stage(merger.merge(List.of(duneBy(AUTHOR, STALE_AUTHOR))));
+        pendingBookService.promoteReady();
+
+        assertThat(books.findByDedupKey(ISBN))
+            .as("the read fetch joins authors and subjects; the join must not repeat subject rows")
+            .get()
+            .satisfies(book -> assertThat(book.getSubjects())
+                .extracting("subject")
+                .containsExactly(GENRE));
+    }
+
     /**
-     * Re-promotes the staged book the way the nightly refresh does: collect the sources for the
-     * staged seed, then promote at once. The staging poll only promotes PENDING rows, so a book
-     * already promoted is re-promoted through this path, not {@link PendingBookService#promoteReady}.
+     * Re-promotes the staged book the way the nightly refresh does: rebuild the seed from the
+     * pending row, collect the sources for it, then promote at once. The staging poll only promotes
+     * PENDING rows, so a book already promoted is re-promoted through this path, not
+     * {@link PendingBookService#promoteReady}.
      */
     private void rePromote() {
-        final MergedBook collected = sourceCollector.collectFor(completeDune());
+        final PendingBook row = pendingBooks.findByIsbn13(ISBN).orElseThrow();
+        final MergedBook collected = sourceCollector.collectFor(pendingBookMapper.toSourceBook(row));
         pendingBookService.promoteNow(ISBN, collected);
+    }
+
+    private static SourceBook openLibraryDune() {
+        return SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+            .isbn13(ISBN)
+            .title(TITLE)
+            .authors(SourceAuthor.ofNames(List.of(AUTHOR)))
+            .build();
     }
 
     private static SourceBook hardcoverDune() {
@@ -298,15 +409,19 @@ class PendingBookServiceIntegrationTest extends ContainerizedTest {
     }
 
     private static SourceBook completeDune() {
+        return duneBy(AUTHOR);
+    }
+
+    private static SourceBook duneBy(final String... authorNames) {
         return SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
             .isbn13(ISBN)
             .openLibraryWorkKey(OL_KEY)
             .title(TITLE)
-            .authors(SourceAuthor.ofNames(List.of("Frank Herbert")))
+            .authors(SourceAuthor.ofNames(List.of(authorNames)))
             .coverUrl("https://covers.openlibrary.org/b/id/1-L.jpg")
             .description("A desert planet holds the universe's only source of the spice melange.")
             .publicationYear(YEAR)
-            .rawSubjects(List.of("science fiction"))
+            .rawSubjects(List.of(GENRE))
             .build();
     }
 
@@ -319,9 +434,9 @@ class PendingBookServiceIntegrationTest extends ContainerizedTest {
     }
 
     /**
-     * Drives promotion with a single controllable Hardcover stub instead of live network calls. A set
-     * {@link #HARDCOVER_RESPONSE} is returned by ISBN, so the source resolves; a null response throws,
-     * so the source does not resolve and the collect models a transient outage.
+     * Drives promotion with controllable Hardcover and OpenLibrary stubs instead of live network
+     * calls. A set response is returned by ISBN, so the source resolves; a null response throws, so
+     * the source does not resolve and the collect models a transient outage.
      */
     @TestConfiguration
     static class NoNetworkSources {
@@ -330,26 +445,42 @@ class PendingBookServiceIntegrationTest extends ContainerizedTest {
         @Primary
         SourceCollector noNetworkSourceCollector(final SourceMerger merger) {
             return new SourceCollector(
-                merger, List.of(new ControllableHardcoverClient(), new EmptyWikidataClient()),
+                merger,
+                List.of(
+                    new ControllableClient(BookFieldSource.HARDCOVER, HARDCOVER_RESPONSE),
+                    new ControllableClient(BookFieldSource.OPEN_LIBRARY, OPEN_LIBRARY_RESPONSE),
+                    new EmptyWikidataClient()),
                 new DescriptionSelector(List.of()), Runnable::run);
         }
     }
 
-    private static final class ControllableHardcoverClient implements BookSourceClient {
+    private static final class ControllableClient implements BookSourceClient {
+
+        private final BookFieldSource reportedSource;
+
+        private final AtomicReference<@Nullable SourceBook> response;
+
+        ControllableClient(
+            final BookFieldSource reportedSource,
+            final AtomicReference<@Nullable SourceBook> response
+        ) {
+            this.reportedSource = reportedSource;
+            this.response = response;
+        }
 
         @Override
         public BookFieldSource source() {
-            return BookFieldSource.HARDCOVER;
+            return reportedSource;
         }
 
         @Override
         public Optional<SourceBook> fetchByIsbn(final String isbn) {
-            final SourceBook response = HARDCOVER_RESPONSE.get();
-            if (response == null) {
+            final SourceBook book = response.get();
+            if (book == null) {
                 throw WebClientResponseException.create(
                     HTTP_SERVER_ERROR, "Service Unavailable", HttpHeaders.EMPTY, new byte[0], null);
             }
-            return ISBN.equals(isbn) ? Optional.of(response) : Optional.empty();
+            return ISBN.equals(isbn) ? Optional.of(book) : Optional.empty();
         }
 
         @Override

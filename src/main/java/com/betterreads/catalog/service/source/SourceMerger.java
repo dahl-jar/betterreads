@@ -18,9 +18,11 @@ import org.springframework.stereotype.Component;
  * Combines several single-source books into one, resolving each field by the priority order in
  * {@code source-trust.md}.
  *
- * <p>Subjects are unioned across every source. Every other field takes the first source in its
- * priority chain that supplies a value, so a higher-priority source missing a field yields to a
- * lower-priority one that has it. Identifiers are carried from whichever source holds them.
+ * <p>Subjects are unioned across the live sources; a staged seed's subjects count only when no live
+ * source carries any. Every other field takes the first source in its priority chain that supplies
+ * a value, so a higher-priority source missing a field yields to a lower-priority one that has it.
+ * A staged seed sits last in each chain, so stored values yield to any live source but keep a book
+ * promotable when every live fetch fails. Identifiers are carried from whichever source holds them.
  */
 // PMD.TooManyMethods: an aggregator with one small private picker per field; splitting scatters the trust-order chains.
 @SuppressWarnings("PMD.TooManyMethods")
@@ -29,45 +31,53 @@ public class SourceMerger {
 
     private static final List<BookFieldSource> TITLE_CHAIN = List.of(
         BookFieldSource.GOOGLE_BOOKS, BookFieldSource.OPEN_LIBRARY,
-        BookFieldSource.HARDCOVER, BookFieldSource.WIKIDATA, BookFieldSource.LOC);
+        BookFieldSource.HARDCOVER, BookFieldSource.WIKIDATA, BookFieldSource.LOC,
+        BookFieldSource.STAGED);
 
-    private static final List<BookFieldSource> SUBTITLE_CHAIN =
-        List.of(BookFieldSource.GOOGLE_BOOKS, BookFieldSource.OPEN_LIBRARY);
+    private static final List<BookFieldSource> SUBTITLE_CHAIN = List.of(
+        BookFieldSource.GOOGLE_BOOKS, BookFieldSource.OPEN_LIBRARY, BookFieldSource.STAGED);
 
     private static final List<BookFieldSource> DESCRIPTION_CHAIN = List.of(
         BookFieldSource.GOOGLE_BOOKS, BookFieldSource.OPEN_LIBRARY,
-        BookFieldSource.HARDCOVER, BookFieldSource.LOC);
+        BookFieldSource.HARDCOVER, BookFieldSource.LOC, BookFieldSource.STAGED);
 
     private static final List<BookFieldSource> COVER_CHAIN = List.of(
-        BookFieldSource.GOOGLE_BOOKS, BookFieldSource.HARDCOVER, BookFieldSource.OPEN_LIBRARY);
+        BookFieldSource.GOOGLE_BOOKS, BookFieldSource.HARDCOVER, BookFieldSource.OPEN_LIBRARY,
+        BookFieldSource.STAGED);
 
     private static final List<BookFieldSource> YEAR_CHAIN = List.of(
         BookFieldSource.OPEN_LIBRARY, BookFieldSource.GOOGLE_BOOKS,
         BookFieldSource.WIKIDATA, BookFieldSource.LOC, BookFieldSource.HARDCOVER);
 
     private static final List<BookFieldSource> PUBLISHER_CHAIN =
-        List.of(BookFieldSource.GOOGLE_BOOKS);
+        List.of(BookFieldSource.GOOGLE_BOOKS, BookFieldSource.STAGED);
 
     private static final List<BookFieldSource> PAGE_COUNT_CHAIN = List.of(
-        BookFieldSource.GOOGLE_BOOKS, BookFieldSource.HARDCOVER, BookFieldSource.LOC);
+        BookFieldSource.GOOGLE_BOOKS, BookFieldSource.HARDCOVER, BookFieldSource.LOC,
+        BookFieldSource.STAGED);
 
     private static final List<BookFieldSource> LANGUAGE_CHAIN = List.of(
-        BookFieldSource.GOOGLE_BOOKS, BookFieldSource.OPEN_LIBRARY, BookFieldSource.LOC);
+        BookFieldSource.GOOGLE_BOOKS, BookFieldSource.OPEN_LIBRARY, BookFieldSource.LOC,
+        BookFieldSource.STAGED);
 
     private static final List<BookFieldSource> AUTHORS_CHAIN =
         List.of(BookFieldSource.OPEN_LIBRARY, BookFieldSource.GOOGLE_BOOKS,
-            BookFieldSource.WIKIDATA, BookFieldSource.HARDCOVER, BookFieldSource.LOC);
+            BookFieldSource.WIKIDATA, BookFieldSource.HARDCOVER, BookFieldSource.LOC,
+            BookFieldSource.STAGED);
 
+    /** No staged entry: {@code keepStagedRating} restores a staged rating on a Hardcover miss. */
     private static final List<BookFieldSource> RATING_CHAIN = List.of(BookFieldSource.HARDCOVER);
 
+    /** No staged entry: a stale stored series must not outlive the live authorities' answer. */
     private static final List<BookFieldSource> SERIES_CHAIN =
         List.of(BookFieldSource.HARDCOVER, BookFieldSource.WIKIDATA);
 
-    private static final List<BookFieldSource> AWARDS_CHAIN = List.of(BookFieldSource.WIKIDATA);
+    private static final List<BookFieldSource> AWARDS_CHAIN =
+        List.of(BookFieldSource.WIKIDATA, BookFieldSource.STAGED);
 
     private static final List<BookFieldSource> ISBN_CHAIN = List.of(
         BookFieldSource.GOOGLE_BOOKS, BookFieldSource.OPEN_LIBRARY,
-        BookFieldSource.LOC, BookFieldSource.HARDCOVER);
+        BookFieldSource.LOC, BookFieldSource.HARDCOVER, BookFieldSource.STAGED);
 
     /** Merges the given books into one, or throws when no source carries a title. */
     public MergedBook merge(final List<SourceBook> sources) {
@@ -75,12 +85,12 @@ public class SourceMerger {
     }
 
     /**
-     * Merges the given books into one, preferring the discovery seed's year.
+     * Merges the given books into one, preferring the seed's year.
      *
-     * <p>The seed is the source that resolved the work itself (the Hardcover series or author hit),
-     * while the other sources resolve an edition by title or ISBN and drift to a reprint year. When
-     * the seed carries a year it wins over {@link #YEAR_CHAIN}; otherwise the chain resolves the year.
-     * A later refresh can replace it with an ISBN-resolved first-publication year.
+     * <p>The seed resolved the work itself: a discovery hit (the Hardcover series or author path) or
+     * the staged row being re-collected. The other sources resolve an edition by title or ISBN and
+     * drift to a reprint year, so when the seed carries a year it wins over {@link #YEAR_CHAIN};
+     * otherwise the chain resolves the year.
      */
     public MergedBook merge(final @Nullable SourceBook seed, final List<SourceBook> sources) {
         final Map<BookFieldSource, SourceBook> bySource = new EnumMap<>(BookFieldSource.class);
@@ -190,17 +200,37 @@ public class SourceMerger {
             .findFirst();
     }
 
+    /**
+     * Unions the live sources' subjects, falling back to the staged seed's when no live source
+     * carries any, so a fresh collect can shrink the stored set instead of re-accumulating it.
+     */
     private static Subjects unionSubjects(final Map<BookFieldSource, SourceBook> bySource) {
         final Set<String> values = new LinkedHashSet<>();
         final Set<BookFieldSource> contributors = new LinkedHashSet<>();
         for (final SourceBook source : bySource.values()) {
-            final List<String> subjects = source.rawSubjects();
-            if (subjects != null && !subjects.isEmpty()) {
-                values.addAll(subjects);
-                contributors.add(source.source());
+            if (source.source() != BookFieldSource.STAGED) {
+                addSubjects(source, values, contributors);
+            }
+        }
+        if (values.isEmpty()) {
+            final SourceBook staged = bySource.get(BookFieldSource.STAGED);
+            if (staged != null) {
+                addSubjects(staged, values, contributors);
             }
         }
         return new Subjects(new ArrayList<>(values), contributors);
+    }
+
+    private static void addSubjects(
+        final SourceBook source,
+        final Set<String> values,
+        final Set<BookFieldSource> contributors
+    ) {
+        final List<String> subjects = source.rawSubjects();
+        if (subjects != null && !subjects.isEmpty()) {
+            values.addAll(subjects);
+            contributors.add(source.source());
+        }
     }
 
     private static @Nullable String firstId(

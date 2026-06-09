@@ -30,8 +30,8 @@ public interface BookRepository extends JpaRepository<Book, Long> {
     /**
      * Returns the book with the given dedup key, with authors and subjects fetched.
      *
-     * <p>Only authors and subjects are fetched in the graph: Hibernate cannot join-fetch two list
-     * collections at once, so awards load lazily within the read transaction.
+     * <p>Only authors and subjects are fetched in the graph; awards load lazily within the read
+     * transaction.
      */
     @EntityGraph(attributePaths = {"authors", "subjects"})
     Optional<Book> findByDedupKey(String dedupKey);

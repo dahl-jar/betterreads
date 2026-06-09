@@ -10,6 +10,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -20,6 +21,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -153,8 +155,13 @@ public class Book {
     )
     private Set<Author> authors = new HashSet<>();
 
+    /**
+     * A fetch that joins authors and subjects in one query repeats each subject row per author; the
+     * {@code Set} collapses the repeats by entity identity, and {@code @OrderBy} keeps row order.
+     */
     @OneToMany(mappedBy = "book", cascade = CascadeType.ALL, orphanRemoval = true)
-    private final List<BookSubject> subjects = new ArrayList<>();
+    @OrderBy("bookSubjectId")
+    private final Set<BookSubject> subjects = new LinkedHashSet<>();
 
     @OneToMany(mappedBy = "book", cascade = CascadeType.ALL, orphanRemoval = true)
     private final List<BookAward> awards = new ArrayList<>();
@@ -313,7 +320,7 @@ public class Book {
         }
     }
 
-    public List<BookSubject> getSubjects() {
+    public Set<BookSubject> getSubjects() {
         return subjects;
     }
 

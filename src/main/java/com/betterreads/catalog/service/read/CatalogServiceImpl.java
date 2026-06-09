@@ -5,9 +5,12 @@ import com.betterreads.catalog.service.source.MergedBook;
 import com.betterreads.catalog.service.source.SourceAuthor;
 import com.betterreads.catalog.service.source.SourceBook;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import com.betterreads.catalog.entity.Author;
 import com.betterreads.catalog.entity.Book;
@@ -70,7 +73,7 @@ public class CatalogServiceImpl implements CatalogService {
             .orElseGet(Book::new);
         book.applyFrom(source);
         book.applySeries(source.seriesName(), source.seriesPosition(), seriesAuthorityResolved);
-        attachAuthors(book, source.authors());
+        replaceAuthors(book, source.authors());
         return bookRepository.save(book);
     }
 
@@ -117,14 +120,25 @@ public class CatalogServiceImpl implements CatalogService {
         }
     }
 
-    private void attachAuthors(final Book book, final @Nullable List<SourceAuthor> authors) {
+    /**
+     * Replaces the book's authors with the source authors, removing any no longer named.
+     *
+     * <p>A null list means the sources did not carry the field and keeps the stored authors, as does
+     * a list with no usable name, so a degenerate response cannot strip a book's authors.
+     */
+    private void replaceAuthors(final Book book, final @Nullable List<SourceAuthor> authors) {
         if (authors == null) {
             return;
         }
-        authors.stream()
+        final Set<Author> named = authors.stream()
             .filter(author -> !author.name().isBlank())
             .map(this::findOrCreateAuthor)
-            .forEach(author -> book.getAuthors().add(author));
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (named.isEmpty()) {
+            return;
+        }
+        book.getAuthors().retainAll(named);
+        book.getAuthors().addAll(named);
     }
 
     /**

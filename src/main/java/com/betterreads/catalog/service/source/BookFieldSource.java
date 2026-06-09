@@ -10,5 +10,7 @@ public enum BookFieldSource {
     WIKIDATA,
     HARDCOVER,
     WIKIPEDIA,
-    ITUNES
+    ITUNES,
+    /** A pending row's stored values, merged as the fallback behind every live source. */
+    STAGED
 }
