@@ -21,6 +21,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -86,6 +87,14 @@ public class Book {
     @Column(name = "cover_url")
     @Nullable
     private String coverUrl;
+
+    @Column(name = "cover_object_key")
+    @Nullable
+    private String coverObjectKey;
+
+    @Nullable
+    @Column(name = "cover_checked_at")
+    private OffsetDateTime coverCheckedAt;
 
     @Column(name = "first_publish_year")
     @Nullable
@@ -165,8 +174,8 @@ public class Book {
     /**
      * Applies {@code source} to this book. Descriptive columns (title, description, cover, year,
      * isbn, pages, language, subjects) overwrite with the source value including null; source ids
-     * and the rating and series columns are filled only when the source supplies them, via
-     * {@link #accrueFrom}.
+     * and the rating columns are filled only when the source supplies them, via {@link #accrueFrom}.
+     * The series columns are not touched here; {@link #applySeries} sets them with its own guard.
      *
      * <p>Authors are not touched here; the catalog service owns the {@code book_author} join
      * because attaching authors requires repository lookups for de-duplication.
@@ -183,6 +192,7 @@ public class Book {
         this.title = sourceTitle;
         this.subtitle = source.subtitle();
         this.description = source.description();
+        invalidateMirrorIfCoverChanged(source.coverUrl());
         this.coverUrl = source.coverUrl();
         this.firstPublishYear = source.publicationYear();
         this.isbn = source.isbn13();
@@ -192,6 +202,19 @@ public class Book {
         replaceAwards(source.awards());
         accrueFrom(source);
         assignDedupKey();
+    }
+
+    /**
+     * Clears the mirrored object when the source cover URL changes, so the image endpoint and backfill
+     * re-mirror instead of serving the cover stored for the old URL.
+     */
+    // PMD.NullAssignment: nulling the mirror-state columns is how "not mirrored" is recorded
+    @SuppressWarnings("PMD.NullAssignment")
+    private void invalidateMirrorIfCoverChanged(final @Nullable String newCoverUrl) {
+        if (!Objects.equals(this.coverUrl, newCoverUrl)) {
+            this.coverObjectKey = null;
+            this.coverCheckedAt = null;
+        }
     }
 
     /**
@@ -214,11 +237,12 @@ public class Book {
     }
 
     /**
-     * Fills source ids and the rating and series fields without overwriting a set value with null.
+     * Fills source ids and the rating fields without overwriting a set value with null.
      *
      * <p>The source rating lives in {@code averageRating} and {@code ratingCount} and the reader
      * rating in {@code communityAverage} and {@code communityCount}, so enrichment refreshes the
-     * source rating freely without touching the reader aggregate.
+     * source rating freely without touching the reader aggregate. The series is set separately by
+     * {@link #applySeries} because clearing it depends on whether its authority resolved.
      */
     private void accrueFrom(final SourceBook source) {
         this.googleBooksVolumeId = coalesce(source.googleBooksVolumeId(), this.googleBooksVolumeId);
@@ -228,8 +252,23 @@ public class Book {
         this.wikidataQid = coalesce(source.wikidataQid(), this.wikidataQid);
         this.averageRating = coalesce(toRating(source.averageRating()), this.averageRating);
         this.ratingCount = coalesce(source.ratingCount(), this.ratingCount);
-        this.seriesName = coalesce(source.seriesName(), this.seriesName);
-        this.seriesPosition = coalesce(source.seriesPosition(), this.seriesPosition);
+    }
+
+    /**
+     * Sets the series name and position when {@code authorityResolved}, clearing both when the
+     * resolved authority reported no volume, and leaving the stored series untouched otherwise.
+     *
+     * <p>Series does not use the fill-only-if-null accrual the rating and ids use: clearing a
+     * mislabelled series needs a null to overwrite, but a clear is trusted only when the authority
+     * resolved, so a failed or timed-out collect does not wipe a real series.
+     */
+    public void applySeries(
+        final @Nullable String name, final @Nullable Integer position, final boolean authorityResolved) {
+        if (!authorityResolved) {
+            return;
+        }
+        this.seriesName = name;
+        this.seriesPosition = position;
     }
 
     private static <T> @Nullable T coalesce(final @Nullable T value, final @Nullable T fallback) {
@@ -385,6 +424,15 @@ public class Book {
 
     public void setCoverUrl(@Nullable final String coverUrl) {
         this.coverUrl = coverUrl;
+    }
+
+    @Nullable
+    public String getCoverObjectKey() {
+        return coverObjectKey;
+    }
+
+    public void setCoverObjectKey(@Nullable final String coverObjectKey) {
+        this.coverObjectKey = coverObjectKey;
     }
 
     @Nullable

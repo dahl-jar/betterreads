@@ -158,7 +158,8 @@ class DescriptionSelectorTest {
             .wikidataQid(QID)
             .authors(List.of(SourceAuthor.ofName(AUTHOR)))
             .build();
-        return new MergedBook(book, Map.of(BookField.TITLE, BookFieldSource.GOOGLE_BOOKS), Set.of());
+        return new MergedBook(book, Map.of(BookField.TITLE, BookFieldSource.GOOGLE_BOOKS),
+            Set.of(), Set.of(BookFieldSource.GOOGLE_BOOKS));
     }
 
     private static DescriptionSource source(final String description) {

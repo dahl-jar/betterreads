@@ -79,6 +79,8 @@ dependencies {
 	implementation("com.bucket4j:bucket4j_jdk17-core:8.14.0")
 	implementation("com.bucket4j:bucket4j_jdk17-lettuce:8.14.0")
 	implementation("com.meilisearch.sdk:meilisearch-java:0.20.1")
+	implementation("io.minio:minio:8.5.17")
+	implementation("net.coobird:thumbnailator:0.4.20")
 
 	annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
 	implementation("org.jspecify:jspecify:1.0.0")

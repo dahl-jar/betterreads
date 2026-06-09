@@ -107,6 +107,28 @@
     </Match>
 
     <!--
+      EI_EXPOSE_REP2 on the cover-mirroring beans. Same rationale: each holds Spring-managed
+      singletons (the MinioClient, the cover WebClient, the ImageStore, repositories), never mutated
+      after construction and shared by design.
+    -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.betterreads.integration.minio.MinioImageStore"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.betterreads.integration.image.CoverFetchClient"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.betterreads.catalog.service.source.CoverMirrorService"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.betterreads.catalog.service.read.CoverImageService"/>
+    </Match>
+
+    <!--
       EI_EXPOSE_REP2 on the review service, its writer, and controller. Same rationale as the
       shelf beans above: each holds Spring-managed singleton repositories, the mapper, and the
       writer, none mutated after construction. A defensive copy is meaningless for these.

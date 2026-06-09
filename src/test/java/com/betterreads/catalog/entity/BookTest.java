@@ -11,7 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-/** Unit tests for {@link Book#applyFrom} subject handling and source-id accrual. */
+/** Unit tests for {@link Book} subject handling, source-id accrual, and the guarded series write. */
 class BookTest {
 
     private static final String FANTASY = "fantasy";
@@ -105,6 +105,58 @@ class BookTest {
             assertThat(book.getLocLccn())
                 .as("a Google or OL refresh that carries no LCCN must not wipe the LoC one")
                 .isEqualTo(DUNE_LCCN);
+        }
+    }
+
+    @Nested
+    @DisplayName("applySeries")
+    class ApplySeries {
+
+        private static final String SERIES = "The Sun Eater";
+
+        @Test
+        @DisplayName("a resolved authority with a numbered volume sets the name and position")
+        void resolvedVolumeIsSet() {
+            final Book book = new Book();
+
+            book.applySeries(SERIES, 1, true);
+
+            assertThat(book).satisfies(applied -> {
+                assertThat(applied.getSeriesName()).isEqualTo(SERIES);
+                assertThat(applied.getSeriesPosition()).isEqualTo(1);
+            });
+        }
+
+        @Test
+        @DisplayName("a resolved authority with no series clears an existing label")
+        void resolvedNullClearsExisting() {
+            final Book book = new Book();
+            book.applySeries(SERIES, 1, true);
+
+            book.applySeries(null, null, true);
+
+            assertThat(book).satisfies(applied -> {
+                assertThat(applied.getSeriesName())
+                    .as("the authority resolved and reported no volume, so the stale label is cleared")
+                    .isNull();
+                assertThat(applied.getSeriesPosition()).isNull();
+            });
+        }
+
+        @Test
+        @DisplayName("an unresolved authority keeps the existing label, so a transient miss does not wipe it")
+        void unresolvedNullKeepsExisting() {
+            final Book book = new Book();
+            book.applySeries(SERIES, 2, true);
+
+            book.applySeries(null, null, false);
+
+            assertThat(book).satisfies(applied -> {
+                assertThat(applied.getSeriesName())
+                    .as("no series authority resolved this run, so the existing series is kept")
+                    .isEqualTo(SERIES);
+                assertThat(applied.getSeriesPosition()).isEqualTo(2);
+            });
         }
     }
 

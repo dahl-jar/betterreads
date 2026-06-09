@@ -1,6 +1,6 @@
 # How to deploy
 
-Production runs on a single-node k3s cluster, deployed by Argo CD from a Git manifests repo. This runbook covers shipping a new version, rolling back, changing config, and restarting workloads.
+Production runs on a single-node k3s cluster, deployed by Argo CD from a Git manifests repo.
 
 `kubectl` reaches the cluster API over the private network. Confirm access first:
 

@@ -102,23 +102,22 @@ public class PendingBookService {
         }
         final SourceBook staged = mapper.toSourceBook(row);
         final MergedBook collected = sourceCollector.collectFor(staged);
-        promoter.promote(dedupKey, keepStagedSignals(collected, staged));
+        promoter.promote(dedupKey, keepStagedRating(collected, staged));
     }
 
     /**
-     * Restores the rating and series the candidate was staged with when the collect re-merge dropped
-     * them. Promotion rebuilds the staged row as a single OpenLibrary-tagged book, but the merger
-     * resolves rating and series only from Hardcover and Wikidata, so those staged signals would
-     * otherwise be lost on every promotion.
+     * Restores the staged rating when the collect re-merge dropped it. The merger resolves the rating
+     * only from Hardcover, so a re-promotion where Hardcover returns no match would otherwise lose it.
+     *
+     * <p>The series is not restored. The fresh merge is its authority, so a stale staged series is
+     * dropped; {@link com.betterreads.catalog.entity.Book#applySeries} keeps a real one on a
+     * transient miss.
      */
-    private static MergedBook keepStagedSignals(final MergedBook collected, final SourceBook staged) {
+    private static MergedBook keepStagedRating(final MergedBook collected, final SourceBook staged) {
         final SourceBook book = collected.book();
         final SourceBook restored = book.toBuilder()
             .averageRating(book.averageRating() == null ? staged.averageRating() : book.averageRating())
             .ratingCount(book.ratingCount() == null ? staged.ratingCount() : book.ratingCount())
-            .seriesName(book.seriesName() == null ? staged.seriesName() : book.seriesName())
-            .seriesPosition(
-                book.seriesPosition() == null ? staged.seriesPosition() : book.seriesPosition())
             .build();
         return collected.withBook(restored);
     }

@@ -1,5 +1,7 @@
 package com.betterreads.catalog.service.read;
 
+import com.betterreads.catalog.service.source.BookFieldSource;
+import com.betterreads.catalog.service.source.MergedBook;
 import com.betterreads.catalog.service.source.SourceAuthor;
 import com.betterreads.catalog.service.source.SourceBook;
 
@@ -52,12 +54,29 @@ public class CatalogServiceImpl implements CatalogService {
     @Transactional
     @CacheEvict(cacheNames = "bookDetails", key = "#result.dedupKey")
     public Book upsertFromSource(final SourceBook source) {
+        return upsert(source, true);
+    }
+
+    @Override
+    @Transactional
+    @CacheEvict(cacheNames = "bookDetails", key = "#result.dedupKey")
+    public Book upsertFromSource(final MergedBook merged) {
+        return upsert(merged.book(), seriesAuthorityResolved(merged));
+    }
+
+    private Book upsert(final SourceBook source, final boolean seriesAuthorityResolved) {
         final Book book = findExistingForSource(source)
             .map(this::lockAndRefresh)
             .orElseGet(Book::new);
         book.applyFrom(source);
+        book.applySeries(source.seriesName(), source.seriesPosition(), seriesAuthorityResolved);
         attachAuthors(book, source.authors());
         return bookRepository.save(book);
+    }
+
+    /** Returns true when Hardcover resolved on the collect, the condition for clearing a stored series. */
+    private static boolean seriesAuthorityResolved(final MergedBook merged) {
+        return merged.resolved(BookFieldSource.HARDCOVER);
     }
 
     private Book lockAndRefresh(final Book existing) {

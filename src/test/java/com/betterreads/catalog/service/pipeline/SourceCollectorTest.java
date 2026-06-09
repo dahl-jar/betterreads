@@ -49,6 +49,8 @@ class SourceCollectorTest {
 
     private static final String OL_WORK_KEY = "OL1W";
 
+    private static final String UNMATCHED_ISBN = "other-isbn";
+
     @Test
     @DisplayName("fetches every source by ISBN and merges them with the seed")
     void collectsAllSourcesByIsbn() {
@@ -105,7 +107,7 @@ class SourceCollectorTest {
             .title(TITLE)
             .build();
         final SourceCollector collector = new SourceCollector(new SourceMerger(),
-            List.of(stubByIsbn(BookFieldSource.HARDCOVER, "other-isbn", null)),
+            List.of(stubByIsbn(BookFieldSource.HARDCOVER, UNMATCHED_ISBN, null)),
             new DescriptionSelector(List.of()), SAME_THREAD);
 
         final MergedBook merged = collector.collectFor(seed);
@@ -245,6 +247,56 @@ class SourceCollectorTest {
         assertThat(merged.book().averageRating())
             .as("a runtime exception from one source is contained; the rest still enrich the book")
             .isEqualTo(HARDCOVER_RATING);
+    }
+
+    @Test
+    @DisplayName("a source that resolves, hit or clean empty, is recorded as resolved")
+    void recordsResolvedSourcesOnSuccess() {
+        final SourceBook seed = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+            .isbn13(ISBN)
+            .title(TITLE)
+            .build();
+        final SourceBook hardcoverHit = SourceBook.builder(BookFieldSource.HARDCOVER)
+            .isbn13(ISBN)
+            .averageRating(HARDCOVER_RATING)
+            .build();
+        final SourceCollector collector = new SourceCollector(new SourceMerger(),
+            List.of(
+                stubByIsbn(BookFieldSource.HARDCOVER, ISBN, hardcoverHit),
+                stubByIsbn(BookFieldSource.GOOGLE_BOOKS, UNMATCHED_ISBN, null)),
+            new DescriptionSelector(List.of()), SAME_THREAD);
+
+        final MergedBook merged = collector.collectFor(seed);
+
+        assertThat(merged.resolvedSources())
+            .as("the seed, a source with a hit, and a source with a clean empty all resolved")
+            .contains(BookFieldSource.OPEN_LIBRARY, BookFieldSource.HARDCOVER,
+                BookFieldSource.GOOGLE_BOOKS);
+    }
+
+    @Test
+    @DisplayName("a source that fails is not recorded as resolved")
+    void omitsFailedSourceFromResolved() {
+        final SourceBook seed = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+            .isbn13(ISBN)
+            .title(TITLE)
+            .build();
+        final SourceBook hardcoverHit = SourceBook.builder(BookFieldSource.HARDCOVER)
+            .isbn13(ISBN)
+            .averageRating(HARDCOVER_RATING)
+            .build();
+        final SourceCollector collector = new SourceCollector(new SourceMerger(),
+            List.of(
+                failingByIsbn(BookFieldSource.GOOGLE_BOOKS),
+                stubByIsbn(BookFieldSource.HARDCOVER, ISBN, hardcoverHit)),
+            new DescriptionSelector(List.of()), SAME_THREAD);
+
+        final MergedBook merged = collector.collectFor(seed);
+
+        assertThat(merged.resolvedSources())
+            .as("Google threw a 503, so it did not resolve; Hardcover and the seed did")
+            .contains(BookFieldSource.HARDCOVER, BookFieldSource.OPEN_LIBRARY)
+            .doesNotContain(BookFieldSource.GOOGLE_BOOKS);
     }
 
     private static BookSourceClient failingByIsbn(final BookFieldSource source) {

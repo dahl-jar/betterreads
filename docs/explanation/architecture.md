@@ -4,7 +4,7 @@
 
 Spring Boot, organised by feature. Each feature module owns its `controller`, `service`, `repository`, `entity`, `dto`, and `mapper` subpackages. External-API integrations live under `integration/<vendor>/`. Cross-cutting concerns (`common/exception`, `common/web`, `common/util`) sit at the top level.
 
-The feature modules are `auth`, `catalog`, and `search`, with five source integrations under `integration/` (Library of Congress, Wikidata, Google Books, OpenLibrary, Hardcover) and a transactional mail outbox under `mail`. ArchUnit enforces the same shape across all of them.
+The feature modules are `auth`, `catalog`, `search`, `collections` (bookshelves and reading status), `reviews` (reader reviews and the community rating), and `comments`. Under `integration/` are the five catalog sources (Library of Congress, Wikidata, Google Books, OpenLibrary, Hardcover), two description-only sources (Wikipedia, Apple Books), an image fetcher, and a MinIO client. A transactional mail outbox lives under `mail`. ArchUnit enforces the same shape across all of them.
 
 ## Stack
 
@@ -13,9 +13,10 @@ The feature modules are `auth`, `catalog`, and `search`, with five source integr
 - Spring Web, Spring Data JPA, Spring Security (resource server for Cloudflare Access JWT validation)
 - PostgreSQL 17
 - Meilisearch for full-text catalog search
+- MinIO for stored book covers
 - Redis for the book-detail cache and shared rate-limit buckets
 - Caffeine for in-process caches
-- WebClient for the five source integrations
+- WebClient for the source integrations and cover downloads
 - Flyway for migrations
 - Testcontainers for integration tests
 - JJWT for app-issued tokens, Bucket4j for rate limiting
@@ -23,11 +24,11 @@ The feature modules are `auth`, `catalog`, and `search`, with five source integr
 ## Implementation rules
 
 - Controllers don't call repositories directly. ArchUnit fails the build if they try.
-- JPA entities don't cross the API boundary. DTO records do.
+- The API sends and receives record DTOs. JPA entities stay in the service and repository layers.
 - Secrets come from environment variables bound to `@ConfigurationProperties`, never from `application.properties`.
-- Spring Security owns authentication and authorization. There are three filter chains: public API on `:8080` (JWT), management endpoints on `127.0.0.1:8081` (Cloudflare Access JWT), and Swagger UI on a relaxed CSP scoped to docs paths.
+- Spring Security owns authentication and authorization. The public API authenticates with the app JWT; the management endpoints are bound to the internal interface and require a separate token; Swagger UI is served on its own chain.
 - Global exception handling lives in `common/exception/GlobalExceptionHandler` and returns a consistent error shape.
-- Database indexes for common lookups, defined in Flyway migrations rather than `@Index` annotations.
+- Database indexes for common lookups, defined in Flyway migrations.
 
 ## Data access
 
@@ -35,7 +36,7 @@ Spring Data JPA repositories. Read paths use derived query methods or `@Query` w
 
 ## Background work
 
-Long-running and request-path-unfriendly work runs in scheduled jobs (`@Scheduled`): a mail outbox worker drains queued mail, an hourly sweep hard-deletes accounts past their grace window, a promoter moves staging books to the catalog once they are complete, a refresh job re-pulls stale catalog data, and a reconciler keeps the Meilisearch index in step with the database. Request handlers stay synchronous and bounded; anything slower is queued for one of these.
+Long-running and request-path-unfriendly work runs in scheduled jobs (`@Scheduled`): a mail outbox worker drains queued mail, an hourly sweep hard-deletes accounts past their grace window, a promoter moves staging books to the catalog once they are complete, a refresh job re-pulls stale catalog data, a reconciler keeps the Meilisearch index in step with the database, and two backfills fill thin book descriptions and mirror covers into MinIO. Each backfill runs on its own single-thread executor with a re-entry guard, walks the catalog a bounded slice at a time, and is idempotent. Request handlers stay synchronous and bounded; anything slower is queued for one of these.
 
 ## Testing
 

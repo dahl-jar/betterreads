@@ -9,8 +9,10 @@ import com.betterreads.catalog.service.source.SourceMerger;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -83,31 +85,41 @@ public class SourceCollector {
     public MergedBook collectFor(final SourceBook seed) {
         final List<SourceBook> found = new ArrayList<>();
         found.add(seed);
-        for (final List<BookFieldSource> wave : WAVES) {
-            found.addAll(fetchWave(wave, seed));
+        final Set<BookFieldSource> resolved = EnumSet.noneOf(BookFieldSource.class);
+        if (seed.source() != null) {
+            resolved.add(seed.source());
         }
-        return descriptionSelector.withBestDescription(merger.merge(seed, found));
+        for (final List<BookFieldSource> wave : WAVES) {
+            for (final Fetched fetched : fetchWave(wave, seed)) {
+                resolved.add(fetched.source());
+                if (fetched.book() != null) {
+                    found.add(fetched.book());
+                }
+            }
+        }
+        final MergedBook merged = merger.merge(seed, found).withResolvedSources(resolved);
+        return descriptionSelector.withBestDescription(merged);
     }
 
-    private List<SourceBook> fetchWave(final List<BookFieldSource> wave, final SourceBook seed) {
-        final List<CompletableFuture<Optional<SourceBook>>> calls = sourceClients.stream()
+    private List<Fetched> fetchWave(final List<BookFieldSource> wave, final SourceBook seed) {
+        final List<CompletableFuture<Fetched>> calls = sourceClients.stream()
             .filter(client -> client.source() != null && wave.contains(client.source()))
             .filter(client -> client.source() != seed.source())
             .map(client -> CompletableFuture.supplyAsync(() -> fetch(client, seed), executor))
             .toList();
         awaitWave(calls);
         return calls.stream()
-            .flatMap(SourceCollector::completedValue)
+            .flatMap(SourceCollector::completed)
             .toList();
     }
 
     /**
      * Waits up to one timeout for the whole wave, then cancels whatever is still running. One timeout
-     * covers the wave, not one per source. A failed source is harvested as empty by
-     * {@link #completedValue}; the rest still merge.
+     * covers the wave, not one per source. A source still running at the timeout is cancelled and
+     * harvested as unresolved by {@link #completed}; the rest still merge.
      */
     @SuppressWarnings("PMD.DoNotUseThreads")
-    private static void awaitWave(final List<CompletableFuture<Optional<SourceBook>>> calls) {
+    private static void awaitWave(final List<CompletableFuture<Fetched>> calls) {
         try {
             CompletableFuture.allOf(calls.toArray(CompletableFuture[]::new))
                 .get(PER_CALL_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
@@ -121,11 +133,12 @@ public class SourceCollector {
         }
     }
 
-    private static Stream<SourceBook> completedValue(final CompletableFuture<Optional<SourceBook>> call) {
+    private static Stream<Fetched> completed(final CompletableFuture<Fetched> call) {
         if (!call.isDone() || call.isCompletedExceptionally() || call.isCancelled()) {
             return Stream.empty();
         }
-        return call.getNow(Optional.empty()).stream();
+        final Fetched fetched = call.getNow(null);
+        return fetched == null ? Stream.empty() : Stream.of(fetched);
     }
 
     private static List<BookSourceClient> order(final List<BookSourceClient> clients) {
@@ -142,21 +155,29 @@ public class SourceCollector {
         return index < 0 ? FETCH_ORDER.size() : index;
     }
 
-    private static Optional<SourceBook> fetch(final BookSourceClient client, final SourceBook seed) {
+    /**
+     * Fetches one source and reports whether it resolved. A returned {@code Fetched} means the source
+     * ran and answered, with or without a hit; {@code null} means it failed and did not resolve.
+     */
+    private static @Nullable Fetched fetch(final BookSourceClient client, final SourceBook seed) {
         try {
-            final String isbn = seed.isbn13();
-            if (isbn != null) {
-                final Optional<SourceBook> byIsbn = client.fetchByIsbn(isbn);
-                if (byIsbn.isPresent()) {
-                    return byIsbn;
-                }
-            }
-            return fetchByTitleAuthor(client, seed);
+            return new Fetched(client.source(), match(client, seed).orElse(null));
         } catch (WebClientException ex) {
             LOG.warn("catalog.collect source {} failed ({}), skipping it for this book",
                 client.source(), ex.getClass().getSimpleName());
-            return Optional.empty();
+            return null;
         }
+    }
+
+    private static Optional<SourceBook> match(final BookSourceClient client, final SourceBook seed) {
+        final String isbn = seed.isbn13();
+        if (isbn != null) {
+            final Optional<SourceBook> byIsbn = client.fetchByIsbn(isbn);
+            if (byIsbn.isPresent()) {
+                return byIsbn;
+            }
+        }
+        return fetchByTitleAuthor(client, seed);
     }
 
     private static Optional<SourceBook> fetchByTitleAuthor(
@@ -171,5 +192,9 @@ public class SourceCollector {
 
     private static String firstAuthor(final List<String> authors) {
         return authors.get(0);
+    }
+
+    /** One source's resolved result: the source that ran and the book it matched, or null for no match. */
+    private record Fetched(BookFieldSource source, @Nullable SourceBook book) {
     }
 }

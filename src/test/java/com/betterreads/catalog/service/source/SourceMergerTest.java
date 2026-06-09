@@ -13,6 +13,8 @@ import org.junit.jupiter.api.Test;
  * resolving each field by the priority order in {@code source-trust.md}: subjects are unioned across
  * every source, every other field takes the first source in its chain that supplies a value.
  */
+// PMD.TooManyMethods: one test per resolved field plus the series and description cases.
+@SuppressWarnings("PMD.TooManyMethods")
 class SourceMergerTest {
 
     private static final int ORIGINAL_YEAR = 1965;
@@ -32,6 +34,10 @@ class SourceMergerTest {
     private static final String EDITION_TITLE = "Dune (2019 Edition)";
 
     private static final String SERIES = "Dune Saga";
+
+    private static final int HARDCOVER_VOLUME = 1;
+
+    private static final int WIKIDATA_VOLUME = 3;
 
     private static final String SCIENCE_FICTION = "science fiction";
 
@@ -207,17 +213,22 @@ class SourceMergerTest {
             final SourceBook wikidata = SourceBook.builder(BookFieldSource.WIKIDATA)
                 .title(TITLE)
                 .seriesName(SERIES)
+                .seriesPosition(WIKIDATA_VOLUME)
                 .build();
             final SourceBook hardcover = SourceBook.builder(BookFieldSource.HARDCOVER)
                 .title(TITLE)
                 .seriesName(TITLE)
+                .seriesPosition(HARDCOVER_VOLUME)
                 .build();
 
             final MergedBook merged = merger.merge(List.of(wikidata, hardcover));
 
-            assertThat(merged.book().seriesName())
-                .as("the series comes from Hardcover when both Hardcover and Wikidata have it")
-                .isEqualTo(TITLE);
+            assertThat(merged.book()).satisfies(book -> {
+                assertThat(book.seriesName())
+                    .as("the series comes from Hardcover when both Hardcover and Wikidata have it")
+                    .isEqualTo(TITLE);
+                assertThat(book.seriesPosition()).isEqualTo(HARDCOVER_VOLUME);
+            });
         }
 
         @Test
@@ -229,11 +240,56 @@ class SourceMergerTest {
             final SourceBook wikidata = SourceBook.builder(BookFieldSource.WIKIDATA)
                 .title(TITLE)
                 .seriesName(SERIES)
+                .seriesPosition(WIKIDATA_VOLUME)
                 .build();
 
             final MergedBook merged = merger.merge(List.of(hardcover, wikidata));
 
-            assertThat(merged.book().seriesName()).isEqualTo(SERIES);
+            assertThat(merged.book()).satisfies(book -> {
+                assertThat(book.seriesName()).isEqualTo(SERIES);
+                assertThat(book.seriesPosition()).isEqualTo(WIKIDATA_VOLUME);
+            });
+        }
+
+        @Test
+        @DisplayName("a source with a series name but no position contributes no series")
+        void seriesNameWithoutPositionIsNotAVolume() {
+            final SourceBook hardcover = SourceBook.builder(BookFieldSource.HARDCOVER)
+                .title(TITLE)
+                .seriesName(SERIES)
+                .build();
+
+            final MergedBook merged = merger.merge(List.of(hardcover));
+
+            assertThat(merged.book()).satisfies(book -> {
+                assertThat(book.seriesName())
+                    .as("a name without a volume position is a companion-style tag, not a series")
+                    .isNull();
+                assertThat(book.seriesPosition()).isNull();
+            });
+        }
+
+        @Test
+        @DisplayName("the series name and position always come from the same source")
+        void seriesNameAndPositionComeFromOneSource() {
+            final SourceBook hardcover = SourceBook.builder(BookFieldSource.HARDCOVER)
+                .title(TITLE)
+                .seriesName(TITLE)
+                .build();
+            final SourceBook wikidata = SourceBook.builder(BookFieldSource.WIKIDATA)
+                .title(TITLE)
+                .seriesName(SERIES)
+                .seriesPosition(WIKIDATA_VOLUME)
+                .build();
+
+            final MergedBook merged = merger.merge(List.of(hardcover, wikidata));
+
+            assertThat(merged.book()).satisfies(book -> {
+                assertThat(book.seriesName())
+                    .as("Hardcover's name-only tag is skipped; Wikidata supplies both fields together")
+                    .isEqualTo(SERIES);
+                assertThat(book.seriesPosition()).isEqualTo(WIKIDATA_VOLUME);
+            });
         }
 
         @Test

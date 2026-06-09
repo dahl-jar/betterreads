@@ -104,6 +104,10 @@ final class HardcoverBookNodeMapper {
      * Returns the built book with its featured series applied, for the author path where the book is
      * not enumerated under one position. The series path sets position itself and uses
      * {@link #toBuilder} instead.
+     *
+     * <p>The series is applied only when the featured membership carries a numbered volume position.
+     * A companion, guide, or anthology is tagged to the series with a null position, which would
+     * otherwise stamp a series name with no volume and read as book one.
      */
     static Optional<SourceBook> toSourceBookWithSeries(final @Nullable HardcoverBookNode node) {
         if (node == null) {
@@ -124,10 +128,11 @@ final class HardcoverBookNodeMapper {
             .findFirst()
             .orElse(memberships.get(0));
         final HardcoverBookNode.Series series = membership.series();
-        if (series == null || series.name() == null) {
+        final Integer position = membership.position();
+        if (series == null || series.name() == null || position == null || position < 1) {
             return builder;
         }
-        return builder.seriesName(series.name()).seriesPosition(membership.position());
+        return builder.seriesName(series.name()).seriesPosition(position);
     }
 
     private static boolean isCanonical(final HardcoverBookNode node) {

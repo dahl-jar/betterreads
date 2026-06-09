@@ -8,6 +8,7 @@ import com.betterreads.catalog.entity.Book;
 import com.betterreads.catalog.entity.BookAward;
 import com.betterreads.catalog.entity.BookSubject;
 import com.betterreads.catalog.entity.PendingBook;
+import com.betterreads.catalog.image.CoverImages;
 import com.betterreads.catalog.service.source.SourceAuthor;
 import com.betterreads.catalog.service.source.SourceBook;
 import org.jspecify.annotations.Nullable;
@@ -24,8 +25,11 @@ public class BookDetailMapper {
 
     private final PendingBookMapper pendingBookMapper;
 
-    public BookDetailMapper(final PendingBookMapper pendingBookMapper) {
+    private final CoverImages coverImages;
+
+    public BookDetailMapper(final PendingBookMapper pendingBookMapper, final CoverImages coverImages) {
         this.pendingBookMapper = pendingBookMapper;
+        this.coverImages = coverImages;
     }
 
     /** Maps a promoted book, marked complete. */
@@ -35,7 +39,7 @@ public class BookDetailMapper {
             .subtitle(book.getSubtitle())
             .authors(book.getAuthors().stream().map(Author::getName).sorted().toList())
             .description(book.getDescription())
-            .coverUrl(book.getCoverUrl())
+            .coverUrl(coverImages.servedUrl(book.getDedupKey(), book.getCoverUrl()))
             .firstPublishYear(book.getFirstPublishYear())
             .isbn(book.getIsbn())
             .pageCount(book.getPageCount())
@@ -57,7 +61,7 @@ public class BookDetailMapper {
             .subtitle(seed.subtitle())
             .authors(names(seed.authors()))
             .description(seed.description())
-            .coverUrl(seed.coverUrl())
+            .coverUrl(coverImages.servedUrl(row.getDedupKey(), seed.coverUrl()))
             .firstPublishYear(seed.publicationYear())
             .isbn(seed.isbn13())
             .pageCount(seed.pageCount())

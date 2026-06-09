@@ -141,6 +141,9 @@ betterreads:
     description-backfill:
       enabled: ${CATALOG_DESCRIPTION_BACKFILL_ENABLED:true}
       full-sweep: ${CATALOG_DESCRIPTION_FULL_SWEEP:false}
+    cover-backfill:
+      enabled: ${CATALOG_COVER_BACKFILL_ENABLED:true}
+      full-sweep: ${CATALOG_COVER_FULL_SWEEP:false}
   cache:
     book-detail-ttl: ${BOOK_DETAIL_CACHE_TTL:PT24H}
 
@@ -187,6 +190,19 @@ meilisearch:
   host: ${MEILISEARCH_HOST:http://localhost:7700}
   master-key: ${MEILI_MASTER_KEY:dev-placeholder-set-MEILI_MASTER_KEY-for-real-use}
   index-name: ${MEILISEARCH_INDEX_NAME:books}
+
+minio:
+  endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+  bucket: ${MINIO_BUCKET:betterreads-images}
+  access-key: ${MINIO_ACCESS_KEY:minioadmin}
+  secret-key: ${MINIO_SECRET_KEY:minioadmin}
+
+cover-fetch:
+  connect-timeout: ${COVER_FETCH_CONNECT_TIMEOUT:5000}
+  read-timeout: ${COVER_FETCH_READ_TIMEOUT:10000}
+
+images:
+  public-base-url: ${IMAGES_PUBLIC_BASE_URL:${SPRINGDOC_PUBLIC_URL:http://localhost:8080}}
 
 springdoc:
   api-docs:

@@ -60,7 +60,7 @@ public class PendingBookPromoter {
         mapper.applyTo(row, collected);
         final MissingFields missing = requiredFields.check(collected.book());
         if (missing.isReady()) {
-            final Book promoted = catalogService.upsertFromSource(collected.book());
+            final Book promoted = catalogService.upsertFromSource(collected);
             row.setStatus(STATUS_PROMOTED);
             events.publishEvent(new BookPromotedEvent(promoted.getDedupKey()));
         } else {

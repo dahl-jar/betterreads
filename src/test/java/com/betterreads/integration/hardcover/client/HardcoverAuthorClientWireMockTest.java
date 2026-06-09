@@ -96,10 +96,17 @@ class HardcoverAuthorClientWireMockTest {
               "default_physical_edition": {"language": {"language": "English"}}}},
             {"book": {"id": 5, "title": "The Way of Kings", "users_count": 7897,
               "canonical_id": null,
+              "default_physical_edition": {"language": {"language": "English"}}}},
+            {"book": {"id": 7, "title": "The World of Mistborn", "users_count": 20,
+              "canonical_id": null, "book_category_id": 1,
+              "book_series": [
+                {"position": null, "featured": true, "series": {"name": "Mistborn"}}],
               "default_physical_edition": {"language": {"language": "English"}}}}
           ]
         }]}}
         """;
+
+    private static final String COMPANION = "The World of Mistborn";
 
     private static final WireMockServer WIREMOCK = startServer();
 
@@ -178,7 +185,7 @@ class HardcoverAuthorClientWireMockTest {
 
             assertThat(works.books())
                 .extracting(SourceBook::title)
-                .containsExactly(MISTBORN, "The Way of Kings");
+                .containsExactly(MISTBORN, "The Way of Kings", COMPANION);
         }
 
         @Test
@@ -193,6 +200,22 @@ class HardcoverAuthorClientWireMockTest {
                 .as("the bind-up has 9000 readers, above The Way of Kings, so reader order alone "
                     + "would rank it second; the compilation flag is what excludes it")
                 .doesNotContain("Mistborn & The Stormlight Archive");
+        }
+
+        @Test
+        @DisplayName("a null-position featured membership leaves the book unlabelled, not volume null")
+        void nullPositionMembershipCarriesNoSeries() {
+            stubSearchAndEnum();
+
+            final SourceAuthorWorks works = client.fetchAuthorWorks(QUERY).orElseThrow();
+
+            assertThat(works.books())
+                .filteredOn(book -> COMPANION.equals(book.title()))
+                .first()
+                .satisfies(book -> {
+                    assertThat(book.seriesName()).isNull();
+                    assertThat(book.seriesPosition()).isNull();
+                });
         }
 
         @Test
