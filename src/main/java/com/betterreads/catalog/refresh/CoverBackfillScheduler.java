@@ -1,8 +1,8 @@
 package com.betterreads.catalog.refresh;
 
 import java.util.concurrent.Executor;
-import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.betterreads.common.scheduling.SkipIfRunningExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -28,9 +28,7 @@ class CoverBackfillScheduler {
 
     private final CoverBackfillProperties properties;
 
-    private final Executor executor;
-
-    private final AtomicBoolean running = new AtomicBoolean();
+    private final SkipIfRunningExecutor executor;
 
     CoverBackfillScheduler(
         final CoverBackfillService backfillService,
@@ -39,7 +37,7 @@ class CoverBackfillScheduler {
     ) {
         this.backfillService = backfillService;
         this.properties = properties;
-        this.executor = coverBackfillExecutor;
+        this.executor = new SkipIfRunningExecutor(coverBackfillExecutor);
     }
 
     @Scheduled(cron = "0 30 4 * * *")
@@ -47,22 +45,16 @@ class CoverBackfillScheduler {
         if (!properties.enabled()) {
             return;
         }
-        if (!running.compareAndSet(false, true)) {
+        if (!executor.tryRun(this::runOnce)) {
             LOG.info("catalog.cover-backfill previous run still in progress, skipping this trigger");
-            return;
         }
-        executor.execute(this::runOnce);
     }
 
     private void runOnce() {
-        try {
-            if (properties.fullSweep()) {
-                backfillService.fullSweep();
-            } else {
-                backfillService.backfillSlice();
-            }
-        } finally {
-            running.set(false);
+        if (properties.fullSweep()) {
+            backfillService.fullSweep();
+        } else {
+            backfillService.backfillSlice();
         }
     }
 }

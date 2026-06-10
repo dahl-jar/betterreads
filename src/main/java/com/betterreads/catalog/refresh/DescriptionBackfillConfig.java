@@ -2,6 +2,7 @@ package com.betterreads.catalog.refresh;
 
 import java.util.concurrent.Executor;
 
+import com.betterreads.common.scheduling.JobExecutors;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -13,6 +14,6 @@ public class DescriptionBackfillConfig {
 
     @Bean
     Executor descriptionBackfillExecutor() {
-        return BackfillExecutors.singleThread("description-backfill-");
+        return JobExecutors.singleThread("description-backfill-");
     }
 }

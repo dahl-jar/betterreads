@@ -7,13 +7,13 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Wires the single-thread executor the cover backfill runs on, off the shared scheduler thread.
+ * Wires the single-thread executor the catalog refresh runs on, off the shared scheduler thread.
  */
 @Configuration
-public class CoverBackfillConfig {
+public class CatalogRefreshConfig {
 
     @Bean
-    Executor coverBackfillExecutor() {
-        return JobExecutors.singleThread("cover-backfill-");
+    Executor catalogRefreshExecutor() {
+        return JobExecutors.singleThread("catalog-refresh-");
     }
 }
