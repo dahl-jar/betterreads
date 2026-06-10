@@ -59,6 +59,21 @@ public class PendingBookPromoter {
         this.events = events;
     }
 
+    /**
+     * Records a failed promotion attempt, counting it toward the candidate's retry backoff and
+     * retirement cap.
+     *
+     * <p>Runs in its own transaction: the failed promote's transaction rolled back, so a stamp written
+     * there is lost, and an unstamped candidate re-enters every poll at full source cost.
+     */
+    @Transactional
+    public void recordFailedAttempt(final String dedupKey) {
+        pendingBooks.findByDedupKey(dedupKey).ifPresent(row -> {
+            recordAttempt(row);
+            pendingBooks.save(row);
+        });
+    }
+
     /** Marks the candidate a duplicate of an existing row, ending its promotion retries. */
     @Transactional
     public void markDuplicate(final String dedupKey) {
