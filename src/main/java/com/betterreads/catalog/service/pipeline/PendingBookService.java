@@ -121,8 +121,9 @@ public class PendingBookService {
      * Collects and promotes one candidate, absorbing its failure so the poll reaches the rest.
      *
      * <p>An integrity violation means the candidate resolves a source id another row already owns,
-     * which no retry changes, so it is retired as a duplicate. Any other failure leaves the
-     * candidate PENDING for the next poll.
+     * which no retry changes, so it is retired as a duplicate. Any other failure records the attempt
+     * in a fresh transaction; the candidate retries after the backoff window and the attempt cap can
+     * retire it.
      */
     // Checkstyle.IllegalCatch + PMD.AvoidCatchingGenericException: one candidate must not stop the poll
     @SuppressWarnings({"checkstyle:IllegalCatch", "PMD.AvoidCatchingGenericException"})
@@ -140,8 +141,9 @@ public class PendingBookService {
                 LogSanitizer.forLog(dedupKey));
             promoter.markDuplicate(dedupKey);
         } catch (RuntimeException ex) {
-            LOG.warn("catalog.staging promotion failed, candidate retries next poll dedupKey={} ({})",
+            LOG.warn("catalog.staging promotion failed, candidate retries after backoff dedupKey={} ({})",
                 LogSanitizer.forLog(dedupKey), ex.getClass().getSimpleName());
+            promoter.recordFailedAttempt(dedupKey);
         }
     }
 

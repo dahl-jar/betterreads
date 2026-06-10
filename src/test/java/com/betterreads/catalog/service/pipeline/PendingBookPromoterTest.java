@@ -19,7 +19,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 
-/** An incomplete candidate's failed attempt is recorded, and the attempt cap retires it. */
+/** Incomplete and failed promotions both record an attempt, and the attempt cap retires the candidate. */
 class PendingBookPromoterTest {
 
     private static final String DEDUP_KEY = "9780441013593";
@@ -27,6 +27,8 @@ class PendingBookPromoterTest {
     private static final String TITLE = "Dune";
 
     private static final String STATUS_PENDING = "PENDING";
+
+    private static final String STATUS_INCOMPLETE_FINAL = "INCOMPLETE_FINAL";
 
     private final PendingBookRepository pendingBooks = mock(PendingBookRepository.class);
 
@@ -57,7 +59,33 @@ class PendingBookPromoterTest {
 
         promoter.promote(DEDUP_KEY, incompleteDune());
 
-        assertThat(row.getStatus()).isEqualTo("INCOMPLETE_FINAL");
+        assertThat(row.getStatus()).isEqualTo(STATUS_INCOMPLETE_FINAL);
+    }
+
+    @Test
+    @DisplayName("a failed promotion records the attempt and stays PENDING below the cap")
+    void failedPromotionRecordsAttempt() {
+        final PendingBook row = pendingRow(0);
+        when(pendingBooks.findByDedupKey(DEDUP_KEY)).thenReturn(Optional.of(row));
+
+        promoter.recordFailedAttempt(DEDUP_KEY);
+
+        assertThat(row).satisfies(attempted -> {
+            assertThat(attempted.getAttemptCount()).isEqualTo(1);
+            assertThat(attempted.getLastAttemptAt()).isNotNull();
+            assertThat(attempted.getStatus()).isEqualTo(STATUS_PENDING);
+        });
+    }
+
+    @Test
+    @DisplayName("the failed attempt that reaches the cap retires the candidate")
+    void failedAttemptReachingCapRetires() {
+        final PendingBook row = pendingRow(PendingBookPromoter.MAX_ATTEMPTS - 1);
+        when(pendingBooks.findByDedupKey(DEDUP_KEY)).thenReturn(Optional.of(row));
+
+        promoter.recordFailedAttempt(DEDUP_KEY);
+
+        assertThat(row.getStatus()).isEqualTo(STATUS_INCOMPLETE_FINAL);
     }
 
     private static PendingBook pendingRow(final int attemptCount) {

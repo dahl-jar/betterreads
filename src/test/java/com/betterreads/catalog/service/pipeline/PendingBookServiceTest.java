@@ -40,8 +40,8 @@ class PendingBookServiceTest {
         promoter);
 
     @Test
-    @DisplayName("a transient promotion failure leaves the candidate PENDING and the poll continues")
-    void transientFailureRetriesLaterAndPollContinues() {
+    @DisplayName("a promotion failure records the attempt, skips DUPLICATE, and the poll continues")
+    void failureRecordsAttemptAndPollContinues() {
         when(pendingBooks.findPendingNotAttemptedSince(any()))
             .thenReturn(List.of(row(FAILING_KEY, FAILING_TITLE), row(NEXT_KEY, NEXT_TITLE)));
         when(pendingBooks.findByDedupKey(FAILING_KEY)).thenReturn(Optional.of(row(FAILING_KEY, FAILING_TITLE)));
@@ -51,6 +51,7 @@ class PendingBookServiceTest {
 
         service.promoteReady();
 
+        verify(promoter).recordFailedAttempt(FAILING_KEY);
         verify(promoter).promote(eq(NEXT_KEY), any());
         verify(promoter, never()).markDuplicate(FAILING_KEY);
     }
