@@ -179,6 +179,20 @@ class ItunesDescriptionSourceWireMockTest {
 
             assertThat(description).isEmpty();
         }
+
+        @Test
+        @DisplayName("a store-marketing first result loses to the publisher blurb behind it")
+        void marketingFirstResultLosesToThePublisherBlurb() {
+            final String marketing = "Available only on Apple Books, this enhanced edition is an "
+                + "amazing way to explore the rich world of the series. Stay on top of the story "
+                + "lines with annotations, glossaries, and family trees.";
+            stubSearch(resultsJson(resultEntry(TITLE, marketing), resultEntry(TITLE, BLURB)));
+
+            final Optional<String> description = source.fetch(
+                new DescriptionLookup(null, null, TITLE, AUTHOR));
+
+            assertThat(description).contains(BLURB);
+        }
     }
 
     private static DescriptionLookup lookup() {
@@ -198,8 +212,16 @@ class ItunesDescriptionSourceWireMockTest {
     }
 
     private static String resultJson(final String trackName, final String description) {
-        return "{ \"resultCount\": 1, \"results\": [ { \"trackName\": \"" + trackName + "\", "
-            + "\"description\": \"" + description + "\" } ] }";
+        return resultsJson(resultEntry(trackName, description));
+    }
+
+    private static String resultsJson(final String... entries) {
+        return "{ \"resultCount\": " + entries.length + ", \"results\": [ "
+            + String.join(", ", entries) + " ] }";
+    }
+
+    private static String resultEntry(final String trackName, final String description) {
+        return "{ \"trackName\": \"" + trackName + "\", \"description\": \"" + description + "\" }";
     }
 
     private static WireMockServer startServer() {

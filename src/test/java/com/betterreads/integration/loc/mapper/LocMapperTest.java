@@ -76,7 +76,7 @@ class LocMapperTest {
         <identifier type="lccn">92159876</identifier>""");
 
     private static final String EYE = sru("""
-        <titleInfo><title>The Eye of the World</title></titleInfo>
+        <titleInfo><nonSort xml:space="preserve">The </nonSort><title>eye of the world</title></titleInfo>
         <name type="personal" usage="primary"><namePart>Jordan, Robert.</namePart></name>
         <physicalDescription><extent>xiv, 670 p., [3] p. of plates : maps ; 24 cm.</extent></physicalDescription>
         <relatedItem type="series"><titleInfo><title>TOR fantasy</title></titleInfo></relatedItem>
@@ -179,6 +179,24 @@ class LocMapperTest {
             assertThat(map(HOBBIT).pageCount())
                 .as("272 pages, then 36 pages of plates, parses to 272")
                 .isEqualTo(HOBBIT_PAGES);
+        }
+
+        @Test
+        @DisplayName("joins the nonSort article onto the title")
+        void joinsNonSortArticleOntoTitle() {
+            assertThat(map(EYE).title())
+                .as("MODS splits the leading article into nonSort")
+                .isEqualTo("The eye of the world");
+        }
+
+        @Test
+        @DisplayName("joins an elided nonSort onto the title without a space")
+        void joinsElidedNonSortWithoutSpace() {
+            final String stranger = sru("""
+                <titleInfo><nonSort xml:space="preserve">L'</nonSort><title>étranger</title></titleInfo>
+                <identifier type="lccn">89015952</identifier>""");
+
+            assertThat(map(stranger).title()).isEqualTo("L'étranger");
         }
 
         @Test

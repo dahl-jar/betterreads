@@ -222,6 +222,10 @@
         <Bug pattern="CRLF_INJECTION_LOGS"/>
         <Class name="com.betterreads.catalog.pipeline.CatalogPipelineLocalDbVerification"/>
     </Match>
+    <Match>
+        <Bug pattern="CRLF_INJECTION_LOGS"/>
+        <Class name="com.betterreads.catalog.pipeline.DescriptionBackfillLocalDbVerification"/>
+    </Match>
 
     <!--
       CRLF_INJECTION_LOGS on the catalog source fan-out. These warn lines log a BookFieldSource enum
