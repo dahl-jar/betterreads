@@ -2,6 +2,7 @@ package com.betterreads.integration.itunes;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -34,7 +35,7 @@ public class ItunesApi {
 
     private static final String EBOOK_MEDIA = "ebook";
 
-    private static final int SEARCH_LIMIT = 1;
+    private static final int SEARCH_LIMIT = 3;
 
     private static final Duration MAX_TOKEN_WAIT = Duration.ofSeconds(5);
 
@@ -50,13 +51,14 @@ public class ItunesApi {
         this.rateLimiter = rateLimiter;
     }
 
-    /** Returns the first result's title and description for the search term, or empty when none. */
-    public Optional<ItunesResult> firstResult(final String term) {
-        return search(term)
-            .map(body -> JSON.readTree(body).path("results").path(0))
+    /** Returns the search's results that carry a description, at most {@link #SEARCH_LIMIT}. */
+    public List<ItunesResult> results(final String term) {
+        return search(term).stream()
+            .flatMap(body -> JSON.readTree(body).path("results").valueStream())
             .map(node -> new ItunesResult(
                 node.path("trackName").asString(""), node.path("description").asString("")))
-            .filter(result -> !result.description().isBlank());
+            .filter(result -> !result.description().isBlank())
+            .toList();
     }
 
     private Optional<String> search(final String term) {

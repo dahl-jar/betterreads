@@ -4,11 +4,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
 
+import com.betterreads.catalog.entity.Author;
 import com.betterreads.catalog.entity.Book;
+import com.betterreads.catalog.entity.PendingBook;
 import com.betterreads.catalog.repository.BookRepository;
 import com.betterreads.catalog.repository.PendingBookRepository;
 import com.betterreads.catalog.service.pipeline.CatalogSearchService;
 import com.betterreads.catalog.service.pipeline.PendingBookService;
+import com.betterreads.catalog.service.pipeline.SourceCollector;
+import com.betterreads.catalog.service.source.BookFieldSource;
+import com.betterreads.catalog.service.source.MergedBook;
+import com.betterreads.catalog.service.source.SourceAuthor;
+import com.betterreads.catalog.service.source.SourceBook;
 import com.betterreads.common.util.LogSanitizer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -46,6 +53,16 @@ class CatalogPipelineLocalDbVerification {
 
     private static final String AUTHOR_QUERY = "Brandon Sanderson";
 
+    private static final String NOVEL_TITLE = "The Eye of the World";
+
+    private static final String NOVEL_HARDCOVER_ID = "77104";
+
+    private static final String JORDAN = "Robert Jordan";
+
+    private static final int NOVEL_YEAR = 1990;
+
+    private static final int COMPANION_YEAR = 1997;
+
     private static final List<String> SERIES_QUERIES = List.of(
         "the wheel of time",
         "a song of ice and fire",
@@ -56,6 +73,9 @@ class CatalogPipelineLocalDbVerification {
 
     @Autowired
     private CatalogSearchService searchService;
+
+    @Autowired
+    private SourceCollector sourceCollector;
 
     @Autowired
     private PendingBookService pendingBookService;
@@ -100,9 +120,59 @@ class CatalogPipelineLocalDbVerification {
                 .satisfies(value -> {
                     assertThat(value.getSeriesName()).isEqualTo("The Wheel of Time");
                     assertThat(value.getSeriesPosition()).isEqualTo(FIRST_POSITION);
-                    assertThat(value.getTitle()).isEqualTo("The Eye of the World");
+                    assertThat(value.getTitle()).isEqualTo(NOVEL_TITLE);
                     assertThat(value.getAverageRating()).isNotNull();
                 }));
+    }
+
+    @Test
+    @DisplayName("staging the companion guide leaves the already-promoted novel untouched")
+    void companionGuideDoesNotOverwriteTheNovel() {
+        pendingBooks.deleteAll();
+        books.deleteAll();
+
+        stageAndPromote(SourceBook.builder(BookFieldSource.HARDCOVER)
+            .hardcoverId(NOVEL_HARDCOVER_ID)
+            .title(NOVEL_TITLE)
+            .authors(SourceAuthor.ofNames(List.of(JORDAN)))
+            .publicationYear(NOVEL_YEAR)
+            .description("The Wheel of Time turns and Ages come and pass, leaving memories that "
+                + "become legend. Legend fades to myth, and even myth is long forgotten when the "
+                + "Age that gave it birth returns again.")
+            .coverUrl("https://assets.hardcover.app/edition/30621010/97e433a0.png")
+            .build());
+
+        stageAndPromote(SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+            .openLibraryWorkKey("OL1946690W")
+            .title("The world of Robert Jordan's the wheel of time")
+            .authors(SourceAuthor.ofNames(List.of(JORDAN, "Teresa Patterson")))
+            .publicationYear(COMPANION_YEAR)
+            .build());
+
+        final Book novel = books.findByHardcoverId(NOVEL_HARDCOVER_ID).orElseThrow();
+        assertThat(novel.getTitle())
+            .as("the novel keeps its title after the companion stages")
+            .isEqualTo(NOVEL_TITLE);
+        assertThat(novel.getAuthors())
+            .extracting(Author::getName)
+            .as("the novel keeps its sole author")
+            .containsExactly(JORDAN);
+
+        final List<String> stagedKeys = pendingBooks.findAll().stream()
+            .map(PendingBook::getDedupKey)
+            .toList();
+        assertThat(stagedKeys)
+            .as("the novel and the companion hold separate staging rows")
+            .hasSize(2)
+            .doesNotHaveDuplicates();
+    }
+
+    /** Stages and promotes one seed the way {@link CatalogSearchService} does for a search hit. */
+    private void stageAndPromote(final SourceBook seed) {
+        final MergedBook merged = sourceCollector.collectFor(seed);
+        final String dedupKey = merged.book().dedupKey();
+        pendingBookService.stage(merged);
+        pendingBookService.promoteNow(dedupKey, merged);
     }
 
     @Test

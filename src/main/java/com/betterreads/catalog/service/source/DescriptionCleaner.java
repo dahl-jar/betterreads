@@ -38,6 +38,8 @@ public final class DescriptionCleaner {
 
     private static final Pattern MULTI_SPACE = Pattern.compile("[ \\t\\u00a0]{2,}");
 
+    private static final Pattern SPACE_BEFORE_PUNCTUATION = Pattern.compile("[ \\t]+([.,;:!?])");
+
     private static final int HEX_RADIX = 16;
 
     private static final int DECIMAL_RADIX = 10;
@@ -53,7 +55,7 @@ public final class DescriptionCleaner {
             return "";
         }
         String text = description.replace("\r\n", "\n").replace('\r', '\n');
-        text = HTML_TAG.matcher(text).replaceAll("");
+        text = HTML_TAG.matcher(text).replaceAll(" ");
         text = decodeEntities(text);
         text = decodeNumericEntities(text);
         text = INLINE_LINK.matcher(text).replaceAll("$1");
@@ -65,6 +67,7 @@ public final class DescriptionCleaner {
         text = LIST_BULLET.matcher(text).replaceAll("");
         text = THEMATIC_BREAK.matcher(text).replaceAll("");
         text = MULTI_SPACE.matcher(text).replaceAll(" ");
+        text = SPACE_BEFORE_PUNCTUATION.matcher(text).replaceAll("$1");
         text = TRAILING_SPACE.matcher(text).replaceAll("");
         text = BLANK_RUN.matcher(text).replaceAll("\n\n");
         return text.strip();

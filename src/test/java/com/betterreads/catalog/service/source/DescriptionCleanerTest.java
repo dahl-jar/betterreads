@@ -33,6 +33,26 @@ class DescriptionCleanerTest {
     }
 
     @Test
+    @DisplayName("a tag between sentences becomes a space, not a glued word")
+    void separatesSentencesAtTags() {
+        final String raw = "<p>Moiraine arrives in the Two Rivers!</p><p>The Eye of the World begins.</p>";
+
+        final String cleaned = DescriptionCleaner.clean(raw);
+
+        assertThat(cleaned).isEqualTo("Moiraine arrives in the Two Rivers! The Eye of the World begins.");
+    }
+
+    @Test
+    @DisplayName("an inline tag leaves no space before the following punctuation")
+    void leavesNoSpaceBeforePunctuationAfterInlineTags() {
+        final String raw = "He reads <i>Dune</i>, then sleeps.";
+
+        final String cleaned = DescriptionCleaner.clean(raw);
+
+        assertThat(cleaned).isEqualTo("He reads Dune, then sleeps.");
+    }
+
+    @Test
     @DisplayName("decodes a numeric non-breaking-space entity to a plain space")
     void decodesNumericEntity() {
         final String raw = "Hadrian is lost.<br />&#xa0;<br />For half a century he has searched.";

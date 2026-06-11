@@ -62,7 +62,7 @@ public class LocMapper {
         return SourceBook.builder(BookFieldSource.LOC)
             .isbn13(ModsIdentifiers.isbn13(mods))
             .locLccn(ModsIdentifiers.firstOfType(mods, "lccn"))
-            .title(SruTree.firstText(SruTree.firstByTag(mods, "titleInfo"), "title"))
+            .title(title(mods))
             .description(summary(mods))
             .publicationYear(marcYear(mods).orElse(null))
             .pageCount(pageCount(mods).orElse(null))
@@ -72,6 +72,24 @@ public class LocMapper {
             .seriesName(ModsSeries.name(mods))
             .seriesPosition(ModsSeries.position(mods).orElse(null))
             .build();
+    }
+
+    /**
+     * Returns the record's title with the leading article joined on. MODS files the article in a
+     * separate {@code nonSort} element; an elided article like {@code L'} joins without a space.
+     */
+    private static @Nullable String title(final JsonNode mods) {
+        final JsonNode titleInfo = SruTree.firstByTag(mods, "titleInfo");
+        final String title = SruTree.firstText(titleInfo, "title");
+        if (title == null) {
+            return null;
+        }
+        final String nonSort = SruTree.firstText(titleInfo, "nonSort");
+        if (nonSort == null || nonSort.isBlank()) {
+            return title;
+        }
+        final String article = nonSort.strip();
+        return article.endsWith("'") ? article + title : article + " " + title;
     }
 
     private static @Nullable List<String> authorNames(final JsonNode mods) {

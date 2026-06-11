@@ -5,7 +5,10 @@ import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Optional;
+
 import com.betterreads.catalog.service.source.BookFieldSource;
+import com.betterreads.catalog.service.source.SourceBook;
 import com.betterreads.integration.loc.LocProperties;
 import com.betterreads.integration.loc.LocSru;
 import com.betterreads.integration.loc.LocWebClientConfig;
@@ -54,6 +57,7 @@ class LocClientWireMockTest {
 
     private static final String SRU_PATH = "/lcdb";
     private static final String DUNE_LCCN = "2019287107";
+    private static final String JORDAN = "Robert Jordan";
 
     private static final WireMockServer WIREMOCK = startServer();
 
@@ -65,6 +69,16 @@ class LocClientWireMockTest {
         <name type="personal" usage="primary"><namePart>Herbert, Frank,</namePart></name>
         <identifier type="isbn">9780593099322</identifier>
         <identifier type="lccn">2019287107</identifier>
+        </mods></zs:recordData></zs:record></zs:records></zs:searchRetrieveResponse>""";
+
+    private static final String EYE_SRU = """
+        <?xml version="1.0"?>
+        <zs:searchRetrieveResponse xmlns:zs="http://www.loc.gov/zing/srw/"><zs:records><zs:record>\
+        <zs:recordData><mods xmlns="http://www.loc.gov/mods/v3" version="3.8">
+        <titleInfo><nonSort xml:space="preserve">The </nonSort><title>eye of the world</title></titleInfo>
+        <name type="personal" usage="primary"><namePart>Jordan, Robert,</namePart></name>
+        <identifier type="isbn">9780312850098</identifier>
+        <identifier type="lccn">89007939</identifier>
         </mods></zs:recordData></zs:record></zs:records></zs:searchRetrieveResponse>""";
 
     @Autowired
@@ -145,6 +159,33 @@ class LocClientWireMockTest {
             client.fetchByTitleAuthor("Du\"ne", "Herbert");
 
             WIREMOCK.verify(sruQueryContaining("bath.title=\"Dune\""));
+        }
+
+        @Test
+        @DisplayName("keeps the record whose title matches the queried title")
+        void keepsAMatchingRecord() {
+            WIREMOCK.stubFor(get(urlPathEqualTo(SRU_PATH)).willReturn(xml(EYE_SRU)));
+
+            final Optional<SourceBook> result =
+                client.fetchByTitleAuthor("The Eye of the World", JORDAN);
+
+            assertThat(result)
+                .isPresent()
+                .get()
+                .satisfies(book -> assertThat(book.isbn13()).isEqualTo("9780312850098"));
+        }
+
+        @Test
+        @DisplayName("rejects a record for a different work that shares the query's keywords")
+        void rejectsADriftedRecord() {
+            WIREMOCK.stubFor(get(urlPathEqualTo(SRU_PATH)).willReturn(xml(EYE_SRU)));
+
+            final Optional<SourceBook> result = client.fetchByTitleAuthor(
+                "The World of Robert Jordan's The Wheel of Time", JORDAN);
+
+            assertThat(result)
+                .as("a keyword match on a different work's record must not attach its identifiers")
+                .isEmpty();
         }
     }
 
