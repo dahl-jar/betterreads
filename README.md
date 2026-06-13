@@ -1,6 +1,8 @@
 # BetterReads
 
-Backend service for BetterReads, a book tracking app. Spring Boot on Java 25, Postgres, deployed at [api.betterreadsapp.com](https://api.betterreadsapp.com). API documentation at [api.betterreadsapp.com/swagger-ui.html](https://api.betterreadsapp.com/swagger-ui.html).
+Backend service for BetterReads, a book tracking app. Spring Boot on Java 25, Postgres.
+
+> The backend isn't live right now, for personal reasons. Everything still works; run it locally with the [Quickstart](#quickstart) below.
 
 ## Background
 
@@ -12,7 +14,7 @@ A catalog book is assembled from five sources: Library of Congress, Wikidata, Go
 
 Descriptions get a second pass from Wikipedia and Apple Books, cleaned of markup and scored so the best one wins. Covers are downloaded once, re-encoded to a size-capped JPEG, stored in MinIO, and served from the API. Scheduled jobs fill short descriptions and copy covers the live path missed.
 
-Search runs on Meilisearch with typo tolerance and a relevance-score floor that drops weak fuzzy matches. A Meilisearch outage returns an empty result rather than failing the request.
+Search runs on Meilisearch with typo tolerance and a relevance-score floor that drops weak fuzzy matches.
 
 Schema changes go through Flyway, and the runtime database role has no DDL privileges. Production runs on a single-node Kubernetes cluster behind a Cloudflare Tunnel, deployed by Argo CD.
 
@@ -69,6 +71,8 @@ docker compose -f docker/docker-compose.yml --env-file .env down -v   # stop and
 Controller calls service, service calls repository. Each feature package has its own controller, service, repository, entity, dto, and mapper subpackages. The API uses record DTOs; JPA entities stay in the service and repository layers. Each external source has its own client, DTOs, and mapper under `integration/<vendor>/`, so a source's own data shape stays at the edge. ArchUnit enforces the layering. See [docs/explanation/architecture.md](docs/explanation/architecture.md).
 
 ## Deployment
+
+The live deployment is paused for personal reasons. Here's how it runs when it's up.
 
 Production runs on a single-node k3s cluster. The app, Postgres, Redis, Meilisearch, and MinIO run as Kubernetes workloads, synced from a Git repo by Argo CD. CI builds the container image and pushes it to GHCR after the quality gate passes.
 
