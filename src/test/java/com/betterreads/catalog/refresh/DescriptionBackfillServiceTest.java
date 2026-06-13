@@ -1,5 +1,6 @@
 package com.betterreads.catalog.refresh;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -19,6 +20,7 @@ import com.betterreads.catalog.service.pipeline.DescriptionSelector;
 import com.betterreads.catalog.service.source.DescriptionLookup;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -42,6 +44,10 @@ class DescriptionBackfillServiceTest {
     private static final long OTHER_BOOK_ID = 99L;
 
     private static final String DEDUP_KEY = "OL1W";
+
+    private static final String WORK_KEY = "OL77W";
+
+    private static final String HARDCOVER_ID = "42";
 
     private static final String BOOK_DETAIL_CACHE = "bookDetails";
 
@@ -97,6 +103,23 @@ class DescriptionBackfillServiceTest {
         service.backfillSlice();
 
         verify(books).updateDescription(eq(OTHER_BOOK_ID), eq(STRONG), any(OffsetDateTime.class));
+    }
+
+    @Test
+    @DisplayName("the lookup carries the row's work key and Hardcover id for the id-keyed sources")
+    void lookupCarriesTheRowsSourceIds() {
+        final Book book = bookNeedingDescription();
+        book.setOpenLibraryWorkKey(WORK_KEY);
+        book.setHardcoverId(HARDCOVER_ID);
+        when(books.findDescriptionBackfillCandidates(anyInt(), any(Pageable.class))).thenReturn(List.of(book));
+        when(selector.bestDescription(any(DescriptionLookup.class), any())).thenReturn(Optional.empty());
+
+        service.backfillSlice();
+
+        final ArgumentCaptor<DescriptionLookup> lookup = ArgumentCaptor.forClass(DescriptionLookup.class);
+        verify(selector).bestDescription(lookup.capture(), eq(WEAK));
+        assertThat(lookup.getValue().openLibraryWorkKey()).isEqualTo(WORK_KEY);
+        assertThat(lookup.getValue().hardcoverId()).isEqualTo(HARDCOVER_ID);
     }
 
     @Test

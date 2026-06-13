@@ -7,6 +7,7 @@ import com.betterreads.catalog.service.source.BookFieldSource;
 import com.betterreads.catalog.service.source.CatalogGenres;
 import com.betterreads.catalog.service.source.SourceAuthor;
 import com.betterreads.catalog.service.source.SourceBook;
+import com.betterreads.integration.hardcover.dto.HardcoverBookNode;
 import com.betterreads.integration.hardcover.dto.HardcoverDocument;
 import com.betterreads.integration.hardcover.dto.HardcoverDocument.FeaturedSeries;
 import org.jspecify.annotations.Nullable;
@@ -24,6 +25,11 @@ public class HardcoverMapper {
     static final int MAX_GENRES = 25;
 
     private static final Pattern ISBN_13 = Pattern.compile("97[89]\\d{10}");
+
+    /** Returns the {@link SourceBook} for a books-table node, or null when it does not qualify. */
+    public @Nullable SourceBook toSourceBook(final @Nullable HardcoverBookNode node) {
+        return HardcoverBookNodeMapper.toSourceBookWithSeries(node).orElse(null);
+    }
 
     /** Returns the {@link SourceBook} for a Hardcover document, or null if it has no title. */
     public @Nullable SourceBook toSourceBook(final @Nullable HardcoverDocument document) {

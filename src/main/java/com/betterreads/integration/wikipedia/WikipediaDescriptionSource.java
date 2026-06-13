@@ -16,6 +16,9 @@ import tools.jackson.databind.JsonNode;
  * the article title is not guessed, since "Red Rising (novel)" is sometimes just "Red Rising". The
  * Wikipedia REST summary then supplies a neutral encyclopedic extract. A book with no QID, no
  * {@code enwiki} sitelink, or a non-standard page resolves to empty.
+ *
+ * <p>Fallback-only: the article lead states who wrote and published the book, not what happens in
+ * it.
  */
 @Component
 public class WikipediaDescriptionSource implements DescriptionSource {
@@ -34,6 +37,11 @@ public class WikipediaDescriptionSource implements DescriptionSource {
     @Override
     public BookFieldSource source() {
         return BookFieldSource.WIKIPEDIA;
+    }
+
+    @Override
+    public boolean fallbackOnly() {
+        return true;
     }
 
     @Override

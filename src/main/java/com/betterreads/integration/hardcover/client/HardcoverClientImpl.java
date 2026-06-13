@@ -11,7 +11,9 @@ import com.betterreads.catalog.service.source.SourceBook;
 import com.betterreads.common.util.LogSanitizer;
 import com.betterreads.common.util.TextMatch;
 import com.betterreads.integration.hardcover.HardcoverClient;
+import com.betterreads.integration.hardcover.dto.BookByIdResponse;
 import com.betterreads.integration.hardcover.dto.GraphQlRequest;
+import com.betterreads.integration.hardcover.dto.HardcoverBookNode;
 import com.betterreads.integration.hardcover.dto.HardcoverDocument;
 import com.betterreads.integration.hardcover.dto.TypesenseHits;
 import com.betterreads.integration.hardcover.dto.TypesenseSearchResponse;
@@ -29,7 +31,8 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  *
  * <p>One search call resolves a book; the hit document already carries every field. Hardcover ranks
  * by relevance, not edition quality. The canonical work is the hit with the most reads, and
- * {@link #titleMatches} rejects a pick that drifted off the query. A 401 means the token expired or
+ * {@link #titleMatches} rejects a pick that drifted off the query. A by-id fetch queries the books
+ * table directly, since the search index does not match on ids. A 401 means the token expired or
  * was revoked and resolves to empty; other 4xx resolve to empty; 5xx and network failures propagate.
  */
 @Component
@@ -40,6 +43,28 @@ public class HardcoverClientImpl implements HardcoverClient {
     private static final String SEARCH_QUERY = """
         query Search($q: String!) {
           search(query: $q, query_type: "Book", per_page: 5, page: 1) { results }
+        }
+        """;
+
+    private static final String BOOK_BY_ID_QUERY = """
+        query BookById($id: Int!) {
+          books(where: {id: {_eq: $id}}) {
+            id
+            title
+            description
+            rating
+            ratings_count
+            users_count
+            release_year
+            canonical_id
+            book_category_id
+            compilation
+            is_partial_book
+            image { url }
+            default_physical_edition { language { language } reading_format { format } }
+            contributions { author { name } }
+            book_series { position featured series { name } }
+          }
         }
         """;
 
@@ -76,7 +101,25 @@ public class HardcoverClientImpl implements HardcoverClient {
 
     @Override
     public Optional<SourceBook> fetchByHardcoverId(final String hardcoverId) {
-        return searchAndMap(hardcoverId, document -> hardcoverId.equals(document.id()));
+        final Integer id = HardcoverGraphQl.parseId(hardcoverId);
+        if (id == null) {
+            return Optional.empty();
+        }
+        return bookById(id).map(mapper::toSourceBook);
+    }
+
+    private Optional<HardcoverBookNode> bookById(final Integer id) {
+        try {
+            final BookByIdResponse response = hardcoverWebClient.post()
+                .bodyValue(new GraphQlRequest(BOOK_BY_ID_QUERY, Map.of("id", id)))
+                .retrieve()
+                .bodyToMono(BookByIdResponse.class)
+                .block();
+            return BookByIdResponse.firstBook(response);
+        } catch (WebClientResponseException exception) {
+            HardcoverGraphQl.recoverOrThrow(LOG, exception, String.valueOf(id));
+            return Optional.empty();
+        }
     }
 
     private Optional<SourceBook> searchAndMap(

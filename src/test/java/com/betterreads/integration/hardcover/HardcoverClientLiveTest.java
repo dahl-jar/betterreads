@@ -141,4 +141,18 @@ class HardcoverClientLiveTest {
             .as("Hardcover has no such book; the client must return empty, not the closest drift hit")
             .isEmpty();
     }
+
+    @Test
+    @DisplayName("a Hardcover id resolves the book record with its description")
+    void byIdReturnsTheBook() {
+        final Optional<SourceBook> result = client.fetchByHardcoverId("427626");
+
+        assertThat(result)
+            .isPresent()
+            .get()
+            .satisfies(book -> {
+                assertThat(book.title()).isEqualTo("The Emperor's Soul");
+                assertThat(book.description()).contains("Shai");
+            });
+    }
 }

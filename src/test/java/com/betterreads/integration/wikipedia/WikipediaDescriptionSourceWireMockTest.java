@@ -162,14 +162,14 @@ class WikipediaDescriptionSourceWireMockTest {
         @DisplayName("a null QID resolves to empty without a call")
         void nullQidIsEmpty() {
             final Optional<String> description = source.fetch(
-                new DescriptionLookup(null, ISBN, TITLE, AUTHOR));
+                new DescriptionLookup(null, ISBN, TITLE, AUTHOR, null, null));
 
             assertThat(description).isEmpty();
         }
     }
 
     private static DescriptionLookup lookup(final String qid) {
-        return new DescriptionLookup(qid, ISBN, TITLE, AUTHOR);
+        return new DescriptionLookup(qid, ISBN, TITLE, AUTHOR, null, null);
     }
 
     private static void stubJson(final String path, final String body) {

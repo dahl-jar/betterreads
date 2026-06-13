@@ -5,13 +5,18 @@ import java.util.Optional;
 /**
  * A source consulted for a book's description alone.
  *
- * <p>Wikipedia and Apple Books carry descriptions but no catalog record worth merging, so they fill
- * the description field for a book the catalog already identifies.
+ * <p>These sources fill the description field for a book the catalog already identifies, without
+ * contributing a catalog record to the merge.
  */
 public interface DescriptionSource {
 
     /** Returns the source identity. */
     BookFieldSource source();
+
+    /** Returns true when the source competes only after every other source came up empty. */
+    default boolean fallbackOnly() {
+        return false;
+    }
 
     /**
      * Returns a description for the book the lookup identifies, or empty when none is found.
