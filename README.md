@@ -78,6 +78,8 @@ Production runs on a single-node k3s cluster. The app, Postgres, Redis, Meilisea
 
 The cluster has no public ports open. A `cloudflared` Deployment connects out to Cloudflare's edge and maps `api.betterreadsapp.com` to the in-cluster ingress, which handles DNS and TLS termination. Metrics and logs ship to Grafana Cloud via a Grafana Alloy agent in the cluster.
 
+The Kubernetes manifests, Argo CD setup, sealed secrets, and network policies live in a template repo: [betterreads-gitops-template](https://github.com/dahl-jar/betterreads-gitops-template).
+
 ## Docs
 
 Reference:
