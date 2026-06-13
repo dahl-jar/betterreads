@@ -2,20 +2,24 @@ package com.betterreads.catalog.service.source;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
+
+import com.betterreads.common.util.EnglishText;
 
 /**
  * Cleans a source description, judges whether it is a usable blurb, and scores the usable ones.
  *
- * <p>The score counts only the sentences that describe the story. Sentences about the publication
- * (publisher, release dates, sequels, editions) count for nothing, so a description that is all
- * publication facts is rejected even at a healthy length. An over-long blurb is cut at the last
- * sentence end under the ceiling.
+ * <p>Publication-fact sentences (publisher, release dates, sequels, editions, marketing leads) are
+ * stripped from the head and tail of the text, and each one left in the interior subtracts a
+ * penalty, so an all-facts description is rejected and a pure story blurb outranks one wrapped in
+ * marketing. The score grows with story length up to the ideal and decays gently past it, so a
+ * long real blurb still outranks a short stub. An over-long blurb is cut at the last sentence end
+ * under the ceiling.
  *
- * <p>Also rejected: a stub under the floor, a catalog-wiki dump (a heading plus a bulleted edition
- * list), and library-catalog boilerplate prefixes. A dump is detected on the raw text, since
- * cleaning would flatten the structure that marks it.
+ * <p>Also rejected: text that is not English, a stub under the floor, a catalog-wiki dump (a
+ * heading plus a bulleted edition list), and library-catalog boilerplate prefixes. A dump is
+ * detected on the raw text, since cleaning would flatten the structure that marks it.
  */
 public final class DescriptionQuality {
 
@@ -25,7 +29,9 @@ public final class DescriptionQuality {
 
     private static final int MAX_LENGTH = 2400;
 
-    private static final int OVERSHOOT_PENALTY = 2;
+    private static final int OVERSHOOT_DIVISOR = 4;
+
+    private static final int FACT_SENTENCE_PENALTY = 60;
 
     private static final Pattern SENTENCE_BREAK = Pattern.compile("(?<=[.!?])\\s+");
 
@@ -35,15 +41,18 @@ public final class DescriptionQuality {
         Pattern.compile("\\bbestselling author\\b", Pattern.CASE_INSENSITIVE),
         Pattern.compile("\\b(?:novel|book|memoir|anthology|collection) by\\b", Pattern.CASE_INSENSITIVE),
         Pattern.compile("\\bthe (?:first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth"
-            + "|\\d{1,2}(?:st|nd|rd|th))\\s+(?:book|novel|volume|instal?lment)\\s+in\\b",
+            + "|\\d{1,2}(?:st|nd|rd|th))(?:\\s+and\\s+\\w+)?\\s+(?:book|novel|volume|instal?lment)\\s+in\\b",
             Pattern.CASE_INSENSITIVE),
         Pattern.compile("\\b(?:followed|preceded) by\\b", Pattern.CASE_INSENSITIVE),
         Pattern.compile("\\bconsists of\\b", Pattern.CASE_INSENSITIVE),
-        Pattern.compile("\\bedition\\b", Pattern.CASE_INSENSITIVE),
+        Pattern.compile("\\beditions?\\b", Pattern.CASE_INSENSITIVE),
         Pattern.compile("\\baudiobook\\b", Pattern.CASE_INSENSITIVE),
         Pattern.compile("\\bcritics\\b", Pattern.CASE_INSENSITIVE),
         Pattern.compile("\\b(?:critical|commercial) (?:acclaim|success)\\b", Pattern.CASE_INSENSITIVE),
-        Pattern.compile("\\bwon the\\b[^.!?]*\\baward\\b", Pattern.CASE_INSENSITIVE));
+        Pattern.compile("\\bwon the\\b[^.!?]*\\baward\\b", Pattern.CASE_INSENSITIVE),
+        Pattern.compile("\\b(?:ebundle|boxed? set|bind-up)\\b", Pattern.CASE_INSENSITIVE),
+        Pattern.compile("\\b(?:major motion picture|prime video|netflix|hbo|now streaming"
+            + "|television series|tv series)\\b", Pattern.CASE_INSENSITIVE));
 
     private static final Pattern HEADING = Pattern.compile("(?m)^\\s*#{1,6}\\s+\\S");
 
@@ -67,13 +76,49 @@ public final class DescriptionQuality {
     /** Cleans and assesses the raw description. */
     public static Assessment assess(final String raw) {
         final boolean dump = isDump(raw);
-        final String cleaned = cutAtSentenceEnd(DescriptionCleaner.clean(raw));
-        final int storyLength = storyLength(cleaned);
+        final String text = cutAtSentenceEnd(withoutEdgeFacts(DescriptionCleaner.clean(raw)));
+        final Sentences sentences = sentences(text);
         final boolean usable = !dump
-            && storyLength >= MIN_LENGTH
-            && cleaned.length() <= MAX_LENGTH
-            && !hasBoilerplatePrefix(cleaned);
-        return new Assessment(cleaned, usable, usable ? score(storyLength) : 0);
+            && sentences.storyLength() >= MIN_LENGTH
+            && text.length() <= MAX_LENGTH
+            && !hasBoilerplatePrefix(text)
+            && EnglishText.isEnglish(text);
+        return new Assessment(text, usable, usable ? score(sentences) : 0);
+    }
+
+    /** Returns the text with publication-fact sentences removed from its head and tail. */
+    private static String withoutEdgeFacts(final String cleaned) {
+        return withoutTrailingFacts(withoutLeadingFacts(cleaned));
+    }
+
+    private static String withoutLeadingFacts(final String cleaned) {
+        String text = cleaned;
+        while (true) {
+            final Matcher firstBreak = SENTENCE_BREAK.matcher(text);
+            final boolean hasBreak = firstBreak.find();
+            final String first = hasBreak ? text.substring(0, firstBreak.start()) : text;
+            if (!isPublicationFact(first)) {
+                return text;
+            }
+            text = hasBreak ? text.substring(firstBreak.end()) : "";
+        }
+    }
+
+    private static String withoutTrailingFacts(final String cleaned) {
+        String text = cleaned;
+        while (!text.isEmpty()) {
+            int lastBreakEnd = -1;
+            final Matcher breaks = SENTENCE_BREAK.matcher(text);
+            while (breaks.find()) {
+                lastBreakEnd = breaks.end();
+            }
+            final String last = lastBreakEnd < 0 ? text : text.substring(lastBreakEnd);
+            if (!isPublicationFact(last)) {
+                return text;
+            }
+            text = lastBreakEnd < 0 ? "" : text.substring(0, lastBreakEnd).stripTrailing();
+        }
+        return text;
     }
 
     /**
@@ -93,11 +138,17 @@ public final class DescriptionQuality {
         return text;
     }
 
-    private static int storyLength(final String cleaned) {
-        return Stream.of(SENTENCE_BREAK.split(cleaned))
-            .filter(sentence -> !isPublicationFact(sentence))
-            .mapToInt(String::length)
-            .sum();
+    private static Sentences sentences(final String cleaned) {
+        int storyLength = 0;
+        int factCount = 0;
+        for (final String sentence : SENTENCE_BREAK.split(cleaned)) {
+            if (isPublicationFact(sentence)) {
+                factCount++;
+            } else {
+                storyLength += sentence.length();
+            }
+        }
+        return new Sentences(storyLength, factCount);
     }
 
     private static boolean isPublicationFact(final String sentence) {
@@ -118,11 +169,15 @@ public final class DescriptionQuality {
         return BOILERPLATE_PREFIXES.stream().anyMatch(lower::startsWith);
     }
 
-    private static int score(final int storyLength) {
-        if (storyLength <= IDEAL_LENGTH) {
-            return storyLength;
-        }
-        return IDEAL_LENGTH - OVERSHOOT_PENALTY * (storyLength - IDEAL_LENGTH);
+    private static int score(final Sentences sentences) {
+        final int storyLength = sentences.storyLength();
+        final int base = storyLength <= IDEAL_LENGTH
+            ? storyLength
+            : IDEAL_LENGTH - (storyLength - IDEAL_LENGTH) / OVERSHOOT_DIVISOR;
+        return base - FACT_SENTENCE_PENALTY * sentences.factCount();
+    }
+
+    private record Sentences(int storyLength, int factCount) {
     }
 
     /**

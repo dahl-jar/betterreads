@@ -20,18 +20,23 @@ import org.springframework.web.reactive.function.client.WebClientException;
  * Picks the best description for a merged book from the description-only sources.
  *
  * <p>Each source is cleaned and scored by {@link DescriptionQuality}, and the highest-scoring blurb
- * wins, the merge's own description included. The merged book is returned unchanged when nothing
- * beats what it already has.
+ * wins, the merge's own description included. A fallback-only source competes only when the current
+ * description is unusable and no other source supplied a usable one.
  */
 @Component
 public class DescriptionSelector {
 
     private static final Logger LOG = LoggerFactory.getLogger(DescriptionSelector.class);
 
-    private final List<DescriptionSource> sources;
+    private static final int UNUSABLE_SCORE = Integer.MIN_VALUE;
+
+    private final List<DescriptionSource> primarySources;
+
+    private final List<DescriptionSource> fallbackSources;
 
     public DescriptionSelector(final List<DescriptionSource> sources) {
-        this.sources = List.copyOf(sources);
+        this.primarySources = sources.stream().filter(source -> !source.fallbackOnly()).toList();
+        this.fallbackSources = sources.stream().filter(DescriptionSource::fallbackOnly).toList();
     }
 
     /** Returns the merged book carrying the best available description, with its source recorded, or unchanged. */
@@ -44,19 +49,37 @@ public class DescriptionSelector {
     }
 
     /**
-     * Returns a cleaned description from the sources that beats {@code currentRaw}, or empty when
-     * nothing does. The current description competes, so a source only wins on a higher score.
+     * Returns a cleaned description from the sources that beats {@code currentRaw}, the stored
+     * text's own cleaned form when no source wins but cleaning changes it, or empty. The current
+     * description competes, so a source only wins on a higher score.
      */
     public Optional<String> bestDescription(final DescriptionLookup lookup, final @Nullable String currentRaw) {
-        return select(lookup, currentRaw).map(Winner::cleaned);
+        final Optional<String> winner = select(lookup, currentRaw).map(Winner::cleaned);
+        if (winner.isPresent() || currentRaw == null) {
+            return winner;
+        }
+        final DescriptionQuality.Assessment current = DescriptionQuality.assess(currentRaw);
+        return current.usable() && !current.cleaned().equals(currentRaw)
+            ? Optional.of(current.cleaned())
+            : Optional.empty();
     }
 
     private Optional<Winner> select(final DescriptionLookup lookup, final @Nullable String currentRaw) {
-        int bestScore = scored(currentRaw).score();
+        final int currentScore = scored(currentRaw).score();
+        final Optional<Winner> primary = bestAbove(currentScore, primarySources, lookup);
+        if (primary.isPresent() || currentScore > UNUSABLE_SCORE) {
+            return primary;
+        }
+        return bestAbove(currentScore, fallbackSources, lookup);
+    }
+
+    private Optional<Winner> bestAbove(
+        final int floor, final List<DescriptionSource> candidates, final DescriptionLookup lookup) {
+        int bestScore = floor;
         String winningText = null;
         BookFieldSource winningSource = null;
 
-        for (final DescriptionSource source : sources) {
+        for (final DescriptionSource source : candidates) {
             final Scored candidate = scored(fetch(source, lookup));
             if (candidate.score() > bestScore) {
                 bestScore = candidate.score();
@@ -80,9 +103,13 @@ public class DescriptionSelector {
         }
     }
 
+    /**
+     * Omits the OpenLibrary and Hardcover ids: the collect already fetched both records, so the
+     * id-keyed sources would refetch the same data.
+     */
     private static DescriptionLookup lookupFor(final SourceBook book) {
         return new DescriptionLookup(
-            book.wikidataQid(), book.isbn13(), book.title(), firstAuthorName(book));
+            book.wikidataQid(), book.isbn13(), book.title(), firstAuthorName(book), null, null);
     }
 
     private static @Nullable String firstAuthorName(final SourceBook book) {
@@ -93,12 +120,12 @@ public class DescriptionSelector {
     /** Assesses a raw description once, scoring an unusable or absent one below every usable one. */
     private static Scored scored(final @Nullable String raw) {
         if (raw == null) {
-            return new Scored(null, Integer.MIN_VALUE);
+            return new Scored(null, UNUSABLE_SCORE);
         }
         final DescriptionQuality.Assessment assessment = DescriptionQuality.assess(raw);
         return assessment.usable()
             ? new Scored(assessment.cleaned(), assessment.score())
-            : new Scored(null, Integer.MIN_VALUE);
+            : new Scored(null, UNUSABLE_SCORE);
     }
 
     private record Scored(@Nullable String cleaned, int score) {

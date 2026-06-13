@@ -22,7 +22,7 @@ import org.springframework.web.reactive.function.client.WebClientException;
 
 /**
  * Re-resolves a stronger description for already-promoted books with a thin one, a bounded slice per
- * run, from the Wikipedia and Apple Books sources.
+ * run, from the description sources.
  *
  * <p>The slice and the thin-description threshold bound the work and the iTunes call rate; a run
  * picks the least recently checked candidates and stamps each as checked, so successive runs walk the
@@ -106,7 +106,8 @@ public class DescriptionBackfillService {
 
     private static DescriptionLookup lookupFor(final Book book) {
         return new DescriptionLookup(
-            book.getWikidataQid(), book.getIsbn(), book.getTitle(), firstAuthorName(book));
+            book.getWikidataQid(), book.getIsbn(), book.getTitle(), firstAuthorName(book),
+            book.getOpenLibraryWorkKey(), book.getHardcoverId());
     }
 
     private static @Nullable String firstAuthorName(final Book book) {

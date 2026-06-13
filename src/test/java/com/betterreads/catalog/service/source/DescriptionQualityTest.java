@@ -26,6 +26,10 @@ class DescriptionQualityTest {
 
     private static final int PAST_CEILING_WORDS = 150;
 
+    private static final int NEAR_IDEAL_BLURBS = 3;
+
+    private static final int LONG_BLURBS = 6;
+
     private static final String GOOD =
         "Mr. Fox steals food from three brutish farmers to feed his family. Tired of being "
         + "outwitted, the farmers set out to dig him from his den, and the foxes must outlast them.";
@@ -159,7 +163,35 @@ class DescriptionQualityTest {
                     + "Reading. The initial publication of The Eye of the World included a "
                     + "prologue and 53 chapters. The book achieved both critical and commercial "
                     + "success. Critics lauded its tone and themes, while its similarities to The "
-                    + "Lord of the Rings received both praise and criticism."));
+                    + "Lord of the Rings received both praise and criticism."),
+                Arguments.of("ordinal-with-interjection series lead",
+                    "Mistborn: The Lost Metal is an urban fantasy novel written by American "
+                    + "author Brandon Sanderson. It was published on November 15, 2022, by Tor "
+                    + "Books. It is the fourth and final book in the Wax and Wayne series and "
+                    + "seventh in the Mistborn series. It is preceded by The Bands of Mourning in "
+                    + "2016 and is to be followed by a new trilogy."),
+                Arguments.of("store bundle listing",
+                    "This discounted ebundle includes: Mistborn: The Final Empire, The Well of "
+                    + "Ascension, The Hero of Ages. From #1 New York Times bestselling author "
+                    + "Brandon Sanderson comes the complete trilogy."),
+                Arguments.of("screen tie-in lead",
+                    "The Wheel of Time is now an original series on Prime Video, starring "
+                    + "Rosamund Pike as Moiraine! Soon to be a major motion picture from the "
+                    + "acclaimed director."));
+        }
+
+        @Test
+        @DisplayName("a blurb in another language is rejected")
+        void rejectsNonEnglishText() {
+            final String french =
+                "Ils m'appellent Vis Telimus. Ils croient que j'ai eu la chance d'être adopté "
+                + "par un sénateur et envoyé à l'Académie pour rejoindre l'élite. Celle-ci "
+                + "exploite l'énergie mentale des castes inférieures, leur Volonté, pour se doter "
+                + "de talents extraordinaires. Ainsi la Hiérarchie a-t-elle conquis le monde.";
+
+            final DescriptionQuality.Assessment assessment = DescriptionQuality.assess(french);
+
+            assertThat(assessment.usable()).isFalse();
         }
 
         @Test
@@ -189,26 +221,71 @@ class DescriptionQualityTest {
         }
 
         @Test
-        @DisplayName("an over-long blurb past the ceiling does not outscore a sensible one")
-        void doesNotRewardLengthPastTheCeiling() {
-            final String sensible = GOOD;
+        @DisplayName("an over-long blurb does not outscore one near the ideal length")
+        void doesNotRewardLengthPastTheIdeal() {
+            final String nearIdeal = (GOOD + " ").repeat(NEAR_IDEAL_BLURBS).strip();
             final String bloated = GOOD + " " + "Filler sentence to pad the length. ".repeat(60);
 
-            final int sensibleScore = DescriptionQuality.assess(sensible).score();
+            final int nearIdealScore = DescriptionQuality.assess(nearIdeal).score();
             final int bloatedScore = DescriptionQuality.assess(bloated).score();
 
-            assertThat(sensibleScore).isGreaterThanOrEqualTo(bloatedScore);
+            assertThat(nearIdealScore).isGreaterThan(bloatedScore);
         }
 
         @Test
-        @DisplayName("publication-fact sentences add nothing to the score")
-        void factSentencesAddNothingToTheScore() {
-            final String withFacts = GOOD + " First published in 1990 by Tor Books.";
+        @DisplayName("an interior publication-fact sentence lowers the score below the same blurb without it")
+        void factSentencesLowerTheScore() {
+            final String withInteriorFact =
+                "Mr. Fox steals food from three brutish farmers to feed his family. "
+                + "First published in 1990 by Tor Books. "
+                + "Tired of being outwitted, the farmers set out to dig him from his den, and the "
+                + "foxes must outlast them.";
 
             final int plotScore = DescriptionQuality.assess(GOOD).score();
-            final int withFactsScore = DescriptionQuality.assess(withFacts).score();
+            final int withFactScore = DescriptionQuality.assess(withInteriorFact).score();
 
-            assertThat(withFactsScore).isEqualTo(plotScore);
+            assertThat(withFactScore).isLessThan(plotScore);
+        }
+
+        @Test
+        @DisplayName("a long pure-story blurb outscores a short story stub")
+        void longStoryBlurbOutscoresShortStub() {
+            final String longBlurb = (GOOD + " ").repeat(LONG_BLURBS).strip();
+            final String shortStub =
+                "Mr. Fox outwits three farmers to feed his family every night, all night.";
+
+            final int longScore = DescriptionQuality.assess(longBlurb).score();
+            final int stubScore = DescriptionQuality.assess(shortStub).score();
+
+            assertThat(longScore).isGreaterThan(stubScore);
+        }
+    }
+
+    @Nested
+    @DisplayName("stripping edge facts")
+    class StrippingEdgeFacts {
+
+        @Test
+        @DisplayName("a leading marketing sentence is stripped from the cleaned text")
+        void stripsLeadingMarketingSentence() {
+            final String raw =
+                "From #1 New York Times bestselling author Roald Dahl comes a beloved classic. " + GOOD;
+
+            final DescriptionQuality.Assessment assessment = DescriptionQuality.assess(raw);
+
+            assertThat(assessment.usable()).isTrue();
+            assertThat(assessment.cleaned()).isEqualTo(GOOD);
+        }
+
+        @Test
+        @DisplayName("a trailing cross-sell sentence is stripped from the cleaned text")
+        void stripsTrailingFactSentence() {
+            final String raw = GOOD + " Explore the illustrated editions of the series.";
+
+            final DescriptionQuality.Assessment assessment = DescriptionQuality.assess(raw);
+
+            assertThat(assessment.usable()).isTrue();
+            assertThat(assessment.cleaned()).isEqualTo(GOOD);
         }
     }
 }

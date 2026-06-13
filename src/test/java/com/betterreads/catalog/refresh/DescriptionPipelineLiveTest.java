@@ -37,8 +37,8 @@ import org.springframework.web.reactive.function.client.WebClient;
  * Books APIs. Gated on {@code DESCRIPTION_LIVE=1} so it never runs in CI.
  *
  * <p>Proves the full chain on real data: HTTP fetch, parse, clean, quality-score, and enrich. Dune
- * has a Wikipedia article (the encyclopedic tier wins); Apple Books supplies a blurb by ISBN; the
- * enricher prefers the strongest over a weak seed.
+ * has a Wikipedia article; Apple Books supplies a blurb by ISBN; the selector prefers the
+ * strongest source over a weak seed.
  */
 @SpringBootTest(
     classes = {
@@ -92,7 +92,7 @@ class DescriptionPipelineLiveTest {
     @DisplayName("Wikipedia returns clean encyclopedic prose for Dune")
     void wikipediaForDune() {
         final DescriptionLookup lookup =
-            new DescriptionLookup(DUNE_QID, DUNE_ISBN, DUNE_TITLE, DUNE_AUTHOR);
+            new DescriptionLookup(DUNE_QID, DUNE_ISBN, DUNE_TITLE, DUNE_AUTHOR, null, null);
 
         final Optional<String> raw = wikipedia.fetch(lookup);
 
@@ -107,7 +107,7 @@ class DescriptionPipelineLiveTest {
     @DisplayName("Apple Books returns a usable blurb by ISBN")
     void itunesByIsbn() {
         final DescriptionLookup lookup =
-            new DescriptionLookup(null, DUNE_ISBN, DUNE_TITLE, DUNE_AUTHOR);
+            new DescriptionLookup(null, DUNE_ISBN, DUNE_TITLE, DUNE_AUTHOR, null, null);
 
         final Optional<String> raw = itunes.fetch(lookup);
 
@@ -123,7 +123,7 @@ class DescriptionPipelineLiveTest {
     void selectorPicksBest() {
         final DescriptionSelector selector = new DescriptionSelector(List.of(wikipedia, itunes));
         final DescriptionLookup lookup =
-            new DescriptionLookup(DUNE_QID, DUNE_ISBN, DUNE_TITLE, DUNE_AUTHOR);
+            new DescriptionLookup(DUNE_QID, DUNE_ISBN, DUNE_TITLE, DUNE_AUTHOR, null, null);
 
         final Optional<String> best = selector.bestDescription(lookup, "A tiny weak stub.");
 

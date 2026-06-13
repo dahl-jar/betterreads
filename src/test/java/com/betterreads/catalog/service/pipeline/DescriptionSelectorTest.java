@@ -16,14 +16,16 @@ import com.betterreads.catalog.service.source.MergedBook;
 import com.betterreads.catalog.service.source.SourceAuthor;
 import com.betterreads.catalog.service.source.SourceBook;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 /**
- * Unit tests for {@link DescriptionSelector}. After the merge, the selector consults the
- * description-only sources for a stronger blurb, keeping the highest-quality one. The merge's own
- * description competes; a source only wins when it scores higher.
+ * Unit tests for {@link DescriptionSelector}. The selector consults the description-only sources
+ * for a stronger blurb, keeping the highest-quality one; the current description competes, so a
+ * source only wins on a higher score. A fallback-only source is consulted solely when the current
+ * description is unusable and no other source supplied a usable one.
  */
 class DescriptionSelectorTest {
 
@@ -31,11 +33,17 @@ class DescriptionSelectorTest {
         "A short merged blurb about a desert planet and the boy who would rule it, just over the bar.";
 
     private static final String STRONG =
-        "Dune is a 1965 epic science fiction novel by Frank Herbert, set on the desert planet "
-        + "Arrakis, the only source of the spice melange. It follows the rise of Paul Atreides as "
-        + "his family takes stewardship of the planet and is betrayed into the deep desert.";
+        "On the desert planet Arrakis, the only source of the spice melange, Paul Atreides watches "
+        + "his family take stewardship of the planet, is betrayed into the deep desert, and rises "
+        + "among the Fremen to reclaim what was taken from his house.";
 
     private static final String STUB = "A tiny stub.";
+
+    private static final String FRENCH =
+        "Ils m'appellent Vis Telimus. Ils croient que j'ai eu la chance d'être adopté par un "
+        + "sénateur et envoyé à l'Académie pour rejoindre l'élite. Celle-ci exploite l'énergie "
+        + "mentale des castes inférieures, leur Volonté, pour se doter de talents extraordinaires. "
+        + "Ainsi la Hiérarchie a-t-elle conquis le monde.";
 
     private static final String QID = "Q190192";
 
@@ -45,109 +53,209 @@ class DescriptionSelectorTest {
 
     private static final String AUTHOR = "Frank Herbert";
 
-    @Test
-    @DisplayName("a stronger source description replaces the weaker merged one")
-    void strongerSourceWins() {
-        final DescriptionSelector selector = new DescriptionSelector(List.of(source(STRONG)));
-        final MergedBook merged = mergedWith(WEAK);
+    private static final String WORK_KEY = "OL893415W";
 
-        final MergedBook selected = selector.withBestDescription(merged);
+    private static final String HARDCOVER_ID = "292120";
 
-        assertThat(selected.book().description()).isEqualTo(STRONG);
+    @Nested
+    @DisplayName("selection")
+    class Selection {
+
+        @Test
+        @DisplayName("a stronger source description replaces the weaker merged one")
+        void strongerSourceWins() {
+            final DescriptionSelector selector = new DescriptionSelector(List.of(source(STRONG)));
+            final MergedBook merged = mergedWith(WEAK);
+
+            final MergedBook selected = selector.withBestDescription(merged);
+
+            assertThat(selected.book().description()).isEqualTo(STRONG);
+        }
+
+        @Test
+        @DisplayName("the merged description is kept when no source beats it")
+        void keepsMergedWhenSourcesAreWeaker() {
+            final DescriptionSelector selector = new DescriptionSelector(List.of(source(STUB)));
+            final MergedBook merged = mergedWith(STRONG);
+
+            final MergedBook selected = selector.withBestDescription(merged);
+
+            assertThat(selected.book().description()).isEqualTo(STRONG);
+        }
+
+        @Test
+        @DisplayName("a source description is cleaned of markup before it is stored")
+        void cleansSourceDescription() {
+            final DescriptionSelector selector =
+                new DescriptionSelector(List.of(source("<p>" + STRONG + "</p>")));
+            final MergedBook merged = mergedWith(WEAK);
+
+            final MergedBook selected = selector.withBestDescription(merged);
+
+            assertThat(selected.book().description()).isEqualTo(STRONG);
+        }
+
+        @Test
+        @DisplayName("a book with no description gains one from a source")
+        void fillsMissingDescription() {
+            final DescriptionSelector selector = new DescriptionSelector(List.of(source(STRONG)));
+            final MergedBook merged = mergedWith(null);
+
+            final MergedBook selected = selector.withBestDescription(merged);
+
+            assertThat(selected.book().description()).isEqualTo(STRONG);
+        }
+
+        @Test
+        @DisplayName("a non-English description is replaced by a weaker-scoring English one")
+        void nonEnglishDescriptionLosesToEnglish() {
+            final DescriptionSelector selector = new DescriptionSelector(List.of(source(WEAK)));
+            final MergedBook merged = mergedWith(FRENCH);
+
+            final MergedBook selected = selector.withBestDescription(merged);
+
+            assertThat(selected.book().description()).isEqualTo(WEAK);
+        }
     }
 
-    @Test
-    @DisplayName("the merged description is kept when no source beats it")
-    void keepsMergedWhenSourcesAreWeaker() {
-        final DescriptionSelector selector = new DescriptionSelector(List.of(source(STUB)));
-        final MergedBook merged = mergedWith(STRONG);
+    @Nested
+    @DisplayName("fallback tier")
+    class FallbackTier {
 
-        final MergedBook selected = selector.withBestDescription(merged);
+        @Test
+        @DisplayName("a fallback source never replaces a usable description, even with a higher score")
+        void fallbackNeverReplacesUsableDescription() {
+            final DescriptionSelector selector =
+                new DescriptionSelector(List.of(fallbackSource(STRONG)));
+            final MergedBook merged = mergedWith(WEAK);
 
-        assertThat(selected.book().description()).isEqualTo(STRONG);
+            final MergedBook selected = selector.withBestDescription(merged);
+
+            assertThat(selected.book().description()).isEqualTo(WEAK);
+        }
+
+        @Test
+        @DisplayName("a fallback source fills in when the description is unusable and no other source has one")
+        void fallbackFillsWhenNothingElseIsUsable() {
+            final DescriptionSelector selector =
+                new DescriptionSelector(List.of(source(null), fallbackSource(STRONG)));
+            final MergedBook merged = mergedWith(null);
+
+            final MergedBook selected = selector.withBestDescription(merged);
+
+            assertThat(selected.book().description()).isEqualTo(STRONG);
+            assertThat(selected.provenanceOf(BookField.DESCRIPTION)).isEqualTo(BookFieldSource.WIKIPEDIA);
+        }
     }
 
-    @Test
-    @DisplayName("a source description is cleaned of markup before it is stored")
-    void cleansSourceDescription() {
-        final DescriptionSelector selector = new DescriptionSelector(List.of(source("<p>" + STRONG + "</p>")));
-        final MergedBook merged = mergedWith(WEAK);
+    @Nested
+    @DisplayName("lookup and provenance")
+    class LookupAndProvenance {
 
-        final MergedBook selected = selector.withBestDescription(merged);
+        @Test
+        @DisplayName("the merge-time lookup carries qid, isbn, title, and author, but no refetch ids")
+        void passesIdentifiersToSources() {
+            final CapturingSource capturing = new CapturingSource();
+            final DescriptionSelector selector = new DescriptionSelector(List.of(capturing));
 
-        assertThat(selected.book().description()).isEqualTo(STRONG);
+            selector.withBestDescription(mergedWith(WEAK));
+
+            final DescriptionLookup seen = capturing.seen.get();
+            assertThat(seen).isNotNull();
+            assertThat(seen.wikidataQid()).isEqualTo(QID);
+            assertThat(seen.isbn13()).isEqualTo(ISBN);
+            assertThat(seen.title()).isEqualTo(TITLE);
+            assertThat(seen.author()).isEqualTo(AUTHOR);
+            assertThat(seen.openLibraryWorkKey())
+                .as("the collect already fetched OpenLibrary; the selector must not key a refetch")
+                .isNull();
+            assertThat(seen.hardcoverId())
+                .as("the collect already fetched Hardcover; the selector must not key a refetch")
+                .isNull();
+        }
+
+        @Test
+        @DisplayName("the winning source is recorded as the description provenance")
+        void recordsWinningSourceProvenance() {
+            final DescriptionSelector selector = new DescriptionSelector(List.of(source(STRONG)));
+            final MergedBook merged = mergedWith(WEAK);
+
+            final MergedBook selected = selector.withBestDescription(merged);
+
+            assertThat(selected.provenanceOf(BookField.DESCRIPTION)).isEqualTo(BookFieldSource.ITUNES);
+        }
+
+        @Test
+        @DisplayName("provenance is unchanged when no source beats the merged description")
+        void keepsProvenanceWhenNoSourceWins() {
+            final DescriptionSelector selector = new DescriptionSelector(List.of(source(STUB)));
+            final MergedBook merged = mergedWith(STRONG);
+
+            final MergedBook selected = selector.withBestDescription(merged);
+
+            assertThat(selected.provenanceOf(BookField.DESCRIPTION)).isNull();
+        }
     }
 
-    @Test
-    @DisplayName("a book with no description gains one from a source")
-    void fillsMissingDescription() {
-        final DescriptionSelector selector = new DescriptionSelector(List.of(source(STRONG)));
-        final MergedBook merged = mergedWith(null);
+    @Nested
+    @DisplayName("self clean")
+    class SelfClean {
 
-        final MergedBook selected = selector.withBestDescription(merged);
+        @Test
+        @DisplayName("a stored description with a marketing lead is rewritten as its own cleaned form")
+        void rewritesStoredDescriptionAsItsCleanedForm() {
+            final DescriptionSelector selector = new DescriptionSelector(List.of(source(null)));
+            final String marketingLed =
+                "From #1 New York Times bestselling author Frank Herbert comes the classic. " + STRONG;
 
-        assertThat(selected.book().description()).isEqualTo(STRONG);
+            final Optional<String> best = selector.bestDescription(lookup(), marketingLed);
+
+            assertThat(best).contains(STRONG);
+        }
+
+        @Test
+        @DisplayName("an already-clean stored description is left alone")
+        void leavesCleanStoredDescriptionAlone() {
+            final DescriptionSelector selector = new DescriptionSelector(List.of(source(null)));
+
+            final Optional<String> best = selector.bestDescription(lookup(), STRONG);
+
+            assertThat(best)
+                .as("rewriting an unchanged text would churn every row on every sweep")
+                .isEmpty();
+        }
+
+        private DescriptionLookup lookup() {
+            return new DescriptionLookup(QID, ISBN, TITLE, AUTHOR, WORK_KEY, HARDCOVER_ID);
+        }
     }
 
-    @Test
-    @DisplayName("the lookup carries the book's qid, isbn, title, and author")
-    void passesIdentifiersToSources() {
-        final CapturingSource capturing = new CapturingSource();
-        final DescriptionSelector selector = new DescriptionSelector(List.of(capturing));
+    @Nested
+    @DisplayName("failing sources")
+    class FailingSources {
 
-        selector.withBestDescription(mergedWith(WEAK));
+        @Test
+        @DisplayName("a source that fails is skipped and a working source still wins")
+        void failingSourceIsSkipped() {
+            final DescriptionSelector selector =
+                new DescriptionSelector(List.of(failingSource(), source(STRONG)));
+            final MergedBook merged = mergedWith(WEAK);
 
-        final DescriptionLookup seen = capturing.seen.get();
-        assertThat(seen).isNotNull();
-        assertThat(seen.wikidataQid()).isEqualTo(QID);
-        assertThat(seen.isbn13()).isEqualTo(ISBN);
-        assertThat(seen.title()).isEqualTo(TITLE);
-        assertThat(seen.author()).isEqualTo(AUTHOR);
-    }
+            final MergedBook selected = selector.withBestDescription(merged);
 
-    @Test
-    @DisplayName("the winning source is recorded as the description provenance")
-    void recordsWinningSourceProvenance() {
-        final DescriptionSelector selector = new DescriptionSelector(List.of(source(STRONG)));
-        final MergedBook merged = mergedWith(WEAK);
+            assertThat(selected.book().description()).isEqualTo(STRONG);
+        }
 
-        final MergedBook selected = selector.withBestDescription(merged);
+        @Test
+        @DisplayName("the merged description is kept when the only source fails")
+        void keepsMergedWhenOnlySourceFails() {
+            final DescriptionSelector selector = new DescriptionSelector(List.of(failingSource()));
+            final MergedBook merged = mergedWith(STRONG);
 
-        assertThat(selected.provenanceOf(BookField.DESCRIPTION)).isEqualTo(BookFieldSource.WIKIPEDIA);
-    }
+            final MergedBook selected = selector.withBestDescription(merged);
 
-    @Test
-    @DisplayName("provenance is unchanged when no source beats the merged description")
-    void keepsProvenanceWhenNoSourceWins() {
-        final DescriptionSelector selector = new DescriptionSelector(List.of(source(STUB)));
-        final MergedBook merged = mergedWith(STRONG);
-
-        final MergedBook selected = selector.withBestDescription(merged);
-
-        assertThat(selected.provenanceOf(BookField.DESCRIPTION)).isNull();
-    }
-
-    @Test
-    @DisplayName("a source that fails is skipped and a working source still wins")
-    void failingSourceIsSkipped() {
-        final DescriptionSelector selector =
-            new DescriptionSelector(List.of(failingSource(), source(STRONG)));
-        final MergedBook merged = mergedWith(WEAK);
-
-        final MergedBook selected = selector.withBestDescription(merged);
-
-        assertThat(selected.book().description()).isEqualTo(STRONG);
-    }
-
-    @Test
-    @DisplayName("the merged description is kept when the only source fails")
-    void keepsMergedWhenOnlySourceFails() {
-        final DescriptionSelector selector = new DescriptionSelector(List.of(failingSource()));
-        final MergedBook merged = mergedWith(STRONG);
-
-        final MergedBook selected = selector.withBestDescription(merged);
-
-        assertThat(selected.book().description()).isEqualTo(STRONG);
+            assertThat(selected.book().description()).isEqualTo(STRONG);
+        }
     }
 
     private static MergedBook mergedWith(final String description) {
@@ -156,6 +264,8 @@ class DescriptionSelectorTest {
             .description(description)
             .isbn13(ISBN)
             .wikidataQid(QID)
+            .openLibraryWorkKey(WORK_KEY)
+            .hardcoverId(HARDCOVER_ID)
             .authors(List.of(SourceAuthor.ofName(AUTHOR)))
             .build();
         return new MergedBook(book, Map.of(BookField.TITLE, BookFieldSource.GOOGLE_BOOKS),
@@ -166,7 +276,26 @@ class DescriptionSelectorTest {
         return new DescriptionSource() {
             @Override
             public BookFieldSource source() {
+                return BookFieldSource.ITUNES;
+            }
+
+            @Override
+            public Optional<String> fetch(final DescriptionLookup lookup) {
+                return Optional.ofNullable(description);
+            }
+        };
+    }
+
+    private static DescriptionSource fallbackSource(final String description) {
+        return new DescriptionSource() {
+            @Override
+            public BookFieldSource source() {
                 return BookFieldSource.WIKIPEDIA;
+            }
+
+            @Override
+            public boolean fallbackOnly() {
+                return true;
             }
 
             @Override

@@ -142,7 +142,7 @@ class ItunesDescriptionSourceWireMockTest {
         @DisplayName("a lookup with no ISBN, title, or author resolves to empty without a call")
         void noKeysIsEmpty() {
             final Optional<String> description = source.fetch(
-                new DescriptionLookup(null, null, null, null));
+                new DescriptionLookup(null, null, null, null, null, null));
 
             assertThat(description).isEmpty();
         }
@@ -153,7 +153,7 @@ class ItunesDescriptionSourceWireMockTest {
             stubSearch(resultJson(TITLE, BLURB));
 
             final Optional<String> description = source.fetch(
-                new DescriptionLookup(null, null, TITLE, AUTHOR));
+                new DescriptionLookup(null, null, TITLE, AUTHOR, null, null));
 
             assertThat(description).contains(BLURB);
         }
@@ -164,7 +164,7 @@ class ItunesDescriptionSourceWireMockTest {
             stubSearch(resultJson("A Completely Different Book", BLURB));
 
             final Optional<String> description = source.fetch(
-                new DescriptionLookup(null, null, TITLE, AUTHOR));
+                new DescriptionLookup(null, null, TITLE, AUTHOR, null, null));
 
             assertThat(description).isEmpty();
         }
@@ -175,7 +175,7 @@ class ItunesDescriptionSourceWireMockTest {
             stubSearch(resultJson("Howling", BLURB));
 
             final Optional<String> description = source.fetch(
-                new DescriptionLookup(null, null, TITLE, AUTHOR));
+                new DescriptionLookup(null, null, TITLE, AUTHOR, null, null));
 
             assertThat(description).isEmpty();
         }
@@ -189,14 +189,14 @@ class ItunesDescriptionSourceWireMockTest {
             stubSearch(resultsJson(resultEntry(TITLE, marketing), resultEntry(TITLE, BLURB)));
 
             final Optional<String> description = source.fetch(
-                new DescriptionLookup(null, null, TITLE, AUTHOR));
+                new DescriptionLookup(null, null, TITLE, AUTHOR, null, null));
 
             assertThat(description).contains(BLURB);
         }
     }
 
     private static DescriptionLookup lookup() {
-        return new DescriptionLookup("Q1", ISBN, TITLE, AUTHOR);
+        return new DescriptionLookup("Q1", ISBN, TITLE, AUTHOR, null, null);
     }
 
     private static void stubSearch(final String body) {

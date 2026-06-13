@@ -108,6 +108,29 @@ class HardcoverClientWireMockTest {
         }
         """;
 
+    private static final String SOUL_ID = "427626";
+
+    private static final String SOUL_DESCRIPTION =
+        "When Shai is caught replacing the Moon Scepter with her nearly flawless forgery, "
+        + "she must bargain for her life.";
+
+    private static final String SOUL_BY_ID_JSON = """
+        {
+          "data": {"books": [{
+            "id": 427626, "title": "The Emperor's Soul",
+            "description": "When Shai is caught replacing the Moon Scepter with her nearly \
+        flawless forgery, she must bargain for her life.",
+            "rating": 4.2, "ratings_count": 1200, "users_count": 3400, "release_year": 2012,
+            "default_physical_edition": {"language": {"language": "English"}},
+            "contributions": [{"author": {"name": "Brandon Sanderson"}}]
+          }]}
+        }
+        """;
+
+    private static final String NO_BOOKS_JSON = """
+        {"data": {"books": []}}
+        """;
+
     private static final WireMockServer WIREMOCK = startServer();
 
     @Autowired
@@ -182,6 +205,42 @@ class HardcoverClientWireMockTest {
                 .as("Hardcover searches by title only, so a shared title under another author must "
                     + "not resolve for the requested author")
                 .isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("fetch by id")
+    class FetchById {
+
+        @Test
+        @DisplayName("a Hardcover id resolves the book record with its description")
+        void byIdReturnsTheBook() {
+            WIREMOCK.stubFor(post(urlPathEqualTo(GRAPHQL_PATH)).willReturn(json(SOUL_BY_ID_JSON)));
+
+            assertThat(client.fetchByHardcoverId(SOUL_ID))
+                .isPresent()
+                .get()
+                .satisfies(book -> {
+                    assertThat(book.hardcoverId()).isEqualTo(SOUL_ID);
+                    assertThat(book.description()).isEqualTo(SOUL_DESCRIPTION);
+                });
+        }
+
+        @Test
+        @DisplayName("an id Hardcover does not know resolves to empty")
+        void byIdUnknownIdIsEmpty() {
+            WIREMOCK.stubFor(post(urlPathEqualTo(GRAPHQL_PATH)).willReturn(json(NO_BOOKS_JSON)));
+
+            assertThat(client.fetchByHardcoverId("999999999")).isEmpty();
+        }
+
+        @Test
+        @DisplayName("a non-numeric id resolves to empty without a call")
+        void byIdNonNumericIdIsEmpty() {
+            WIREMOCK.stubFor(post(urlPathEqualTo(GRAPHQL_PATH))
+                .willReturn(aResponse().withStatus(HTTP_SERVER_ERROR)));
+
+            assertThat(client.fetchByHardcoverId("not-a-number")).isEmpty();
         }
     }
 
