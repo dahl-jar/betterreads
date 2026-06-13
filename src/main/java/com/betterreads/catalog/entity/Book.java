@@ -82,10 +82,6 @@ public class Book {
     @Nullable
     private String description;
 
-    @Column(name = "cover_id")
-    @Nullable
-    private Integer coverId;
-
     @Column(name = "cover_url")
     @Nullable
     private String coverUrl;
@@ -413,15 +409,6 @@ public class Book {
 
     public void setDescription(@Nullable final String description) {
         this.description = description;
-    }
-
-    @Nullable
-    public Integer getCoverId() {
-        return coverId;
-    }
-
-    public void setCoverId(@Nullable final Integer coverId) {
-        this.coverId = coverId;
     }
 
     @Nullable
