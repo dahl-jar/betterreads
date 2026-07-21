@@ -14,7 +14,7 @@ import java.util.Optional;
 import com.betterreads.catalog.entity.PendingBook;
 import com.betterreads.catalog.mapper.PendingBookMapper;
 import com.betterreads.catalog.repository.PendingBookRepository;
-import com.betterreads.catalog.service.source.SourceMerger;
+import com.betterreads.catalog.service.source.merge.SourceMerger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;

@@ -4,8 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import com.betterreads.auth.entity.User;
-import com.betterreads.auth.repository.UserRepository;
+import com.betterreads.auth.service.UsernameLookup;
 import com.betterreads.comments.dto.CommentPage;
 import com.betterreads.comments.dto.CommentResponse;
 import com.betterreads.comments.entity.Comment;
@@ -24,15 +23,15 @@ import org.springframework.stereotype.Component;
 @Component
 public class CommentResponseAssembler {
 
-    private final UserRepository users;
+    private final UsernameLookup usernames;
 
     private final CommentRepository comments;
 
     private final CommentMapper mapper;
 
     public CommentResponseAssembler(
-        final UserRepository users, final CommentRepository comments, final CommentMapper mapper) {
-        this.users = users;
+        final UsernameLookup usernames, final CommentRepository comments, final CommentMapper mapper) {
+        this.usernames = usernames;
         this.comments = comments;
         this.mapper = mapper;
     }
@@ -54,8 +53,7 @@ public class CommentResponseAssembler {
 
     /** Builds the response for a freshly created comment, resolving its author's username. */
     public CommentResponse assembleOne(final Comment comment) {
-        final String author = users.findById(comment.getUserId())
-            .map(User::getUsername)
+        final String author = usernames.usernameOf(comment.getUserId())
             .orElseThrow(() -> new IllegalStateException(
                 "comment author has no app_user row userId=" + comment.getUserId()));
         return mapper.toResponse(comment, author);
@@ -63,8 +61,7 @@ public class CommentResponseAssembler {
 
     private Map<Long, String> authorsFor(final List<Comment> page) {
         final List<Long> userIds = page.stream().map(Comment::getUserId).distinct().toList();
-        return users.findAllById(userIds).stream()
-            .collect(Collectors.toMap(User::getUserId, User::getUsername));
+        return usernames.usernamesByIds(userIds);
     }
 
     private Map<Long, Long> replyCountsFor(final List<Comment> page) {

@@ -6,8 +6,8 @@ import java.util.List;
 
 import com.betterreads.catalog.entity.Book;
 import com.betterreads.catalog.repository.BookCoverRepository;
-import com.betterreads.catalog.service.source.CoverMirrorService;
-import com.betterreads.integration.minio.ImageStoreException;
+import com.betterreads.catalog.image.CoverMirrorService;
+import com.betterreads.catalog.image.store.ImageStoreException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;

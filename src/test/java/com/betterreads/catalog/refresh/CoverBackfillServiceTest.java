@@ -12,7 +12,7 @@ import java.util.Optional;
 
 import com.betterreads.catalog.entity.Book;
 import com.betterreads.catalog.repository.BookCoverRepository;
-import com.betterreads.catalog.service.source.CoverMirrorService;
+import com.betterreads.catalog.image.CoverMirrorService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;

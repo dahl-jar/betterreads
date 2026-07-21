@@ -23,12 +23,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Verifies the outbox worker's claim/send/resolve loop end-to-end against real Postgres. The
- * scheduled poller is disabled; tests trigger {@code drain()} manually for deterministic
- * sequencing. A scripted {@link MailSender} substitutes for the real transport so tests can
- * force success / retryable-fail / permanent-fail without touching Resend.
- */
 @SpringBootTest
 @Testcontainers
 @TestPropertySource(properties = {
@@ -49,11 +43,15 @@ class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
 
     private static final int MAX_ATTEMPTS = 3;
 
-    private static final String EMAIL = "alice@example.com";
+    private static final Duration FIRST_RETRY_BACKOFF = Duration.ofMinutes(5);
+
+    private static final String EMAIL = "darrow@example.com";
 
     private static final String IDEMPOTENCY_PREFIX = "outbox-";
 
     private static final String TRANSIENT_ERROR = "temporary";
+
+    private static final String CLEARED_PAYLOAD = "{}";
 
     @Autowired
     private MailOutboxRepository repository;
@@ -81,47 +79,44 @@ class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
 
         worker.drain();
 
-        final MailOutbox row = repository.findAll().get(0);
+        final MailOutbox row = onlyRow();
         assertThat(row)
-            .as("row is marked sent on first attempt and the send used the row id as idempotency key")
-            .satisfies(r -> assertThat(r.getSentAt()).isNotNull())
-            .satisfies(r -> assertThat(r.getFailedAt()).isNull())
-            .satisfies(r -> assertThat(r.getAttemptCount()).isEqualTo(1))
-            .satisfies(r -> assertThat(sender.captured)
-                .hasSize(1)
-                .first()
-                .extracting(MailMessage::idempotencyKey)
-                .isEqualTo(IDEMPOTENCY_PREFIX + r.getMailOutboxId()));
+            .satisfies(saved -> assertThat(saved.getSentAt()).isNotNull())
+            .satisfies(saved -> assertThat(saved.getFailedAt()).isNull())
+            .satisfies(saved -> assertThat(saved.getAttemptCount()).isEqualTo(1));
     }
 
     @Test
-    void successfulSendClearsThePayload() {
+    void successfulSendClearsPayload() {
         final String secretToken = "secret-token-must-not-linger";
         outbox.enqueuePasswordReset(EMAIL, secretToken);
         sender.script.add(SendOutcome.success());
 
         worker.drain();
 
-        final MailOutbox row = repository.findAll().get(0);
-        assertThat(row.getPayload())
-            .as("payload must not retain the plaintext token after send so a DB read leak cannot redeem it")
-            .doesNotContain(secretToken);
+        final MailOutbox row = onlyRow();
+        assertThat(row.getPayload()).isEqualTo(CLEARED_PAYLOAD);
     }
 
     @Test
     void retryableFailureSchedulesNextAttemptAndKeepsRowPending() {
-        outbox.enqueuePasswordReset(EMAIL, "tok-2");
+        final String retryToken = "tok-2";
+        outbox.enqueuePasswordReset(EMAIL, retryToken);
         sender.script.add(SendOutcome.retryable(TRANSIENT_ERROR));
 
+        final Instant beforeDrain = Instant.now();
         worker.drain();
+        final Instant afterDrain = Instant.now();
 
-        assertThat(repository.findAll().get(0))
-            .as("retryable failure leaves row pending with bumped next_attempt_at and recorded error")
-            .satisfies(r -> assertThat(r.getSentAt()).isNull())
-            .satisfies(r -> assertThat(r.getFailedAt()).isNull())
-            .satisfies(r -> assertThat(r.getAttemptCount()).isEqualTo(1))
-            .satisfies(r -> assertThat(r.getNextAttemptAt()).isAfter(Instant.now().plus(Duration.ofMinutes(1))))
-            .satisfies(r -> assertThat(r.getLastError()).contains(TRANSIENT_ERROR));
+        final MailOutbox row = onlyRow();
+        assertThat(row)
+            .satisfies(saved -> assertThat(saved.getSentAt()).isNull())
+            .satisfies(saved -> assertThat(saved.getFailedAt()).isNull())
+            .satisfies(saved -> assertThat(saved.getAttemptCount()).isEqualTo(1))
+            .satisfies(saved -> assertThat(saved.getNextAttemptAt()).isBetween(
+                beforeDrain.plus(FIRST_RETRY_BACKOFF), afterDrain.plus(FIRST_RETRY_BACKOFF)))
+            .satisfies(saved -> assertThat(saved.getLastError()).contains(TRANSIENT_ERROR))
+            .satisfies(saved -> assertThat(saved.getPayload()).contains(retryToken));
     }
 
     @Test
@@ -131,30 +126,32 @@ class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
 
         worker.drain();
 
-        assertThat(repository.findAll().get(0))
-            .as("non-retryable failure marks the row failed on the first attempt")
-            .satisfies(r -> assertThat(r.getFailedAt()).isNotNull())
-            .satisfies(r -> assertThat(r.getSentAt()).isNull())
-            .satisfies(r -> assertThat(r.getAttemptCount()).isEqualTo(1));
+        final MailOutbox row = onlyRow();
+        assertThat(row)
+            .satisfies(saved -> assertThat(saved.getFailedAt()).isNotNull())
+            .satisfies(saved -> assertThat(saved.getSentAt()).isNull())
+            .satisfies(saved -> assertThat(saved.getAttemptCount()).isEqualTo(1))
+            .satisfies(saved -> assertThat(saved.getPayload()).isEqualTo(CLEARED_PAYLOAD));
     }
 
     @Test
-    void givesUpAfterMaxAttempts() {
+    void retryableFailureMarksRowFailedAtMaxAttempts() {
         outbox.enqueuePasswordReset(EMAIL, "tok-4");
-        sender.script.add(SendOutcome.retryable("flap 1"));
-        sender.script.add(SendOutcome.retryable("flap 2"));
-        sender.script.add(SendOutcome.retryable("flap 3"));
+        sender.script.add(SendOutcome.retryable("retry 1"));
+        sender.script.add(SendOutcome.retryable("retry 2"));
+        sender.script.add(SendOutcome.retryable("retry 3"));
 
         for (int i = 0; i < MAX_ATTEMPTS; i++) {
             forceClaimable();
             worker.drain();
         }
 
-        assertThat(repository.findAll().get(0))
-            .as("after max attempts the row is marked failed even though every attempt was retryable")
-            .satisfies(r -> assertThat(r.getAttemptCount()).isEqualTo(MAX_ATTEMPTS))
-            .satisfies(r -> assertThat(r.getFailedAt()).isNotNull())
-            .satisfies(r -> assertThat(r.getSentAt()).isNull());
+        final MailOutbox row = onlyRow();
+        assertThat(row)
+            .satisfies(saved -> assertThat(saved.getAttemptCount()).isEqualTo(MAX_ATTEMPTS))
+            .satisfies(saved -> assertThat(saved.getFailedAt()).isNotNull())
+            .satisfies(saved -> assertThat(saved.getSentAt()).isNull())
+            .satisfies(saved -> assertThat(saved.getPayload()).isEqualTo(CLEARED_PAYLOAD));
     }
 
     @Test
@@ -167,21 +164,26 @@ class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
         forceClaimable();
         worker.drain();
 
-        final MailOutbox row = repository.findAll().get(0);
+        final MailOutbox row = onlyRow();
         final long outboxId = row.getMailOutboxId();
         assertThat(sender.captured)
-            .as("idempotency key is the same on attempt 1 and attempt 2")
             .hasSize(2)
-            .allSatisfy(msg -> assertThat(msg.idempotencyKey()).isEqualTo(IDEMPOTENCY_PREFIX + outboxId));
+            .allSatisfy(message -> assertThat(message.idempotencyKey())
+                .isEqualTo(IDEMPOTENCY_PREFIX + outboxId));
+    }
+
+    private MailOutbox onlyRow() {
+        final List<MailOutbox> rows = repository.findAll();
+        assertThat(rows).hasSize(1);
+        return rows.getFirst();
     }
 
     private void forceClaimable() {
-        repository.findAll().forEach(row -> {
-            if (row.getSentAt() == null && row.getFailedAt() == null) {
-                row.setNextAttemptAt(Instant.now().minusSeconds(1));
-                repository.save(row);
-            }
-        });
+        final MailOutbox row = onlyRow();
+        if (row.getSentAt() == null && row.getFailedAt() == null) {
+            row.setNextAttemptAt(Instant.now().minusSeconds(1));
+            repository.save(row);
+        }
     }
 
     @TestConfiguration

@@ -1,47 +1,33 @@
 # BetterReads
 
-Backend service for BetterReads, a book tracking app. Spring Boot on Java 25, Postgres.
+Backend API for a book tracking app. It provides catalog search, book details, shelves, reviews, comments, and account authentication.
 
-> The backend isn't live right now, for personal reasons. Everything still works; run it locally with the [Quickstart](#quickstart) below.
-
-## Background
-
-The first version of BetterReads was a school project: a Thymeleaf app that called OpenLibrary on every page load, used Spring's default session auth, and let Hibernate auto-create the schema. The original code is at [dahl-jar/legacy-betterreads](https://github.com/dahl-jar/legacy-betterreads).
-
-This is a rebuild. The backend is a headless JSON API; a separate web client consumes it. Auth uses short-lived access JWTs and refresh tokens that rotate on every use, with replay detection.
-
-A catalog book is assembled from five sources: Library of Congress, Wikidata, Google Books, OpenLibrary, and Hardcover. Each field has its own source priority. Title resolves from Google Books first, authors from OpenLibrary first, rating and series from Hardcover, awards from Wikidata. Subjects are merged across all five. A book is shown only once it has a title, an author, a cover, a description, a publication year, and an ISBN; until then it stays in a staging table while the remaining sources are fetched.
-
-Descriptions get a second pass from Wikipedia and Apple Books, cleaned of markup and scored so the best one wins. Covers are downloaded once, re-encoded to a size-capped JPEG, stored in MinIO, and served from the API. Scheduled jobs fill short descriptions and copy covers the live path missed.
-
-Search runs on Meilisearch with typo tolerance and a relevance-score floor that drops weak fuzzy matches.
-
-Schema changes go through Flyway, and the runtime database role has no DDL privileges. Production runs on a single-node Kubernetes cluster behind a Cloudflare Tunnel, deployed by Argo CD.
+Catalog records combine data from Library of Congress, Wikidata, Google Books, OpenLibrary, and Hardcover. Incomplete records remain in staging until they have the fields required by the public catalog. Meilisearch serves catalog search, Redis caches book details, and MinIO stores processed cover images.
 
 ## Stack
 
-Java 25 · Spring Boot 4.0 · Postgres 17 · Meilisearch · Redis · MinIO · Flyway · Caffeine · WebClient · JJWT · Bucket4j · Gradle 9 (Kotlin DSL)
+Java 25 · Spring Boot 4.0 · Postgres 17 · Meilisearch · Redis · MinIO · Flyway · Gradle 9
 
 ## Prerequisites
 
-- JDK 25 (Oracle GraalVM or Temurin)
+- JDK 25
 - Docker
 - `JAVA_HOME` set
 
 ## Quickstart
 
 ```bash
-# copy the env template, then set JWT_SECRET to a 32+ byte random value
+# copy the environment template and set JWT_SECRET to at least 32 random bytes
 cp .env.example .env
 
-# start local Postgres
+# start Postgres
 docker compose -f docker/docker-compose.yml --env-file .env up -d
 
-# run the app, Flyway migrates on first startup
+# run the API
 ./gradlew bootRun
 ```
 
-API at `http://localhost:8080`, Swagger UI at `http://localhost:8080/swagger-ui.html`.
+The API listens on `http://localhost:8080`. Swagger UI is at `http://localhost:8080/swagger-ui.html`.
 
 ## Commands
 
@@ -49,51 +35,39 @@ API at `http://localhost:8080`, Swagger UI at `http://localhost:8080/swagger-ui.
 # run the app
 ./gradlew bootRun
 
-# tests only
+# run deterministic tests
 ./gradlew test
 
-# full quality gate: Checkstyle, PMD, SpotBugs, ErrorProne, NullAway, JaCoCo, JUnit
+# run tests and static analysis
 ./gradlew check
 
-# build the JVM jar
+# build the executable jar
 ./gradlew bootJar
 
-# build a native binary (GraalVM)
-./gradlew nativeCompile
+# start Postgres
+docker compose -f docker/docker-compose.yml --env-file .env up -d
 
-# Postgres lifecycle
-docker compose -f docker/docker-compose.yml --env-file .env up -d    # start
-docker compose -f docker/docker-compose.yml --env-file .env down -v   # stop and wipe
+# stop Postgres and delete its volume
+docker compose -f docker/docker-compose.yml --env-file .env down -v
 ```
 
 ## Architecture
 
-Controller calls service, service calls repository. Each feature package has its own controller, service, repository, entity, dto, and mapper subpackages. The API uses record DTOs; JPA entities stay in the service and repository layers. Each external source has its own client, DTOs, and mapper under `integration/<vendor>/`, so a source's own data shape stays at the edge. ArchUnit enforces the layering. See [docs/explanation/architecture.md](docs/explanation/architecture.md).
+Code is organised by feature. Controllers expose record DTOs, services contain application logic, and repositories access Postgres. External API types remain under `integration/<vendor>/`; catalog code consumes internal source models and ports. ArchUnit checks package placement, layer dependencies, and feature ownership. See [Backend architecture](docs/explanation/architecture.md).
 
 ## Deployment
 
-The live deployment is paused for personal reasons. Here's how it runs when it's up.
-
-Production runs on a single-node k3s cluster. The app, Postgres, Redis, Meilisearch, and MinIO run as Kubernetes workloads, synced from a Git repo by Argo CD. CI builds the container image and pushes it to GHCR after the quality gate passes.
-
-The cluster has no public ports open. A `cloudflared` Deployment connects out to Cloudflare's edge and maps `api.betterreadsapp.com` to the in-cluster ingress, which handles DNS and TLS termination. Metrics and logs ship to Grafana Cloud via a Grafana Alloy agent in the cluster.
-
-The Kubernetes manifests, Argo CD setup, sealed secrets, and network policies live in a template repo: [betterreads-gitops-template](https://github.com/dahl-jar/betterreads-gitops-template).
+Production runs on a single-node k3s cluster. CI publishes the application image to GHCR, updates the Kubernetes manifests, and Argo CD applies the change. Cloudflare Tunnel routes `api.betterreadsapp.com` to the cluster. See [Deployment](docs/explanation/deployment.md).
 
 ## Docs
 
-Reference:
-- [API](docs/reference/api.md)
+- [API reference](docs/reference/api.md)
 - [Database schema](docs/reference/database-schema.md)
 - [Project structure](docs/reference/project-structure.md)
-
-Explanation:
 - [Backend architecture](docs/explanation/architecture.md)
 - [Catalog pipeline](docs/explanation/catalog-pipeline.md)
 - [Deployment](docs/explanation/deployment.md)
-
-How-to:
-- [Deploy](docs/how-to/deploy.md)
+- [Deploy the app](docs/how-to/deploy.md)
 - [Back up and restore Postgres](docs/how-to/backup-postgres.md)
 
 ## License

@@ -4,10 +4,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
 
-import com.betterreads.catalog.service.source.BookFieldSource;
-import com.betterreads.catalog.service.source.CatalogGenres;
-import com.betterreads.catalog.service.source.SourceAuthor;
-import com.betterreads.catalog.service.source.SourceBook;
+import com.betterreads.catalog.service.source.model.BookFieldSource;
+import com.betterreads.catalog.service.source.quality.CatalogGenres;
+import com.betterreads.catalog.service.source.model.SourceAuthor;
+import com.betterreads.catalog.service.source.model.SourceBook;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;

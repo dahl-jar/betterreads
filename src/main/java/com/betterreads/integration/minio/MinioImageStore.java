@@ -6,6 +6,9 @@ import java.io.InputStream;
 import java.security.GeneralSecurityException;
 import java.util.Optional;
 
+import com.betterreads.catalog.image.store.ImageStore;
+import com.betterreads.catalog.image.store.ImageStoreException;
+import com.betterreads.catalog.image.store.StoredImage;
 import io.minio.GetObjectArgs;
 import io.minio.GetObjectResponse;
 import io.minio.MinioClient;

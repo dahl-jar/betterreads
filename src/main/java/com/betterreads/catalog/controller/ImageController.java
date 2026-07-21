@@ -3,7 +3,7 @@ package com.betterreads.catalog.controller;
 import java.time.Duration;
 
 import com.betterreads.catalog.service.read.CoverImageService;
-import com.betterreads.integration.minio.StoredImage;
+import com.betterreads.catalog.image.store.StoredImage;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;

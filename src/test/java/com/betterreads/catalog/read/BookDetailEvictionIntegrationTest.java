@@ -3,11 +3,11 @@ package com.betterreads.catalog.read;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.betterreads.catalog.dto.BookDetailResponse;
-import com.betterreads.catalog.service.source.BookFieldSource;
+import com.betterreads.catalog.service.source.model.BookFieldSource;
 import com.betterreads.catalog.service.read.BookReadService;
-import com.betterreads.catalog.service.read.CatalogService;
-import com.betterreads.catalog.service.source.SourceAuthor;
-import com.betterreads.catalog.service.source.SourceBook;
+import com.betterreads.catalog.service.write.BookUpsertService;
+import com.betterreads.catalog.service.source.model.SourceAuthor;
+import com.betterreads.catalog.service.source.model.SourceBook;
 import com.betterreads.catalog.repository.AuthorRepository;
 import com.betterreads.catalog.repository.BookRepository;
 import com.betterreads.support.ContainerizedTest;
@@ -56,7 +56,7 @@ class BookDetailEvictionIntegrationTest extends ContainerizedTest {
     static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
 
     @Autowired
-    private CatalogService catalogService;
+    private BookUpsertService bookUpsertService;
 
     @Autowired
     private BookReadService bookReadService;
@@ -80,10 +80,10 @@ class BookDetailEvictionIntegrationTest extends ContainerizedTest {
     @Test
     @DisplayName("re-writing a book serves the new title, not the cached one")
     void evictsOnReWrite() {
-        catalogService.upsertFromSource(book(ORIGINAL_TITLE));
+        bookUpsertService.upsertFromSource(book(ORIGINAL_TITLE));
         final BookDetailResponse cached = bookReadService.findByKey(ISBN).orElseThrow();
 
-        catalogService.upsertFromSource(book(REVISED_TITLE));
+        bookUpsertService.upsertFromSource(book(REVISED_TITLE));
 
         assertThat(cached.title()).isEqualTo(ORIGINAL_TITLE);
         assertThat(titleAfterEviction())

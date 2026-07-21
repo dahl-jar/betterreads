@@ -2,7 +2,7 @@ package com.betterreads.collections.service;
 
 import java.util.function.Consumer;
 
-import com.betterreads.catalog.entity.Book;
+import com.betterreads.catalog.dto.BookSummary;
 import com.betterreads.collections.dto.ShelfEntryResponse;
 import com.betterreads.collections.entity.ShelfEntry;
 import com.betterreads.collections.mapper.ShelfEntryMapper;
@@ -35,10 +35,10 @@ public class ShelfWriter {
      */
     @Transactional
     public ShelfEntryResponse applyToShelf(
-        final Long userId, final Book book, final Consumer<ShelfEntry> change,
+        final Long userId, final BookSummary book, final Consumer<ShelfEntry> change,
         final @Nullable Integer myRating) {
-        final ShelfEntry entry = entries.findByUserIdAndBookId(userId, book.getBookId())
-            .orElseGet(() -> new ShelfEntry(userId, book.getBookId()));
+        final ShelfEntry entry = entries.findByUserIdAndBookId(userId, book.bookId())
+            .orElseGet(() -> new ShelfEntry(userId, book.bookId()));
         change.accept(entry);
         return mapper.toResponse(entries.saveAndFlush(entry), book, myRating);
     }

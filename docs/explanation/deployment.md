@@ -1,29 +1,25 @@
 # Deployment
 
-## Architecture
+## Cluster
 
-Production runs on a single-node k3s cluster. The Spring Boot app, Postgres, and Redis run as Kubernetes workloads. Argo CD syncs them from a Git repo (GitOps), and Cloudflare sits in front for DNS, TLS, and the tunnel.
+Production runs in the `betterreads` namespace on a single-node k3s cluster. The Spring Boot app runs as a Deployment. Postgres 17, Redis 7, Meilisearch, and MinIO run as StatefulSets with local persistent volumes.
 
-## Workloads
+Postgres stores application data. Redis stores cache entries and rate-limit buckets. Meilisearch serves catalog search. MinIO stores book cover images in the `betterreads-images` bucket. Cluster services are private.
 
-The app runs as a Deployment pulling its image from GHCR. Postgres 17, Redis 7, Meilisearch, and MinIO run as StatefulSets, each with its own PersistentVolumeClaim on the cluster's local-path storage. MinIO holds book covers in the `betterreads-images` bucket, reached by a bucket-scoped app user. All of them live in the `betterreads` namespace. Services are cluster-internal; nothing is published to the host network, so covers reach the browser only through the app.
-
-Flyway creates a separate `betterreads_app` role with CRUD-only privileges. Spring Boot connects as `betterreads_app`; Flyway runs as the migration owner `betterreads`. SQL injection on the runtime path can't drop tables or alter schema.
+The application connects to Postgres with the CRUD-only `betterreads_app` role. Flyway uses the `betterreads` migration role.
 
 ## Delivery
 
-CI builds the container image on push to `main`, gated behind the quality check (`./gradlew check`), and pushes it to GHCR tagged with the commit SHA. CI then pins that tag in the manifests repo's Kustomize `images` list and commits. Argo CD watches the manifests repo and reconciles the cluster to match, so a deploy is the Git commit CI just made; Argo applies it and rolls the Deployment. The image tag is the commit SHA, so the running version always maps back to a known commit.
+A push to `main` starts the quality gate and container build. CI pushes the image to GHCR with the commit SHA, updates the Kustomize image in the manifests repository, and commits that change. Argo CD applies the manifests and rolls the application Deployment.
 
-## Edge
+## Traffic
 
-Cloudflare provides DNS, TLS, CDN, and DDoS protection. A `cloudflared` Deployment in the cluster connects out to Cloudflare's edge, so no inbound ports are open on the host. The tunnel routes `api.betterreadsapp.com` to the in-cluster Traefik ingress, which host-routes to the app Service.
-
-Per-endpoint rate limiting lives in the backend via Bucket4j.
+A `cloudflared` Deployment opens an outbound tunnel to Cloudflare. Requests for `api.betterreadsapp.com` pass through the tunnel to the cluster ingress and application Service. Cloudflare provides DNS and TLS. Bucket4j applies endpoint rate limits in the application.
 
 ## Observability
 
-A Grafana Alloy agent in the cluster scrapes the app's actuator metrics, Postgres metrics, and node metrics, and ships them with pod logs to Grafana Cloud. Alert rules and dashboards live in the Grafana Cloud stack.
+Grafana Alloy collects application metrics, Postgres metrics, node metrics, and pod logs. It sends them to Grafana Cloud.
 
-## Operating it
+## Operations
 
-See [how-to/deploy.md](../how-to/deploy.md) for updating the app, rolling back, and changing config.
+See [Deploy](../how-to/deploy.md) for releases, rollback, and configuration changes.

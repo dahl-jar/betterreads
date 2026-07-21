@@ -4,10 +4,10 @@ import java.util.Comparator;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-import com.betterreads.catalog.service.source.BookFieldSource;
-import com.betterreads.catalog.service.source.DescriptionLookup;
-import com.betterreads.catalog.service.source.DescriptionQuality;
-import com.betterreads.catalog.service.source.DescriptionSource;
+import com.betterreads.catalog.service.source.model.BookFieldSource;
+import com.betterreads.catalog.service.source.port.DescriptionLookup;
+import com.betterreads.catalog.service.source.quality.DescriptionQuality;
+import com.betterreads.catalog.service.source.port.DescriptionSource;
 import com.betterreads.common.util.TextMatch;
 import org.springframework.stereotype.Component;
 

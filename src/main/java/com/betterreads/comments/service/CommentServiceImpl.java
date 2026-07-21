@@ -1,6 +1,6 @@
 package com.betterreads.comments.service;
 
-import com.betterreads.catalog.repository.BookRepository;
+import com.betterreads.catalog.service.read.BookIdLookup;
 import com.betterreads.comments.dto.CommentPage;
 import com.betterreads.comments.dto.CommentResponse;
 import com.betterreads.comments.dto.CreateCommentRequest;
@@ -11,7 +11,7 @@ import com.betterreads.common.dto.PageQuery;
 import com.betterreads.common.exception.ForbiddenException;
 import com.betterreads.common.exception.InvalidRequestException;
 import com.betterreads.common.exception.ResourceNotFoundException;
-import com.betterreads.reviews.repository.ReviewRepository;
+import com.betterreads.reviews.service.ReviewLookup;
 
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
@@ -25,19 +25,19 @@ public class CommentServiceImpl implements CommentService {
 
     private final CommentRepository comments;
 
-    private final BookRepository books;
+    private final BookIdLookup bookIds;
 
-    private final ReviewRepository reviews;
+    private final ReviewLookup reviews;
 
     private final CommentResponseAssembler assembler;
 
     public CommentServiceImpl(
         final CommentRepository comments,
-        final BookRepository books,
-        final ReviewRepository reviews,
+        final BookIdLookup bookIds,
+        final ReviewLookup reviews,
         final CommentResponseAssembler assembler) {
         this.comments = comments;
-        this.books = books;
+        this.bookIds = bookIds;
         this.reviews = reviews;
         this.assembler = assembler;
     }
@@ -46,16 +46,14 @@ public class CommentServiceImpl implements CommentService {
     @Transactional
     public CommentResponse commentOnBook(
         final Long userId, final String bookKey, final CreateCommentRequest request) {
-        return create(userId, CommentTarget.BOOK, requireBookId(bookKey), request);
+        return create(userId, CommentTarget.BOOK, bookIds.requireBookId(bookKey), request);
     }
 
     @Override
     @Transactional
     public CommentResponse commentOnReview(
         final Long userId, final Long reviewId, final CreateCommentRequest request) {
-        final Long lockedReviewId = reviews.findForUpdate(reviewId)
-            .orElseThrow(() -> new ResourceNotFoundException(NO_REVIEW + reviewId))
-            .getReviewId();
+        final long lockedReviewId = reviews.lockAndGetId(reviewId);
         return create(userId, CommentTarget.REVIEW, lockedReviewId, request);
     }
 
@@ -63,7 +61,7 @@ public class CommentServiceImpl implements CommentService {
     @Transactional(readOnly = true)
     public CommentPage listForBook(final String bookKey, final PageQuery page) {
         final Page<Comment> found = comments.findTopLevelForTarget(
-            CommentTarget.BOOK, requireBookId(bookKey), page.toPageable());
+            CommentTarget.BOOK, bookIds.requireBookId(bookKey), page.toPageable());
         return assembler.assemble(found, page, true);
     }
 
@@ -118,14 +116,8 @@ public class CommentServiceImpl implements CommentService {
         }
     }
 
-    private Long requireBookId(final String bookKey) {
-        return books.findByDedupKey(bookKey)
-            .orElseThrow(() -> new ResourceNotFoundException("No book with key " + bookKey))
-            .getBookId();
-    }
-
     private Long requireReviewId(final Long reviewId) {
-        if (!reviews.existsById(reviewId)) {
+        if (!reviews.exists(reviewId)) {
             throw new ResourceNotFoundException(NO_REVIEW + reviewId);
         }
         return reviewId;

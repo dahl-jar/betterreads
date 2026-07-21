@@ -43,6 +43,32 @@ configurations {
 	}
 }
 
+val mainSourceSet = sourceSets.main.get()
+val testSourceSet = sourceSets.test.get()
+
+val liveTestSourceSet = sourceSets.create("liveTest") {
+	compileClasspath += mainSourceSet.output + testSourceSet.output
+	runtimeClasspath += output + compileClasspath
+}
+
+val localDbVerificationSourceSet = sourceSets.create("localDbVerification") {
+	compileClasspath += mainSourceSet.output + testSourceSet.output
+	runtimeClasspath += output + compileClasspath
+}
+
+configurations.named(liveTestSourceSet.implementationConfigurationName) {
+	extendsFrom(configurations.testImplementation.get())
+}
+configurations.named(liveTestSourceSet.runtimeOnlyConfigurationName) {
+	extendsFrom(configurations.testRuntimeOnly.get())
+}
+configurations.named(localDbVerificationSourceSet.implementationConfigurationName) {
+	extendsFrom(configurations.testImplementation.get())
+}
+configurations.named(localDbVerificationSourceSet.runtimeOnlyConfigurationName) {
+	extendsFrom(configurations.testRuntimeOnly.get())
+}
+
 repositories {
 	mavenCentral()
 }
@@ -101,7 +127,7 @@ dependencies {
 	testImplementation("org.testcontainers:testcontainers")
 	testImplementation("org.wiremock:wiremock-standalone:3.13.2")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-	testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
+	testImplementation("com.tngtech.archunit:archunit-junit5:1.4.1")
 }
 
 checkstyle {
@@ -250,9 +276,58 @@ dependencyCheck {
 // ---------------------------------------------------------------------------
 // Test config
 // ---------------------------------------------------------------------------
+// the test JVM does not inherit the parent environment, so credentials and opt-in flags
+// would fall back to application.yml defaults without this
+fun Test.forwardEnvironmentVariables(names: Iterable<String>) {
+	names.forEach { name ->
+		project.providers.environmentVariable(name).orNull?.let { environment(name, it) }
+	}
+}
+
+val liveTestEnvironmentVariables = listOf(
+	"DESCRIPTION_LIVE",
+	"GOOGLE_BOOKS_API_KEY",
+	"HARDCOVER_BEARER_TOKEN",
+	"RUN_LOC_LIVE",
+	"RUN_OPENLIBRARY_LIVE"
+)
+
+val localDbVerificationEnvironmentVariables = listOf(
+	"DB_HOST",
+	"DB_PORT",
+	"DB_NAME",
+	"DB_USERNAME",
+	"DB_PASSWORD",
+	"DB_APP_USERNAME",
+	"DB_APP_PASSWORD",
+	"GOOGLE_BOOKS_API_KEY",
+	"HARDCOVER_BEARER_TOKEN",
+	"RUN_LOCAL_DB_VERIFICATION",
+	"RUN_LOC_LIVE"
+)
+
+tasks.register<Test>("liveTest") {
+	description = "Runs tests against live external services."
+	group = "verification"
+	testClassesDirs = liveTestSourceSet.output.classesDirs
+	classpath = liveTestSourceSet.runtimeClasspath
+	dependsOn(liveTestSourceSet.classesTaskName)
+	shouldRunAfter(tasks.test)
+	forwardEnvironmentVariables(liveTestEnvironmentVariables)
+}
+
+tasks.register<Test>("localDbVerification") {
+	description = "Runs operator checks against the local database."
+	group = "verification"
+	testClassesDirs = localDbVerificationSourceSet.output.classesDirs
+	classpath = localDbVerificationSourceSet.runtimeClasspath
+	dependsOn(localDbVerificationSourceSet.classesTaskName)
+	shouldRunAfter(tasks.test)
+	forwardEnvironmentVariables(localDbVerificationEnvironmentVariables)
+}
+
 tasks.withType<Test> {
 	useJUnitPlatform()
-	finalizedBy(tasks.jacocoTestReport)
 
 	// ArchUnit builds an in-memory class graph over the whole application, which overflows the
 	// default fork heap as the suite grows. Give the test JVM room so the architecture rules run.
@@ -264,23 +339,26 @@ tasks.withType<Test> {
 	// long after the test has already passed.
 	systemProperty("mail.outbox.worker-enabled", "false")
 	systemProperty("betterreads.auth.deletion.scheduler-enabled", "false")
-
-	// Forward env vars the opt-in live/local-DB verification tests need. Gradle does not pass the
-	// parent environment to the test JVM, so the compose-DB credentials and source API keys would
-	// fall back to their application.yml defaults and fail to authenticate. Only forwarded when set.
-	listOf(
-		"DB_HOST", "DB_PORT", "DB_NAME", "DB_USERNAME", "DB_PASSWORD",
-		"DB_APP_USERNAME", "DB_APP_PASSWORD",
-		"HARDCOVER_BEARER_TOKEN", "GOOGLE_BOOKS_API_KEY",
-		"RUN_LOCAL_DB_VERIFICATION", "RUN_OPENLIBRARY_LIVE",
-	).forEach { name ->
-		System.getenv(name)?.let { environment(name, it) }
-	}
 }
 
-// Wire coverage verification into check
+tasks.test {
+	finalizedBy(tasks.jacocoTestReport)
+}
+
+// Wire coverage verification and the opt-in suites' compile + static analysis into check.
+// The opt-in suites run only via their own tasks.
 tasks.named("check") {
-	dependsOn(tasks.jacocoTestCoverageVerification)
+	dependsOn(
+		tasks.jacocoTestCoverageVerification,
+		tasks.named(liveTestSourceSet.classesTaskName),
+		tasks.named(localDbVerificationSourceSet.classesTaskName),
+		tasks.named("checkstyleLiveTest"),
+		tasks.named("checkstyleLocalDbVerification"),
+		tasks.named("pmdLiveTest"),
+		tasks.named("pmdLocalDbVerification"),
+		tasks.named("spotbugsLiveTest"),
+		tasks.named("spotbugsLocalDbVerification")
+	)
 	val nvdApiKey = providers.environmentVariable("NVD_API_KEY").orNull
 	if (!nvdApiKey.isNullOrBlank()) {
 		dependsOn(tasks.named("dependencyCheckAnalyze"))

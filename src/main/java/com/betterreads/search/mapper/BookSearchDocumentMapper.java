@@ -1,14 +1,11 @@
 package com.betterreads.search.mapper;
 
-import com.betterreads.catalog.entity.Author;
-import com.betterreads.catalog.entity.Book;
-import com.betterreads.catalog.entity.BookSubject;
-import com.betterreads.catalog.image.CoverImages;
+import com.betterreads.catalog.dto.BookIndexView;
 import com.betterreads.search.dto.BookSearchDocument;
 import org.springframework.stereotype.Component;
 
 /**
- * Maps a catalog {@link Book} to its search document.
+ * Maps a catalog {@link BookIndexView} to its search document.
  *
  * <p>The document id is the same key the detail endpoint resolves by, the first present source
  * identifier, so a search hit links straight to its detail page. Popularity scores rating volume and
@@ -17,34 +14,28 @@ import org.springframework.stereotype.Component;
 @Component
 public class BookSearchDocumentMapper {
 
-    private final CoverImages coverImages;
-
-    public BookSearchDocumentMapper(final CoverImages coverImages) {
-        this.coverImages = coverImages;
-    }
-
     /** Builds the search document for the given book. */
-    public BookSearchDocument toDocument(final Book book) {
-        return BookSearchDocument.builder(book.getDedupKey())
-            .title(book.getTitle())
-            .subtitle(book.getSubtitle())
-            .seriesName(book.getSeriesName())
-            .seriesPosition(book.getSeriesPosition())
-            .authors(book.getAuthors().stream().map(Author::getName).sorted().toList())
-            .subjects(book.getSubjects().stream().map(BookSubject::getSubject).toList())
-            .language(book.getLanguage())
-            .coverUrl(coverImages.servedUrl(book.getDedupKey(), book.getCoverUrl()))
-            .publicationYear(book.getFirstPublishYear())
+    public BookSearchDocument toDocument(final BookIndexView book) {
+        return BookSearchDocument.builder(book.dedupKey())
+            .title(book.title())
+            .subtitle(book.subtitle())
+            .seriesName(book.seriesName())
+            .seriesPosition(book.seriesPosition())
+            .authors(book.authors())
+            .subjects(book.subjects())
+            .language(book.language())
+            .coverUrl(book.servedCoverUrl())
+            .publicationYear(book.firstPublishYear())
             .popularityScore(popularityScore(book))
             .build();
     }
 
-    private static double popularityScore(final Book book) {
-        final Integer ratingCount = book.getRatingCount();
+    private static double popularityScore(final BookIndexView book) {
+        final Integer ratingCount = book.ratingCount();
         if (ratingCount == null || ratingCount <= 0) {
             return 0.0;
         }
-        final double average = book.getAverageRating() == null ? 0.0 : book.getAverageRating().doubleValue();
+        final double average = book.averageRating() == null ? 0.0 : book.averageRating().doubleValue();
         return Math.log10(1 + ratingCount) * average;
     }
 }

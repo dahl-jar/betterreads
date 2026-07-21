@@ -7,8 +7,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Optional;
 
-import com.betterreads.catalog.service.source.BookFieldSource;
-import com.betterreads.catalog.service.source.DescriptionLookup;
+import com.betterreads.catalog.service.source.model.BookFieldSource;
+import com.betterreads.catalog.service.source.port.DescriptionLookup;
 import com.betterreads.common.ratelimit.RateLimiter;
 import com.betterreads.common.web.WebClients;
 import com.github.tomakehurst.wiremock.WireMockServer;

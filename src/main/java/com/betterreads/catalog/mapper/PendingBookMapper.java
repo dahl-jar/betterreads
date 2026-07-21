@@ -7,11 +7,11 @@ import java.util.Set;
 import java.util.function.Function;
 
 import com.betterreads.catalog.entity.PendingBook;
-import com.betterreads.catalog.service.source.BookField;
-import com.betterreads.catalog.service.source.BookFieldSource;
-import com.betterreads.catalog.service.source.MergedBook;
-import com.betterreads.catalog.service.source.SourceAuthor;
-import com.betterreads.catalog.service.source.SourceBook;
+import com.betterreads.catalog.service.source.model.BookField;
+import com.betterreads.catalog.service.source.model.BookFieldSource;
+import com.betterreads.catalog.service.source.model.MergedBook;
+import com.betterreads.catalog.service.source.model.SourceAuthor;
+import com.betterreads.catalog.service.source.model.SourceBook;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 

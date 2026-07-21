@@ -5,9 +5,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
 
-import com.betterreads.catalog.service.source.SourceBook;
-import com.betterreads.catalog.service.source.SourceSeries;
-import com.betterreads.catalog.service.source.SourceSeriesVolume;
+import com.betterreads.catalog.service.source.model.SourceBook;
+import com.betterreads.catalog.service.source.model.SourceSeries;
+import com.betterreads.catalog.service.source.model.SourceSeriesVolume;
 import com.betterreads.integration.hardcover.dto.HardcoverBookNode;
 import com.betterreads.integration.hardcover.dto.SeriesEnumerationResponse;
 import com.betterreads.integration.hardcover.dto.SeriesSearchDocument;

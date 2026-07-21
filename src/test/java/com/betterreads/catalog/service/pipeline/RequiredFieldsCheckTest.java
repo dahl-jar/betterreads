@@ -1,8 +1,8 @@
 package com.betterreads.catalog.service.pipeline;
 
-import com.betterreads.catalog.service.source.BookFieldSource;
-import com.betterreads.catalog.service.source.SourceAuthor;
-import com.betterreads.catalog.service.source.SourceBook;
+import com.betterreads.catalog.service.source.model.BookFieldSource;
+import com.betterreads.catalog.service.source.model.SourceAuthor;
+import com.betterreads.catalog.service.source.model.SourceBook;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.params.provider.Arguments.arguments;

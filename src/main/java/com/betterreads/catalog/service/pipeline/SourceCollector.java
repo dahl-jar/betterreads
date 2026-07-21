@@ -1,10 +1,10 @@
 package com.betterreads.catalog.service.pipeline;
 
-import com.betterreads.catalog.service.source.BookFieldSource;
-import com.betterreads.catalog.service.source.BookSourceClient;
-import com.betterreads.catalog.service.source.MergedBook;
-import com.betterreads.catalog.service.source.SourceBook;
-import com.betterreads.catalog.service.source.SourceMerger;
+import com.betterreads.catalog.service.source.model.BookFieldSource;
+import com.betterreads.catalog.service.source.port.BookSourceClient;
+import com.betterreads.catalog.service.source.model.MergedBook;
+import com.betterreads.catalog.service.source.model.SourceBook;
+import com.betterreads.catalog.service.source.merge.SourceMerger;
 
 import java.time.Duration;
 import java.util.ArrayList;

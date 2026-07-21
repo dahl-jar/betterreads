@@ -5,13 +5,12 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 
 import com.betterreads.catalog.repository.BookRepository;
 import com.betterreads.catalog.repository.PendingBookRepository;
-import com.betterreads.catalog.service.source.BookFieldSource;
 import com.betterreads.catalog.service.pipeline.DescriptionSelector;
 import com.betterreads.catalog.service.pipeline.PendingBookService;
-import com.betterreads.catalog.service.source.SourceAuthor;
-import com.betterreads.catalog.service.source.SourceBook;
 import com.betterreads.catalog.service.pipeline.SourceCollector;
-import com.betterreads.catalog.service.source.SourceMerger;
+import com.betterreads.catalog.service.source.model.SourceBook;
+import com.betterreads.catalog.service.source.model.SourceBooks;
+import com.betterreads.catalog.service.source.merge.SourceMerger;
 import com.betterreads.search.dto.BookSearchDocument;
 import com.betterreads.search.dto.BookSearchResult;
 import com.betterreads.search.dto.SearchOutcome;
@@ -57,10 +56,6 @@ import org.testcontainers.utility.DockerImageName;
 })
 class PromotionIndexOutageIntegrationTest extends ContainerizedTest {
 
-    private static final String ISBN = "9780441013593";
-
-    private static final int DUNE_YEAR = 1965;
-
     @Container
     @ServiceConnection
     static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
@@ -86,25 +81,14 @@ class PromotionIndexOutageIntegrationTest extends ContainerizedTest {
     @Test
     @DisplayName("promotion survives a Meilisearch outage in the index hook")
     void promotionSurvivesIndexOutage() {
-        pendingBookService.stage(merger.merge(List.of(completeDune())));
+        final SourceBook dune = SourceBooks.dune();
+        pendingBookService.stage(merger.merge(List.of(dune)));
 
         assertThatCode(pendingBookService::promoteReady).doesNotThrowAnyException();
 
-        assertThat(books.findByDedupKey(ISBN))
+        assertThat(books.findByDedupKey(dune.isbn13()))
             .as("the book is promoted even though indexing it failed")
             .isPresent();
-    }
-
-    private static SourceBook completeDune() {
-        return SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
-            .isbn13(ISBN)
-            .openLibraryWorkKey("OL893415W")
-            .title("Dune")
-            .description("Paul Atreides leads the Fremen against the Padishah Empire on Arrakis.")
-            .coverUrl("https://covers.example/dune.jpg")
-            .publicationYear(DUNE_YEAR)
-            .authors(List.of(SourceAuthor.ofName("Frank Herbert")))
-            .build();
     }
 
     /** Replaces the source collector with one that re-merges only the staged data, no network. */

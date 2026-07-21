@@ -2,7 +2,7 @@ package com.betterreads.search.service;
 
 import java.util.List;
 
-import com.betterreads.catalog.repository.BookRepository;
+import com.betterreads.catalog.service.read.BookIndexViewReader;
 import com.betterreads.search.dto.BookSearchDocument;
 import com.betterreads.search.mapper.BookSearchDocumentMapper;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +24,7 @@ public class BookIndexReconciler {
 
     private static final Logger LOG = LoggerFactory.getLogger(BookIndexReconciler.class);
 
-    private final BookRepository books;
+    private final BookIndexViewReader indexViews;
 
     private final BookSearchDocumentMapper mapper;
 
@@ -34,7 +34,7 @@ public class BookIndexReconciler {
     @Scheduled(cron = "0 30 3 * * *")
     @Transactional(readOnly = true)
     public void reconcile() {
-        final List<BookSearchDocument> documents = books.findAllBy().stream()
+        final List<BookSearchDocument> documents = indexViews.allForIndex().stream()
             .map(mapper::toDocument)
             .toList();
         searchService.index(documents);

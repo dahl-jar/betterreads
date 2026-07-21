@@ -22,16 +22,16 @@ import com.betterreads.catalog.entity.PendingBook;
 import com.betterreads.catalog.mapper.PendingBookMapper;
 import com.betterreads.catalog.repository.BookRepository;
 import com.betterreads.catalog.repository.PendingBookRepository;
-import com.betterreads.catalog.service.read.CatalogService;
-import com.betterreads.catalog.service.source.BookFieldSource;
-import com.betterreads.catalog.service.source.BookSourceClient;
-import com.betterreads.catalog.service.source.MergedBook;
+import com.betterreads.catalog.service.write.BookUpsertService;
+import com.betterreads.catalog.service.source.model.BookFieldSource;
+import com.betterreads.catalog.service.source.port.BookSourceClient;
+import com.betterreads.catalog.service.source.model.MergedBook;
 import com.betterreads.catalog.service.pipeline.DescriptionSelector;
 import com.betterreads.catalog.service.pipeline.PendingBookService;
-import com.betterreads.catalog.service.source.SourceAuthor;
-import com.betterreads.catalog.service.source.SourceBook;
+import com.betterreads.catalog.service.source.model.SourceAuthor;
+import com.betterreads.catalog.service.source.model.SourceBook;
 import com.betterreads.catalog.service.pipeline.SourceCollector;
-import com.betterreads.catalog.service.source.SourceMerger;
+import com.betterreads.catalog.service.source.merge.SourceMerger;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
@@ -134,7 +134,7 @@ class PendingBookServiceIntegrationTest extends ContainerizedTest {
     private SourceCollector sourceCollector;
 
     @Autowired
-    private CatalogService catalogService;
+    private BookUpsertService bookUpsertService;
 
     @Autowired
     private PendingBookMapper pendingBookMapper;
@@ -395,9 +395,9 @@ class PendingBookServiceIntegrationTest extends ContainerizedTest {
     @Test
     @DisplayName("an upsert without authors keeps the stored authors")
     void upsertWithoutAuthorsKeepsStoredAuthors() {
-        catalogService.upsertFromSource(completeDune());
+        bookUpsertService.upsertFromSource(completeDune());
 
-        catalogService.upsertFromSource(sparseDune());
+        bookUpsertService.upsertFromSource(sparseDune());
 
         assertThat(books.findByOpenLibraryWorkKey(OL_KEY))
             .as("null authors mean the source did not carry the field, so the stored set is kept")
@@ -410,9 +410,9 @@ class PendingBookServiceIntegrationTest extends ContainerizedTest {
     @Test
     @DisplayName("an upsert whose author names are all blank keeps the stored authors")
     void upsertWithBlankAuthorNamesKeepsStoredAuthors() {
-        catalogService.upsertFromSource(completeDune());
+        bookUpsertService.upsertFromSource(completeDune());
 
-        catalogService.upsertFromSource(duneBy(" "));
+        bookUpsertService.upsertFromSource(duneBy(" "));
 
         assertThat(books.findByOpenLibraryWorkKey(OL_KEY))
             .as("a response with no usable author name must not strip the book's authors")

@@ -1,0 +1,191 @@
+package com.betterreads.catalog.service.write;
+
+import com.betterreads.catalog.service.source.model.BookFieldSource;
+import com.betterreads.catalog.service.source.model.MergedBook;
+import com.betterreads.catalog.service.source.model.SourceAuthor;
+import com.betterreads.catalog.service.source.model.SourceBook;
+
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import com.betterreads.catalog.entity.Author;
+import com.betterreads.catalog.entity.Book;
+import com.betterreads.catalog.repository.AuthorRepository;
+import com.betterreads.catalog.repository.BookRepository;
+
+import jakarta.persistence.EntityManager;
+
+import org.jspecify.annotations.Nullable;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Persists external metadata into the local catalog. Identity per source comes from the
+ * source-specific id column on {@code book}; the upsert is a lookup-then-save in a single
+ * transaction. Writing a book evicts its cached detail.
+ */
+@Service
+public class BookUpsertServiceImpl implements BookUpsertService {
+
+    private final BookRepository bookRepository;
+
+    private final AuthorRepository authorRepository;
+
+    private final EntityManager entityManager;
+
+    public BookUpsertServiceImpl(
+        final BookRepository bookRepository,
+        final AuthorRepository authorRepository,
+        final EntityManager entityManager
+    ) {
+        this.bookRepository = bookRepository;
+        this.authorRepository = authorRepository;
+        this.entityManager = entityManager;
+    }
+
+    /**
+     * Persists external metadata, locking an existing book row and refreshing it so enrichment sees
+     * and keeps a user-owned rating that a concurrent review committed between the lookup and save.
+     */
+    @Override
+    @Transactional
+    @CacheEvict(cacheNames = "bookDetails", key = "#result.dedupKey")
+    public Book upsertFromSource(final SourceBook source) {
+        return upsert(source, true);
+    }
+
+    @Override
+    @Transactional
+    @CacheEvict(cacheNames = "bookDetails", key = "#result.dedupKey")
+    public Book upsertFromSource(final MergedBook merged) {
+        return upsert(merged.book(), seriesAuthorityResolved(merged));
+    }
+
+    private Book upsert(final SourceBook source, final boolean seriesAuthorityResolved) {
+        final Book book = findExistingForSource(source)
+            .map(this::lockAndRefresh)
+            .orElseGet(Book::new);
+        book.applyFrom(source);
+        book.applySeries(source.seriesName(), source.seriesPosition(), seriesAuthorityResolved);
+        replaceAuthors(book, source.authors());
+        return bookRepository.save(book);
+    }
+
+    /** Returns true when Hardcover resolved on the collect, the condition for clearing a stored series. */
+    private static boolean seriesAuthorityResolved(final MergedBook merged) {
+        return merged.resolved(BookFieldSource.HARDCOVER);
+    }
+
+    private Book lockAndRefresh(final Book existing) {
+        final Book locked = bookRepository.findForUpdate(existing.getBookId()).orElse(existing);
+        entityManager.refresh(locked);
+        return locked;
+    }
+
+    private Optional<Book> findExistingForSource(final SourceBook source) {
+        return identityLookups().stream()
+            .map(lookup -> lookup.find(source))
+            .flatMap(Optional::stream)
+            .findFirst();
+    }
+
+    private List<SourceIdentityLookup> identityLookups() {
+        return List.of(
+            new SourceIdentityLookup(
+                SourceBook::googleBooksVolumeId, bookRepository::findByGoogleBooksVolumeId),
+            new SourceIdentityLookup(
+                SourceBook::openLibraryWorkKey, bookRepository::findByOpenLibraryWorkKey),
+            new SourceIdentityLookup(
+                SourceBook::hardcoverId, bookRepository::findByHardcoverId),
+            new SourceIdentityLookup(
+                SourceBook::locLccn, bookRepository::findByLocLccn),
+            new SourceIdentityLookup(
+                SourceBook::wikidataQid, bookRepository::findByWikidataQid));
+    }
+
+    private record SourceIdentityLookup(
+        Function<SourceBook, @Nullable String> idOf,
+        Function<String, Optional<Book>> findById
+    ) {
+
+        Optional<Book> find(final SourceBook source) {
+            final String sourceId = idOf.apply(source);
+            return sourceId == null ? Optional.empty() : findById.apply(sourceId);
+        }
+    }
+
+    /**
+     * Replaces the book's authors with the source authors, removing any no longer named.
+     *
+     * <p>A null list means the sources did not carry the field and keeps the stored authors, as does
+     * a list with no usable name, so a degenerate response cannot strip a book's authors.
+     */
+    private void replaceAuthors(final Book book, final @Nullable List<SourceAuthor> authors) {
+        if (authors == null) {
+            return;
+        }
+        final Set<Author> named = authors.stream()
+            .filter(author -> !author.name().isBlank())
+            .map(this::findOrCreateAuthor)
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (named.isEmpty()) {
+            return;
+        }
+        book.getAuthors().retainAll(named);
+        book.getAuthors().addAll(named);
+    }
+
+    /**
+     * Returns the author matching the source author, by Wikidata QID first and then by name,
+     * creating one when neither matches. Wikidata's photo and bio fill the row without overwriting a
+     * set value with null.
+     *
+     * <p>The {@code DataIntegrityViolationException} path handles the race between two concurrent
+     * upserts both finding the author missing and both trying to insert. The {@code UNIQUE}
+     * constraint on {@code author.name} (V21) lets the losing transaction re-query under the existing
+     * row instead of writing a duplicate.
+     */
+    private Author findOrCreateAuthor(final SourceAuthor source) {
+        final Author author = lookup(source).orElseGet(() -> insertOrLookup(source.name()));
+        fillIdentityFields(author, source);
+        return author;
+    }
+
+    private Optional<Author> lookup(final SourceAuthor source) {
+        final String qid = source.wikidataQid();
+        final Optional<Author> byQid = qid == null
+            ? Optional.empty()
+            : authorRepository.findByWikidataQid(qid);
+        return byQid.or(() -> authorRepository.findByName(source.name()));
+    }
+
+    private static void fillIdentityFields(final Author author, final SourceAuthor source) {
+        if (author.getWikidataQid() == null) {
+            author.setWikidataQid(source.wikidataQid());
+        }
+        if (author.getPhotoUrl() == null) {
+            author.setPhotoUrl(source.photoUrl());
+        }
+        if (author.getBio() == null) {
+            author.setBio(source.bio());
+        }
+    }
+
+    private Author insertOrLookup(final String name) {
+        final Author created = new Author();
+        created.setName(name);
+        try {
+            return authorRepository.saveAndFlush(created);
+        } catch (DataIntegrityViolationException ex) {
+            return authorRepository.findByName(name)
+                .orElseThrow(() -> new IllegalStateException(
+                    "author.name UNIQUE was violated but no row exists for name=" + name, ex));
+        }
+    }
+}

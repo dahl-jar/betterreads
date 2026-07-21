@@ -17,7 +17,7 @@ import java.util.Optional;
 import com.betterreads.catalog.entity.Book;
 import com.betterreads.catalog.repository.BookDescriptionRepository;
 import com.betterreads.catalog.service.pipeline.DescriptionSelector;
-import com.betterreads.catalog.service.source.DescriptionLookup;
+import com.betterreads.catalog.service.source.port.DescriptionLookup;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;

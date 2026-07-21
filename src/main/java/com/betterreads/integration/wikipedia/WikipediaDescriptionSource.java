@@ -2,9 +2,9 @@ package com.betterreads.integration.wikipedia;
 
 import java.util.Optional;
 
-import com.betterreads.catalog.service.source.BookFieldSource;
-import com.betterreads.catalog.service.source.DescriptionLookup;
-import com.betterreads.catalog.service.source.DescriptionSource;
+import com.betterreads.catalog.service.source.model.BookFieldSource;
+import com.betterreads.catalog.service.source.port.DescriptionLookup;
+import com.betterreads.catalog.service.source.port.DescriptionSource;
 import com.betterreads.integration.wikidata.WikidataApi;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;

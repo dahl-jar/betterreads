@@ -69,7 +69,7 @@
     </Match>
     <Match>
         <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="com.betterreads.catalog.service.read.CatalogServiceImpl"/>
+        <Class name="com.betterreads.catalog.service.write.BookUpsertServiceImpl"/>
     </Match>
     <Match>
         <Bug pattern="EI_EXPOSE_REP2"/>
@@ -82,10 +82,6 @@
     <Match>
         <Bug pattern="EI_EXPOSE_REP2"/>
         <Class name="com.betterreads.collections.service.ShelfWriter"/>
-    </Match>
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="com.betterreads.collections.service.ShelfRatings"/>
     </Match>
 
     <!--
@@ -121,7 +117,7 @@
     </Match>
     <Match>
         <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="com.betterreads.catalog.service.source.CoverMirrorService"/>
+        <Class name="com.betterreads.catalog.image.CoverMirrorService"/>
     </Match>
     <Match>
         <Bug pattern="EI_EXPOSE_REP2"/>
@@ -140,6 +136,14 @@
     <Match>
         <Bug pattern="EI_EXPOSE_REP2"/>
         <Class name="com.betterreads.reviews.service.ReviewWriter"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.betterreads.reviews.service.ReaderRatings"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.betterreads.reviews.service.ReviewLookup"/>
     </Match>
     <Match>
         <Bug pattern="EI_EXPOSE_REP2"/>
@@ -278,10 +282,10 @@
     -->
     <Match>
         <Bug pattern="REDOS"/>
-        <Class name="com.betterreads.catalog.service.source.DescriptionCleaner"/>
+        <Class name="com.betterreads.catalog.service.source.quality.DescriptionCleaner"/>
     </Match>
     <Match>
         <Bug pattern="REDOS"/>
-        <Class name="com.betterreads.catalog.service.source.DescriptionQuality"/>
+        <Class name="com.betterreads.catalog.service.source.quality.DescriptionQuality"/>
     </Match>
 </FindBugsFilter>

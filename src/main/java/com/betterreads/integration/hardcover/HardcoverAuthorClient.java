@@ -1,6 +1,6 @@
 package com.betterreads.integration.hardcover;
 
-import com.betterreads.catalog.service.source.SourceAuthorWorks;
+import com.betterreads.catalog.service.source.model.SourceAuthorWorks;
 import java.util.Optional;
 
 /** Resolves an author and their books from Hardcover. */

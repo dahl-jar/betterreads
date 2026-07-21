@@ -3,8 +3,8 @@ package com.betterreads.integration.image;
 import java.net.URI;
 import java.util.Optional;
 
-import com.betterreads.catalog.service.source.CoverFetcher;
-import com.betterreads.catalog.service.source.FetchedImage;
+import com.betterreads.catalog.service.source.port.CoverFetcher;
+import com.betterreads.catalog.service.source.port.FetchedImage;
 import com.betterreads.common.util.LogSanitizer;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;

@@ -7,8 +7,9 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import com.betterreads.catalog.entity.Book;
-import com.betterreads.catalog.repository.BookRepository;
+import com.betterreads.catalog.dto.BookSummary;
+import com.betterreads.catalog.service.read.BookIdLookup;
+import com.betterreads.catalog.service.read.BookSummaryReader;
 import com.betterreads.collections.dto.ShelfEntryResponse;
 import com.betterreads.collections.dto.UpdateEntryRequest;
 import com.betterreads.collections.entity.ReadingStatus;
@@ -18,6 +19,7 @@ import com.betterreads.collections.repository.ShelfEntryRepository;
 import com.betterreads.common.exception.InvalidRequestException;
 import com.betterreads.common.exception.ResourceNotFoundException;
 import com.betterreads.common.util.ConflictRetry;
+import com.betterreads.reviews.service.ReaderRatings;
 
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -35,22 +37,27 @@ public class ShelfServiceImpl implements ShelfService {
 
     private final ShelfEntryRepository entries;
 
-    private final BookRepository books;
+    private final BookSummaryReader bookSummaries;
+
+    private final BookIdLookup bookIds;
 
     private final ShelfEntryMapper mapper;
 
     private final ShelfWriter writer;
 
-    private final ShelfRatings ratings;
+    private final ReaderRatings ratings;
 
+    @SuppressWarnings("PMD.ExcessiveParameterList")
     public ShelfServiceImpl(
         final ShelfEntryRepository entries,
-        final BookRepository books,
+        final BookSummaryReader bookSummaries,
+        final BookIdLookup bookIds,
         final ShelfEntryMapper mapper,
         final ShelfWriter writer,
-        final ShelfRatings ratings) {
+        final ReaderRatings ratings) {
         this.entries = entries;
-        this.books = books;
+        this.bookSummaries = bookSummaries;
+        this.bookIds = bookIds;
         this.mapper = mapper;
         this.writer = writer;
         this.ratings = ratings;
@@ -77,10 +84,10 @@ public class ShelfServiceImpl implements ShelfService {
      */
     private ShelfEntryResponse upsert(
         final Long userId, final String bookKey, final Consumer<ShelfEntry> change) {
-        final Book book = requireBook(bookKey);
-        final Integer myRating = ratings.forBook(userId, book.getBookId());
+        final BookSummary book = requireBook(bookKey);
+        final Integer myRating = ratings.ratingOf(userId, book.bookId()).orElse(null);
         return ConflictRetry.retryOnConflict(MAX_UPSERT_ATTEMPTS, LOG,
-            "collection.upsert conflict, retrying userId=" + userId + " bookId=" + book.getBookId(),
+            "collection.upsert conflict, retrying userId=" + userId + " bookId=" + book.bookId(),
             () -> writer.applyToShelf(userId, book, change, myRating));
     }
 
@@ -88,8 +95,8 @@ public class ShelfServiceImpl implements ShelfService {
     @Transactional
     public ShelfEntryResponse updateEntry(
         final Long userId, final String bookKey, final UpdateEntryRequest request) {
-        final Book book = requireBook(bookKey);
-        final ShelfEntry entry = entries.findByUserIdAndBookId(userId, book.getBookId())
+        final BookSummary book = requireBook(bookKey);
+        final ShelfEntry entry = entries.findByUserIdAndBookId(userId, book.bookId())
             .orElseThrow(() -> new ResourceNotFoundException("Book is not on the shelf: " + bookKey));
         applyDates(entry, request);
         if (request.notes() != null) {
@@ -101,8 +108,7 @@ public class ShelfServiceImpl implements ShelfService {
     @Override
     @Transactional
     public void remove(final Long userId, final String bookKey) {
-        final Book book = requireBook(bookKey);
-        entries.deleteByUserIdAndBookId(userId, book.getBookId());
+        entries.deleteByUserIdAndBookId(userId, bookIds.requireBookId(bookKey));
     }
 
     @Override
@@ -111,24 +117,25 @@ public class ShelfServiceImpl implements ShelfService {
         final List<ShelfEntry> shelf = status == null
             ? entries.findByUserIdOrderByCreatedAtDesc(userId)
             : entries.findByUserIdAndStatusOrderByCreatedAtDesc(userId, status);
-        final List<Long> bookIds = shelf.stream().map(ShelfEntry::getBookId).toList();
-        final Map<Long, Book> booksById = books.findByBookIdIn(bookIds).stream()
-            .collect(Collectors.toMap(Book::getBookId, Function.identity()));
-        final Map<Long, Integer> ratingsByBookId = ratings.forBooks(userId, bookIds);
+        final List<Long> shelfBookIds = shelf.stream().map(ShelfEntry::getBookId).toList();
+        final Map<Long, BookSummary> booksById = bookSummaries.summariesByIds(shelfBookIds).stream()
+            .collect(Collectors.toMap(BookSummary::bookId, Function.identity()));
+        final Map<Long, Integer> ratingsByBookId = ratings.ratingsOf(userId, shelfBookIds);
         return shelf.stream()
             .map(entry -> resolveAndMap(entry, booksById, ratingsByBookId))
             .toList();
     }
 
-    private ShelfEntryResponse saveAndMap(final ShelfEntry entry, final Book book) {
+    private ShelfEntryResponse saveAndMap(final ShelfEntry entry, final BookSummary book) {
         return mapper.toResponse(
-            entries.save(entry), book, ratings.forBook(entry.getUserId(), book.getBookId()));
+            entries.save(entry), book,
+            ratings.ratingOf(entry.getUserId(), book.bookId()).orElse(null));
     }
 
     private ShelfEntryResponse resolveAndMap(
-        final ShelfEntry entry, final Map<Long, Book> booksById,
+        final ShelfEntry entry, final Map<Long, BookSummary> booksById,
         final Map<Long, Integer> ratingsByBookId) {
-        final Book book = booksById.get(entry.getBookId());
+        final BookSummary book = booksById.get(entry.getBookId());
         if (book == null) {
             throw new IllegalStateException(
                 "shelf row references a missing book bookId=" + entry.getBookId());
@@ -136,8 +143,8 @@ public class ShelfServiceImpl implements ShelfService {
         return mapper.toResponse(entry, book, ratingsByBookId.get(entry.getBookId()));
     }
 
-    private Book requireBook(final String bookKey) {
-        return books.findByDedupKey(bookKey)
+    private BookSummary requireBook(final String bookKey) {
+        return bookSummaries.summaryByKey(bookKey)
             .orElseThrow(() -> new ResourceNotFoundException("No book with key " + bookKey));
     }
 

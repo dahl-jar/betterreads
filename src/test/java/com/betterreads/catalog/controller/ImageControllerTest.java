@@ -8,7 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 import com.betterreads.catalog.service.read.CoverImageService;
-import com.betterreads.integration.minio.StoredImage;
+import com.betterreads.catalog.image.store.StoredImage;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;

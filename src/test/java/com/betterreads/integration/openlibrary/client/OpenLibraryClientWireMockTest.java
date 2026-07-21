@@ -8,8 +8,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import java.util.Optional;
 
-import com.betterreads.catalog.service.source.BookFieldSource;
-import com.betterreads.catalog.service.source.SourceBook;
+import com.betterreads.catalog.service.source.model.BookFieldSource;
+import com.betterreads.catalog.service.source.model.SourceBook;
 import com.betterreads.integration.openlibrary.OpenLibraryProperties;
 import com.betterreads.integration.openlibrary.OpenLibraryWebClientConfig;
 import com.betterreads.integration.openlibrary.mapper.OpenLibraryMapper;
@@ -26,15 +26,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
-/**
- * Exercises the full OpenLibrary client request path against a stubbed HTTP boundary, so the
- * search-then-work-detail flow, DTO deserialization, title-drift guard, and 4xx handling run in
- * CI with no live API and no Docker.
- *
- * <p>The stub bodies are trimmed copies of the real shapes observed on the live API: the bulk
- * {@code isbn} array, the {@code {type, value}} description object, the {@code cover_i} field, and
- * a search result whose title differs from the query (the drift case).
- */
 @SpringBootTest(
     classes = {
         OpenLibraryWebClientConfig.class,
@@ -72,6 +63,8 @@ class OpenLibraryClientWireMockTest {
 
     private static final String GENRE_FANTASY = "fantasy";
 
+    private static final String GENRE_FICTION = "fiction";
+
     private static final String GENRE_CLASSICS = "classics";
 
     private static final WireMockServer WIREMOCK = startServer();
@@ -103,15 +96,6 @@ class OpenLibraryClientWireMockTest {
         """;
 
     private static final String EMPTY_SEARCH_JSON = "{\"numFound\": 0, \"docs\": []}";
-
-    private static final String DRIFT_SEARCH_JSON = """
-        {
-          "numFound": 1,
-          "docs": [
-            {"key": "/works/OL999W", "title": "Some Unrelated Sequel", "first_publish_year": 2010}
-          ]
-        }
-        """;
 
     @Autowired
     private OpenLibraryClientImpl client;
@@ -149,7 +133,6 @@ class OpenLibraryClientWireMockTest {
     class FetchByTitleAuthor {
 
         @Test
-        @DisplayName("maps the full work into a SourceBook with clean genres and original year")
         void mapsFullWork() {
             WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH)).willReturn(json(HOBBIT_SEARCH_JSON)));
             WIREMOCK.stubFor(get(urlPathEqualTo(HOBBIT_WORK_PATH)).willReturn(json(HOBBIT_WORK_JSON)));
@@ -167,28 +150,11 @@ class OpenLibraryClientWireMockTest {
                         .isEqualTo("https://covers.openlibrary.org/b/id/14627509-L.jpg");
                     assertThat(book.description()).isEqualTo("A tale of high adventure.");
                     assertThat(book.rawSubjects())
-                        .as("the {type,value} description and canonical-genre reduction run "
-                            + "end-to-end through the real client, not just the mapper unit test")
-                        .contains(GENRE_FANTASY, "fiction", GENRE_CLASSICS)
-                        .doesNotContain("thrushes", "the one ring", "fantasy fiction");
+                        .containsExactlyInAnyOrder(GENRE_FANTASY, GENRE_FICTION, GENRE_CLASSICS);
                 });
         }
 
         @Test
-        @DisplayName("a search result whose title does not match the query is rejected as drift")
-        void titleDriftRejected() {
-            WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH)).willReturn(json(DRIFT_SEARCH_JSON)));
-
-            final Optional<SourceBook> result = client.fetchByTitleAuthor(HOBBIT_TITLE, HOBBIT_AUTHOR);
-
-            assertThat(result)
-                .as("the returned title 'Some Unrelated Sequel' does not contain the query, so the "
-                    + "client must not return the drift match")
-                .isEmpty();
-        }
-
-        @Test
-        @DisplayName("picks the earliest-year title match, not the first hit, when hit 0 is an adaptation")
         void picksCanonicalEarliestYear() {
             final String multiHitJson = """
                 {"numFound": 4, "docs": [
@@ -205,8 +171,6 @@ class OpenLibraryClientWireMockTest {
             final Optional<SourceBook> result = client.fetchByTitleAuthor("1984", "George Orwell");
 
             assertThat(result)
-                .as("the adaptation drifts and is skipped; among the real '1984' works the original "
-                    + "1949 edition wins, not the 2021 reprint that ranks first")
                 .isPresent()
                 .get()
                 .satisfies(book -> {
@@ -216,7 +180,6 @@ class OpenLibraryClientWireMockTest {
         }
 
         @Test
-        @DisplayName("a prefix-drift result (The Sandman -> The Sandman - Overture) is rejected")
         void prefixDriftRejected() {
             final String overtureJson = """
                 {"numFound": 1, "docs": [
@@ -228,10 +191,7 @@ class OpenLibraryClientWireMockTest {
 
             final Optional<SourceBook> result = client.fetchByTitleAuthor("The Sandman", "Neil Gaiman");
 
-            assertThat(result)
-                .as("'The Sandman - Overture' extends the query with extra title content, so it is a "
-                    + "different work; the seed proved this drift was being persisted as 'The Sandman'")
-                .isEmpty();
+            assertThat(result).isEmpty();
         }
     }
 
@@ -258,35 +218,35 @@ class OpenLibraryClientWireMockTest {
             """;
 
         @Test
-        @DisplayName("a multi-hit search returns one SourceBook per hit, each with its work key")
         void mapsEveryHit() {
             WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH)).willReturn(json(SERIES_SEARCH_JSON)));
 
             final List<SourceBook> results = client.search("The Wheel of Time", SEARCH_LIMIT);
 
             assertThat(results)
-                .as("each series volume is a distinct book, not collapsed to one")
                 .hasSize(SERIES_HIT_COUNT)
                 .extracting(SourceBook::openLibraryWorkKey)
                 .containsExactly("OL1W", "OL2W", "OL3W");
         }
 
         @Test
-        @DisplayName("an empty docs array returns an empty list, not null")
         void emptyResultIsEmptyList() {
             WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH))
                 .willReturn(json(EMPTY_SEARCH_JSON)));
 
-            assertThat(client.search("nothing matches this", SEARCH_LIMIT)).isEmpty();
+            final List<SourceBook> results = client.search("nothing matches this", SEARCH_LIMIT);
+
+            assertThat(results).isEmpty();
         }
 
         @Test
-        @DisplayName("a 404 from search resolves to an empty list, not an exception")
         void notFoundIsEmptyList() {
             WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH))
                 .willReturn(aResponse().withStatus(HTTP_NOT_FOUND)));
 
-            assertThat(client.search("anything", SEARCH_LIMIT)).isEmpty();
+            final List<SourceBook> results = client.search("anything", SEARCH_LIMIT);
+
+            assertThat(results).isEmpty();
         }
     }
 
@@ -295,21 +255,23 @@ class OpenLibraryClientWireMockTest {
     class ErrorHandling {
 
         @Test
-        @DisplayName("a 404 from search resolves to empty, not an exception")
         void notFoundIsEmpty() {
             WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH))
                 .willReturn(aResponse().withStatus(HTTP_NOT_FOUND)));
 
-            assertThat(client.fetchByTitleAuthor(MISSING_TITLE, MISSING_AUTHOR)).isEmpty();
+            final Optional<SourceBook> result = client.fetchByTitleAuthor(MISSING_TITLE, MISSING_AUTHOR);
+
+            assertThat(result).isEmpty();
         }
 
         @Test
-        @DisplayName("an empty docs array resolves to empty")
         void noDocsIsEmpty() {
             WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH))
                 .willReturn(json(EMPTY_SEARCH_JSON)));
 
-            assertThat(client.fetchByTitleAuthor(MISSING_TITLE, MISSING_AUTHOR)).isEmpty();
+            final Optional<SourceBook> result = client.fetchByTitleAuthor(MISSING_TITLE, MISSING_AUTHOR);
+
+            assertThat(result).isEmpty();
         }
     }
 
@@ -318,14 +280,16 @@ class OpenLibraryClientWireMockTest {
     class FetchByWorkKey {
 
         @Test
-        @DisplayName("fetches the work directly and maps its subjects")
         void fetchesWorkDirectly() {
             WIREMOCK.stubFor(get(urlPathEqualTo(HOBBIT_WORK_PATH)).willReturn(json(HOBBIT_WORK_JSON)));
 
-            assertThat(client.fetchByWorkKey(HOBBIT_WORK_KEY))
+            final Optional<SourceBook> result = client.fetchByWorkKey(HOBBIT_WORK_KEY);
+
+            assertThat(result)
                 .isPresent()
                 .get()
-                .satisfies(book -> assertThat(book.rawSubjects()).contains(GENRE_FANTASY, GENRE_CLASSICS));
+                .satisfies(book -> assertThat(book.rawSubjects())
+                    .containsExactlyInAnyOrder(GENRE_FANTASY, GENRE_FICTION, GENRE_CLASSICS));
         }
     }
 }

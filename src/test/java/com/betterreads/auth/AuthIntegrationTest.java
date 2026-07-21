@@ -11,6 +11,7 @@ import com.betterreads.auth.jwt.JwtIssuer;
 import com.betterreads.auth.ratelimit.RateLimitFilter;
 import com.betterreads.auth.repository.UserRepository;
 import com.betterreads.mail.outbox.MailOutboxRepository;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,9 +23,11 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.security.web.FilterChainProxy;
@@ -63,9 +66,9 @@ class AuthIntegrationTest extends ContainerizedTest {
 
     private static final String ME_URL = "/api/v1/auth/me";
 
-    private static final String DEFAULT_USERNAME = "alice";
+    private static final String DEFAULT_USERNAME = "darrow";
 
-    private static final String DEFAULT_EMAIL = "alice@example.com";
+    private static final String DEFAULT_EMAIL = "darrow@example.com";
 
     private static final String DEFAULT_PASSWORD = "Sup3rSecret!";
 
@@ -74,11 +77,11 @@ class AuthIntegrationTest extends ContainerizedTest {
 
     private static final String IT_ISSUER = "betterreads-it";
 
-    private static final String OTHER_USERNAME = "different";
+    private static final String OTHER_USERNAME = "mustang";
 
-    private static final String OTHER_EMAIL = "different@example.com";
+    private static final String OTHER_EMAIL = "mustang@example.com";
 
-    private static final String UNKNOWN_USERNAME = "ghost";
+    private static final String UNKNOWN_USERNAME = "lysander";
 
     private static final String AUTH_HEADER = "Authorization";
 
@@ -94,11 +97,11 @@ class AuthIntegrationTest extends ContainerizedTest {
 
     private static final String JSON_EMAIL = "$.data.email";
 
-    private static final String MIXED_CASE_EMAIL = "Alice@Example.COM";
+    private static final String MIXED_CASE_EMAIL = "Darrow@Example.COM";
 
-    private static final String LOWERCASE_USERNAME = "joe";
+    private static final String LOWERCASE_USERNAME = "goblin";
 
-    private static final String MIXED_CASE_USERNAME = "Joe";
+    private static final String MIXED_CASE_USERNAME = "Goblin";
 
     private static final String RETRY_AFTER_HEADER = "Retry-After";
 
@@ -107,6 +110,12 @@ class AuthIntegrationTest extends ContainerizedTest {
     private static final String CONTENT_TYPE_OPTIONS_HEADER = "X-Content-Type-Options";
 
     private static final String CSP_HEADER = "Content-Security-Policy";
+
+    private static final String API_CSP = "default-src 'none'; frame-ancestors 'none'";
+
+    private static final String SWAGGER_CSP =
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+            + "img-src 'self' data:; font-src 'self' data:; frame-ancestors 'none'";
 
     private static final String SWAGGER_INDEX = "/swagger-ui/index.html";
 
@@ -223,10 +232,10 @@ class AuthIntegrationTest extends ContainerizedTest {
 
         @ParameterizedTest(name = "rejects invalid {0} with 400")
         @CsvSource({
-            "short password,        alice,             alice@example.com, short",
-            "invalid email,         alice,             not-an-email,      Sup3rSecret!",
-            "email-shaped username, bob@example.com,   bob@other.com,     Sup3rSecret!",
-            "password over 72 bytes, alice,            alice@example.com, " + LONG_PASSWORD_73_BYTES
+            "short password,        darrow,                darrow@example.com, short",
+            "invalid email,         darrow,                not-an-email,       Sup3rSecret!",
+            "email-shaped username, mustang@example.com,  mustang@other.com,  Sup3rSecret!",
+            "password over 72 bytes, darrow,               darrow@example.com, " + LONG_PASSWORD_73_BYTES
         })
         void rejectsInvalidFieldWithBadRequest(
             final String invalidField,
@@ -273,7 +282,7 @@ class AuthIntegrationTest extends ContainerizedTest {
 
         @ParameterizedTest(name = "rejects {0} body with 400")
         @CsvSource({
-            "truncated, '{\"username\": \"alice\"'",
+            "truncated, '{\"username\": \"darrow\"'",
             "empty,     ''"
         })
         void rejectsBadJsonBodyWithBadRequest(final String label, final String content) throws Exception {
@@ -357,12 +366,16 @@ class AuthIntegrationTest extends ContainerizedTest {
         void apiIssuedTokenFromRegisterAuthenticatesMeRequest() throws Exception {
             final String registerBody = registerPayload(DEFAULT_USERNAME, DEFAULT_EMAIL, DEFAULT_PASSWORD);
 
-            final String registerResponse = mockMvc.perform(
+            final MvcResult registerResult = mockMvc.perform(
                     post(REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content(registerBody))
                 .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-            final String apiToken =
-                objectMapper.readTree(registerResponse).get("data").get("accessToken").asString();
+                .andReturn();
+            final MockHttpServletResponse registerResponse = registerResult.getResponse();
+            final String registerJson = registerResponse.getContentAsString();
+            final JsonNode responseJson = objectMapper.readTree(registerJson);
+            final JsonNode responseData = responseJson.get("data");
+            final JsonNode accessToken = responseData.get("accessToken");
+            final String apiToken = accessToken.asString();
 
             mockMvc.perform(get(ME_URL).header(AUTH_HEADER, BEARER_PREFIX + apiToken))
                 .andExpect(status().isOk())
@@ -398,7 +411,7 @@ class AuthIntegrationTest extends ContainerizedTest {
     class SecurityHeaders {
 
         @Test
-        void includesCoreSecurityHeadersOnEveryResponse() throws Exception {
+        void includesCoreSecurityHeadersOnUnauthorizedResponse() throws Exception {
             mockMvc.perform(get(ME_URL))
                 .andExpect(header().string(CONTENT_TYPE_OPTIONS_HEADER, NOSNIFF_VALUE))
                 .andExpect(header().string("X-Frame-Options", "DENY"))
@@ -409,10 +422,9 @@ class AuthIntegrationTest extends ContainerizedTest {
         }
 
         @Test
-        void apiCspIsStricterThanSwaggerCsp() throws Exception {
+        void apiResponseUsesStrictCsp() throws Exception {
             mockMvc.perform(get(ME_URL))
-                .andExpect(header().string(CSP_HEADER,
-                    org.hamcrest.Matchers.containsString("default-src 'none'")));
+                .andExpect(header().string(CSP_HEADER, API_CSP));
         }
     }
 
@@ -480,18 +492,19 @@ class AuthIntegrationTest extends ContainerizedTest {
                 mockMvc.perform(post(LOGIN_URL).contentType(MediaType.APPLICATION_JSON).content(body));
             }
 
-            final String retryAfter = mockMvc.perform(
+            final MvcResult rateLimitedResult = mockMvc.perform(
                     post(LOGIN_URL).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isTooManyRequests())
-                .andReturn()
-                .getResponse()
-                .getHeader(RETRY_AFTER_HEADER);
+                .andReturn();
+            final MockHttpServletResponse rateLimitedResponse = rateLimitedResult.getResponse();
+            final String retryAfter = rateLimitedResponse.getHeader(RETRY_AFTER_HEADER);
 
             assertThat(retryAfter)
                 .isNotNull()
                 .satisfies(value -> assertThat(Long.parseLong(value)).isGreaterThanOrEqualTo(1L));
         }
 
+        // PMD.AvoidUsingHardCodedIP: private test addresses vary X-Forwarded-For without network calls.
         @Test
         @SuppressWarnings("PMD.AvoidUsingHardCodedIP")
         void doesNotTrustForwardedForFromUntrustedClient() throws Exception {
@@ -517,16 +530,15 @@ class AuthIntegrationTest extends ContainerizedTest {
     class SwaggerUi {
 
         @Test
-        void isReachableWithoutAuth() throws Exception {
+        void isPubliclyAccessible() throws Exception {
             mockMvc.perform(get(SWAGGER_INDEX))
-                .andExpect(status().is2xxSuccessful());
+                .andExpect(status().isOk());
         }
 
         @Test
-        void hasRelaxedCspToAllowInlineScripts() throws Exception {
+        void allowsInlineScriptsAndStyles() throws Exception {
             mockMvc.perform(get(SWAGGER_INDEX))
-                .andExpect(header().string(CSP_HEADER,
-                    org.hamcrest.Matchers.containsString("'self'")));
+                .andExpect(header().string(CSP_HEADER, SWAGGER_CSP));
         }
     }
 
@@ -562,7 +574,8 @@ class AuthIntegrationTest extends ContainerizedTest {
         final User user = new User();
         user.setUsername(username);
         user.setEmail(email);
-        user.setPasswordHash(passwordEncoder.encode(rawPassword));
+        final String passwordHash = java.util.Objects.requireNonNull(passwordEncoder.encode(rawPassword));
+        user.setPasswordHash(passwordHash);
         return userRepository.save(user).getUserId();
     }
 

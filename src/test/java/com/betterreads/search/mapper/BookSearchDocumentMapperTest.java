@@ -3,22 +3,17 @@ package com.betterreads.search.mapper;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
-import com.betterreads.catalog.entity.Author;
-import com.betterreads.catalog.entity.Book;
-import com.betterreads.catalog.image.CoverImages;
-import com.betterreads.catalog.image.CoverVersion;
-import com.betterreads.catalog.image.ImageProperties;
-import com.betterreads.catalog.service.source.BookFieldSource;
-import com.betterreads.catalog.service.source.SourceBook;
+import com.betterreads.catalog.dto.BookIndexView;
 import com.betterreads.search.dto.BookSearchDocument;
+import java.math.BigDecimal;
 import java.util.List;
-import java.util.function.UnaryOperator;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Maps a catalog {@link Book} to the search document, including the popularity score derived from
- * the rating volume and average.
+ * Maps a catalog {@link BookIndexView} to the search document, including the popularity score
+ * derived from the rating volume and average.
  */
 class BookSearchDocumentMapperTest {
 
@@ -36,37 +31,27 @@ class BookSearchDocumentMapperTest {
 
     private static final String LANGUAGE = "en";
 
-    private static final String COVER_URL = "https://covers.openlibrary.org/b/id/1-L.jpg";
-
-    private static final String API_BASE_URL = "https://api.betterreadsapp.com";
-
     private static final String SERVED_COVER_URL =
-        API_BASE_URL + "/api/v1/images/covers/hc-1?v=" + CoverVersion.of(COVER_URL);
+        "https://api.example.com/api/v1/images/covers/hc-1?v=abc123";
 
     private static final int YEAR = 2006;
 
-    private static final int THOUSAND_RATINGS = 999;
+    private static final int RATING_COUNT = 999;
 
-    private static final double ROUND_AVERAGE = 4.0;
+    private static final BigDecimal ROUND_AVERAGE = BigDecimal.valueOf(4.0);
 
     private static final double EXPECTED_SCORE = 12.0;
 
     private static final double TOLERANCE = 1e-9;
 
-    private final BookSearchDocumentMapper mapper =
-        new BookSearchDocumentMapper(new CoverImages(new ImageProperties(API_BASE_URL)));
+    private final BookSearchDocumentMapper mapper = new BookSearchDocumentMapper();
 
     @Test
     @DisplayName("maps identity, display, and facet fields onto the document")
     void mapsFields() {
-        final Book book = book(MISTBORN_KEY, builder -> builder
-            .title(MISTBORN_TITLE)
-            .seriesName(SERIES)
-            .seriesPosition(SERIES_POSITION)
-            .language(LANGUAGE)
-            .coverUrl(COVER_URL)
-            .publicationYear(YEAR)
-            .rawSubjects(List.of(SUBJECT)));
+        final BookIndexView book = new BookIndexView(
+            MISTBORN_KEY, MISTBORN_TITLE, null, SERIES, SERIES_POSITION,
+            List.of(AUTHOR), List.of(SUBJECT), LANGUAGE, SERVED_COVER_URL, YEAR, null, null);
 
         final BookSearchDocument document = mapper.toDocument(book);
 
@@ -88,10 +73,7 @@ class BookSearchDocumentMapperTest {
     @Test
     @DisplayName("scores popularity as log10(1 + ratingCount) times the average rating")
     void scoresPopularity() {
-        final Book book = book("hc-2", builder -> builder
-            .title("Elantris")
-            .ratingCount(THOUSAND_RATINGS)
-            .averageRating(ROUND_AVERAGE));
+        final BookIndexView book = view("hc-2", "Elantris", RATING_COUNT, ROUND_AVERAGE);
 
         final BookSearchDocument document = mapper.toDocument(book);
 
@@ -101,24 +83,18 @@ class BookSearchDocumentMapperTest {
     @Test
     @DisplayName("scores zero popularity when the book has no ratings")
     void scoresZeroWithoutRatings() {
-        final Book book = book("hc-3", builder -> builder.title("Warbreaker"));
+        final BookIndexView book = view("hc-3", "Warbreaker", null, null);
 
         final BookSearchDocument document = mapper.toDocument(book);
 
         assertThat(document.popularityScore()).isZero();
     }
 
-    private static Book book(
-        final String hardcoverId, final UnaryOperator<SourceBook.Builder> customize) {
-        final SourceBook source = customize
-            .apply(SourceBook.builder(BookFieldSource.HARDCOVER).hardcoverId(hardcoverId))
-            .build();
-        final Book book = new Book();
-        book.applyFrom(source);
-        book.applySeries(source.seriesName(), source.seriesPosition(), true);
-        final Author author = new Author();
-        author.setName(AUTHOR);
-        book.getAuthors().add(author);
-        return book;
+    private static BookIndexView view(
+        final String dedupKey, final String title,
+        final @Nullable Integer ratingCount, final @Nullable BigDecimal averageRating) {
+        return new BookIndexView(
+            dedupKey, title, null, null, null, List.of(), List.of(), null, null, null,
+            averageRating, ratingCount);
     }
 }

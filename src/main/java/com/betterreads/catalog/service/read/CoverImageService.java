@@ -6,9 +6,9 @@ import com.betterreads.catalog.entity.Book;
 import com.betterreads.catalog.entity.PendingBook;
 import com.betterreads.catalog.repository.BookRepository;
 import com.betterreads.catalog.repository.PendingBookRepository;
-import com.betterreads.catalog.service.source.CoverMirrorService;
-import com.betterreads.integration.minio.ImageStore;
-import com.betterreads.integration.minio.StoredImage;
+import com.betterreads.catalog.image.CoverMirrorService;
+import com.betterreads.catalog.image.store.ImageStore;
+import com.betterreads.catalog.image.store.StoredImage;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 

@@ -4,10 +4,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
-import com.betterreads.catalog.service.source.BookFieldSource;
-import com.betterreads.catalog.service.source.SingleBookFilter;
-import com.betterreads.catalog.service.source.SourceAuthor;
-import com.betterreads.catalog.service.source.SourceBook;
+import com.betterreads.catalog.service.source.model.BookFieldSource;
+import com.betterreads.catalog.service.source.merge.SingleBookFilter;
+import com.betterreads.catalog.service.source.model.SourceAuthor;
+import com.betterreads.catalog.service.source.model.SourceBook;
 import com.betterreads.integration.hardcover.dto.HardcoverBookNode;
 import org.jspecify.annotations.Nullable;
 

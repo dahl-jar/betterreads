@@ -6,9 +6,9 @@ import java.util.concurrent.Executor;
 
 import com.betterreads.catalog.entity.Book;
 import com.betterreads.catalog.repository.BookCoverRepository;
-import com.betterreads.catalog.service.source.CoverMirrorService;
+import com.betterreads.catalog.image.CoverMirrorService;
 import com.betterreads.common.util.LogSanitizer;
-import com.betterreads.integration.minio.ImageStoreException;
+import com.betterreads.catalog.image.store.ImageStoreException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;

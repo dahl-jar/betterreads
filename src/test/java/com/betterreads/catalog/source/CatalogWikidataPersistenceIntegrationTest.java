@@ -14,10 +14,10 @@ import com.betterreads.catalog.entity.Author;
 import com.betterreads.catalog.entity.BookAward;
 import com.betterreads.catalog.repository.AuthorRepository;
 import com.betterreads.catalog.repository.BookRepository;
-import com.betterreads.catalog.service.source.BookFieldSource;
-import com.betterreads.catalog.service.read.CatalogService;
-import com.betterreads.catalog.service.source.SourceAuthor;
-import com.betterreads.catalog.service.source.SourceBook;
+import com.betterreads.catalog.service.source.model.BookFieldSource;
+import com.betterreads.catalog.service.write.BookUpsertService;
+import com.betterreads.catalog.service.source.model.SourceAuthor;
+import com.betterreads.catalog.service.source.model.SourceBook;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -27,7 +27,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * Round-trips a Wikidata {@link SourceBook} through {@code CatalogService} into a real Postgres and
+ * Round-trips a Wikidata {@link SourceBook} through {@code BookUpsertService} into a real Postgres and
  * reads the award rows and author identity columns back from the database.
  */
 @SpringBootTest(properties = "jwt.secret=test-secret-at-least-thirty-two-bytes-long")
@@ -48,7 +48,7 @@ class CatalogWikidataPersistenceIntegrationTest extends ContainerizedTest {
     private static final String NEBULA = "Nebula Award for Best Novel";
 
     @Autowired
-    private CatalogService catalogService;
+    private BookUpsertService bookUpsertService;
 
     @Autowired
     private BookRepository bookRepository;
@@ -80,7 +80,7 @@ class CatalogWikidataPersistenceIntegrationTest extends ContainerizedTest {
 
         @Test
         void persistsAwardRowsReadableFromTheDatabase() {
-            catalogService.upsertFromSource(dune(List.of(NEBULA, HUGO)));
+            bookUpsertService.upsertFromSource(dune(List.of(NEBULA, HUGO)));
 
             assertThat(bookRepository.findWithAwardsByWikidataQid(DUNE_QID))
                 .isPresent()
@@ -92,18 +92,18 @@ class CatalogWikidataPersistenceIntegrationTest extends ContainerizedTest {
 
         @Test
         void leavesExistingAwardsWhenARefreshCarriesNull() {
-            catalogService.upsertFromSource(dune(List.of(HUGO)));
+            bookUpsertService.upsertFromSource(dune(List.of(HUGO)));
 
-            catalogService.upsertFromSource(dune(null));
+            bookUpsertService.upsertFromSource(dune(null));
 
             assertThat(reloadedAwards()).containsExactly(HUGO);
         }
 
         @Test
         void clearsAwardsWhenARefreshCarriesAnEmptyList() {
-            catalogService.upsertFromSource(dune(List.of(HUGO)));
+            bookUpsertService.upsertFromSource(dune(List.of(HUGO)));
 
-            catalogService.upsertFromSource(dune(List.of()));
+            bookUpsertService.upsertFromSource(dune(List.of()));
 
             assertThat(reloadedAwards()).isEmpty();
         }
@@ -119,7 +119,7 @@ class CatalogWikidataPersistenceIntegrationTest extends ContainerizedTest {
 
         @Test
         void persistsThePhotoAndBioOntoTheAuthorRow() {
-            catalogService.upsertFromSource(dune(List.of()));
+            bookUpsertService.upsertFromSource(dune(List.of()));
 
             assertThat(authorRepository.findByWikidataQid(HERBERT_QID))
                 .isPresent()
@@ -137,7 +137,7 @@ class CatalogWikidataPersistenceIntegrationTest extends ContainerizedTest {
             existing.setName(HERBERT_NAME);
             authorRepository.saveAndFlush(existing);
 
-            catalogService.upsertFromSource(dune(List.of()));
+            bookUpsertService.upsertFromSource(dune(List.of()));
 
             assertThat(authorRepository.count())
                 .as("the QID lookup must reuse the existing name row, not insert a second")

@@ -1,6 +1,6 @@
 package com.betterreads.integration.wikidata.mapper;
 
-import com.betterreads.catalog.service.source.SourceAuthor;
+import com.betterreads.catalog.service.source.model.SourceAuthor;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 

@@ -3,7 +3,7 @@ package com.betterreads.search.service;
 import java.util.List;
 
 import com.betterreads.catalog.event.BookPromotedEvent;
-import com.betterreads.catalog.repository.BookRepository;
+import com.betterreads.catalog.service.read.BookIndexViewReader;
 import com.betterreads.common.util.LogSanitizer;
 import com.betterreads.search.mapper.BookSearchDocumentMapper;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +27,7 @@ public class BookPromotedIndexListener {
 
     private static final Logger LOG = LoggerFactory.getLogger(BookPromotedIndexListener.class);
 
-    private final BookRepository books;
+    private final BookIndexViewReader indexViews;
 
     private final BookSearchDocumentMapper mapper;
 
@@ -37,7 +37,7 @@ public class BookPromotedIndexListener {
     @TransactionalEventListener
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public void onBookPromoted(final BookPromotedEvent event) {
-        books.findByDedupKey(event.dedupKey())
+        indexViews.indexViewByKey(event.dedupKey())
             .ifPresentOrElse(
                 book -> searchService.index(List.of(mapper.toDocument(book))),
                 () -> LOG.warn("search.index promoted book vanished before indexing key={}",

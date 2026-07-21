@@ -9,7 +9,7 @@ import com.betterreads.catalog.entity.Author;
 import com.betterreads.catalog.entity.Book;
 import com.betterreads.catalog.repository.BookDescriptionRepository;
 import com.betterreads.catalog.service.pipeline.DescriptionSelector;
-import com.betterreads.catalog.service.source.DescriptionLookup;
+import com.betterreads.catalog.service.source.port.DescriptionLookup;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

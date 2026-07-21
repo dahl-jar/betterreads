@@ -6,8 +6,11 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import com.betterreads.catalog.entity.Book;
-import com.betterreads.catalog.repository.BookRepository;
+import com.betterreads.catalog.dto.BookCommunityRating;
+import com.betterreads.catalog.dto.BookSummary;
+import com.betterreads.catalog.service.read.BookCommunityRatingReader;
+import com.betterreads.catalog.service.read.BookIdLookup;
+import com.betterreads.catalog.service.read.BookSummaryReader;
 import com.betterreads.common.dto.PageQuery;
 import com.betterreads.common.exception.ResourceNotFoundException;
 import com.betterreads.common.util.ConflictRetry;
@@ -41,19 +44,28 @@ public class ReviewServiceImpl implements ReviewService {
 
     private final ReviewRepository reviews;
 
-    private final BookRepository books;
+    private final BookIdLookup bookIds;
+
+    private final BookSummaryReader bookSummaries;
+
+    private final BookCommunityRatingReader communityRatings;
 
     private final ReviewMapper mapper;
 
     private final ReviewWriter writer;
 
+    @SuppressWarnings("PMD.ExcessiveParameterList")
     public ReviewServiceImpl(
         final ReviewRepository reviews,
-        final BookRepository books,
+        final BookIdLookup bookIds,
+        final BookSummaryReader bookSummaries,
+        final BookCommunityRatingReader communityRatings,
         final ReviewMapper mapper,
         final ReviewWriter writer) {
         this.reviews = reviews;
-        this.books = books;
+        this.bookIds = bookIds;
+        this.bookSummaries = bookSummaries;
+        this.communityRatings = communityRatings;
         this.mapper = mapper;
         this.writer = writer;
     }
@@ -66,23 +78,22 @@ public class ReviewServiceImpl implements ReviewService {
     @Override
     public ReviewResponse upsert(
         final Long userId, final String bookKey, final UpsertReviewRequest request) {
-        final Book book = requireBook(bookKey);
+        final long bookId = bookIds.requireBookId(bookKey);
         return ConflictRetry.retryOnConflict(MAX_UPSERT_ATTEMPTS, LOG,
-            "review.upsert conflict, retrying userId=" + userId + " bookId=" + book.getBookId(),
-            () -> writer.upsert(userId, book, request));
+            "review.upsert conflict, retrying userId=" + userId + " bookId=" + bookId,
+            () -> writer.upsert(userId, bookId, bookKey, request));
     }
 
     @Override
     public void remove(final Long userId, final String bookKey) {
-        writer.remove(userId, requireBook(bookKey));
+        writer.remove(userId, bookIds.requireBookId(bookKey));
     }
 
     @Override
     @Transactional(readOnly = true)
     public ReviewPage listForBook(final String bookKey, final PageQuery page) {
-        final Book book = requireBook(bookKey);
         final Page<Review> found = reviews.findForBook(
-            book.getBookId(), page.toPageable());
+            bookIds.requireBookId(bookKey), page.toPageable());
         final List<ReviewResponse> responses = found.getContent().stream()
             .map(review -> mapper.toResponse(review, bookKey))
             .toList();
@@ -93,10 +104,10 @@ public class ReviewServiceImpl implements ReviewService {
     @Transactional(readOnly = true)
     public ReviewPage listOwn(final Long userId, final PageQuery page) {
         final Page<Review> found = reviews.findForUser(userId, page.toPageable());
-        final Map<Long, Book> booksById = books.findByBookIdIn(
+        final Map<Long, BookSummary> booksById = bookSummaries.summariesByIds(
                 found.getContent().stream().map(Review::getBookId).toList())
             .stream()
-            .collect(Collectors.toMap(Book::getBookId, Function.identity()));
+            .collect(Collectors.toMap(BookSummary::bookId, Function.identity()));
         final List<ReviewResponse> responses = found.getContent().stream()
             .map(review -> mapper.toResponse(review, keyOf(review, booksById)))
             .toList();
@@ -106,28 +117,24 @@ public class ReviewServiceImpl implements ReviewService {
     @Override
     @Transactional(readOnly = true)
     public CommunityRatingResponse communityRating(final String bookKey) {
-        final Book book = requireBook(bookKey);
-        final Map<Integer, Long> countByStar = reviews.countByStarForBook(book.getBookId()).stream()
+        final BookCommunityRating book = communityRatings.byKey(bookKey)
+            .orElseThrow(() -> new ResourceNotFoundException("No book with key " + bookKey));
+        final Map<Integer, Long> countByStar = reviews.countByStarForBook(book.bookId()).stream()
             .collect(Collectors.toMap(RatingBucket::star, RatingBucket::count));
         final List<StarCount> distribution = IntStream.iterate(
                 HIGHEST_STAR, star -> star >= LOWEST_STAR, star -> star - 1)
             .mapToObj(star -> new StarCount(star, countByStar.getOrDefault(star, 0L)))
             .toList();
         return new CommunityRatingResponse(
-            book.getCommunityAverage(), book.getCommunityCount(), distribution);
+            book.average(), book.count(), distribution);
     }
 
-    private static String keyOf(final Review review, final Map<Long, Book> booksById) {
-        final Book book = booksById.get(review.getBookId());
+    private static String keyOf(final Review review, final Map<Long, BookSummary> booksById) {
+        final BookSummary book = booksById.get(review.getBookId());
         if (book == null) {
             throw new IllegalStateException(
                 "review references a missing book bookId=" + review.getBookId());
         }
-        return book.getDedupKey();
-    }
-
-    private Book requireBook(final String bookKey) {
-        return books.findByDedupKey(bookKey)
-            .orElseThrow(() -> new ResourceNotFoundException("No book with key " + bookKey));
+        return book.dedupKey();
     }
 }

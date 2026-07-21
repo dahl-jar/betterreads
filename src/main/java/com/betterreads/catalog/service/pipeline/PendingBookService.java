@@ -1,7 +1,7 @@
 package com.betterreads.catalog.service.pipeline;
 
-import com.betterreads.catalog.service.source.MergedBook;
-import com.betterreads.catalog.service.source.SourceBook;
+import com.betterreads.catalog.service.source.model.MergedBook;
+import com.betterreads.catalog.service.source.model.SourceBook;
 
 import java.time.Duration;
 import java.time.OffsetDateTime;

@@ -27,7 +27,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
 
-import com.betterreads.catalog.service.source.SourceBook;
+import com.betterreads.catalog.service.source.model.SourceBook;
 import org.jspecify.annotations.Nullable;
 
 /**

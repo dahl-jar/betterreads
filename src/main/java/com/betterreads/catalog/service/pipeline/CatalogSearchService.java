@@ -1,10 +1,10 @@
 package com.betterreads.catalog.service.pipeline;
 
-import com.betterreads.catalog.service.source.MergedBook;
-import com.betterreads.catalog.service.source.SingleBookFilter;
-import com.betterreads.catalog.service.source.SourceBook;
-import com.betterreads.catalog.service.source.SourceSeries;
-import com.betterreads.catalog.service.source.SourceSeriesVolume;
+import com.betterreads.catalog.service.source.model.MergedBook;
+import com.betterreads.catalog.service.source.merge.SingleBookFilter;
+import com.betterreads.catalog.service.source.model.SourceBook;
+import com.betterreads.catalog.service.source.model.SourceSeries;
+import com.betterreads.catalog.service.source.model.SourceSeriesVolume;
 import com.betterreads.common.util.TextMatch;
 
 import java.util.Comparator;

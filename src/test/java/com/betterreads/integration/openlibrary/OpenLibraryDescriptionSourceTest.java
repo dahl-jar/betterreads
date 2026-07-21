@@ -6,9 +6,9 @@ import static org.mockito.Mockito.when;
 
 import java.util.Optional;
 
-import com.betterreads.catalog.service.source.BookFieldSource;
-import com.betterreads.catalog.service.source.DescriptionLookup;
-import com.betterreads.catalog.service.source.SourceBook;
+import com.betterreads.catalog.service.source.model.BookFieldSource;
+import com.betterreads.catalog.service.source.port.DescriptionLookup;
+import com.betterreads.catalog.service.source.model.SourceBook;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

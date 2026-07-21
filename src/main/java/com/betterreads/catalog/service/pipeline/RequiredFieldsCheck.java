@@ -1,6 +1,6 @@
 package com.betterreads.catalog.service.pipeline;
 
-import com.betterreads.catalog.service.source.SourceBook;
+import com.betterreads.catalog.service.source.model.SourceBook;
 
 import java.util.List;
 import java.util.function.Predicate;

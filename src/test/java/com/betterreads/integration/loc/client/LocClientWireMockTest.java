@@ -7,8 +7,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Optional;
 
-import com.betterreads.catalog.service.source.BookFieldSource;
-import com.betterreads.catalog.service.source.SourceBook;
+import com.betterreads.catalog.service.source.model.BookFieldSource;
+import com.betterreads.catalog.service.source.model.SourceBook;
 import com.betterreads.integration.loc.LocProperties;
 import com.betterreads.integration.loc.LocSru;
 import com.betterreads.integration.loc.LocWebClientConfig;

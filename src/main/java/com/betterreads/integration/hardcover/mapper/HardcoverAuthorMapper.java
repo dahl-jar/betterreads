@@ -3,8 +3,8 @@ package com.betterreads.integration.hardcover.mapper;
 import java.util.List;
 import java.util.Optional;
 
-import com.betterreads.catalog.service.source.SourceAuthorWorks;
-import com.betterreads.catalog.service.source.SourceBook;
+import com.betterreads.catalog.service.source.model.SourceAuthorWorks;
+import com.betterreads.catalog.service.source.model.SourceBook;
 import com.betterreads.integration.hardcover.dto.AuthorWorksResponse;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;

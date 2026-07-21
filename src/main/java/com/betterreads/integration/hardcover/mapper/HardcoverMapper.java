@@ -3,10 +3,10 @@ package com.betterreads.integration.hardcover.mapper;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import com.betterreads.catalog.service.source.BookFieldSource;
-import com.betterreads.catalog.service.source.CatalogGenres;
-import com.betterreads.catalog.service.source.SourceAuthor;
-import com.betterreads.catalog.service.source.SourceBook;
+import com.betterreads.catalog.service.source.model.BookFieldSource;
+import com.betterreads.catalog.service.source.quality.CatalogGenres;
+import com.betterreads.catalog.service.source.model.SourceAuthor;
+import com.betterreads.catalog.service.source.model.SourceBook;
 import com.betterreads.integration.hardcover.dto.HardcoverBookNode;
 import com.betterreads.integration.hardcover.dto.HardcoverDocument;
 import com.betterreads.integration.hardcover.dto.HardcoverDocument.FeaturedSeries;

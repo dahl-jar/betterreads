@@ -3,8 +3,8 @@ package com.betterreads.catalog.service.pipeline;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
-import com.betterreads.catalog.service.read.CatalogService;
-import com.betterreads.catalog.service.source.MergedBook;
+import com.betterreads.catalog.service.source.model.MergedBook;
+import com.betterreads.catalog.service.write.BookUpsertService;
 
 import com.betterreads.catalog.entity.Book;
 import com.betterreads.catalog.entity.PendingBook;
@@ -37,7 +37,7 @@ public class PendingBookPromoter {
 
     private final PendingBookRepository pendingBooks;
 
-    private final CatalogService catalogService;
+    private final BookUpsertService bookUpsertService;
 
     private final RequiredFieldsCheck requiredFields;
 
@@ -47,13 +47,13 @@ public class PendingBookPromoter {
 
     public PendingBookPromoter(
         final PendingBookRepository pendingBooks,
-        final CatalogService catalogService,
+        final BookUpsertService bookUpsertService,
         final RequiredFieldsCheck requiredFields,
         final PendingBookMapper mapper,
         final ApplicationEventPublisher events
     ) {
         this.pendingBooks = pendingBooks;
-        this.catalogService = catalogService;
+        this.bookUpsertService = bookUpsertService;
         this.requiredFields = requiredFields;
         this.mapper = mapper;
         this.events = events;
@@ -93,7 +93,7 @@ public class PendingBookPromoter {
         mapper.applyTo(row, collected);
         final MissingFields missing = requiredFields.check(collected.book());
         if (missing.isReady()) {
-            final Book promoted = catalogService.upsertFromSource(collected);
+            final Book promoted = bookUpsertService.upsertFromSource(collected);
             row.setStatus(STATUS_PROMOTED);
             events.publishEvent(new BookPromotedEvent(promoted.getDedupKey()));
         } else {

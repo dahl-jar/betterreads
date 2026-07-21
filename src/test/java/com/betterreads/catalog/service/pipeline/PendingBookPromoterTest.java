@@ -10,11 +10,11 @@ import java.util.Optional;
 import com.betterreads.catalog.entity.PendingBook;
 import com.betterreads.catalog.mapper.PendingBookMapper;
 import com.betterreads.catalog.repository.PendingBookRepository;
-import com.betterreads.catalog.service.read.CatalogService;
-import com.betterreads.catalog.service.source.BookFieldSource;
-import com.betterreads.catalog.service.source.MergedBook;
-import com.betterreads.catalog.service.source.SourceBook;
-import com.betterreads.catalog.service.source.SourceMerger;
+import com.betterreads.catalog.service.source.model.BookFieldSource;
+import com.betterreads.catalog.service.source.model.MergedBook;
+import com.betterreads.catalog.service.source.model.SourceBook;
+import com.betterreads.catalog.service.source.merge.SourceMerger;
+import com.betterreads.catalog.service.write.BookUpsertService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
@@ -33,7 +33,7 @@ class PendingBookPromoterTest {
     private final PendingBookRepository pendingBooks = mock(PendingBookRepository.class);
 
     private final PendingBookPromoter promoter = new PendingBookPromoter(
-        pendingBooks, mock(CatalogService.class), new RequiredFieldsCheck(),
+        pendingBooks, mock(BookUpsertService.class), new RequiredFieldsCheck(),
         new PendingBookMapper(), mock(ApplicationEventPublisher.class));
 
     @Test
