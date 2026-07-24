@@ -39,7 +39,7 @@ class GlobalExceptionHandlerTest {
     class WhenResourceNotFound {
 
         @Test
-        void statusDrivesNotFound() {
+        void statusIs404() {
             final ProblemDetail problem = handler.handleNotFound(
                     new ResourceNotFoundException(BOOK_NOT_FOUND));
 
@@ -59,7 +59,7 @@ class GlobalExceptionHandlerTest {
     class WhenValidationFails {
 
         @Test
-        void statusDrivesBadRequest() throws NoSuchMethodException {
+        void statusIs400() throws NoSuchMethodException {
             final ProblemDetail problem = handler.handleValidation(buildValidationException());
 
             assertThat(problem.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
@@ -79,7 +79,7 @@ class GlobalExceptionHandlerTest {
     class WhenForbidden {
 
         @Test
-        void statusDrivesForbidden() {
+        void statusIs403() {
             final ProblemDetail problem = handler.handleForbidden(new ForbiddenException("not yours"));
 
             assertThat(problem.getStatus()).isEqualTo(HttpStatus.FORBIDDEN.value());
@@ -90,7 +90,7 @@ class GlobalExceptionHandlerTest {
     class WhenBusinessRuleViolated {
 
         @Test
-        void statusDrivesConflict() {
+        void statusIs409() {
             final ProblemDetail problem = handler.handleBusinessRule(
                     new BusinessRuleException(BUSINESS_RULE_MESSAGE));
 
@@ -102,7 +102,7 @@ class GlobalExceptionHandlerTest {
     class WhenUnexpectedErrorOccurs {
 
         @Test
-        void statusDrivesInternalServerError() {
+        void statusIs500() {
             final ProblemDetail problem = handler.handleUnexpected(new RuntimeException(UNEXPECTED_ERROR));
 
             assertThat(problem.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
@@ -122,7 +122,7 @@ class GlobalExceptionHandlerTest {
     class WhenMethodNotAllowed {
 
         @Test
-        void statusDrives405() {
+        void statusIs405() {
             final ResponseEntity<ProblemDetail> response = handler.handleMethodNotSupported(
                     new HttpRequestMethodNotSupportedException(HttpMethod.GET.name(), List.of(HttpMethod.POST.name())));
 
@@ -142,7 +142,7 @@ class GlobalExceptionHandlerTest {
     class WhenContentTypeNotSupported {
 
         @Test
-        void statusDrives415() {
+        void statusIs415() {
             final ProblemDetail problem = handler.handleMediaTypeNotSupported(
                     new HttpMediaTypeNotSupportedException(MediaType.TEXT_PLAIN, List.of(MediaType.APPLICATION_JSON)));
 
@@ -156,8 +156,7 @@ class GlobalExceptionHandlerTest {
         bindingResult.addError(new FieldError(BINDING_TARGET, "password", "must be at least 8 characters"));
 
         final MethodParameter methodParameter = new MethodParameter(
-                WhenValidationFails.class.getDeclaredMethod(
-                        "statusDrivesBadRequest"), -1);
+                GlobalExceptionHandlerTest.class.getDeclaredMethod("buildValidationException"), -1);
         return new MethodArgumentNotValidException(methodParameter, bindingResult);
     }
 }

@@ -14,9 +14,8 @@ import org.springframework.stereotype.Component;
  *
  * <p>Runs at 04:30, after the 04:00 description backfill, so an overnight-promoted book has its
  * description filled before its cover is mirrored. The run is handed to a dedicated executor because
- * mirroring downloads and stores an image for every candidate; running it on the shared scheduler
- * thread would stall the mail outbox and the SSE heartbeat. A run still in progress when the next
- * trigger fires is skipped rather than queued. Disabled by
+ * mirroring downloads and stores an image for every candidate; on the shared scheduler thread it
+ * delayed every later trigger by that long. Disabled by
  * {@code betterreads.catalog.cover-backfill.enabled=false}.
  */
 @Component

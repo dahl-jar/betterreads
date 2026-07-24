@@ -7,9 +7,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /**
  * Refresh-cookie configuration bound from {@code auth.refresh-cookie.*}.
  *
- * <p>{@code sameSite} is {@code None} when the SPA and the API are on different origins (the
- * Cloudflare Pages apex calling the {@code api.} subdomain), so the browser sends the cookie on the
- * cross-origin refresh fetch; {@code None} requires {@code secure}, enforced here.
+ * <p>{@code sameSite=None} lets the browser send the cookie when the SPA and the API sit on
+ * different origins. Browsers drop a {@code None} cookie that is not {@code Secure}, so the
+ * constructor rejects that combination.
  *
  * @param secure when {@code true}, browsers send the cookie over HTTPS only
  * @param sameSite the cookie's SameSite attribute: {@code Strict}, {@code Lax}, or {@code None}

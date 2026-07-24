@@ -10,7 +10,7 @@ import org.springframework.dao.OptimisticLockingFailureException;
 /**
  * Retries a write that loses a race for the same row. Two concurrent first writes both miss the
  * pre-read and insert, and the loser hits the unique constraint; two concurrent updates to the same
- * row collide on the version check. Either way the winner's row is there to read on the next attempt.
+ * row collide on the version check. Either way the winner's row is readable on the next attempt.
  *
  * <p>The write must run in a separate proxied bean so each attempt gets a fresh transaction: the
  * failure rolls the previous one back, and a retry inside the rolled-back transaction fails again.
@@ -21,8 +21,8 @@ public final class ConflictRetry {
     }
 
     /**
-     * Runs {@code write} up to {@code maxAttempts} times, retrying only the two race failures above
-     * and rethrowing the last one if every attempt loses. Any other {@link DataAccessException}
+     * Runs {@code write} up to {@code maxAttempts} times, retrying only those two race failures and
+     * rethrowing the last one if every attempt loses. Any other {@link DataAccessException}
      * propagates on the first try, since no retry would fix it.
      *
      * @param maxAttempts the total number of tries, including the first

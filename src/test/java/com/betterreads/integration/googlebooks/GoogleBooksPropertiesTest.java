@@ -28,7 +28,7 @@ class GoogleBooksPropertiesTest {
     }
 
     @Test
-    @DisplayName("keeps a null key null so a key-less profile still boots")
+    @DisplayName("keeps a null key null so a key-less profile boots")
     void keepsNullKey() {
         final GoogleBooksProperties properties = new GoogleBooksProperties(
             BASE_URL, null, CONNECT_TIMEOUT, READ_TIMEOUT);

@@ -94,7 +94,7 @@ class BookDetailEvictionIntegrationTest extends ContainerizedTest {
     /**
      * Reads the title, retrying briefly because the shared Redis cache makes eviction visible
      * asynchronously under load. The read settles within a bound; a missing eviction never settles
-     * and still fails.
+     * and fails.
      */
     // PMD.DoNotUseThreads: a bounded test poll for an eventually-visible cache eviction, not app code.
     @SuppressWarnings("PMD.DoNotUseThreads")

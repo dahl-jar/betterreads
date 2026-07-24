@@ -20,9 +20,9 @@ import org.springframework.web.reactive.function.client.WebClientException;
 /**
  * Mirrors a promoted book's cover into object storage after its promotion commits.
  *
- * <p>Runs on a dedicated executor because mirroring downloads the external cover and writes it to
- * MinIO, work too slow for the commit thread. A failure leaves the book on its external URL, which
- * the image endpoint still mirrors on first read, so a missed mirror self-heals.
+ * <p>Runs on a dedicated executor because mirroring downloads the external cover and stores it,
+ * work too slow for the commit thread. A failure leaves the book on its external URL, which the
+ * image endpoint mirrors on first read, so a missed mirror self-heals.
  */
 @Component
 public class BookPromotedCoverListener {

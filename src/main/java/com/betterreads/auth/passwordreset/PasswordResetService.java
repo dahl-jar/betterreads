@@ -5,12 +5,11 @@ import com.betterreads.auth.entity.User;
 import com.betterreads.auth.refresh.RefreshTokenChainRevoker;
 import com.betterreads.auth.repository.UserRepository;
 import com.betterreads.auth.token.EmailToken;
+import com.betterreads.auth.token.EmailTokenIssuer;
 import com.betterreads.auth.token.EmailTokenRepository;
-import com.betterreads.auth.token.TokenGenerator;
 import com.betterreads.common.crypto.HmacTokenHasher;
 import com.betterreads.common.crypto.PasswordByteLimit;
 import com.betterreads.common.exception.InvalidRequestException;
-
 import com.betterreads.mail.outbox.MailOutboxService;
 
 import java.time.Duration;
@@ -36,8 +35,6 @@ public class PasswordResetService {
 
     private static final Logger LOG = LoggerFactory.getLogger(PasswordResetService.class);
 
-    private static final int TOKEN_BYTES = 32;
-
     private static final Duration TOKEN_LIFETIME = Duration.ofMinutes(15);
 
     private static final String INVALID_OR_EXPIRED_TOKEN = "Invalid or expired reset token";
@@ -45,6 +42,8 @@ public class PasswordResetService {
     private final UserRepository userRepository;
 
     private final EmailTokenRepository tokenRepository;
+
+    private final EmailTokenIssuer tokenIssuer;
 
     private final HmacTokenHasher hasher;
 
@@ -58,6 +57,7 @@ public class PasswordResetService {
     public PasswordResetService(
         final UserRepository userRepository,
         final EmailTokenRepository tokenRepository,
+        final EmailTokenIssuer tokenIssuer,
         final HmacTokenHasher hasher,
         final MailOutboxService mailOutbox,
         final PasswordEncoder passwordEncoder,
@@ -65,6 +65,7 @@ public class PasswordResetService {
     ) {
         this.userRepository = userRepository;
         this.tokenRepository = tokenRepository;
+        this.tokenIssuer = tokenIssuer;
         this.hasher = hasher;
         this.mailOutbox = mailOutbox;
         this.passwordEncoder = passwordEncoder;
@@ -87,36 +88,10 @@ public class PasswordResetService {
             return;
         }
         final User user = userOpt.get();
-        consumeOutstandingTokens(user.getUserId());
-        final String plaintext = TokenGenerator.randomToken(TOKEN_BYTES);
-        insertNewToken(user.getUserId(), plaintext);
+        final String plaintext =
+            tokenIssuer.issue(user.getUserId(), EmailToken.Purpose.PASSWORD_RESET, TOKEN_LIFETIME);
         mailOutbox.enqueuePasswordReset(user.getEmail(), plaintext);
         LOG.info("Issued password-reset token userId={}", user.getUserId());
-    }
-
-    /**
-     * Marks every active token for the user as consumed.
-     *
-     * <p>Flushes at the end because Hibernate's default action queue runs inserts before
-     * updates, so the next insert would hit the partial unique index against the still-active
-     * prior row.
-     */
-    private void consumeOutstandingTokens(final long userId) {
-        final Instant now = Instant.now();
-        tokenRepository.findActive(userId, EmailToken.Purpose.PASSWORD_RESET).forEach(t -> {
-            t.setConsumedAt(now);
-            tokenRepository.save(t);
-        });
-        tokenRepository.flush();
-    }
-
-    private void insertNewToken(final long userId, final String plaintext) {
-        final EmailToken row = new EmailToken();
-        row.setUserId(userId);
-        row.setPurpose(EmailToken.Purpose.PASSWORD_RESET);
-        row.setTokenHash(hasher.hash(plaintext));
-        row.setExpiresAt(Instant.now().plus(TOKEN_LIFETIME));
-        tokenRepository.saveAndFlush(row);
     }
 
     /**

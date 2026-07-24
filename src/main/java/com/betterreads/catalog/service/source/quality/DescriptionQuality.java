@@ -12,10 +12,10 @@ import com.betterreads.common.util.EnglishText;
  *
  * <p>Publication-fact sentences (publisher, release dates, sequels, editions, marketing leads) are
  * stripped from the head and tail of the text, and each one left in the interior subtracts a
- * penalty, so an all-facts description is rejected and a pure story blurb outranks one wrapped in
- * marketing. The score grows with story length up to the ideal and decays gently past it, so a
- * long real blurb still outranks a short stub. An over-long blurb is cut at the last sentence end
- * under the ceiling.
+ * penalty, so an all-facts description is rejected and a pure story blurb scores above one wrapped
+ * in marketing. The score grows with story length up to the ideal and decays slowly past it, so a
+ * long real blurb still scores above a short stub. An over-long blurb is cut at the last sentence
+ * end under the ceiling.
  *
  * <p>Also rejected: text that is not English, a stub under the floor, a catalog-wiki dump (a
  * heading plus a bulleted edition list), and library-catalog boilerplate prefixes. A dump is

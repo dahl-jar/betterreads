@@ -10,8 +10,8 @@ import org.springframework.web.reactive.function.client.WebClient;
  * Builds the {@link WebClient} that downloads external cover images, with explicit timeouts so a slow
  * cover host cannot stall a mirror.
  *
- * <p>The body buffer is sized by {@code cover-fetch.max-bytes}; covers outgrow the shared
- * JSON-sized source buffer.
+ * <p>The body buffer is sized by {@code cover-fetch.max-bytes}, since image bodies outgrow the
+ * default codec limit.
  */
 @Configuration
 public class CoverFetchWebClientConfig {

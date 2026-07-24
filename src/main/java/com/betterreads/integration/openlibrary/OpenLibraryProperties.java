@@ -10,8 +10,7 @@ import org.springframework.validation.annotation.Validated;
  * OpenLibrary REST API config bound from {@code openlibrary.*}.
  *
  * <p>OpenLibrary is keyless. {@code contactEmail} is required because OpenLibrary throttles
- * anonymous traffic and wants a contact in the {@code User-Agent}; {@code OpenLibraryWebClientConfig}
- * puts it there.
+ * anonymous traffic and wants a contact in the {@code User-Agent}.
  *
  * @param baseUrl OpenLibrary base, e.g. {@code https://openlibrary.org}
  * @param contactEmail contact address sent in the User-Agent

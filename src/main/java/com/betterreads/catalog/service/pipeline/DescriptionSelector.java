@@ -19,9 +19,9 @@ import org.springframework.web.reactive.function.client.WebClientException;
 /**
  * Picks the best description for a merged book from the description-only sources.
  *
- * <p>Each source is cleaned and scored by {@link DescriptionQuality}, and the highest-scoring blurb
- * wins, the merge's own description included. A fallback-only source competes only when the current
- * description is unusable and no other source supplied a usable one.
+ * <p>Every candidate blurb, the merge's own included, is cleaned and scored by
+ * {@link DescriptionQuality}, and the highest score wins. A fallback-only source competes only when
+ * the current description is unusable and no other source supplied a usable one.
  */
 @Component
 public class DescriptionSelector {

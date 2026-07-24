@@ -4,10 +4,8 @@ import java.io.Serial;
 
 /**
  * Thrown when the request is well-formed but rejected for content reasons such as an unknown
- * or expired token. Mapped to {@code 400} by {@link GlobalExceptionHandler}.
- *
- * <p>Separate from {@link BusinessRuleException} ({@code 409}) so a bad input is distinguished
- * from a state conflict like duplicate registration.
+ * or expired token. Mapped to {@code 400} by {@link GlobalExceptionHandler}. A state conflict
+ * such as a duplicate registration is a {@link BusinessRuleException}.
  */
 public class InvalidRequestException extends RuntimeException {
 

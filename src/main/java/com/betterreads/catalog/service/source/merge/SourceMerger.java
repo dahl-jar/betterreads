@@ -21,16 +21,15 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * Combines several single-source books into one, resolving each field by the priority order in
- * {@code source-trust.md}.
+ * Combines several single-source books into one, resolving each field by its own priority chain.
  *
  * <p>Subjects are unioned across the live sources; a staged seed's subjects count only when no live
- * source carries any. Every other field takes the first source in its priority chain that supplies
- * a value, so a higher-priority source missing a field yields to a lower-priority one that has it.
- * A staged seed sits last in each chain, so stored values yield to any live source but keep a book
- * promotable when every live fetch fails. Identifiers are carried from whichever source holds them.
+ * source carries any. Every other field takes the first source in its chain that supplies a value,
+ * so a higher-priority source missing a field yields to a lower-priority one that has it. A staged
+ * seed sits last in each chain, so stored values yield to any live source but keep a book promotable
+ * when every live fetch fails. Identifiers are carried from whichever source holds them.
  */
-// PMD.TooManyMethods: an aggregator with one small private picker per field; splitting scatters the trust-order chains.
+// PMD.TooManyMethods: an aggregator with one small private picker per field; splitting scatters the priority chains.
 @SuppressWarnings("PMD.TooManyMethods")
 @Component
 public class SourceMerger {
@@ -71,10 +70,10 @@ public class SourceMerger {
             BookFieldSource.WIKIDATA, BookFieldSource.HARDCOVER, BookFieldSource.LOC,
             BookFieldSource.STAGED);
 
-    /** No staged entry: {@code keepStagedRating} restores a staged rating on a Hardcover miss. */
+    /** No staged entry: a staged rating is restored after the merge when Hardcover misses. */
     private static final List<BookFieldSource> RATING_CHAIN = List.of(BookFieldSource.HARDCOVER);
 
-    /** No staged entry: a stale stored series must not outlive the live authorities' answer. */
+    /** No staged entry: a stale stored series must not outlive the live sources' answer. */
     private static final List<BookFieldSource> SERIES_CHAIN =
         List.of(BookFieldSource.HARDCOVER, BookFieldSource.WIKIDATA);
 
@@ -251,9 +250,9 @@ public class SourceMerger {
     /**
      * Picks the highest-quality description across the chain and returns it cleaned of markup.
      *
-     * <p>A source's raw description is assessed by {@link DescriptionQuality}; a dump, a stub, or
-     * boilerplate scores as unusable and is skipped. The chain is walked in priority order so a score
-     * tie breaks toward the higher-priority source.
+     * <p>Each source's raw description is scored by {@link DescriptionQuality}, and one it judges
+     * unusable is skipped. The chain is walked in priority order so a score tie breaks toward the
+     * higher-priority source.
      */
     private static @Nullable Winner<String> pickBestDescription(
         final Map<BookFieldSource, SourceBook> bySource

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 import com.betterreads.catalog.service.source.model.SourceBook;
 import com.betterreads.integration.hardcover.dto.HardcoverDocument;
@@ -12,12 +13,15 @@ import com.betterreads.integration.hardcover.dto.HardcoverDocument.Image;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
- * Unit tests for the pure helpers inside {@link HardcoverMapper}. The Dune cases target shapes the
- * live API returned on 2026-05-31: the bulk ISBN-10/ISBN-13 array, the noisy genre list, the whole
- * series position, and the rating and vote count. The series-position cases also cover the null and
- * sub-volume positions that tag companions and prologues to a series.
+ * Maps a Hardcover search document onto a {@link SourceBook}.
+ *
+ * <p>The Dune cases target shapes the live API returned on 2026-05-31: the bulk ISBN-10/ISBN-13
+ * array, the noisy genre list, the whole series position, and the rating and vote count.
  */
 class HardcoverMapperTest {
 
@@ -41,8 +45,6 @@ class HardcoverMapperTest {
 
     private static final String GENRE_FICTION_RAW = "Fiction";
 
-    private static final String GENRE_COMICS_RAW = "Comics & Graphic Novels";
-
     private static final String DUNE_TITLE = "Dune";
 
     private static final String SUN_EATER_SERIES = "The Sun Eater";
@@ -50,6 +52,8 @@ class HardcoverMapperTest {
     private static final String DUNE_HARDCOVER_ID = "312460";
 
     private static final String DUNE_COVER_URL = "https://assets.hardcover.app/dune.jpg";
+
+    private static final double FRACTIONAL_POSITION = 0.5;
 
     @Nested
     @DisplayName("firstIsbn13")
@@ -73,44 +77,23 @@ class HardcoverMapperTest {
     }
 
     @Nested
-    @DisplayName("cleanGenres")
-    class CleanGenres {
-
-        @Test
-        @DisplayName("Hardcover genres reduce to canonical terms; the comics signal survives")
-        void duneGenresReduceToCanonical() {
-            final List<String> genres = List.of(
-                GENRE_SCIENCE_FICTION_RAW, GENRE_FICTION_RAW, "Fantasy", "Classics", GENRE_COMICS_RAW);
-
-            assertThat(HardcoverMapper.cleanGenres(genres))
-                .as("raw Hardcover genres reduce to the canonical shelf terms")
-                .contains(SCIENCE_FICTION, FICTION, "fantasy", "classics", "comics")
-                .doesNotContain(GENRE_SCIENCE_FICTION_RAW, GENRE_COMICS_RAW);
-        }
-
-        @Test
-        @DisplayName("null genres reduce to an empty list; the caller maps absent to null")
-        void nullGenresYieldEmpty() {
-            assertThat(HardcoverMapper.cleanGenres(null)).isEmpty();
-        }
-    }
-
-    @Nested
     @DisplayName("seriesPosition")
     class SeriesPosition {
 
-        private static final double PROLOGUE_POSITION = 0.5;
-
-        @Test
-        @DisplayName("the whole-number position 2.0 maps to the integer 2 the catalog stores")
-        void wholeNumberPositionMapsToInteger() {
-            assertThat(HardcoverMapper.seriesPosition(2.0)).isEqualTo(2);
+        static Stream<Arguments> positions() {
+            return Stream.of(
+                Arguments.of(2.0, 2),
+                Arguments.of(FRACTIONAL_POSITION, null),
+                Arguments.of(0.0, null));
         }
 
-        @Test
-        @DisplayName("a fractional prologue position is not a volume and maps to null")
-        void fractionalPositionMapsToNull() {
-            assertThat(HardcoverMapper.seriesPosition(PROLOGUE_POSITION)).isNull();
+        @ParameterizedTest(name = "position {0} maps to volume {1}")
+        @MethodSource("positions")
+        @DisplayName("only a whole position of one or more is a volume the catalog stores")
+        void mapsWholePositionsFromOneUp(final double position, final Integer volume) {
+            assertThat(HardcoverMapper.seriesPosition(position))
+                .as("a fractional position is a prologue, position 0 is a prequel")
+                .isEqualTo(volume);
         }
     }
 
@@ -140,6 +123,9 @@ class HardcoverMapperTest {
                 assertThat(book.seriesName()).isEqualTo(DUNE_TITLE);
                 assertThat(book.seriesPosition()).isEqualTo(1);
                 assertThat(book.coverUrl()).isEqualTo(DUNE_COVER_URL);
+                assertThat(book.rawSubjects())
+                    .as("raw Hardcover genres land in rawSubjects as canonical shelf terms")
+                    .contains(SCIENCE_FICTION, FICTION);
             });
         }
 

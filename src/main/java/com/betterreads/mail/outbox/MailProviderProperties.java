@@ -14,8 +14,7 @@ import org.springframework.validation.annotation.Validated;
  * Mail-provider configuration bound from {@code mail.*}.
  *
  * <p>Provider-specific fields are optional at bind time so the app boots in {@code logging}
- * mode without them. The {@code requireXxx} methods throw at boot if a required Resend value
- * is missing, so the app fails to start rather than failing on the first send.
+ * mode without them. The {@code requireXxx} methods throw when a Resend value is missing.
  *
  * @param provider {@code resend} or {@code logging}
  * @param apiKey Resend API key

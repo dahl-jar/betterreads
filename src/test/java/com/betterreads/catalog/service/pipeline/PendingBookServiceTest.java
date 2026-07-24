@@ -1,6 +1,8 @@
 package com.betterreads.catalog.service.pipeline;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -15,11 +17,16 @@ import com.betterreads.catalog.entity.PendingBook;
 import com.betterreads.catalog.mapper.PendingBookMapper;
 import com.betterreads.catalog.repository.PendingBookRepository;
 import com.betterreads.catalog.service.source.merge.SourceMerger;
+import com.betterreads.catalog.service.source.model.BookFieldSource;
+import com.betterreads.catalog.service.source.model.SourceBook;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
 
-/** The promotion poll isolates one candidate's failure from the rest of the queue. */
+/**
+ * Staging rejects a book with nothing to dedup on, and the promotion poll isolates one candidate's
+ * failure from the rest of the queue.
+ */
 class PendingBookServiceTest {
 
     private static final String FAILING_KEY = "9780441013593";
@@ -38,6 +45,18 @@ class PendingBookServiceTest {
         pendingBooks, new PendingBookMapper(), new SourceCollector(
             new SourceMerger(), List.of(), new DescriptionSelector(List.of()), Runnable::run),
         promoter);
+
+    @Test
+    @DisplayName("staging a book carrying no source identifier is rejected before any row is reserved")
+    void stagingWithoutASourceIdentifierIsRejected() {
+        final SourceBook keyless = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+            .title(FAILING_TITLE)
+            .build();
+
+        assertThatThrownBy(() -> service.stage(new SourceMerger().merge(List.of(keyless))))
+            .isInstanceOf(IllegalArgumentException.class);
+        verify(pendingBooks, never()).reserve(anyString());
+    }
 
     @Test
     @DisplayName("a promotion failure records the attempt, skips DUPLICATE, and the poll continues")

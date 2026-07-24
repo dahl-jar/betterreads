@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Wikidata client over the REST entity API.
+ * Wikidata client over the entity search and entity document endpoints.
  *
  * <p>Search ranks films and franchises above the work, so {@code fetchByTitleAuthor} keeps the first
  * candidate that is a written-work type and lists the requested author. Wikidata holds no ISBN on
@@ -31,11 +31,13 @@ public class WikidataClientImpl implements WikidataClient {
     private static final String AUTHOR_PROPERTY = "P50";
     private static final String INSTANCE_OF_PROPERTY = "P31";
 
-    private static final Set<String> WRITTEN_WORK_TYPES = Set.of(
-        "Q7725634",
-        "Q47461344",
-        "Q14406742",
-        "Q3297186");
+    private static final String LITERARY_WORK = "Q7725634";
+    private static final String WRITTEN_WORK = "Q47461344";
+    private static final String COMIC_BOOK_SERIES = "Q14406742";
+    private static final String LIMITED_SERIES = "Q3297186";
+
+    private static final Set<String> WRITTEN_WORK_TYPES =
+        Set.of(LITERARY_WORK, WRITTEN_WORK, COMIC_BOOK_SERIES, LIMITED_SERIES);
 
     private final WikidataApi api;
 
@@ -91,18 +93,7 @@ public class WikidataClientImpl implements WikidataClient {
         if (authors.isEmpty()) {
             return book;
         }
-        return SourceBook.builder(BookFieldSource.WIKIDATA)
-            .wikidataQid(book.wikidataQid())
-            .title(book.title())
-            .publicationYear(book.publicationYear())
-            .openLibraryWorkKey(book.openLibraryWorkKey())
-            .locLccn(book.locLccn())
-            .authors(authors)
-            .rawSubjects(book.rawSubjects())
-            .awards(book.awards())
-            .seriesName(book.seriesName())
-            .seriesPosition(book.seriesPosition())
-            .build();
+        return book.toBuilder().authors(authors).build();
     }
 
     private @Nullable SourceAuthor fetchAuthor(final String authorQid) {

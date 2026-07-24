@@ -10,8 +10,7 @@ import tools.jackson.databind.annotation.JsonNaming;
 /**
  * A {@code books} node from a Hardcover series or author enumeration.
  *
- * <p>Carries the fields both enumerations read: title, rating, year, cover, description, language,
- * and authors. {@code canonicalId} differs from {@code id} on a translation or alternate edition;
+ * <p>{@code canonicalId} differs from {@code id} on a translation or alternate edition;
  * {@code language} can be null on an edition that exists but has none set.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)

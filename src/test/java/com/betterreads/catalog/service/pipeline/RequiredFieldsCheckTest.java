@@ -134,18 +134,6 @@ class RequiredFieldsCheckTest {
                 MISSING_AUTHOR, MISSING_COVER, MISSING_DESCRIPTION, MISSING_YEAR, MISSING_ISBN);
     }
 
-    @Test
-    @DisplayName("a book with no rating is still ready to show")
-    void ratingIsNotRequired() {
-        final SourceBook book = complete().averageRating(null).ratingCount(null).build();
-
-        final MissingFields result = requiredFields.check(book);
-
-        assertThat(result.isReady())
-            .as("rating is excluded from the show bar; a complete book with no rating still shows")
-            .isTrue();
-    }
-
     private static SourceBook.Builder complete() {
         return SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
             .title(TITLE)

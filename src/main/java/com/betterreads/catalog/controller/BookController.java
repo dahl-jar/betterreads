@@ -22,10 +22,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-/**
- * Public catalog book detail and homepage lists. The promoted book is served when present, otherwise
- * the staging seed.
- */
+/** Public catalog book detail and homepage lists. */
 @RestController
 @RequestMapping("/api/v1/books")
 @Validated
@@ -52,12 +49,7 @@ public class BookController {
         this.emitters = emitters;
     }
 
-    /**
-     * Returns a homepage book list.
-     *
-     * @param list which list to return
-     * @param limit the maximum number of cards, capped at {@value #MAX_LIST_SIZE}
-     */
+    /** @param limit the maximum number of cards, capped at {@value #MAX_LIST_SIZE} */
     @GetMapping
     @Operation(summary = "Get a homepage book list")
     public List<BookCardResponse> list(
@@ -67,10 +59,8 @@ public class BookController {
     }
 
     /**
-     * Returns the detail for the book with the given key.
-     *
      * @param key a source identifier shared with search results
-     * @throws ResourceNotFoundException when no promoted book or staging seed has the key
+     * @throws ResourceNotFoundException when no book has the key
      */
     @GetMapping("/{key}")
     @Operation(summary = "Get book detail by key")
@@ -80,11 +70,11 @@ public class BookController {
     }
 
     /**
-     * Streams the book's fill-in: a complete book is sent at once, a cold book's stream stays open
-     * until enrichment writes it.
+     * Streams book detail updates. A complete book is sent at once; an incomplete book holds the
+     * stream open until its missing fields are written.
      *
      * @param key a source identifier shared with search results
-     * @throws ResourceNotFoundException when no promoted book or staging seed has the key
+     * @throws ResourceNotFoundException when no book has the key
      */
     @GetMapping(value = "/{key}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "Stream book detail updates by key")

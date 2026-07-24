@@ -17,8 +17,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * Maps to {@code pending_book}, the staging table for books not yet complete enough to show. A
  * candidate accumulates merged metadata across runs and is promoted into {@code book} once it
- * carries every required field. Subjects, awards, and authors are held as delimited text here and
- * split into the normalized child tables at promotion.
+ * carries every required field. Subjects, awards, and authors are held on the row as delimited text
+ * and split into the normalized child tables at promotion.
  */
 @Entity
 @Table(name = "pending_book")

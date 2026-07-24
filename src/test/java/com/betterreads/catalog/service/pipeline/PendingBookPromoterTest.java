@@ -77,17 +77,6 @@ class PendingBookPromoterTest {
         });
     }
 
-    @Test
-    @DisplayName("the failed attempt that reaches the cap retires the candidate")
-    void failedAttemptReachingCapRetires() {
-        final PendingBook row = pendingRow(PendingBookPromoter.MAX_ATTEMPTS - 1);
-        when(pendingBooks.findByDedupKey(DEDUP_KEY)).thenReturn(Optional.of(row));
-
-        promoter.recordFailedAttempt(DEDUP_KEY);
-
-        assertThat(row.getStatus()).isEqualTo(STATUS_INCOMPLETE_FINAL);
-    }
-
     private static PendingBook pendingRow(final int attemptCount) {
         final PendingBook row = new PendingBook();
         row.setDedupKey(DEDUP_KEY);

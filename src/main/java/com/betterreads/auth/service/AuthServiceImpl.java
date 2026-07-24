@@ -142,12 +142,13 @@ class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public TokenPair refresh(final String refreshToken) {
-        final Optional<RefreshTokenRotation> rotation = refreshTokenService.rotate(refreshToken);
-        if (rotation.isEmpty()) {
+        final Optional<RefreshTokenRotation> rotated = refreshTokenService.rotate(refreshToken);
+        if (rotated.isEmpty()) {
             LOG.warn("Refresh rejected: token unknown, expired, or already revoked");
             throw new BadCredentialsException(INVALID_REFRESH_TOKEN);
         }
-        final long userId = rotation.get().userId();
+        final RefreshTokenRotation rotation = rotated.get();
+        final long userId = rotation.userId();
         final User user = userRepository.findById(userId)
             .orElseThrow(() -> {
                 LOG.warn("Refresh succeeded but owning user is gone userId={}", userId);
@@ -155,7 +156,7 @@ class AuthServiceImpl implements AuthService {
             });
         final String accessToken = jwtIssuer.issue(user.getUserId());
         final AuthResponse body = new AuthResponse(accessToken, userMapper.toResponse(user));
-        return new TokenPair(body, rotation.get().plaintext());
+        return new TokenPair(body, rotation.plaintext());
     }
 
     @Override

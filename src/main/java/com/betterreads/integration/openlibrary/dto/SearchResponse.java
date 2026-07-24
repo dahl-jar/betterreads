@@ -9,7 +9,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * Top-level OpenLibrary {@code search.json} response.
  *
- * @param numFound total matches across the index, not the size of {@code docs}
+ * @param numFound total matches across the index; {@code docs} carries the requested page
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record SearchResponse(

@@ -268,19 +268,6 @@ class ShelvesIntegrationTest extends ContainerizedTest {
         }
 
         @Test
-        void patchSucceedsAfterFinishedThenReadingTransition() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
-            putStatus(token, DUNE_KEY, FINISHED);
-            putStatus(token, DUNE_KEY, CURRENTLY_READING);
-
-            final ResultActions response = patchEntry(token, DUNE_KEY, null, null, READING_NOTE);
-
-            response
-                .andExpect(status().isOk())
-                .andExpect(jsonPath(JSON_NOTES).value(READING_NOTE));
-        }
-
-        @Test
         void unknownStatusValueIsRejected() throws Exception {
             final String token = registerAndLogin(DARROW, DARROW_EMAIL);
 
@@ -373,6 +360,21 @@ class ShelvesIntegrationTest extends ContainerizedTest {
             final ResultActions response = patchEntry(token, DUNE_KEY, FINISH_DATE, START_DATE, null);
 
             response.andExpect(status().isBadRequest());
+        }
+
+        @Test
+        void patchingOnlyTheNoteKeepsTheStoredDates() throws Exception {
+            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            putStatus(token, DUNE_KEY, CURRENTLY_READING);
+            patchEntry(token, DUNE_KEY, START_DATE, FINISH_DATE, NOTE);
+
+            final ResultActions response = patchEntry(token, DUNE_KEY, null, null, READING_NOTE);
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_NOTES).value(READING_NOTE))
+                .andExpect(jsonPath(JSON_STARTED).value(START_DATE))
+                .andExpect(jsonPath(JSON_FINISHED).value(FINISH_DATE));
         }
 
         @Test
@@ -474,7 +476,7 @@ class ShelvesIntegrationTest extends ContainerizedTest {
         }
 
         @Test
-        void averageRatingCarriesTheBooksCommunityRating() throws Exception {
+        void averageRatingCarriesTheBooksSourceRating() throws Exception {
             final String token = registerAndLogin(DARROW, DARROW_EMAIL);
 
             final ResultActions response = putStatus(token, RATED_KEY, WANT_TO_READ);
@@ -485,7 +487,7 @@ class ShelvesIntegrationTest extends ContainerizedTest {
         }
 
         @Test
-        void averageRatingIsAbsentWhenTheBookHasNoCommunityRating() throws Exception {
+        void averageRatingIsAbsentWhenTheBookHasNoSourceRating() throws Exception {
             final String token = registerAndLogin(DARROW, DARROW_EMAIL);
 
             final ResultActions response = putStatus(token, DUNE_KEY, WANT_TO_READ);

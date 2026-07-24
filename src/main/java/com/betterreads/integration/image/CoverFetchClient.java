@@ -19,11 +19,11 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 /**
  * Downloads cover bytes from an external URL with explicit timeouts.
  *
- * <p>Redirects are followed manually, with each hop's target re-checked by {@link CoverUrlGuard}, so
- * an OpenLibrary cover that 302s to its CDN still resolves while a redirect to a private address is
- * refused. A 4xx, an unsafe target, too many hops, or a body over {@code cover-fetch.max-bytes}
- * resolves to empty; 5xx and network errors propagate as {@link
- * org.springframework.web.reactive.function.client.WebClientException} for the caller to skip.
+ * <p>Redirects are followed one hop at a time and every hop's target goes through
+ * {@link CoverUrlGuard}, so an OpenLibrary cover that 302s to its CDN resolves while a redirect to
+ * a private address is refused. A 4xx, an unsafe target, too many hops, or a body over
+ * {@code cover-fetch.max-bytes} resolves to empty; 5xx and network errors propagate as {@link
+ * org.springframework.web.reactive.function.client.WebClientException}.
  */
 @Component
 public class CoverFetchClient implements CoverFetcher {

@@ -13,10 +13,10 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
  * Wires the off-thread executor and the {@link SearchMissStager} that resolves a search query's
  * series and author into the catalog.
  *
- * <p>The pool caps at {@code MAX_POOL} threads and the queue at {@code QUEUE_CAPACITY}; once both are
- * full the reject policy discards further work, so a flood of queries stays within fixed thread and
- * memory limits. The 24-hour dedup window keeps every query resolving at most once a day, so staging
- * on every search rather than only on a miss does not multiply external calls.
+ * <p>The pool and queue are both capped; once both are full the abort policy rejects further work,
+ * so a flood of queries stays within fixed thread and memory limits. The 24-hour dedup window keeps
+ * every query resolving at most once a day, so staging on every search does not multiply external
+ * calls.
  */
 @Configuration
 public class SearchMissConfig {

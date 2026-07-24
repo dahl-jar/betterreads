@@ -61,8 +61,9 @@ public class CatalogSearchService {
      * Resolves a miss to a series, an author, or a standalone book and stages what it finds.
      *
      * <p>A series query stages each volume; an author query stages each of the author's books; a
-     * title query stages the one standalone hit. The order goes from most specific to least so a
-     * series or author name is expanded rather than collapsed to a single title fallback.
+     * title query stages the one standalone hit. The order runs from most specific to least: a
+     * series or author name expands to its volumes or books, and only a query matching neither
+     * falls through to the single title hit.
      */
     public void searchAndStage(final String query) {
         final Optional<SourceSeries> series = seriesClient.fetchSeries(query);

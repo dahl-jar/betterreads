@@ -10,10 +10,10 @@ import com.betterreads.catalog.entity.Book;
 import com.betterreads.catalog.repository.BookDescriptionRepository;
 import com.betterreads.catalog.service.pipeline.DescriptionSelector;
 import com.betterreads.catalog.service.source.port.DescriptionLookup;
+import com.betterreads.catalog.service.write.BookDetailCache;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.domain.PageRequest;
@@ -26,9 +26,9 @@ import org.springframework.web.reactive.function.client.WebClientException;
  *
  * <p>The slice and the thin-description threshold bound the work and the iTunes call rate; a run
  * picks the least recently checked candidates and stamps each as checked, so successive runs walk the
- * catalog without re-doing books already tried. The new description is written to its own column with
- * a targeted update, leaving rating and community columns untouched, and the cached detail is evicted.
- * One failing book is logged and skipped.
+ * catalog without re-doing books already tried. The resolved description is written to its own column
+ * with a targeted update, leaving rating and community columns untouched, and the cached detail is
+ * evicted. One failing book is logged and skipped.
  */
 @Service
 public class DescriptionBackfillService {
@@ -38,8 +38,6 @@ public class DescriptionBackfillService {
     private static final int THIN_DESCRIPTION_LENGTH = 200;
 
     private static final int SLICE_SIZE = 50;
-
-    private static final String BOOK_DETAIL_CACHE = "bookDetails";
 
     private final BookDescriptionRepository books;
 
@@ -87,20 +85,13 @@ public class DescriptionBackfillService {
             final Optional<String> better = selector.bestDescription(lookupFor(book), book.getDescription());
             if (better.isPresent()) {
                 books.updateDescription(book.getBookId(), better.get(), checkedAt);
-                evictDetail(book.getDedupKey());
+                BookDetailCache.evict(cacheManager, book.getDedupKey());
             } else {
                 books.markDescriptionChecked(book.getBookId(), checkedAt);
             }
         } catch (WebClientException | DataAccessException ex) {
             LOG.warn("catalog.description-backfill failed for one book ({}), skipping it",
                 ex.getClass().getSimpleName());
-        }
-    }
-
-    private void evictDetail(final String dedupKey) {
-        final Cache cache = cacheManager.getCache(BOOK_DETAIL_CACHE);
-        if (cache != null) {
-            cache.evict(dedupKey);
         }
     }
 

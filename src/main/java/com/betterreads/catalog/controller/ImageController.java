@@ -20,9 +20,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Serves book cover images from object storage so the browser fetches covers only from this API.
- */
+/** Serves book cover images by book key. */
 @RestController
 @RequestMapping("/api/v1/images")
 @Tag(name = "Images", description = "Book cover images")
@@ -41,7 +39,7 @@ public class ImageController {
      * Returns the cover image for the book key, or 404 when none can be resolved.
      *
      * @param key the book lookup key shared with detail and search
-     * @param ifNoneMatch the client's cached ETag, answered with 304 when it still matches
+     * @param ifNoneMatch the client's cached ETag, answered with 304 when it matches
      */
     @GetMapping("/covers/{key}")
     @Operation(summary = "Get a book cover image")

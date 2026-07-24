@@ -15,8 +15,8 @@ import org.mockito.Mockito;
 
 /**
  * The search endpoint resolves a query's series and author in the background on the first page of
- * every successful search, so an author whose catalog is mostly unstaged still fills in for a later
- * search even when the current search already returns some hits.
+ * every successful search, so a thinly staged author fills in for later searches even when the
+ * search returns hits.
  */
 class BookSearchControllerTest {
 
@@ -37,7 +37,7 @@ class BookSearchControllerTest {
     private final BookSearchController controller = new BookSearchController(searchService, stager);
 
     @Test
-    @DisplayName("the first page stages the query even when the search already returns hits")
+    @DisplayName("the first page stages the query even when the search returns hits")
     void firstPageStagesEvenWithHits() {
         stub(FIRST_PAGE, outcome(SOME_HITS, FIRST_PAGE, false));
 

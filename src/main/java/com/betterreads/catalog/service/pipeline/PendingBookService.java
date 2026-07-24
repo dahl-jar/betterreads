@@ -151,9 +151,8 @@ public class PendingBookService {
      * Restores the staged rating when the collect re-merge dropped it. The merger resolves the rating
      * only from Hardcover, so a re-promotion where Hardcover returns no match would otherwise lose it.
      *
-     * <p>The series is not restored. The fresh merge is its authority, so a stale staged series is
-     * dropped; {@link com.betterreads.catalog.entity.Book#applySeries} keeps a real one on a
-     * transient miss.
+     * <p>The series is not restored: the fresh merge is its authority, so a stale staged series is
+     * dropped. A series stored on the book survives a transient Hardcover miss on its own.
      */
     private static MergedBook keepStagedRating(final MergedBook collected, final SourceBook staged) {
         final SourceBook book = collected.book();

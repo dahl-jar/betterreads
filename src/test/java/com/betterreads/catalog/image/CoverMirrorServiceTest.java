@@ -19,12 +19,15 @@ import com.betterreads.catalog.image.store.StoredImage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 /**
  * The mirror service fetches a book's external cover, re-encodes it to a clean JPEG, and stores the
- * bytes under a key derived from the dedup key. A non-image or a failed fetch leaves the book
- * un-mirrored and never throws into the caller.
+ * bytes under a key derived from the dedup key. A non-image, an empty fetch, or a cover host error
+ * leaves the book un-mirrored and never throws into the caller.
  */
 class CoverMirrorServiceTest {
 
@@ -73,7 +76,7 @@ class CoverMirrorServiceTest {
     }
 
     @Test
-    @DisplayName("an already-mirrored cover is not re-fetched or re-stored")
+    @DisplayName("a mirrored cover is not re-fetched or re-stored")
     void skipsAlreadyMirrored() {
         final String objectKey = CoverMirrorService.objectKey(DEDUP_KEY, COVER_URL);
         store.saved.put(objectKey, new StoredImage(PNG, MediaType.IMAGE_JPEG_VALUE));
@@ -103,6 +106,24 @@ class CoverMirrorServiceTest {
         fetchResult = Optional.empty();
 
         final Optional<String> key = service.mirror(DEDUP_KEY, COVER_URL);
+
+        assertThat(key).isEmpty();
+        assertThat(store.saved).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a cover host returning 503 leaves the book un-mirrored without throwing")
+    void fetchTransportFailureIsContained() {
+        final CoverMirrorService failingFetch = new CoverMirrorService(
+            store,
+            url -> {
+                throw new WebClientResponseException(
+                    HttpStatus.SERVICE_UNAVAILABLE.value(), HttpStatus.SERVICE_UNAVAILABLE.getReasonPhrase(),
+                    HttpHeaders.EMPTY, new byte[0], StandardCharsets.UTF_8);
+            },
+            new CoverImageProcessor());
+
+        final Optional<String> key = failingFetch.mirror(DEDUP_KEY, COVER_URL);
 
         assertThat(key).isEmpty();
         assertThat(store.saved).isEmpty();

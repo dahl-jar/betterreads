@@ -102,7 +102,7 @@ class OpenLibraryClientLiveTest {
     }
 
     @Test
-    @DisplayName("Watchmen surfaces the artist co-creators Google omits")
+    @DisplayName("Watchmen lists the artist co-creators")
     void watchmenListsCoCreators() {
         final Optional<SourceBook> result = client.fetchByTitleAuthor("Watchmen", WATCHMEN_LEAD_AUTHOR);
 

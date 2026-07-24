@@ -17,14 +17,8 @@ import java.time.ZoneOffset;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Maps to {@code user_book_collection}: one row per user and book, holding the shelf status, the
- * favorite flag, optional reading dates, and a note. The {@code (user_id, book_id)} pair is unique,
- * so a user shelves a given book once.
- *
- * <p>Status changes stamp the reading dates through {@link #moveTo}: entering
- * {@link ReadingStatus#CURRENTLY_READING} fills {@code startedAt} the first time, marking
- * {@link ReadingStatus#FINISHED} fills {@code finishedAt} the first time. A re-read keeps the
- * original dates rather than overwriting them with today.
+ * Maps to {@code user_book_collection}: one row per user and book. The {@code (user_id, book_id)}
+ * pair is unique, so a user shelves a given book once.
  */
 @Entity
 @Table(name = "user_book_collection")
@@ -95,10 +89,10 @@ public class ShelfEntry {
     /**
      * Moves the entry to {@code target}, stamping the matching reading date on first entry.
      *
-     * <p>An already-set {@code startedAt} or {@code finishedAt} is left as-is so a re-read keeps the
+     * <p>An existing {@code startedAt} or {@code finishedAt} is left as-is so a re-read keeps the
      * dates from the first pass. Moving to {@link ReadingStatus#CURRENTLY_READING} clears
      * {@code finishedAt}: the book is being read again, so a finish date left in place would sit
-     * before the new start date and put the row in a state {@code updateEntry} rejects.
+     * before the new start date, which a date update rejects.
      */
     // PMD.NullAssignment: clearing finishedAt is the intended state, the book is no longer finished.
     @SuppressWarnings("PMD.NullAssignment")

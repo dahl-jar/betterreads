@@ -54,6 +54,18 @@ class CoverUrlGuardTest {
     }
 
     @Test
+    @DisplayName("the wildcard address is rejected")
+    void rejectsWildcardAddress() {
+        assertThat(guard.isAllowed("http://0.0.0.0/cover.jpg")).isFalse();
+    }
+
+    @Test
+    @DisplayName("a multicast address is rejected")
+    void rejectsMulticast() {
+        assertThat(guard.isAllowed("http://224.0.0.1/cover.jpg")).isFalse();
+    }
+
+    @Test
     @DisplayName("an IPv6 unique-local address is rejected")
     void rejectsIpv6UniqueLocal() {
         assertThat(guard.isAllowed("http://[fc00::1]/cover.jpg")).isFalse();

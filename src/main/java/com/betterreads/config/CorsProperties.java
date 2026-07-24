@@ -13,8 +13,6 @@ import org.springframework.validation.annotation.Validated;
  *
  * <p>Each entry must be a full origin, e.g. {@code https://app.betterreads.example.com}.
  * Patterns like {@code *.example.com} are rejected at startup. An empty list closes CORS.
- *
- * @param allowedOrigins allowed origins
  */
 @Validated
 @ConfigurationProperties(prefix = "app.cors")

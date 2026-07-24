@@ -6,8 +6,7 @@ import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A book as the search index sees it, with the cover already resolved to the served URL. Carries
- * the raw rating average and count; search computes its own popularity score from them.
+ * A book as the search index sees it, with the cover resolved to the served URL.
  *
  * @param dedupKey the public lookup key, used as the index primary key
  * @param title the book title

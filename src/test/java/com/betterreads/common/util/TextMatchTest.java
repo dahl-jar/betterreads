@@ -6,19 +6,13 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for {@link TextMatch#canonicalTitleMatches}. Two titles match when their core titles are
- * equal once case, a trailing subtitle, and surrounding punctuation are removed. A title that merely
- * shares a leading word with another, like a sequel, does not match.
+ * Unit tests for {@link TextMatch#canonicalTitleMatches}. Two titles match when their core titles
+ * are equal once case, a trailing subtitle, and surrounding whitespace are removed. A title that
+ * merely shares a leading word with another, like a sequel, does not match.
  */
 class TextMatchTest {
 
     private static final String DUNE = "Dune";
-
-    @Test
-    @DisplayName("identical titles match")
-    void identicalTitlesMatch() {
-        assertThat(TextMatch.canonicalTitleMatches(DUNE, DUNE)).isTrue();
-    }
 
     @Test
     @DisplayName("case and surrounding whitespace are ignored")

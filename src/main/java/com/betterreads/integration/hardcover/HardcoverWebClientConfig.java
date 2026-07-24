@@ -12,7 +12,7 @@ import org.springframework.web.reactive.function.client.WebClient;
  *
  * <p>The token is sent as {@code Authorization: Bearer <token>} only when one is configured; without
  * one the client returns empty. The token is stripped of surrounding whitespace, so a secret sealed
- * with a trailing newline still yields a header value the HTTP client accepts.
+ * with a trailing newline yields a header value the HTTP client accepts.
  */
 @Configuration
 public class HardcoverWebClientConfig {

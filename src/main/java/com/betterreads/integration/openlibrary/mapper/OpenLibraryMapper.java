@@ -15,9 +15,8 @@ import org.springframework.stereotype.Component;
 /**
  * Maps OpenLibrary DTOs into the catalog's {@link SourceBook}.
  *
- * <p>{@code description} comes back as a string or a {@code {type, value}} object
- * ({@link #coerceDescription}), {@code subjects} is noisy and gets reduced to canonical genres
- * ({@link #cleanSubjects}), and {@code cover_i = 0} means no cover.
+ * <p>{@code description} comes back as a string or a {@code {type, value}} object, {@code subjects}
+ * is noisy and gets reduced to canonical genres, and {@code cover_i = 0} means no cover.
  */
 @Component
 public class OpenLibraryMapper {
@@ -56,7 +55,8 @@ public class OpenLibraryMapper {
             .build();
     }
 
-    static @Nullable String stripWorksPrefix(final @Nullable String key) {
+    /** Returns the work key without its {@code /works/} prefix. */
+    public static @Nullable String stripWorksPrefix(final @Nullable String key) {
         if (key == null) {
             return null;
         }
@@ -103,8 +103,8 @@ public class OpenLibraryMapper {
      * Returns the work's language, preferring English when the work has an English edition.
      *
      * <p>OpenLibrary lists every language a work has editions in, in no useful order, so a work with
-     * an English edition can still list a translation first. English is the catalog's language for
-     * such a work; only a work with no English edition keeps its first listed language.
+     * an English edition can list a translation first. English is the catalog's language for such a
+     * work; only a work with no English edition keeps its first listed language.
      */
     private static @Nullable String firstLanguage(final @Nullable List<String> languages) {
         if (languages == null || languages.isEmpty()) {

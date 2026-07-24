@@ -10,8 +10,8 @@ import org.testcontainers.utility.DockerImageName;
  * context needs to start.
  *
  * <p>Redis is one singleton for the whole suite because each test clears its own bucket keys through
- * {@code RateLimitFilter.reset()}, so sharing the instance stays isolated. Each test still declares
- * its own Postgres container so a class gets a clean schema.
+ * {@code RateLimitFilter.reset()}, so sharing the instance stays isolated. Each test declares its
+ * own Postgres container so a class gets a clean schema.
  */
 // PMD.AbstractClassWithoutAbstractMethod: a shared-fixture base, not a template-method type.
 @SuppressWarnings("PMD.AbstractClassWithoutAbstractMethod")

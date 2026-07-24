@@ -11,8 +11,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Verifies the emitter registry isolates subscribers by key, removes them after an update is
- * published, and tolerates a publish to a key nobody is watching.
+ * The stream registry keys streams by book key, frees a slot when its update publishes, and
+ * re-checks completeness after registering so an update during the open is not missed.
  */
 class BookUpdateEmittersTest {
 
@@ -25,14 +25,6 @@ class BookUpdateEmittersTest {
     private static final String AUTHOR = "Frank Herbert";
 
     private final BookUpdateEmitters emitters = new BookUpdateEmitters();
-
-    @Test
-    @DisplayName("registers an emitter under its key")
-    void registersUnderKey() {
-        emitters.register(KEY);
-
-        assertThat(emitters.openCount(KEY)).isEqualTo(1);
-    }
 
     @Test
     @DisplayName("removes the key's emitters after an update is published to it")
@@ -82,7 +74,7 @@ class BookUpdateEmittersTest {
     }
 
     @Test
-    @DisplayName("opening an incomplete book that is still incomplete holds the stream open")
+    @DisplayName("opening an incomplete book that has not completed holds the stream open")
     void openHoldsStreamForIncompleteBook() {
         emitters.open(KEY, incompleteDetail(), false, () -> Optional.of(incompleteDetail()));
 

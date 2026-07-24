@@ -17,7 +17,7 @@ import org.springframework.web.reactive.function.client.WebClientException;
  *
  * <p>The fetched bytes are re-encoded to a clean JPEG by {@link CoverImageProcessor}, which rejects
  * anything that is not a decodable image, so an HTML error page or a disguised payload is dropped
- * rather than served later as a cover. An already-stored cover is left in place. A fetch, decode,
+ * rather than served later as a cover. A stored cover is left in place. A fetch, decode,
  * or storage failure leaves the book un-mirrored and returns empty without throwing, so the read
  * path keeps falling back to the external URL.
  */
@@ -52,7 +52,7 @@ public class CoverMirrorService {
 
     /**
      * Mirrors the cover at {@code coverUrl} and returns its stored object key, or empty when it could
-     * not be stored. An already-mirrored cover returns its key without re-fetching.
+     * not be stored. A mirrored cover returns its key without re-fetching.
      */
     public Optional<String> mirror(final String dedupKey, final String coverUrl) {
         final String key = objectKey(dedupKey, coverUrl);

@@ -17,9 +17,9 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 /**
  * Holds the open detail-page SSE streams, keyed by book key, and pushes the filled-in book to them.
  *
- * <p>The detail page opens a stream while a cold book finishes enriching. When the book is written,
- * {@link #publish} sends one {@code book-updated} event to every stream watching that key and
- * completes them, since the fill is a one-time event. An emitter removes itself on completion,
+ * <p>The detail page opens a stream while an incomplete book is being filled in. When the book is
+ * written, {@link #publish} sends one {@code book-updated} event to every stream watching that key
+ * and completes them, since the fill is a one-time event. An emitter removes itself on completion,
  * timeout, or error.
  */
 @Component
@@ -38,19 +38,14 @@ public class BookUpdateEmitters {
     private final AtomicInteger openStreams = new AtomicInteger();
 
     /** Registers a new stream for the key and removes it again when it ends. */
-    public SseEmitter register(final String key, final long timeoutMillis) {
-        final SseEmitter emitter = new SseEmitter(timeoutMillis);
+    public SseEmitter register(final String key) {
+        final SseEmitter emitter = new SseEmitter(DEFAULT_TIMEOUT_MILLIS);
         openStreams.incrementAndGet();
         byKey.computeIfAbsent(key, ignored -> ConcurrentHashMap.newKeySet()).add(emitter);
         emitter.onCompletion(() -> remove(key, emitter));
         emitter.onTimeout(() -> remove(key, emitter));
         emitter.onError(ignored -> remove(key, emitter));
         return emitter;
-    }
-
-    /** Registers a stream with the default timeout. */
-    public SseEmitter register(final String key) {
-        return register(key, DEFAULT_TIMEOUT_MILLIS);
     }
 
     /**
@@ -85,9 +80,8 @@ public class BookUpdateEmitters {
     /**
      * Sends the filled-in book to every stream on the key, then completes them.
      *
-     * <p>The key's set is taken out of the registry first, so each emitter's completion callback finds
-     * the key already gone and does not adjust the count again; the count is decremented here per
-     * stream instead.
+     * <p>Removing the key's set before the sends stops each emitter's completion callback from
+     * decrementing the open count a second time.
      */
     public void publish(final String key, final BookDetailResponse detail) {
         final Set<SseEmitter> streams = byKey.remove(key);

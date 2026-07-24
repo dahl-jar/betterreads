@@ -20,8 +20,7 @@ public final class JobExecutors {
 
     /**
      * Returns a single-thread executor that runs one job at a time. The one-deep queue and abort
-     * policy mean a second submission while a run is in progress is rejected rather than queued; the
-     * scheduler's own guard already prevents that, so rejection is a backstop.
+     * policy reject a second submission made while a run is in progress.
      */
     // PMD.DoNotUseThreads: Spring manages this bounded executor's lifecycle and thread pool.
     @SuppressWarnings("PMD.DoNotUseThreads")

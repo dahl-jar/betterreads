@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
  * Builds the {@link BookDetailResponse} from a promoted {@link Book} or a staging {@link PendingBook}.
  *
  * <p>The pending seed stores authors, subjects, and awards as delimited text, so it routes through
- * {@link PendingBookMapper#toSourceBook} to split them once rather than repeat the parsing here.
+ * {@link PendingBookMapper#toSourceBook}, which owns the split.
  */
 @Component
 public class BookDetailMapper {

@@ -37,7 +37,7 @@ public class OpenApiConfig {
             .info(new Info()
                 .title("BetterReads API")
                 .version("v1")
-                .description("Book tracking and recommendation API.")
+                .description("Book tracking and review API.")
                 .contact(new Contact().name("BetterReads"))
                 .license(new License()
                     .name("Apache 2.0")

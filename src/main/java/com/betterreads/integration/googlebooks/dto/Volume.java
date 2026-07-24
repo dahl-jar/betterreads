@@ -7,7 +7,7 @@ import org.jspecify.annotations.Nullable;
  * One volume entry from a Google Books search or detail response.
  *
  * @param id Google Books volume id, e.g. {@code TtkxEAAAQBAJ}
- * @param volumeInfo per-edition metadata; can be missing on degenerate responses
+ * @param volumeInfo per-edition metadata; can be missing on a partial response
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record Volume(

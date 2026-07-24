@@ -55,10 +55,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Verifies the password-reset flow end-to-end: token issue, single-use consumption, expiry,
- * enumeration-resistance, and the side-effect that all refresh tokens are revoked when a reset
- * succeeds. The plaintext token is captured through a test {@link PasswordResetMailer} so the
- * test never reads it from the DB.
+ * Covers issuing a reset token, consuming it once, and the refresh-token revoke that follows a
+ * successful reset.
+ *
+ * <p>The mail-outbox worker is off ({@code mail.outbox.worker-enabled=false}) so enqueued rows
+ * stay in the database and a test can read the plaintext token out of the payload without
+ * racing a real send.
  */
 @SpringBootTest
 @Testcontainers
@@ -93,9 +95,9 @@ class PasswordResetIntegrationTest extends ContainerizedTest {
 
     private static final String SET_COOKIE_HEADER = "Set-Cookie";
 
-    private static final String USERNAME = "alice";
+    private static final String USERNAME = "darrow";
 
-    private static final String EMAIL = "alice@example.com";
+    private static final String EMAIL = "darrow@example.com";
 
     private static final String OLD_PASSWORD = "OldP4ssword!";
 
@@ -202,7 +204,7 @@ class PasswordResetIntegrationTest extends ContainerizedTest {
 
             mockMvc.perform(post(FORGOT_URL)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(forgotPayload("Alice@Example.COM")))
+                    .content(forgotPayload("Darrow@Example.COM")))
                 .andExpect(status().isNoContent());
 
             assertThat(mailOutboxRepository.findAll()).hasSize(1);
@@ -219,18 +221,17 @@ class PasswordResetIntegrationTest extends ContainerizedTest {
         }
 
         /**
-         * Hammers the service from many threads at once. Two transactions racing on the partial
-         * unique index for {@code (user_id) WHERE consumed_at IS NULL} produce a
-         * {@link org.springframework.dao.DataIntegrityViolationException}; the loser must catch
-         * that, not surface a 500, and must leave at most one active token in the DB.
+         * Concurrent reset requests contend for the partial unique index on
+         * {@code (user_id) WHERE consumed_at IS NULL}. The write lock on the user row serializes
+         * them, so every call succeeds and one active token survives.
          *
-         * <p>The service is invoked directly so the per-IP rate limit filter is bypassed; the
-         * unique-constraint race is the unit under test, not the throttle.
+         * <p>The service is called directly so the per-IP rate limit filter does not cap the
+         * thread count; the index race is under test.
          */
         // PMD.DoNotUseThreads is a J2EE-webapp rule; this test needs real threads for the race.
         @SuppressWarnings("PMD.DoNotUseThreads")
         @Test
-        void concurrentRequestsLeaveAtMostOneActiveToken() throws Exception {
+        void concurrentRequestsLeaveOneActiveToken() throws Exception {
             seedUser();
             final CountDownLatch start = new CountDownLatch(1);
             final List<Future<?>> futures = new ArrayList<>(CONCURRENT_THREADS);
@@ -252,8 +253,8 @@ class PasswordResetIntegrationTest extends ContainerizedTest {
             assertThat(emailTokenRepository.findActive(
                     userRepository.findByEmail(EMAIL).orElseThrow().getUserId(),
                     EmailToken.Purpose.PASSWORD_RESET))
-                .as("at most one active token survives the race; loser caught DataIntegrityViolation")
-                .hasSizeLessThanOrEqualTo(1);
+                .as("serialized requests leave exactly one active token, never zero or a duplicate")
+                .hasSize(1);
         }
     }
 

@@ -15,10 +15,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/**
- * Unit tests for {@link HardcoverDescriptionSource}. The source resolves a description through the
- * book record the lookup's Hardcover id identifies, and resolves empty without one.
- */
+/** Resolves a description from the book record the lookup's Hardcover id names, or empty without one. */
 class HardcoverDescriptionSourceTest {
 
     private static final String HARDCOVER_ID = "379004";

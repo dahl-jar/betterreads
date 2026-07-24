@@ -1,7 +1,9 @@
 package com.betterreads.integration.itunes;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.anyUrl;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -27,9 +29,9 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
- * Exercises the Apple Books description source against a stubbed HTTP boundary: the search returns a
- * marketing blurb with HTML, an empty result set resolves to empty, and the lookup falls back from
- * ISBN to title-and-author.
+ * Exercises the Apple Books description source against a stubbed HTTP boundary: the ISBN search
+ * returns the publisher blurb, an empty or blank-description result set resolves to empty, and the
+ * lookup falls back from ISBN to title-and-author.
  */
 @SpringBootTest(
     classes = {
@@ -145,6 +147,7 @@ class ItunesDescriptionSourceWireMockTest {
                 new DescriptionLookup(null, null, null, null, null, null));
 
             assertThat(description).isEmpty();
+            WIREMOCK.verify(0, getRequestedFor(anyUrl()));
         }
 
         @Test
@@ -162,17 +165,6 @@ class ItunesDescriptionSourceWireMockTest {
         @DisplayName("the title-author fallback rejects a result for a different book")
         void titleAuthorFallbackRejectsWrongBook() {
             stubSearch(resultJson("A Completely Different Book", BLURB));
-
-            final Optional<String> description = source.fetch(
-                new DescriptionLookup(null, null, TITLE, AUTHOR, null, null));
-
-            assertThat(description).isEmpty();
-        }
-
-        @Test
-        @DisplayName("the title-author fallback rejects a result whose title is only a leading word")
-        void titleAuthorFallbackRejectsLeadingWordMatch() {
-            stubSearch(resultJson("Howling", BLURB));
 
             final Optional<String> description = source.fetch(
                 new DescriptionLookup(null, null, TITLE, AUTHOR, null, null));

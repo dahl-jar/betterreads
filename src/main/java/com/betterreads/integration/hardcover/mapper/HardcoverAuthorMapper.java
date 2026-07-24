@@ -12,10 +12,8 @@ import org.springframework.stereotype.Component;
 /**
  * Builds a {@link SourceAuthorWorks} from a Hardcover author name and their contributions.
  *
- * <p>The contributions arrive ordered by readers. A book survives when it is the canonical work, has
- * an English edition, and its title is a single book rather than a boxed set. Each surviving book
- * carries the fields the enumeration returned. Order is preserved and the list is capped at
- * {@link #MAX_BOOKS}.
+ * <p>The contributions arrive ordered by readers and keep that order. Books that do not qualify are
+ * dropped and the list is capped at {@link #MAX_BOOKS}.
  */
 @Component
 public class HardcoverAuthorMapper {
@@ -33,8 +31,7 @@ public class HardcoverAuthorMapper {
         final List<SourceBook> books = author.contributions().stream()
             .map(AuthorWorksResponse.Contribution::book)
             .map(HardcoverBookNodeMapper::toSourceBookWithSeries)
-            .filter(Optional::isPresent)
-            .map(Optional::get)
+            .flatMap(Optional::stream)
             .limit(MAX_BOOKS)
             .toList();
         return books.isEmpty() ? null : new SourceAuthorWorks(authorName, books);

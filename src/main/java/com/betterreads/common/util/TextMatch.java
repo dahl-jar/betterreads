@@ -34,8 +34,8 @@ public final class TextMatch {
      * Returns true when two titles share the same core, ignoring case and a trailing subtitle.
      *
      * <p>The core is the title up to the first colon or parenthesis, so "Dune" matches "Dune: A
-     * Novel" and "Dune (novel)". A sequel that only shares a leading word, like "Dune Messiah", does
-     * not match "Dune", which a substring check would wrongly accept.
+     * Novel" and "Dune (novel)". A sequel that only shares a leading word, like "Dune Messiah",
+     * does not match "Dune".
      */
     public static boolean canonicalTitleMatches(final String first, final String second) {
         return coreTitle(first).equals(coreTitle(second));

@@ -23,8 +23,8 @@ import org.springframework.web.context.WebApplicationContext;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * The public search endpoint is rate limited per client, so a rapid burst past the configured
- * capacity is rejected with 429 instead of firing one Meilisearch query per hit.
+ * The public search endpoint is rate limited per client: a burst past the configured capacity is
+ * rejected with 429, so it never reaches Meilisearch.
  */
 @SpringBootTest
 @Testcontainers

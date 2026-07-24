@@ -1,2 +1,2 @@
-/** WebClient for the Wikidata SPARQL endpoint and REST API. */
+/** Wikidata catalog client. */
 package com.betterreads.integration.wikidata.client;

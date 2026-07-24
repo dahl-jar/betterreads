@@ -36,8 +36,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 /**
  * Book-detail reads against a real Postgres and Redis: a promoted book serves its full detail and
  * is marked complete; a key that only exists in {@code pending_book} serves the seed and is marked
- * incomplete; an unknown key is a 404. The endpoint is public, the promoted read is cached, and a
- * re-promotion evicts the stale entry.
+ * incomplete; an unknown key is a 404. The promoted read is cached under the book key, so evicting
+ * that key serves the fresh row.
  */
 @SpringBootTest
 @Testcontainers

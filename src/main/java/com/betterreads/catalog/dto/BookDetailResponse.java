@@ -7,11 +7,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * Book detail returned by {@code GET /api/v1/books/{key}}.
  *
- * <p>{@code complete} is true for a promoted catalog book and false for a staging seed served while
- * enrichment is still running.
- *
  * @param key the lookup key, a source identifier shared with search results
- * @param complete true when the book is promoted, false when it is still a staging seed
+ * @param complete true when every detail field is filled in, false while some are missing
  */
 public record BookDetailResponse(
     String key,
@@ -60,8 +57,8 @@ public record BookDetailResponse(
     }
 
     /**
-     * Builds a {@link BookDetailResponse} field by field so the mapper sets each field by name
-     * instead of by position, where two same-typed fields could be swapped unnoticed.
+     * Builds a {@link BookDetailResponse} by field name. The record has seventeen components and
+     * several share a type, so positional construction swaps two of them unnoticed.
      */
     @SuppressWarnings({"PMD.TooManyMethods", "PMD.AvoidFieldNameMatchingMethodName"})
     public static final class Builder {

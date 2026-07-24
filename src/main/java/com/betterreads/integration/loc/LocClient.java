@@ -4,7 +4,7 @@ import com.betterreads.catalog.service.source.port.BookSourceClient;
 import com.betterreads.catalog.service.source.model.SourceBook;
 import java.util.Optional;
 
-/** Library of Congress catalog client over the SRU endpoint ({@code lx2.loc.gov:210/lcdb}). */
+/** Library of Congress catalog client over the SRU endpoint. */
 public interface LocClient extends BookSourceClient {
 
     /**

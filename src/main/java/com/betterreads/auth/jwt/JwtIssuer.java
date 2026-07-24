@@ -37,10 +37,6 @@ public final class JwtIssuer {
         this(properties.secret(), properties.issuer(), Duration.ofMinutes(properties.expirationMinutes()));
     }
 
-    /**
-     * Constructor for direct wiring with a raw secret, issuer, and lifetime, without going
-     * through {@link JwtProperties}.
-     */
     public JwtIssuer(final String secret, final String issuer, final Duration expiration) {
         this.signingKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.issuer = issuer;
@@ -65,7 +61,8 @@ public final class JwtIssuer {
      * Returns the user id from the subject claim, or throws if the token does not pass every
      * check.
      *
-     * <p>Audience is checked so a token minted for another service cannot be replayed here.
+     * <p>Audience is checked so a token issued for another service cannot be replayed against
+     * this API.
      *
      * @throws InvalidJwtException malformed, bad signature, expired, wrong issuer, wrong
      *         audience, or non-numeric subject

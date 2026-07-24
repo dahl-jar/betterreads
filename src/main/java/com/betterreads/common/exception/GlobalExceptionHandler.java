@@ -119,12 +119,7 @@ class GlobalExceptionHandler {
         return problem(HttpStatus.BAD_REQUEST, INVALID_PARAMETER);
     }
 
-    /**
-     * Maps an unsupported HTTP method to {@code 405} with an {@code Allow} header.
-     *
-     * <p>Without this handler the default falls through to the catch-all {@code 500}, turning a
-     * client error into a server error in the 5xx metrics.
-     */
+    /** Maps an unsupported HTTP method to {@code 405} with an {@code Allow} header. */
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ProblemDetail> handleMethodNotSupported(
             final HttpRequestMethodNotSupportedException exception) {
@@ -143,12 +138,7 @@ class GlobalExceptionHandler {
         return builder.body(problem(HttpStatus.METHOD_NOT_ALLOWED, "Method not allowed"));
     }
 
-    /**
-     * Maps an unsupported {@code Content-Type} to {@code 415}.
-     *
-     * <p>Without this handler the default falls through to {@code 500}, turning a client error into
-     * a server error.
-     */
+    /** Maps an unsupported {@code Content-Type} to {@code 415}. */
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     public ProblemDetail handleMediaTypeNotSupported(final HttpMediaTypeNotSupportedException exception) {
         final MediaType received = exception.getContentType();
@@ -163,7 +153,7 @@ class GlobalExceptionHandler {
     }
 
     /**
-     * Lets an SSE stream that times out close quietly. The response is already committed as
+     * Lets an SSE stream that times out close quietly. The response is committed as
      * {@code text/event-stream}, so serializing an error body onto it would fail.
      */
     @ExceptionHandler(AsyncRequestTimeoutException.class)

@@ -19,11 +19,12 @@ import org.springframework.stereotype.Component;
  *
  * <p>The enumeration lists every edition and translation at each position. One volume survives per
  * integer position 1 to the series' primary book count: the most-read English canonical single book
- * at that position. Each surviving volume carries the fields the enumeration returned. Positions with
- * no qualifying book are dropped.
+ * at that position. Positions with no qualifying book are dropped.
  */
 @Component
 public class HardcoverSeriesMapper {
+
+    private static final int FIRST_VOLUME = 1;
 
     /**
      * Returns the series, or null when the search hit or the enumeration cannot supply a name,
@@ -53,8 +54,8 @@ public class HardcoverSeriesMapper {
 
         final Map<Integer, Candidate> best = new TreeMap<>();
         for (final SeriesEnumerationResponse.BookSeries row : rows) {
-            final Optional<Integer> position = integerPosition(row.position())
-                .filter(p -> p >= 1 && p <= cap);
+            final Optional<Integer> position = VolumeNumber.fromPosition(row.position())
+                .filter(volume -> volume >= FIRST_VOLUME && volume <= cap);
             if (position.isEmpty()) {
                 continue;
             }
@@ -85,12 +86,5 @@ public class HardcoverSeriesMapper {
     }
 
     private record Candidate(SourceBook book, int readers) {
-    }
-
-    private static Optional<Integer> integerPosition(final @Nullable Double position) {
-        if (position == null || Double.compare(position, Math.floor(position)) != 0) {
-            return Optional.empty();
-        }
-        return Optional.of(position.intValue());
     }
 }

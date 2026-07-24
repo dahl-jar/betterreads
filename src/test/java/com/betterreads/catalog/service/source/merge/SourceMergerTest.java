@@ -1,6 +1,7 @@
 package com.betterreads.catalog.service.source.merge;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 
@@ -14,9 +15,9 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for {@link SourceMerger}. The merger combines several single-source books into one,
- * resolving each field by the priority order in {@code source-trust.md}: subjects are unioned across
- * every source, every other field takes the first source in its chain that supplies a value.
+ * Unit tests for {@link SourceMerger}. The merger combines several single-source books into one:
+ * subjects are unioned across every source, every other field takes the first source in its
+ * priority chain that supplies a value.
  */
 // PMD.TooManyMethods: one test per resolved field plus the series and description cases.
 @SuppressWarnings("PMD.TooManyMethods")
@@ -112,6 +113,18 @@ class SourceMergerTest {
             assertThat(merged.book().title())
                 .as("a higher-priority null must not beat a lower-priority real value")
                 .isEqualTo(TITLE);
+        }
+
+        @Test
+        @DisplayName("a merge where no source carries a title is rejected")
+        void mergeWithoutATitleIsRejected() {
+            final SourceBook untitled = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+                .isbn13(ISBN)
+                .build();
+
+            assertThatThrownBy(() -> merger.merge(List.of(untitled)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("title");
         }
 
         @Test
@@ -374,7 +387,7 @@ class SourceMergerTest {
             final MergedBook merged = merger.merge(List.of(openLibrary, google));
 
             assertThat(merged.provenanceOf(BookField.DESCRIPTION))
-                .as("Google outranks OpenLibrary in the description chain, so it wins an equal-quality tie")
+                .as("Google comes before OpenLibrary in the description chain, so it wins an equal-quality tie")
                 .isEqualTo(BookFieldSource.GOOGLE_BOOKS);
         }
 

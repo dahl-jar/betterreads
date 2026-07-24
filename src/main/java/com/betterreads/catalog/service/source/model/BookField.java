@@ -1,9 +1,6 @@
 package com.betterreads.catalog.service.source.model;
 
-/**
- * The book fields that carry per-source provenance. The scheduled refresh re-queries a source for
- * the field it last supplied, so only the fields worth re-querying are tracked.
- */
+/** The book fields whose winning source the merge records as provenance. */
 public enum BookField {
     TITLE,
     DESCRIPTION,

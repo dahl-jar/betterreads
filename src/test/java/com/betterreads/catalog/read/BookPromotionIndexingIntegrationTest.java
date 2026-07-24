@@ -5,9 +5,7 @@ import static org.awaitility.Awaitility.await;
 
 import com.betterreads.catalog.repository.BookRepository;
 import com.betterreads.catalog.repository.PendingBookRepository;
-import com.betterreads.catalog.service.pipeline.DescriptionSelector;
 import com.betterreads.catalog.service.pipeline.PendingBookService;
-import com.betterreads.catalog.service.pipeline.SourceCollector;
 import com.betterreads.catalog.service.source.model.SourceBooks;
 import com.betterreads.catalog.service.source.merge.SourceMerger;
 import com.betterreads.search.dto.BookSearchResult;
@@ -24,10 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
@@ -47,7 +42,7 @@ import org.testcontainers.utility.DockerImageName;
     "jwt.issuer=betterreads-it",
     "betterreads.catalog.staging.poll-enabled=false"
 })
-@Import(BookPromotionIndexingIntegrationTest.NoNetworkSources.class)
+@Import(NoNetworkSources.class)
 class BookPromotionIndexingIntegrationTest extends ContainerizedTest {
 
     @Container
@@ -115,16 +110,5 @@ class BookPromotionIndexingIntegrationTest extends ContainerizedTest {
             final BookSearchResult result = searchService.search("dune", 0, FULL_PAGE);
             assertThat(result.hits()).hasSize(ONE_HIT);
         });
-    }
-
-    /** Replaces the source collector with one that re-merges only the staged data, no network. */
-    @TestConfiguration
-    static class NoNetworkSources {
-
-        @Bean
-        @Primary
-        SourceCollector noNetworkSourceCollector(final SourceMerger merger) {
-            return new SourceCollector(merger, List.of(), new DescriptionSelector(List.of()), Runnable::run);
-        }
     }
 }

@@ -1,2 +1,2 @@
-/** Library of Congress SRU catalog integration ({@code lx2.loc.gov:210/lcdb}, MARC/MODS XML). */
+/** Library of Congress catalog integration over SRU, returning MARC and MODS XML. */
 package com.betterreads.integration.loc;

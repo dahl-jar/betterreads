@@ -19,11 +19,10 @@ import org.springframework.stereotype.Component;
  * Translates Google Books DTOs to the {@link SourceBook} contract used by the catalog layer.
  *
  * <p>{@code pageCount} is {@code 0} on reprints where Google has metadata but no real page
- * count, so it is nulled. {@code industryIdentifiers} sometimes carries only an {@code ISBN_10},
- * never synthesized into an ISBN-13. {@code description} ships with embedded HTML
- * ({@code <p>}, {@code <b>}, {@code <i>}, {@code <br>}), stripped before persistence.
- * {@code categories} are reduced to canonical genres
- * like the other sources. Rating is not mapped; only Hardcover supplies a trustworthy rating.
+ * count, so it is nulled. A volume carrying only an {@code ISBN_10} maps to no ISBN-13.
+ * {@code description} ships with embedded HTML ({@code <p>}, {@code <b>}, {@code <i>},
+ * {@code <br>}), stripped before persistence. {@code categories} are reduced to canonical genres.
+ * The volume's rating is left out; the catalog takes ratings from Hardcover.
  */
 @Component
 public class GoogleBooksMapper {
@@ -69,8 +68,8 @@ public class GoogleBooksMapper {
     /**
      * Returns the edition's thumbnail as an https URL, or null when Google supplies none.
      *
-     * <p>The cover is the one Google attaches to this specific edition. Google serves the thumbnail
-     * over http, upgraded to https so it loads on an https page without a mixed-content block.
+     * <p>Google serves the thumbnail over http, upgraded to https so it loads on an https page
+     * without a mixed-content block.
      */
     static @Nullable String coverUrl(final @Nullable ImageLinks imageLinks) {
         if (imageLinks == null) {

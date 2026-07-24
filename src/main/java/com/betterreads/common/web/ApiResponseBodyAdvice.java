@@ -18,20 +18,21 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 
 /**
- * Wraps every JSON response body in the {@link ApiResponse} envelope so clients see one consistent
- * shape. A {@link Paged} body becomes {@code {data: [...], meta: {...}}}; anything else becomes
+ * Wraps every JSON response body in {@link ApiResponse} so clients see one consistent shape. A
+ * {@link Paged} body becomes {@code {data: [...], meta: {...}}}; anything else becomes
  * {@code {data: ...}}.
  *
- * <p>Left untouched: an already-wrapped {@link ApiResponse}, a {@link ProblemDetail} error body
- * (RFC 9457 uses {@code application/problem+json}), a {@code text/event-stream} SSE body, the health
- * check (an infrastructure contract that probes read directly), and a null body (a 204).
+ * <p>Left untouched: an {@link ApiResponse} the controller returned itself, a
+ * {@link ProblemDetail} error body (RFC 9457 uses {@code application/problem+json}), a
+ * {@code text/event-stream} SSE body, the health check that probes read directly, and a null
+ * body (a 204).
  */
 @ControllerAdvice
 public class ApiResponseBodyAdvice implements ResponseBodyAdvice<Object> {
 
     private static final String APPLICATION_PACKAGE = "com.betterreads";
 
-    /** Bodies the envelope leaves alone; wrapping any of them would break its converter or contract. */
+    /** Bodies that pass through; wrapping one would break its converter or its contract. */
     private static final List<Class<?>> UNWRAPPED = List.of(
         ApiResponse.class, ProblemDetail.class, HealthResponse.class,
         CharSequence.class, byte[].class, Resource.class);

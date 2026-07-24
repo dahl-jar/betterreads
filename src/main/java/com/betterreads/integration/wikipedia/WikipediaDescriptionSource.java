@@ -17,8 +17,7 @@ import tools.jackson.databind.JsonNode;
  * Wikipedia REST summary then supplies a neutral encyclopedic extract. A book with no QID, no
  * {@code enwiki} sitelink, or a non-standard page resolves to empty.
  *
- * <p>Fallback-only: the article lead states who wrote and published the book, not what happens in
- * it.
+ * <p>Used only as a fallback: the article lead covers the book's publication and reception.
  */
 @Component
 public class WikipediaDescriptionSource implements DescriptionSource {

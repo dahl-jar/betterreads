@@ -23,8 +23,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Verifies the generated OpenAPI document shows the runtime {@code data}/{@code meta} envelope, so
- * Swagger and generated clients match the wire shape the response advice produces.
+ * Verifies the generated OpenAPI document shows the runtime {@code data}/{@code meta} shape, so
+ * Swagger and generated clients match the wire format the response advice produces.
  */
 @SpringBootTest
 @Testcontainers

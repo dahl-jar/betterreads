@@ -9,8 +9,8 @@ import java.util.HexFormat;
  * Derives a short, stable version token from a cover URL.
  *
  * <p>The object key and the served URL both carry this token, so a changed cover URL produces a new
- * storage key and a new browser URL together. The browser then fetches the new cover instead of a
- * cached one, and the storage read misses instead of returning the object stored for the old URL.
+ * storage key and a new browser URL together. The browser then misses its cache and the storage
+ * read misses the object held for the old URL.
  */
 public final class CoverVersion {
 

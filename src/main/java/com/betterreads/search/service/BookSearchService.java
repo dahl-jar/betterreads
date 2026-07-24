@@ -5,9 +5,7 @@ import com.betterreads.search.dto.BookSearchResult;
 import com.betterreads.search.dto.SearchOutcome;
 import java.util.Collection;
 
-/**
- * Contract for catalog search backed by Meilisearch.
- */
+/** Full-text search over the book catalog. */
 public interface BookSearchService {
 
     /**
@@ -28,13 +26,8 @@ public interface BookSearchService {
      */
     SearchOutcome searchOutcome(String query, int offset, int limit);
 
-    /**
-     * Inserts or replaces the given documents in the books index.
-     */
+    /** Inserts or replaces the given documents in the books index. */
     void index(Collection<BookSearchDocument> documents);
 
-    /**
-     * Removes the document with the given id from the books index.
-     */
     void remove(String bookId);
 }

@@ -21,9 +21,8 @@ import tools.jackson.dataformat.xml.XmlMapper;
 /**
  * Maps a Library of Congress SRU response into a {@link SourceBook}.
  *
- * <p>The MODS record is read as a parsed tree by {@link SruTree} rather than bound to DTO records,
- * which avoids wrestling the MODS default namespace and the {@code zs:} SRU wrapper into Jackson XML
- * bindings. Identifier and series extraction live in {@link ModsIdentifiers} and {@link ModsSeries}.
+ * <p>The MODS record is read as a parsed tree by {@link SruTree}, which keeps the MODS default
+ * namespace and the {@code zs:} SRU wrapper out of Jackson XML bindings.
  */
 @Component
 public class LocMapper {

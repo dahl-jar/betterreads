@@ -13,10 +13,10 @@ import org.springframework.stereotype.Component;
 /**
  * Decides whether a cover URL is safe to fetch server-side.
  *
- * <p>Cover URLs come from external catalog responses, so a compromised source could point one at a
- * cluster service or a cloud metadata endpoint. Only {@code http}/{@code https} URLs whose host
+ * <p>Cover URLs come from external catalog responses, so a compromised source could point one at an
+ * internal service or a cloud metadata endpoint. Only {@code http}/{@code https} URLs whose host
  * resolves entirely to public addresses are allowed; loopback, link-local, site-local, and other
- * non-routable targets are rejected, and a host that fails to resolve is rejected rather than tried.
+ * non-routable targets are rejected, as is a host that fails to resolve.
  */
 @Component
 public class CoverUrlGuard {
@@ -90,7 +90,7 @@ public class CoverUrlGuard {
 
     /**
      * Returns true for the 100.64.0.0/10 shared-address space, which {@link InetAddress} does not
-     * flag as site-local. Overlay and mesh networks route private hosts here, so it must be refused.
+     * flag as site-local. Overlay and mesh networks route private hosts through that range.
      */
     private static boolean isCarrierGradeNat(final InetAddress address) {
         final byte[] octets = address.getAddress();
@@ -100,8 +100,8 @@ public class CoverUrlGuard {
     }
 
     /**
-     * Returns true for the fc00::/7 unique-local range, which {@link InetAddress#isSiteLocalAddress}
-     * covers only for the deprecated fec0::/10 prefix, not the current fc00::/7.
+     * Returns true for the fc00::/7 unique-local range. {@link InetAddress#isSiteLocalAddress} flags
+     * only the deprecated fec0::/10 prefix.
      */
     private static boolean isUniqueLocalIpv6(final InetAddress address) {
         final byte[] octets = address.getAddress();

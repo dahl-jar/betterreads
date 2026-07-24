@@ -16,12 +16,11 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * Wires the Bucket4j proxy manager that keeps rate-limit buckets in Redis, so every app replica
- * shares one count per client instead of each holding its own.
+ * shares one count per client.
  *
- * <p>Uses a dedicated Lettuce connection with a {@code String}-key, {@code byte[]}-value codec
- * because Bucket4j stores bucket state as bytes, which would clash with the JSON codec the detail
- * cache uses on its own connection. Buckets expire from Redis once enough time has passed to refill
- * them to full, so idle keys shed on their own.
+ * <p>Bucket state is bytes, so the proxy manager gets its own Lettuce connection with a
+ * {@code String}-key, {@code byte[]}-value codec. Buckets expire once enough time has passed to
+ * refill them to full, so idle keys clear themselves.
  */
 @Configuration(proxyBeanMethods = false)
 public class RateLimitRedisConfig {

@@ -565,8 +565,8 @@ class AuthIntegrationTest extends ContainerizedTest {
                     .header(REQUEST_METHOD_HEADER, METHOD_POST))
                 .andExpect(status().isOk())
                 .andExpect(header().string(ALLOW_ORIGIN_HEADER, ALLOWED_ORIGIN))
-                .andExpect(header().string(ALLOW_METHODS_HEADER,
-                    org.hamcrest.Matchers.containsString(METHOD_POST)));
+                .andExpect(result -> assertThat(result.getResponse().getHeader(ALLOW_METHODS_HEADER))
+                    .contains(METHOD_POST));
         }
     }
 

@@ -32,8 +32,8 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  * on the GraphQL query text.
  *
  * <p>The works payload puts each filter rule on its own row: a translation is a non-canonical
- * edition, a foreign edition is non-English, an anthology fails the single-book check, a bind-up
- * carries the compilation flag, and the remaining rows arrive in descending reader order.
+ * edition, a foreign edition is non-English, an anthology fails the single-book check, and a bind-up
+ * carries the compilation flag. The remaining rows arrive in descending reader order.
  */
 @SpringBootTest(
     classes = {

@@ -21,12 +21,11 @@ import org.springframework.data.redis.serializer.RedisSerializationContext;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Two caches with different homes: promoted book detail in Redis, and a short-lived in-process cache
- * for search results.
+ * Two cache managers: promoted book detail in Redis, search results in Caffeine.
  *
- * <p>Book detail is Redis-backed, shared across replicas. It is written once at promotion and
- * evicted on re-enrichment, with a TTL backstop and the cluster {@code allkeys-lru} cap bounding
- * growth. Search results stay in Caffeine with a short TTL, in-process and not in Redis.
+ * <p>Book detail is shared across replicas, written once at promotion and evicted on
+ * re-enrichment, with a TTL backstop. Search results stay in process with a short TTL and a
+ * bounded entry count.
  */
 @Configuration
 @EnableCaching

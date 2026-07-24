@@ -14,9 +14,8 @@ import org.springframework.stereotype.Component;
  *
  * <p>Runs at 04:00, after the 02:00 author and series refresh and the 03:30 index reconcile, so a
  * book promoted overnight is a candidate the same night. The run is handed to a dedicated executor
- * because a slice makes rate-limited iTunes calls for up to 50 books and can take minutes; running it
- * on the shared scheduler thread would stall the mail outbox and the SSE heartbeat. A run still in
- * progress when the next trigger fires is skipped rather than queued. Disabled by
+ * because a slice makes rate-limited iTunes calls for up to 50 books and can take minutes; on the
+ * shared scheduler thread it delayed every later trigger by that long. Disabled by
  * {@code betterreads.catalog.description-backfill.enabled=false}.
  */
 @Component

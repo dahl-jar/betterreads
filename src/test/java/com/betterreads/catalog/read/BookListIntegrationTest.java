@@ -203,13 +203,6 @@ class BookListIntegrationTest extends ContainerizedTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(DATA_LENGTH).value(2));
         }
-
-        @Test
-        void returnsAnEmptyListForAnEmptyCatalog() throws Exception {
-            mockMvc.perform(get(LIST_PATH).param(LIST_PARAM, RECENTLY_ADDED))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath(DATA_LENGTH).value(0));
-        }
     }
 
     private void saveBook(

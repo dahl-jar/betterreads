@@ -13,11 +13,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClientException;
 
 /**
- * Re-resolves the authors and series already in the catalog against the discovery sources, so a new
- * book by a known author is added without waiting for a user to search that author again.
+ * Re-resolves the catalog's authors and series against the discovery sources, so a new book by a
+ * known author is added without waiting for a user to search that author again.
  *
- * <p>This bypasses the search-miss dedup window on purpose: it is the deliberate refresh that the
- * dedup window defers. One failing author or series is logged and skipped so the rest still run.
+ * <p>The search-miss dedup window does not apply: it defers repeat resolution to exactly this run.
+ * One failing author or series is logged and skipped so the rest still run.
  */
 @Service
 public class CatalogRefreshService {
@@ -41,12 +41,12 @@ public class CatalogRefreshService {
     }
 
     /**
-     * Re-resolves every known author and series, staging any new books they now have.
+     * Re-resolves every known author and series, staging the books they have gained.
      *
-     * <p>Not transactional: this reads the author and series names, then each {@code stage} call opens
-     * its own read-write transaction for the insert. A read-only transaction here would join the
-     * staging inserts and Postgres would reject them ({@code 25006 cannot execute INSERT in a
-     * read-only transaction}), poisoning the rest of the run.
+     * <p>Not transactional: the author and series names are read first, then each {@code stage} call
+     * opens its own read-write transaction for the insert. A read-only transaction would join those
+     * inserts and Postgres would reject them ({@code 25006 cannot execute INSERT in a read-only
+     * transaction}), poisoning the rest of the run.
      */
     public void refreshKnownAuthorsAndSeries() {
         final List<String> authorNames = authors.findAll().stream().map(Author::getName).toList();

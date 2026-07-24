@@ -16,8 +16,8 @@ import org.springframework.stereotype.Component;
  *
  * <p>The ISBN identifies a book exactly, so its results are trusted. The title-and-author fallback
  * is a fuzzy search whose hits can be a different book, so each result's title is checked against
- * the looked-up title. The store lists several editions of the same book and ranks its own enhanced
- * editions first, so the usable description that assesses best across the matches is returned.
+ * the looked-up title. The store lists several editions of one book and puts its own enhanced
+ * editions first, so the best-scoring usable description across the matches is returned.
  */
 @Component
 public class ItunesDescriptionSource implements DescriptionSource {
@@ -43,7 +43,7 @@ public class ItunesDescriptionSource implements DescriptionSource {
         if (isbn == null || isbn.isBlank()) {
             return Optional.empty();
         }
-        return bestDescription(itunesApi.results(isbn).stream());
+        return bestDescription(itunesApi.resultsWithDescriptions(isbn).stream());
     }
 
     private Optional<String> byTitleAuthor(final DescriptionLookup lookup) {
@@ -52,7 +52,7 @@ public class ItunesDescriptionSource implements DescriptionSource {
         if (title == null || title.isBlank() || author == null || author.isBlank()) {
             return Optional.empty();
         }
-        return bestDescription(itunesApi.results(title + " " + author).stream()
+        return bestDescription(itunesApi.resultsWithDescriptions(title + " " + author).stream()
             .filter(result -> TextMatch.canonicalTitleMatches(result.trackName(), title)));
     }
 

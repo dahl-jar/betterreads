@@ -8,7 +8,6 @@ import java.util.function.Predicate;
 
 import com.betterreads.catalog.service.source.model.BookFieldSource;
 import com.betterreads.catalog.service.source.model.SourceBook;
-import com.betterreads.common.util.LogSanitizer;
 import com.betterreads.common.util.TextMatch;
 import com.betterreads.integration.hardcover.HardcoverClient;
 import com.betterreads.integration.hardcover.dto.BookByIdResponse;
@@ -21,7 +20,6 @@ import com.betterreads.integration.hardcover.mapper.HardcoverMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
@@ -29,11 +27,11 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 /**
  * Hardcover GraphQL client.
  *
- * <p>One search call resolves a book; the hit document already carries every field. Hardcover ranks
- * by relevance, not edition quality. The canonical work is the hit with the most reads, and
- * {@link #titleMatches} rejects a pick that drifted off the query. A by-id fetch queries the books
- * table directly, since the search index does not match on ids. A 401 means the token expired or
- * was revoked and resolves to empty; other 4xx resolve to empty; 5xx and network failures propagate.
+ * <p>One search call resolves a book; the hit document carries every field. Hardcover ranks hits by
+ * relevance, so the canonical work is the hit with the most reads, and a pick whose title drifted
+ * off the query is rejected. A by-id fetch queries the books table directly, since the search index
+ * does not match on ids. A 401 means the token expired or was revoked and resolves to empty; other
+ * 4xx resolve to empty; 5xx and network failures propagate.
  */
 @Component
 public class HardcoverClientImpl implements HardcoverClient {
@@ -140,24 +138,9 @@ public class HardcoverClientImpl implements HardcoverClient {
                 .filter(document -> document.title() != null)
                 .max(BY_READ_COUNT);
         } catch (WebClientResponseException exception) {
-            return recover(exception, query);
-        }
-    }
-
-    private Optional<HardcoverDocument> recover(
-        final WebClientResponseException exception,
-        final String query
-    ) {
-        if (exception.getStatusCode() == HttpStatus.UNAUTHORIZED) {
-            LOG.warn("hardcover.auth token rejected (401), expired or revoked, regenerate at "
-                + "hardcover.app query={}", LogSanitizer.forLog(query));
+            HardcoverGraphQl.recoverOrThrow(LOG, exception, query);
             return Optional.empty();
         }
-        if (exception.getStatusCode().is4xxClientError()) {
-            LOG.debug("hardcover.search returned 4xx status={}", exception.getStatusCode().value());
-            return Optional.empty();
-        }
-        throw exception;
     }
 
     private static int readCount(final HardcoverDocument document) {

@@ -31,12 +31,11 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 /**
- * Exercises the LoC SRU request path against a stubbed HTTP boundary, so query building, the
- * MODS-to-SourceBook map, and the 4xx-to-empty / 5xx-propagates contract run in CI with no live
- * endpoint.
+ * Exercises the LoC SRU request path against a stubbed HTTP boundary: query building, the
+ * MODS-to-SourceBook map, and the 4xx-to-empty / 5xx-propagates contract.
  *
- * <p>The stub body is an inline Dune SRU response, so the test fails if the client stops handing the
- * raw XML to the mapper.
+ * <p>The stub bodies are inline SRU responses in the {@code zs:} wrapper and MODS namespace the
+ * parser navigates.
  */
 @SpringBootTest(
     classes = {

@@ -26,13 +26,13 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 /**
- * Exercises the Google Books client request path against a stubbed HTTP boundary, so search-result
- * parsing, the HTML-strip mapper rule, ISBN-13 selection, page count, and 4xx handling run in CI
- * with no live API and no key.
+ * Exercises the Google Books client request path against a stubbed HTTP boundary: search-result
+ * parsing, HTML stripping, ISBN-13 selection, page count, and 4xx handling, with no live API and no
+ * key.
  *
- * <p>The stub bodies are trimmed copies of the real shapes the live client test documents: the
- * {@code volumeInfo} block, an {@code industryIdentifiers} array with both ISBN types, HTML in the
- * description, and {@code pageCount} present.
+ * <p>The stub bodies carry the fields the assertions touch: the {@code volumeInfo} block, an
+ * {@code industryIdentifiers} array with both ISBN types, HTML in the description, and
+ * {@code pageCount}.
  */
 @SpringBootTest(
     classes = {
@@ -162,28 +162,37 @@ class GoogleBooksClientWireMockTest {
     }
 
     @Nested
-    @DisplayName("error handling")
-    class ErrorHandling {
+    @DisplayName("fetchByVolumeId")
+    class FetchByVolumeId {
 
         @Test
-        @DisplayName("a 404 resolves to empty, not an exception")
-        void notFoundIsEmpty() {
-            WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH))
-                .willReturn(aResponse().withStatus(HTTP_NOT_FOUND)));
-
-            assertThat(client.fetchByTitleAuthor("Nope", "Nobody")).isEmpty();
-        }
-
-        @Test
-        @DisplayName("a volume lookup by id maps the single-volume response")
-        void fetchByVolumeId() {
+        @DisplayName("maps the single-volume response")
+        void mapsSingleVolumeResponse() {
             WIREMOCK.stubFor(get(urlPathEqualTo(VOLUME_PATH)).willReturn(json(VOLUME_JSON)));
 
-            assertThat(client.fetchByVolumeId(VOLUME_ID))
+            final Optional<SourceBook> result = client.fetchByVolumeId(VOLUME_ID);
+
+            assertThat(result)
                 .isPresent()
                 .get()
                 .extracting(SourceBook::title)
                 .isEqualTo(DUNE_TITLE);
+        }
+    }
+
+    @Nested
+    @DisplayName("error handling")
+    class ErrorHandling {
+
+        @Test
+        @DisplayName("a 404 on the search resolves to empty")
+        void notFoundIsEmpty() {
+            WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH))
+                .willReturn(aResponse().withStatus(HTTP_NOT_FOUND)));
+
+            final Optional<SourceBook> result = client.fetchByTitleAuthor("Nope", "Nobody");
+
+            assertThat(result).isEmpty();
         }
     }
 }

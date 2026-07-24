@@ -15,7 +15,6 @@ import com.betterreads.auth.jwt.JwtProperties;
 import com.betterreads.auth.passwordreset.PasswordResetService;
 import com.betterreads.auth.service.AuthService;
 import com.betterreads.auth.service.TokenPair;
-import org.springframework.http.ProblemDetail;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -30,6 +29,7 @@ import java.time.Duration;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -45,10 +45,9 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Authentication endpoints. {@code me} requires a valid access JWT; the rest are public.
  *
- * <p>The refresh token is sent in the {@value #COOKIE_NAME} {@code HttpOnly} cookie so frontend
- * JavaScript cannot read it. The cookie's SameSite and Secure attributes are configured per
- * environment so a same-origin deployment can use {@code Strict} while a split apex/API deployment
- * uses {@code None} with {@code Secure}.
+ * <p>The refresh token travels in the {@value #COOKIE_NAME} cookie scoped to
+ * {@value #COOKIE_PATH}. Its SameSite and Secure attributes come from configuration, since a
+ * same-origin deployment can use {@code Strict} and a split-origin one needs {@code None}.
  */
 @RestController
 @RequestMapping(AuthController.COOKIE_PATH)
@@ -134,14 +133,14 @@ class AuthController {
     }
 
     /**
-     * Soft-deletes the authenticated user. The row is hard-deleted after the grace window.
+     * Soft-deletes the authenticated user; the row is hard-deleted after the grace period.
      *
-     * <p>Idempotent. The access JWT stays valid until natural expiry; refresh-revoke kills
-     * renewals at once.
+     * <p>Idempotent. The access JWT stays valid until natural expiry, so revoking the refresh
+     * token cuts renewals off immediately.
      */
     @DeleteMapping("/me")
-    @Operation(summary = "Delete the current account (soft-delete with 30-day grace)")
-    @ApiResponse(responseCode = "204", description = "Account soft-deleted")
+    @Operation(summary = "Delete the current account")
+    @ApiResponse(responseCode = "204", description = "Account deleted")
     @ApiResponse(responseCode = "401", description = "Missing or invalid access token",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     public ResponseEntity<Void> deleteMe(@AuthenticationPrincipal final Long userId) {

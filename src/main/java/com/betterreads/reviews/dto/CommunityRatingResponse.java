@@ -9,8 +9,8 @@ import org.jspecify.annotations.Nullable;
  * The reader-community rating for a book: the average, the number of ratings, and the per-star
  * breakdown.
  *
- * <p>The source rating from external catalogs stays on the book detail; this is the rating built
- * from BetterReads reviews alone.
+ * <p>Built from BetterReads reviews alone. The source rating from external catalogs is on the book
+ * detail.
  *
  * @param average the mean reader rating, null when the book has no ratings
  * @param count the number of reader ratings

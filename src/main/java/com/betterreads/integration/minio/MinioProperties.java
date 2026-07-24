@@ -8,7 +8,7 @@ import org.springframework.validation.annotation.Validated;
 /**
  * MinIO object-storage config bound from {@code minio.*}.
  *
- * @param endpoint the S3 API endpoint, e.g. {@code http://minio.betterreads.svc.cluster.local:9000}
+ * @param endpoint the S3 API endpoint
  * @param bucket the bucket holding book images
  * @param accessKey the scoped access key
  * @param secretKey the scoped secret key

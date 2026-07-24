@@ -15,8 +15,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 /**
- * The cover endpoint streams stored image bytes with caching headers, answers a matching
- * {@code If-None-Match} with 304, and returns 404 when no cover can be resolved.
+ * The cover endpoint serves stored bytes with caching headers, answers a matching
+ * {@code If-None-Match} with 304, re-sends on a stale ETag, and 404s when no cover resolves.
  */
 class ImageControllerTest {
 
@@ -48,12 +48,24 @@ class ImageControllerTest {
     @DisplayName("a request whose If-None-Match matches the current cover gets 304")
     void notModifiedWhenETagMatches() {
         when(coverImageService.loadCover(KEY)).thenReturn(Optional.of(new StoredImage(JPEG, JPEG_TYPE)));
-        final String etag = controller.cover(KEY, null).getHeaders().getETag();
+        final ResponseEntity<byte[]> firstRead = controller.cover(KEY, null);
+        final String etag = firstRead.getHeaders().getETag();
 
         final ResponseEntity<byte[]> response = controller.cover(KEY, etag);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_MODIFIED);
         assertThat(response.getBody()).isNull();
+    }
+
+    @Test
+    @DisplayName("a request holding the ETag of a superseded cover gets the current bytes")
+    void servesCoverWhenETagIsStale() {
+        when(coverImageService.loadCover(KEY)).thenReturn(Optional.of(new StoredImage(JPEG, JPEG_TYPE)));
+
+        final ResponseEntity<byte[]> response = controller.cover(KEY, "\"an-older-cover\"");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isEqualTo(JPEG);
     }
 
     @Test

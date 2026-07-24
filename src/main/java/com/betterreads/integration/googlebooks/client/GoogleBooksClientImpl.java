@@ -19,13 +19,12 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 /**
  * Google Books REST API client.
  *
- * <p>4xx responses resolve to {@link Optional#empty()} so callers treat "no such volume" and
- * "search returned nothing" uniformly. 5xx responses and network failures propagate as
- * {@link WebClientResponseException}.
+ * <p>4xx responses resolve to {@link Optional#empty()}; 5xx responses and network failures
+ * propagate as {@link WebClientResponseException}.
  *
- * <p>Search ordering on the {@code /volumes} endpoint biases toward the most recent reprint
- * for a given title, so {@link #fetchByTitleAuthor} returns reprint-edition metadata
- * (publishedDate, publisher, ISBN) rather than first-edition metadata.
+ * <p>Search ordering on the {@code /volumes} endpoint biases toward the most recent reprint for a
+ * given title, so {@link #fetchByTitleAuthor} returns that reprint's publishedDate, publisher, and
+ * ISBN.
  */
 @Component
 public class GoogleBooksClientImpl implements GoogleBooksClient {
@@ -118,11 +117,9 @@ public class GoogleBooksClientImpl implements GoogleBooksClient {
     /**
      * Strips characters that would break out of a {@code field:"..."} query term.
      *
-     * <p>Google Books' query DSL uses double-quotes to delimit phrase terms; a literal
-     * double-quote inside a user-provided title or author closes the phrase early and lets
-     * the remainder of the string be interpreted as additional query operators. Backslash is
-     * also dropped because it is the only character that could re-open quoting in some
-     * Lucene-flavored interpretations.
+     * <p>Google Books' query DSL delimits phrase terms with double-quotes, so a double-quote inside
+     * a title or author closes the phrase early and turns the rest of the string into query
+     * operators. Backslash goes too, since it can re-open quoting.
      */
     private static String escapeForQuery(final String input) {
         return input.replace("\\", "").replace("\"", "");

@@ -2,11 +2,7 @@ package com.betterreads.common.ratelimit;
 
 import java.time.Duration;
 
-/**
- * Paces calls to a rate-limited resource.
- *
- * <p>A caller asks for one permit, waiting up to a bound for one to free.
- */
+/** Paces calls to a rate-limited resource. */
 @FunctionalInterface
 public interface RateLimiter {
 

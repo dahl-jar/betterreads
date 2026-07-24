@@ -50,14 +50,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Verifies the email-verification flow end-to-end: registration enqueues a verification mail,
- * the token flips {@code email_verified_at} when consumed, the same token is idempotent under
- * replay, expired and unknown tokens are rejected, and the resend path is enumeration-resistant
- * for both unknown and already-verified addresses.
+ * Covers issuing, consuming, and resending email-verification tokens.
  *
- * <p>The mail-outbox worker is disabled in this test ({@code mail.outbox.worker-enabled=false})
- * so enqueued rows stay in the DB and the test can read the plaintext token from the payload
- * without racing against a real send.
+ * <p>The mail-outbox worker is off ({@code mail.outbox.worker-enabled=false}) so enqueued rows
+ * stay in the database and a test can read the plaintext token out of the payload without
+ * racing a real send.
  */
 @SpringBootTest
 @Testcontainers
@@ -89,9 +86,9 @@ class EmailVerificationIntegrationTest extends ContainerizedTest {
 
     private static final String RESEND_URL = "/api/v1/auth/resend-verification";
 
-    private static final String USERNAME = "alice";
+    private static final String USERNAME = "darrow";
 
-    private static final String EMAIL = "alice@example.com";
+    private static final String EMAIL = "darrow@example.com";
 
     private static final String PASSWORD = "Str0ngPassword!";
 
@@ -262,12 +259,10 @@ class EmailVerificationIntegrationTest extends ContainerizedTest {
         }
 
         /**
-         * If a user requests a resend before clicking the original link, the prior token is
-         * marked consumed by the issue path. Presenting that superseded token must NOT report
-         * success: the user is still unverified, and a 204 here would leave the frontend
-         * showing a verified state while {@code email_verified_at} stays null. Only tokens
-         * consumed by an actual verification (i.e. the user IS verified) qualify for the
-         * idempotent-replay 204 branch.
+         * A resend before the original link is clicked marks the prior token consumed.
+         * Presenting that superseded token has to fail: the user is unverified, and a 204 would
+         * leave the frontend showing a verified state while {@code email_verified_at} stays
+         * null. Only a token consumed by a real verification qualifies for the replay 204.
          */
         @Test
         void rejectsSupersededTokenWhenUserStillUnverified() throws Exception {
@@ -401,7 +396,7 @@ class EmailVerificationIntegrationTest extends ContainerizedTest {
 
             mockMvc.perform(post(RESEND_URL)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(resendPayload("Alice@Example.COM")))
+                    .content(resendPayload("Darrow@Example.COM")))
                 .andExpect(status().isNoContent());
 
             assertThat(mailOutboxRepository.findAll())
@@ -410,14 +405,13 @@ class EmailVerificationIntegrationTest extends ContainerizedTest {
         }
 
         /**
-         * Two concurrent resend calls race on the partial unique index
-         * {@code (user_id) WHERE consumed_at IS NULL}. The loser must catch the
-         * {@link org.springframework.dao.DataIntegrityViolationException} and return silently;
-         * at most one fresh active token may survive.
+         * Concurrent resends contend for the partial unique index on
+         * {@code (user_id) WHERE consumed_at IS NULL}. The write lock on the user row serializes
+         * them, so every call succeeds and one active token survives.
          */
         @SuppressWarnings("PMD.DoNotUseThreads")
         @Test
-        void concurrentResendLeavesAtMostOneActiveToken() throws Exception {
+        void concurrentResendLeavesOneActiveToken() throws Exception {
             registerNewUser();
             final long userId = userRepository.findByEmail(EMAIL).orElseThrow().getUserId();
 
@@ -440,8 +434,8 @@ class EmailVerificationIntegrationTest extends ContainerizedTest {
 
             assertThat(emailTokenRepository.findActive(
                     userId, EmailToken.Purpose.EMAIL_VERIFICATION))
-                .as("partial unique index keeps at most one active token under concurrent resend")
-                .hasSizeLessThanOrEqualTo(1);
+                .as("serialized resends leave exactly one active token, never zero or a duplicate")
+                .hasSize(1);
         }
     }
 

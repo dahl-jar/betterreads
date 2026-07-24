@@ -88,15 +88,28 @@ class JwtIssuerTest {
     @Test
     void tokenWithWrongAudienceIsRejected() {
         final JwtIssuer issuer = new JwtIssuer(SECRET, ISSUER, ONE_HOUR);
-        final String foreignToken = Jwts.builder()
-            .issuer(ISSUER)
-            .audience().add("some-other-api").and()
-            .subject(Long.toString(USER_ID))
-            .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)))
-            .compact();
+        final String foreignToken = signedToken(ISSUER, "some-other-api");
 
         assertThatThrownBy(() -> issuer.parseUserId(foreignToken))
             .isInstanceOf(InvalidJwtException.class);
+    }
+
+    @Test
+    void tokenFromAnotherIssuerIsRejected() {
+        final JwtIssuer issuer = new JwtIssuer(SECRET, ISSUER, ONE_HOUR);
+        final String foreignToken = signedToken("some-other-service", JwtIssuer.AUDIENCE);
+
+        assertThatThrownBy(() -> issuer.parseUserId(foreignToken))
+            .isInstanceOf(InvalidJwtException.class);
+    }
+
+    private static String signedToken(final String issuerClaim, final String audienceClaim) {
+        return Jwts.builder()
+            .issuer(issuerClaim)
+            .audience().add(audienceClaim).and()
+            .subject(Long.toString(USER_ID))
+            .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)))
+            .compact();
     }
 
     private static Claims readClaims(final String token) {

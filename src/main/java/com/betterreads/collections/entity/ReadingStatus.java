@@ -3,7 +3,7 @@ package com.betterreads.collections.entity;
 /**
  * Shelf a book sits on for one user. The wire and enum form is the constant name; {@link #dbValue}
  * is the lowercase string stored in {@code user_book_collection.status}, matching the CHECK
- * constraint added in migration V9 and the vocabulary {@code user_book_interaction} already uses.
+ * constraint from migration V9 and the vocabulary in {@code user_book_interaction}.
  */
 @SuppressWarnings("PMD.AvoidFieldNameMatchingMethodName")
 public enum ReadingStatus {

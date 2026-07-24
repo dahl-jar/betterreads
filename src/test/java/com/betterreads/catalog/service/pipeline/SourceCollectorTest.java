@@ -45,6 +45,8 @@ class SourceCollectorTest {
 
     private static final String SERIES = "Dune Saga";
 
+    private static final int FIRST_VOLUME = 1;
+
     private static final Executor SAME_THREAD = Runnable::run;
 
     private static final String OL_WORK_KEY = "OL1W";
@@ -126,7 +128,7 @@ class SourceCollectorTest {
             .authors(SourceAuthor.ofNames(List.of(AUTHOR)))
             .averageRating(HARDCOVER_RATING)
             .seriesName(SERIES)
-            .seriesPosition(YEAR)
+            .seriesPosition(FIRST_VOLUME)
             .build();
         final SourceCollector collector = new SourceCollector(new SourceMerger(),
             List.of(failingByTitleAuthor(BookFieldSource.HARDCOVER)),

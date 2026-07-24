@@ -43,9 +43,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Verifies the refresh-token flow end-to-end: rotation, replay defense, expiry, deleted user, and
- * the cookie contract that carries the token between client and server. The token never appears
- * in the JSON body; it lives only in the {@code br_refresh} {@code HttpOnly} cookie.
+ * Covers rotation, replay defense, expiry, and the {@code br_refresh} cookie that carries the
+ * token between client and server.
  */
 @SpringBootTest
 @Testcontainers
@@ -77,9 +76,9 @@ class RefreshTokenIntegrationTest extends ContainerizedTest {
 
     private static final String SET_COOKIE_HEADER = "Set-Cookie";
 
-    private static final String USERNAME = "alice";
+    private static final String USERNAME = "darrow";
 
-    private static final String EMAIL = "alice@example.com";
+    private static final String EMAIL = "darrow@example.com";
 
     private static final String PASSWORD = "Sup3rSecret!";
 
@@ -136,7 +135,7 @@ class RefreshTokenIntegrationTest extends ContainerizedTest {
     class CookieContract {
 
         @Test
-        void setsHttpOnlySecureSameSiteStrictCookieScopedToAuthPath() throws Exception {
+        void carriesTheConfiguredCookieAttributes() throws Exception {
             final MvcResult result = mockMvc.perform(post(REGISTER_URL)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(registerPayload(USERNAME, EMAIL, PASSWORD)))

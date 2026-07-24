@@ -4,9 +4,6 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
 import org.springframework.stereotype.Component;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 /** Renders the {@code password_reset} mail body. */
 @Component
@@ -16,15 +13,15 @@ class PasswordResetTemplate {
 
     private final MailProviderProperties properties;
 
-    private final ObjectMapper objectMapper;
+    private final MailPayloadReader payloads;
 
-    PasswordResetTemplate(final MailProviderProperties properties, final ObjectMapper objectMapper) {
+    PasswordResetTemplate(final MailProviderProperties properties, final MailPayloadReader payloads) {
         this.properties = properties;
-        this.objectMapper = objectMapper;
+        this.payloads = payloads;
     }
 
     String renderBody(final String payload) {
-        final String token = readToken(payload);
+        final String token = payloads.readToken(payload, MailOutboxService.TEMPLATE_PASSWORD_RESET);
         final String resetLink = properties.requireAppBaseUrl()
             + "/reset-password?token="
             + URLEncoder.encode(token, StandardCharsets.UTF_8);
@@ -32,18 +29,5 @@ class PasswordResetTemplate {
             + "If that was you, open this link within 15 minutes:\n"
             + resetLink + "\n\n"
             + "If it was not you, ignore this email. Your password stays unchanged.\n";
-    }
-
-    private String readToken(final String payload) {
-        try {
-            final JsonNode node = objectMapper.readTree(payload);
-            final String token = node.path("token").asString();
-            if (token.isEmpty()) {
-                throw new IllegalStateException("password_reset payload missing token");
-            }
-            return token;
-        } catch (final JacksonException ex) {
-            throw new IllegalStateException("malformed password_reset payload", ex);
-        }
     }
 }

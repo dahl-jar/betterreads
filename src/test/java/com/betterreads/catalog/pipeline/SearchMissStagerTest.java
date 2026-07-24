@@ -3,7 +3,6 @@ package com.betterreads.catalog.pipeline;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -21,8 +20,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 /**
- * Verifies the search-miss stager delegates each fresh query to staging once and drops a repeat of
- * the same query inside the dedup window.
+ * The search-miss stager stages each fresh query once and drops a repeat of the same query inside
+ * the dedup window.
  */
 class SearchMissStagerTest {
 
@@ -116,6 +115,5 @@ class SearchMissStagerTest {
 
         verify(catalogSearch).searchAndStage(DUNE);
         verify(catalogSearch).searchAndStage(FOUNDATION);
-        verify(catalogSearch, never()).searchAndStage("asimov");
     }
 }

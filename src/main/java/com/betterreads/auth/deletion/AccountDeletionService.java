@@ -47,7 +47,7 @@ public class AccountDeletionService {
      *
      * <p>Skips {@code SELECT ... FOR UPDATE} on {@code app_user} on purpose. The refresh-rotate
      * path locks the refresh row first and then takes an FK lock on the user, so locking the
-     * user here would deadlock against a concurrent {@code POST /refresh}. A plain
+     * user on delete would deadlock against a concurrent {@code POST /refresh}. A plain
      * {@code UPDATE} only takes {@code FOR NO KEY UPDATE}, which is compatible with rotate.
      *
      * <p>A refresh that races this delete may issue one successor token before the commit

@@ -25,10 +25,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Verifies that {@code X-Forwarded-For} IS honored when the request comes from a trusted-proxy
- * CIDR. The default {@link AuthIntegrationTest} runs with no trusted proxies; this class boots
- * a separate context that trusts loopback so MockMvc's {@code 127.0.0.1} client is treated as a
- * proxy. Each fake client IP in the header should get its own bucket.
+ * Covers honoring {@code X-Forwarded-For} when the request arrives from a trusted-proxy CIDR.
+ *
+ * <p>Trusting loopback makes MockMvc's {@code 127.0.0.1} client count as a proxy, so each client
+ * IP in the header gets its own bucket.
  */
 @SpringBootTest
 @Testcontainers
@@ -80,7 +80,7 @@ class RateLimitTrustedProxyTest extends ContainerizedTest {
     }
 
     @Test
-    void honorsForwardedForFromTrustedProxyAndKeepsBucketsPerClient() throws Exception {
+    void forwardedForFromATrustedProxyKeepsBucketsPerClient() throws Exception {
         final String body = loginPayload();
 
         for (int i = 0; i < LOGIN_RATE_LIMIT_BURST; i++) {

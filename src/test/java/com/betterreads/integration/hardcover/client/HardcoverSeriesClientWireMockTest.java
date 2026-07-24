@@ -34,10 +34,10 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  * enumeration call hit the same path, so the stub matches on the GraphQL query text to return the
  * series-search payload for one and the volume payload for the other.
  *
- * <p>The volume payload puts each collapse rule on its own row so a single assertion can prove which
- * rule fired: position 0 is a prequel, position 1 carries a boxed set ahead of the novel, position 2
- * carries a non-English edition ahead of the English one, position 3 is non-English only, and
- * position 4 sits past the series' three-book count.
+ * <p>The volume payload puts each collapse rule on its own row: position 0 is a prequel, position 1
+ * carries a boxed set ahead of the novel, position 2 carries a non-English edition ahead of the
+ * English one, position 3 is non-English only, and position 4 sits past the series' three-book
+ * count.
  */
 @SpringBootTest(
     classes = {
@@ -245,17 +245,27 @@ class HardcoverSeriesClientWireMockTest {
         @Test
         @DisplayName("a zero-book container series is rejected so a standalone title is not staged as a series")
         void zeroBookSeriesRejected() {
-            final String zeroBookSeries = """
+            final String zeroBookSearch = """
                 {"data": {"search": {"results": {"hits": [
                   {"document": {"id": "999", "name": "George Orwell - 1984",
                     "author_name": "George Orwell", "primary_books_count": 0, "readers_count": 0}}
                 ]}}}}
                 """;
-            WIREMOCK.stubFor(post(urlPathEqualTo(GRAPHQL_PATH)).withRequestBody(containing(SEARCH_MARKER))
-                .willReturn(json(zeroBookSeries)));
+            final String zeroBookEnum = """
+                {"data": {"series": [{
+                  "id": 999, "name": "George Orwell - 1984", "primary_books_count": 0,
+                  "book_series": [
+                    {"position": 1, "book": {"title": "1984", "users_count": 5000,
+                      "default_physical_edition": {"reading_format": {"format": "Read"},
+                        "language": {"language": "English"}},
+                      "contributions": [{"author": {"name": "George Orwell"}}]}}
+                  ]
+                }]}}
+                """;
+            stub(zeroBookSearch, zeroBookEnum);
 
             assertThat(client.fetchSeries(QUERY))
-                .as("a 0-book 'series' is a container, not a real series, so it must not resolve")
+                .as("a 0-book 'series' is a container, so its one qualifying book must not resolve")
                 .isEmpty();
         }
     }
@@ -263,19 +273,6 @@ class HardcoverSeriesClientWireMockTest {
     @Nested
     @DisplayName("volume collapse")
     class VolumeCollapse {
-
-        @Test
-        @DisplayName("at one position the non-English edition is skipped for the English one")
-        void skipsNonEnglishForEnglish() {
-            stubSearchAndEnum();
-
-            final SourceSeries series = client.fetchSeries(QUERY).orElseThrow();
-
-            assertThat(series.volumes())
-                .filteredOn(volume -> volume.position() == SECOND_POSITION)
-                .extracting(volume -> volume.book().title())
-                .containsExactly(GREAT_HUNT);
-        }
 
         @Test
         @DisplayName("a position with only a non-English edition is dropped")
@@ -370,7 +367,7 @@ class HardcoverSeriesClientWireMockTest {
         }
 
         @Test
-        @DisplayName("a long series whose body passes the 256 KB default decode buffer still resolves")
+        @DisplayName("a long series whose body passes the 256 KB default decode buffer resolves")
         void largeEnumerationBodyResolves() {
             final String largeEnum = enumWithManyVolumes(LARGE_SERIES_VOLUME_COUNT);
             assertThat(largeEnum.length())

@@ -178,10 +178,10 @@ public class Book {
      * Applies {@code source} to this book. Descriptive columns (title, description, cover, year,
      * isbn, pages, language, subjects) overwrite with the source value including null; source ids
      * and the rating columns are filled only when the source supplies them, via {@link #accrueFrom}.
-     * The series columns are not touched here; {@link #applySeries} sets them with its own guard.
+     * The series columns belong to {@link #applySeries}, which has its own guard.
      *
-     * <p>Authors are not touched here; the catalog service owns the {@code book_author} join
-     * because attaching authors requires repository lookups for de-duplication.
+     * <p>The catalog service owns the {@code book_author} join, because attaching authors requires
+     * repository lookups for de-duplication.
      *
      * @throws IllegalArgumentException if {@code source} has no title
      */
@@ -242,10 +242,8 @@ public class Book {
     /**
      * Fills source ids and the rating fields without overwriting a set value with null.
      *
-     * <p>The source rating lives in {@code averageRating} and {@code ratingCount} and the reader
-     * rating in {@code communityAverage} and {@code communityCount}, so enrichment refreshes the
-     * source rating freely without touching the reader aggregate. The series is set separately by
-     * {@link #applySeries} because clearing it depends on whether its authority resolved.
+     * <p>The source rating and the reader-community rating live in separate columns, so refreshing
+     * a source rating never touches the reader aggregate.
      */
     private void accrueFrom(final SourceBook source) {
         this.googleBooksVolumeId = coalesce(source.googleBooksVolumeId(), this.googleBooksVolumeId);
@@ -261,9 +259,8 @@ public class Book {
      * Sets the series name and position when {@code authorityResolved}, clearing both when the
      * resolved authority reported no volume, and leaving the stored series untouched otherwise.
      *
-     * <p>Series does not use the fill-only-if-null accrual the rating and ids use: clearing a
-     * mislabelled series needs a null to overwrite, but a clear is trusted only when the authority
-     * resolved, so a failed or timed-out collect does not wipe a real series.
+     * <p>A clear is trusted only when the authority resolved, so a failed or timed-out collect does
+     * not wipe a real series.
      */
     public void applySeries(
         final @Nullable String name, final @Nullable Integer position, final boolean authorityResolved) {

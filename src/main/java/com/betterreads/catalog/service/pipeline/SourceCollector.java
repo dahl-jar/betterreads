@@ -43,10 +43,6 @@ public class SourceCollector {
 
     private static final Duration PER_CALL_TIMEOUT = Duration.ofSeconds(30);
 
-    /**
-     * Fetch waves, ordered by latency. The first wave holds the sources that fill the show fields
-     * fast; the second holds the slower, low-yield sources.
-     */
     private static final List<List<BookFieldSource>> WAVES = List.of(
         List.of(BookFieldSource.GOOGLE_BOOKS, BookFieldSource.OPEN_LIBRARY),
         List.of(BookFieldSource.HARDCOVER, BookFieldSource.LOC, BookFieldSource.WIKIDATA));
@@ -76,11 +72,10 @@ public class SourceCollector {
     /**
      * Fetches every source for the seed, wave by wave, and returns the merge with the matches.
      *
-     * <p>Both waves always run, so the merge sees every source, including the enrichment fields the
-     * show bar does not require (rating, awards, full genre, page count, author identity). The waves
-     * order the fetches by latency, not by a stop condition: the fast show-field sources first, the
-     * slow ones after, each wave fetched concurrently. The merge is then enriched with a stronger
-     * description from Wikipedia or Apple Books when one beats the merged sources'.
+     * <p>Both waves always run, so the merge sees every source, including the fields the show bar
+     * does not require: rating, awards, full genre, page count, author identity. The description-only
+     * sources are consulted last, and one of them replaces the merged description when it scores
+     * higher.
      */
     public MergedBook collectFor(final SourceBook seed) {
         final List<SourceBook> found = new ArrayList<>();

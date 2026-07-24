@@ -1,7 +1,6 @@
 package com.betterreads.integration.wikidata;
 
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
@@ -40,7 +39,7 @@ public class WikidataApi {
 
     /** Returns candidate QIDs for the search term, or empty on a 4xx. */
     public List<String> searchCandidates(final String term) {
-        final Optional<String> body = get(builder -> builder
+        final Optional<String> body = responseBody(builder -> builder
             .path(SEARCH_PATH)
             .queryParam("action", "wbsearchentities")
             .queryParam(SEARCH_FIELD, term)
@@ -54,12 +53,12 @@ public class WikidataApi {
 
     /** Returns the entity node under {@code entities.<qid>}, or empty on a 4xx or unknown id. */
     public Optional<JsonNode> entity(final String qid) {
-        return get(builder -> builder.path(ENTITY_PATH + qid + ".json").build())
+        return responseBody(builder -> builder.path(ENTITY_PATH + qid + ".json").build())
             .map(body -> JSON.readTree(body).path("entities").path(qid))
             .filter(node -> !node.isMissingNode() && !node.isEmpty());
     }
 
-    private Optional<String> get(final Function<UriBuilder, URI> uri) {
+    private Optional<String> responseBody(final Function<UriBuilder, URI> uri) {
         try {
             return Optional.ofNullable(wikidataWebClient.get()
                 .uri(uri)
@@ -76,13 +75,10 @@ public class WikidataApi {
     }
 
     private static List<String> parseCandidates(final String body) {
-        final List<String> ids = new ArrayList<>();
-        for (final JsonNode hit : JSON.readTree(body).path(SEARCH_FIELD)) {
-            final JsonNode hitId = hit.path("id");
-            if (hitId.isValueNode()) {
-                ids.add(hitId.asString());
-            }
-        }
-        return ids;
+        return JSON.readTree(body).path(SEARCH_FIELD).valueStream()
+            .map(hit -> hit.path("id"))
+            .filter(JsonNode::isValueNode)
+            .map(JsonNode::asString)
+            .toList();
     }
 }

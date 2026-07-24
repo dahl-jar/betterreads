@@ -33,8 +33,8 @@ public class MeilisearchBookSearchService implements BookSearchService {
 
     /**
      * Drops hits below this relevance score, which removes typo cross-matches: a query like
-     * "sanderson" fuzzy-matches "Anderson" but scores far lower (~0.03 vs ~0.74 for the real author),
-     * so the threshold keeps the genuine matches and cuts the noise.
+     * "sanderson" fuzzy-matches "Anderson" but scores far lower, ~0.03 against ~0.74 for the real
+     * author.
      */
     private static final double RANKING_SCORE_THRESHOLD = 0.4;
 

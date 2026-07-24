@@ -1,6 +1,5 @@
 package com.betterreads.integration.wikidata.mapper;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -50,13 +49,8 @@ public final class WikidataTree {
 
     /** Streams every claim of the property that carries a value. */
     static Stream<JsonNode> valueClaims(final JsonNode entity, final String property) {
-        final List<JsonNode> claims = new ArrayList<>();
-        for (final JsonNode claim : entity.path(CLAIMS).path(property)) {
-            if (VALUE_SNAK.equals(text(claim.path(MAINSNAK).path(SNAKTYPE)))) {
-                claims.add(claim);
-            }
-        }
-        return claims.stream();
+        return entity.path(CLAIMS).path(property).valueStream()
+            .filter(claim -> VALUE_SNAK.equals(text(claim.path(MAINSNAK).path(SNAKTYPE))));
     }
 
     /** Returns the {@code datavalue.value} node of the claim's main snak. */

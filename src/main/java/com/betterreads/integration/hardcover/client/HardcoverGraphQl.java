@@ -6,7 +6,7 @@ import org.slf4j.Logger;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
-/** Shared Hardcover GraphQL handling: id parsing and 4xx-versus-5xx recovery. */
+/** Id parsing and failure recovery shared by the Hardcover GraphQL clients. */
 final class HardcoverGraphQl {
 
     private HardcoverGraphQl() {
@@ -19,7 +19,7 @@ final class HardcoverGraphQl {
         }
         try {
             return Integer.valueOf(id);
-        } catch (NumberFormatException ex) {
+        } catch (NumberFormatException exception) {
             return null;
         }
     }

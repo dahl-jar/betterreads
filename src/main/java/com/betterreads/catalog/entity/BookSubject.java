@@ -13,7 +13,7 @@ import jakarta.persistence.Table;
  * One genre subject on a {@link Book}, mapped to {@code book_subject}.
  *
  * <p>Each row belongs to one book and is replaced wholesale on re-upsert. The owning {@code Book}
- * cascades persist and removal, so this has no lifecycle of its own.
+ * cascades persist and removal.
  */
 @Entity
 @Table(name = "book_subject")

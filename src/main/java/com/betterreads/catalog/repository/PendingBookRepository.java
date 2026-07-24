@@ -14,7 +14,7 @@ import org.springframework.data.repository.query.Param;
 public interface PendingBookRepository extends JpaRepository<PendingBook, Long> {
 
     /**
-     * Reserves the row for {@code dedupKey}, doing nothing when it already exists. Two concurrent
+     * Reserves the row for {@code dedupKey}, doing nothing when it exists. Two concurrent
      * stages of the same book both call this; one inserts, the other is a no-op, so the row exists
      * exactly once before either fills in the descriptive fields. This is the atomic step that makes
      * staging race-safe without catching duplicate-key errors.

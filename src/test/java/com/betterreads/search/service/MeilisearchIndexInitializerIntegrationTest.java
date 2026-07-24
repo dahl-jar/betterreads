@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.betterreads.support.ContainerizedTest;
 import com.meilisearch.sdk.Client;
-import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -21,8 +20,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 /**
- * The index initializer applies search settings even when the index already exists, so a restart
- * after first boot still reaches a freshly created or settings-less index.
+ * The index initializer applies search settings on every boot, whether it creates the index or
+ * finds an existing one.
  */
 @SpringBootTest
 @Testcontainers
@@ -69,15 +68,13 @@ class MeilisearchIndexInitializerIntegrationTest extends ContainerizedTest {
     }
 
     @Test
-    @DisplayName("applies searchable settings when the index already exists")
+    @DisplayName("applies searchable settings to an existing index")
     void appliesSettingsToExistingIndex() throws Exception {
         client.index(INDEX_NAME).waitForTask(client.createIndex(INDEX_NAME).getTaskUid());
 
         initializer.run(null);
 
-        final List<String> searchable = client.index(INDEX_NAME).getSettings().getSearchableAttributes() == null
-            ? List.of()
-            : List.of(client.index(INDEX_NAME).getSettings().getSearchableAttributes());
+        final String[] searchable = client.index(INDEX_NAME).getSettings().getSearchableAttributes();
         assertThat(searchable).contains("title", "authors", "subjects");
     }
 }

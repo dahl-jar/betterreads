@@ -16,8 +16,7 @@ import org.springframework.stereotype.Component;
  * <p>Lives in its own bean so the call goes through the Spring proxy; a self-call inside
  * {@code PendingBookService} would skip the proxy and lose the {@code @Transactional}. The poll runs
  * on a dedicated executor because draining a promotion backlog takes hours; on the shared scheduler
- * thread it delayed every nightly cron job by that long. A poll still in progress when the next
- * trigger fires is skipped rather than queued. Disabled by
+ * thread it delayed every nightly cron job by that long. Disabled by
  * {@code betterreads.catalog.staging.poll-enabled=false}.
  */
 @Component

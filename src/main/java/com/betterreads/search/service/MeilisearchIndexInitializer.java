@@ -18,8 +18,7 @@ import org.springframework.stereotype.Component;
  * startup.
  *
  * <p>Idempotent: creating an existing index and re-applying unchanged settings are no-ops, so this
- * is safe on every boot. A Meilisearch outage at startup is logged rather than failing the boot, so
- * the rest of the application still serves while search recovers.
+ * is safe on every boot. A Meilisearch outage at startup is logged and does not fail the boot.
  */
 @Component
 @RequiredArgsConstructor

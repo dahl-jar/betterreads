@@ -15,8 +15,8 @@ import java.time.ZoneOffset;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Maps to {@code author}. {@code openLibraryKey} is the canonical cross-source identifier;
- * Google Books inserts have it null until the OpenLibrary slice lands.
+ * Maps to {@code author}. An incoming author is matched on {@code wikidataQid} when a source
+ * supplies one, otherwise on {@code name}.
  */
 @Entity
 @Table(name = "author")

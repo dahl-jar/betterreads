@@ -1,7 +1,6 @@
 /**
- * Catalog search wiring backed by a Meilisearch StatefulSet.
+ * Catalog search backed by Meilisearch.
  *
- * <p>The book rows in Postgres are canonical; the search index is rebuilt from them by the
- * reconciler in this package.
+ * <p>The book rows in Postgres are canonical; the search index is rebuilt from them.
  */
 package com.betterreads.search;

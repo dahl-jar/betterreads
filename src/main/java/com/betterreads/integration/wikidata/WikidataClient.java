@@ -4,7 +4,7 @@ import com.betterreads.catalog.service.source.port.BookSourceClient;
 import com.betterreads.catalog.service.source.model.SourceBook;
 import java.util.Optional;
 
-/** Wikidata client over the SPARQL endpoint and the REST entity API. */
+/** Wikidata client over the entity search and entity document endpoints. */
 public interface WikidataClient extends BookSourceClient {
 
     /**

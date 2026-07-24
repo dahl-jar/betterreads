@@ -150,8 +150,8 @@ public final class SecurityConfig {
     /**
      * Filter chain for Swagger UI and OpenAPI doc paths.
      *
-     * <p>CSP allows inline scripts and styles because the bundled Swagger UI loads them. No
-     * authentication; gate at the network edge if docs should not be public.
+     * <p>CSP allows inline scripts and styles because the bundled Swagger UI loads them. The docs
+     * paths are unauthenticated.
      */
     @Bean
     @Order(1)

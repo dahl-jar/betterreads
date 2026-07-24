@@ -1,7 +1,9 @@
 package com.betterreads.integration.wikipedia;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.anyUrl;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -27,8 +29,7 @@ import org.springframework.test.context.DynamicPropertySource;
 /**
  * Exercises the Wikipedia description source against a stubbed HTTP boundary: the Wikidata entity
  * carries the {@code enwiki} sitelink, the Wikipedia REST summary carries the extract. A
- * disambiguation summary, a missing sitelink, and a 404 each resolve to empty so the merge falls
- * through to the next source.
+ * disambiguation summary, a missing sitelink, and a 404 each resolve to empty.
  *
  * <p>One WireMock server serves both hosts; the Wikidata and Wikipedia clients point at it.
  */
@@ -165,6 +166,7 @@ class WikipediaDescriptionSourceWireMockTest {
                 new DescriptionLookup(null, ISBN, TITLE, AUTHOR, null, null));
 
             assertThat(description).isEmpty();
+            WIREMOCK.verify(0, getRequestedFor(anyUrl()));
         }
     }
 

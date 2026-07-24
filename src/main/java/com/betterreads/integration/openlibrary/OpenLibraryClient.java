@@ -17,8 +17,8 @@ public interface OpenLibraryClient extends BookSourceClient {
 
     /**
      * Returns up to {@code limit} books matching the query, each a distinct work, so a series
-     * query keeps all its volumes. The results carry only the search-level fields; description and
-     * subjects come from later per-book enrichment.
+     * query keeps all its volumes. The results carry the search-level fields only; description and
+     * subjects come back null.
      */
     List<SourceBook> search(String query, int limit);
 }

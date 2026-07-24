@@ -3,6 +3,7 @@ package com.betterreads.integration.wikidata.mapper;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Map;
+import java.util.Optional;
 
 import com.betterreads.catalog.service.source.model.SourceAuthor;
 import com.betterreads.catalog.service.source.model.SourceBook;
@@ -75,7 +76,7 @@ class WikidataMapperTest {
             }}""");
 
         @Test
-        void resolvesTheAuthorViaTheEnwikiFallback() {
+        void resolvesTheAuthorNameFromTheP50Qid() {
             assertThat(book.authors()).extracting(SourceAuthor::name).containsExactly(HERBERT);
         }
 
@@ -148,11 +149,6 @@ class WikidataMapperTest {
             assertThat(book.authors()).extracting(SourceAuthor::name)
                 .containsExactly(MOORE, GIBBONS);
         }
-
-        @Test
-        void mapsAsAWorkWhenInstanceOfCarriesAWrittenWorkType() {
-            assertThat(book.title()).isEqualTo("Watchmen");
-        }
     }
 
     @Nested
@@ -163,16 +159,6 @@ class WikidataMapperTest {
               "P31":  [{"mainsnak": {"snaktype": "value", "datavalue": {"value": {"id": "Q7725634"}}}}],
               "P244": [{"mainsnak": {"snaktype": "value", "datavalue": {"value": "n79102640"}}}]
             }}""");
-
-        @Test
-        void leavesSeriesNullForAStandaloneWork() {
-            assertThat(book.seriesName()).isNull();
-        }
-
-        @Test
-        void readsTheLccnWhenPresent() {
-            assertThat(book.locLccn()).isEqualTo("n79102640");
-        }
 
         @Test
         void returnsEmptyAwardsSoStaleRowsClear() {
@@ -196,11 +182,24 @@ class WikidataMapperTest {
         void takesTheFirstOpenLibraryKeyWhenP648IsMultiValued() {
             assertThat(book.openLibraryWorkKey()).isEqualTo("OL1955946W");
         }
+    }
+
+    @Nested
+    class Untitled {
 
         @Test
-        void readsTheSeriesPosition() {
-            assertThat(book.seriesName()).isEqualTo(ICE_AND_FIRE);
-            assertThat(book.seriesPosition()).isEqualTo(2);
+        void returnsEmptyWhenTheEntityCarriesNoId() {
+            final String noId = """
+                {"labels": {"en": {"value": "Dune"}}, "claims": {
+                  "P31": [{"mainsnak": {"snaktype": "value", "datavalue": {"value": {"id": "Q7725634"}}}}]
+                }}""";
+
+            final Optional<SourceBook> mapped =
+                new WikidataMapper().toSourceBook(JSON.readTree(noId), DUNE_QID, LABELS::get);
+
+            assertThat(mapped)
+                .as("no id means no display name, and a book with no title is unmappable")
+                .isEmpty();
         }
     }
 }

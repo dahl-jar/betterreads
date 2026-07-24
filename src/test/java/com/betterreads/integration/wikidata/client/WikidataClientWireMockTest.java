@@ -27,12 +27,11 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 /**
- * Exercises the Wikidata client request path against a stubbed boundary, so candidate
- * disambiguation, author enrichment, and the 4xx-to-empty / 5xx-propagates contract run with no
- * live API.
+ * Exercises the Wikidata client request path against a stubbed boundary: candidate disambiguation,
+ * author resolution, and the 4xx-to-empty / 5xx-propagates contract.
  *
- * <p>The search stub returns the real "Dune" ranking: the film outranks the novel, so the resolver
- * must skip the top hit and pick the literary work.
+ * <p>The search stub returns the real "Dune" ranking, where the film outranks the novel, so the
+ * resolver must skip the top hit and pick the literary work.
  */
 @SpringBootTest(
     classes = {

@@ -1,2 +1,2 @@
-/** WebClient for the Library of Congress linked data service. */
+/** Library of Congress SRU catalog client. */
 package com.betterreads.integration.loc.client;

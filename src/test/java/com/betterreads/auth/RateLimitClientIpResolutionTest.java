@@ -26,12 +26,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Verifies that the rate limiter keys buckets on {@code CF-Connecting-IP} when present.
- * {@code CF-Connecting-IP} is set by Cloudflare and overwritten on every request, while
- * {@code X-Forwarded-For} can be appended to by the client before reaching Cloudflare and is
- * therefore unsafe as a bucket key. Production runs behind Cloudflare Tunnel; trusting
- * {@code CF-Connecting-IP} closes the bypass where a fresh forged XFF per request gives the
- * caller a fresh bucket per request.
+ * Covers keying rate-limit buckets on {@code CF-Connecting-IP} when the header is present.
+ *
+ * <p>Cloudflare overwrites {@code CF-Connecting-IP} on every request, while a client can append
+ * to {@code X-Forwarded-For} before the request reaches Cloudflare. Keying on the forgeable
+ * header would hand a caller a fresh bucket per request.
  */
 @SpringBootTest
 @Testcontainers
@@ -82,11 +81,9 @@ class RateLimitClientIpResolutionTest extends ContainerizedTest {
     }
 
     /**
-     * A different {@code CF-Connecting-IP} gets its own bucket so a real client behind
-     * Cloudflare cannot be rate-limited by another client's burst. Pre-fix, both
-     * {@code CF-Connecting-IP} values mapped to the same {@code 127.0.0.1} bucket and the
-     * second client received 429 instead of 401, so this test fails on broken code and passes
-     * once {@code clientIp()} reads the header.
+     * Each {@code CF-Connecting-IP} value gets its own bucket, so one client's burst cannot
+     * rate-limit another. Without the header lookup both values collapse onto the
+     * {@code 127.0.0.1} bucket and the second client is throttled on its first request.
      */
     @Test
     void differentCfConnectingIpsKeepSeparateBuckets() throws Exception {

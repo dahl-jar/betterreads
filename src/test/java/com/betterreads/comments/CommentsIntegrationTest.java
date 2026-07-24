@@ -126,6 +126,8 @@ class CommentsIntegrationTest extends ContainerizedTest {
 
     private static final String JSON_FIRST_REPLY_COUNT = "$.data[0].replyCount";
 
+    private static final long UNKNOWN_COMMENT_ID = 9_999_999L;
+
     @Autowired
     private WebApplicationContext webApplicationContext;
 
@@ -294,6 +296,21 @@ class CommentsIntegrationTest extends ContainerizedTest {
 
             response.andExpect(status().isBadRequest());
         }
+
+        @Test
+        void replyingToACommentOnAnotherTargetIsRejected() throws Exception {
+            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final long reviewId = postReview(token, DUNE_KEY);
+            final long bookCommentId = commentId(postBookComment(token, DUNE_KEY, FIRST_COMMENT, null));
+
+            final ResultActions response = mockMvc.perform(
+                post(REVIEWS_BASE + reviewId + COMMENTS_SUFFIX)
+                    .header(AUTH_HEADER, BEARER_PREFIX + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(commentPayload(A_REPLY, bookCommentId)));
+
+            response.andExpect(status().isBadRequest());
+        }
     }
 
     @Nested
@@ -363,6 +380,29 @@ class CommentsIntegrationTest extends ContainerizedTest {
                 delete(COMMENTS_BASE + id).header(AUTH_HEADER, BEARER_PREFIX + goblinToken));
 
             response.andExpect(status().isForbidden());
+        }
+
+        @Test
+        void deletingAnUnknownCommentIsANoOp() throws Exception {
+            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+
+            final ResultActions response = mockMvc.perform(
+                delete(COMMENTS_BASE + UNKNOWN_COMMENT_ID).header(AUTH_HEADER, BEARER_PREFIX + token));
+
+            response.andExpect(status().isNoContent());
+        }
+
+        @Test
+        void deletingACommentDeletesItsReplies() throws Exception {
+            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final long parentId = commentId(postBookComment(token, DUNE_KEY, FIRST_COMMENT, null));
+            postBookComment(token, DUNE_KEY, A_REPLY, parentId);
+
+            mockMvc.perform(delete(COMMENTS_BASE + parentId).header(AUTH_HEADER, BEARER_PREFIX + token))
+                .andExpect(status().isNoContent());
+
+            final Long remaining = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM comment", Long.class);
+            assertThat(remaining).isZero();
         }
     }
 

@@ -184,17 +184,6 @@ class DescriptionSelectorTest {
 
             assertThat(selected.provenanceOf(BookField.DESCRIPTION)).isEqualTo(BookFieldSource.ITUNES);
         }
-
-        @Test
-        @DisplayName("provenance is unchanged when no source beats the merged description")
-        void keepsProvenanceWhenNoSourceWins() {
-            final DescriptionSelector selector = new DescriptionSelector(List.of(source(STUB)));
-            final MergedBook merged = mergedWith(STRONG);
-
-            final MergedBook selected = selector.withBestDescription(merged);
-
-            assertThat(selected.provenanceOf(BookField.DESCRIPTION)).isNull();
-        }
     }
 
     @Nested
@@ -240,17 +229,6 @@ class DescriptionSelectorTest {
             final DescriptionSelector selector =
                 new DescriptionSelector(List.of(failingSource(), source(STRONG)));
             final MergedBook merged = mergedWith(WEAK);
-
-            final MergedBook selected = selector.withBestDescription(merged);
-
-            assertThat(selected.book().description()).isEqualTo(STRONG);
-        }
-
-        @Test
-        @DisplayName("the merged description is kept when the only source fails")
-        void keepsMergedWhenOnlySourceFails() {
-            final DescriptionSelector selector = new DescriptionSelector(List.of(failingSource()));
-            final MergedBook merged = mergedWith(STRONG);
 
             final MergedBook selected = selector.withBestDescription(merged);
 

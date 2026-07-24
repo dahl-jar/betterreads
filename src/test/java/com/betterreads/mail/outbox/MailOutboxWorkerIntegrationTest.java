@@ -53,6 +53,8 @@ class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
 
     private static final String CLEARED_PAYLOAD = "{}";
 
+    private static final String APP_BASE_URL = "https://test.example.com";
+
     @Autowired
     private MailOutboxRepository repository;
 
@@ -172,10 +174,47 @@ class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
                 .isEqualTo(IDEMPOTENCY_PREFIX + outboxId));
     }
 
+    @Test
+    void aPasswordResetRowSendsTheResetMail() {
+        final String token = "tok-reset";
+        outbox.enqueuePasswordReset(EMAIL, token);
+        sender.script.add(SendOutcome.success());
+
+        worker.drain();
+
+        final MailMessage sent = onlySentMessage();
+        assertThat(sent)
+            .satisfies(mail -> assertThat(mail.recipient()).isEqualTo(EMAIL))
+            .satisfies(mail -> assertThat(mail.subject()).isEqualTo("Reset your BetterReads password"))
+            .satisfies(mail -> assertThat(mail.body())
+                .contains(APP_BASE_URL + "/reset-password?token=" + token));
+    }
+
+    @Test
+    void anEmailVerificationRowSendsTheVerificationMail() {
+        final String token = "tok-verify";
+        outbox.enqueueEmailVerification(EMAIL, token);
+        sender.script.add(SendOutcome.success());
+
+        worker.drain();
+
+        final MailMessage sent = onlySentMessage();
+        assertThat(sent)
+            .satisfies(mail -> assertThat(mail.recipient()).isEqualTo(EMAIL))
+            .satisfies(mail -> assertThat(mail.subject()).isEqualTo("Confirm your BetterReads email"))
+            .satisfies(mail -> assertThat(mail.body())
+                .contains(APP_BASE_URL + "/verify-email?token=" + token));
+    }
+
     private MailOutbox onlyRow() {
         final List<MailOutbox> rows = repository.findAll();
         assertThat(rows).hasSize(1);
         return rows.getFirst();
+    }
+
+    private MailMessage onlySentMessage() {
+        assertThat(sender.captured).hasSize(1);
+        return sender.captured.getFirst();
     }
 
     private void forceClaimable() {

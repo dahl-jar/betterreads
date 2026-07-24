@@ -20,10 +20,7 @@ public final class WebClients {
     private WebClients() {
     }
 
-    /**
-     * Returns a {@link WebClient.Builder} bound to {@code baseUrl} with the given timeouts applied.
-     * The caller adds source-specific headers and filters, then {@code build()}s.
-     */
+    /** Returns a {@link WebClient.Builder} bound to {@code baseUrl} with the given timeouts applied. */
     public static WebClient.Builder builderWithTimeouts(
         final String baseUrl,
         final int connectTimeoutMillis,

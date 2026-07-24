@@ -13,10 +13,9 @@ import org.springframework.stereotype.Component;
 /**
  * Library of Congress SRU enrichment client.
  *
- * <p>One {@code searchRetrieve} call resolves a record; the response is MARC/MODS XML, so
- * {@link LocSru} returns the body as a string and {@link LocMapper} parses it. A title-and-author
- * lookup keeps its record only when the returned title matches the query, since the keyword index
- * can answer with a different work.
+ * <p>One {@code searchRetrieve} call resolves a record. A title-and-author lookup keeps its record
+ * only when the returned title matches the query, since the keyword index can answer with a
+ * different work.
  */
 @Component
 public class LocClientImpl implements LocClient {

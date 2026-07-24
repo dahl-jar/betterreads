@@ -5,9 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 
 import com.betterreads.catalog.repository.BookRepository;
 import com.betterreads.catalog.repository.PendingBookRepository;
-import com.betterreads.catalog.service.pipeline.DescriptionSelector;
 import com.betterreads.catalog.service.pipeline.PendingBookService;
-import com.betterreads.catalog.service.pipeline.SourceCollector;
 import com.betterreads.catalog.service.source.model.SourceBook;
 import com.betterreads.catalog.service.source.model.SourceBooks;
 import com.betterreads.catalog.service.source.merge.SourceMerger;
@@ -37,8 +35,7 @@ import org.testcontainers.utility.DockerImageName;
 
 /**
  * A Meilisearch outage during the post-promotion index hook leaves the book promoted and does not
- * stop the promotion loop, so other pending books still promote and the nightly reconcile heals the
- * unindexed one.
+ * stop the promotion loop.
  */
 @SpringBootTest
 @Testcontainers
@@ -50,10 +47,7 @@ import org.testcontainers.utility.DockerImageName;
     "meilisearch.master-key=unused",
     "meilisearch.index-name=unused"
 })
-@Import({
-    PromotionIndexOutageIntegrationTest.NoNetworkSources.class,
-    PromotionIndexOutageIntegrationTest.FailingSearch.class
-})
+@Import({NoNetworkSources.class, PromotionIndexOutageIntegrationTest.FailingSearch.class})
 class PromotionIndexOutageIntegrationTest extends ContainerizedTest {
 
     @Container
@@ -91,17 +85,6 @@ class PromotionIndexOutageIntegrationTest extends ContainerizedTest {
             .isPresent();
     }
 
-    /** Replaces the source collector with one that re-merges only the staged data, no network. */
-    @TestConfiguration
-    static class NoNetworkSources {
-
-        @Bean
-        @Primary
-        SourceCollector noNetworkSourceCollector(final SourceMerger merger) {
-            return new SourceCollector(merger, List.of(), new DescriptionSelector(List.of()), Runnable::run);
-        }
-    }
-
     /** A search service whose index call always fails, standing in for a Meilisearch outage. */
     @TestConfiguration
     static class FailingSearch {
@@ -113,7 +96,7 @@ class PromotionIndexOutageIntegrationTest extends ContainerizedTest {
         }
     }
 
-    /** Throws on index to simulate the outage; search and remove are inert. */
+    /** Throws on index to simulate the outage; search returns nothing and remove is never called. */
     private static final class OutageSearchService implements BookSearchService {
 
         @Override

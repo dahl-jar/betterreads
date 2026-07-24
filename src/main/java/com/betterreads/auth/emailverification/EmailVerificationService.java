@@ -4,8 +4,8 @@ import com.betterreads.auth.Emails;
 import com.betterreads.auth.entity.User;
 import com.betterreads.auth.repository.UserRepository;
 import com.betterreads.auth.token.EmailToken;
+import com.betterreads.auth.token.EmailTokenIssuer;
 import com.betterreads.auth.token.EmailTokenRepository;
-import com.betterreads.auth.token.TokenGenerator;
 import com.betterreads.common.crypto.HmacTokenHasher;
 import com.betterreads.common.exception.InvalidRequestException;
 import com.betterreads.mail.outbox.MailOutboxService;
@@ -25,8 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Only the HMAC-SHA256 hash is stored. The resend side returns {@code 204} for every
  * branch so the response cannot be used to enumerate accounts.
  *
- * <p>Verification is idempotent: the same token clicked twice succeeds silently. Password
- * reset rejects replays because reset is destructive; verification is not.
+ * <p>Verification is idempotent: the same token clicked twice succeeds silently.
  *
  * <p>Lock order is user-first. The verify path looks up the token without a lock, locks the
  * user, then re-fetches the token under that lock so issue-vs-verify cannot deadlock.
@@ -36,8 +35,6 @@ public class EmailVerificationService {
 
     private static final Logger LOG = LoggerFactory.getLogger(EmailVerificationService.class);
 
-    private static final int TOKEN_BYTES = 32;
-
     private static final Duration TOKEN_LIFETIME = Duration.ofHours(24);
 
     private static final String INVALID_OR_EXPIRED_TOKEN = "Invalid or expired verification token";
@@ -46,6 +43,8 @@ public class EmailVerificationService {
 
     private final EmailTokenRepository tokenRepository;
 
+    private final EmailTokenIssuer tokenIssuer;
+
     private final HmacTokenHasher hasher;
 
     private final MailOutboxService mailOutbox;
@@ -53,11 +52,13 @@ public class EmailVerificationService {
     public EmailVerificationService(
         final UserRepository userRepository,
         final EmailTokenRepository tokenRepository,
+        final EmailTokenIssuer tokenIssuer,
         final HmacTokenHasher hasher,
         final MailOutboxService mailOutbox
     ) {
         this.userRepository = userRepository;
         this.tokenRepository = tokenRepository;
+        this.tokenIssuer = tokenIssuer;
         this.hasher = hasher;
         this.mailOutbox = mailOutbox;
     }
@@ -72,9 +73,8 @@ public class EmailVerificationService {
      */
     @Transactional
     public void issueVerification(final long userId, final String recipient) {
-        consumeOutstandingTokens(userId);
-        final String plaintext = TokenGenerator.randomToken(TOKEN_BYTES);
-        insertNewToken(userId, plaintext);
+        final String plaintext =
+            tokenIssuer.issue(userId, EmailToken.Purpose.EMAIL_VERIFICATION, TOKEN_LIFETIME);
         mailOutbox.enqueueEmailVerification(recipient, plaintext);
         LOG.info("Issued verification token userId={}", userId);
     }
@@ -98,31 +98,6 @@ public class EmailVerificationService {
             return;
         }
         issueVerification(user.getUserId(), user.getEmail());
-    }
-
-    /**
-     * Marks every active token for the user as consumed.
-     *
-     * <p>Flushes at the end because Hibernate's default action queue runs inserts before
-     * updates, so the next insert would hit the partial unique index against the still-active
-     * prior row.
-     */
-    private void consumeOutstandingTokens(final long userId) {
-        final Instant now = Instant.now();
-        tokenRepository.findActive(userId, EmailToken.Purpose.EMAIL_VERIFICATION).forEach(t -> {
-            t.setConsumedAt(now);
-            tokenRepository.save(t);
-        });
-        tokenRepository.flush();
-    }
-
-    private void insertNewToken(final long userId, final String plaintext) {
-        final EmailToken row = new EmailToken();
-        row.setUserId(userId);
-        row.setPurpose(EmailToken.Purpose.EMAIL_VERIFICATION);
-        row.setTokenHash(hasher.hash(plaintext));
-        row.setExpiresAt(Instant.now().plus(TOKEN_LIFETIME));
-        tokenRepository.saveAndFlush(row);
     }
 
     /**
@@ -170,10 +145,6 @@ public class EmailVerificationService {
         LOG.info("Verified email userId={}", user.getUserId());
     }
 
-    /**
-     * Accepts a consumed token only when the user is already verified (replay), and rejects
-     * the superseded case where a later resend exists.
-     */
     private void assertReplay(final EmailToken row, final User user) {
         if (user.getEmailVerifiedAt() != null) {
             LOG.info("Verification replay accepted, user already verified userId={}", row.getUserId());

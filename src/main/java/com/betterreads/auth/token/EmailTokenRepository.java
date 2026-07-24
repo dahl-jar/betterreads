@@ -12,12 +12,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface EmailTokenRepository extends JpaRepository<EmailToken, Long> {
 
-    /**
-     * Returns the token matching the given hash and purpose, or empty if none matches.
-     *
-     * <p>Purpose is part of the lookup so a token issued for one feature cannot be presented
-     * to another.
-     */
+    /** Purpose is part of the lookup so a token issued for one feature cannot be used on another. */
     @Query("""
         SELECT t FROM EmailToken t
         WHERE t.tokenHash = :hash AND t.purpose = :purpose

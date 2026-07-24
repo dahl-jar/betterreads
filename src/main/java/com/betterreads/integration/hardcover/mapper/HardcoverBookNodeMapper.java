@@ -14,11 +14,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * Turns a {@link HardcoverBookNode} into a Hardcover-sourced {@link SourceBook} builder.
  *
- * <p>A node qualifies only when it is the canonical English work and not an edition variant: not an
- * audiobook, deluxe or illustrated edition, boxed set, omnibus, split part, or single comic issue. A
- * qualifying node carries forward everything the enumeration returned. The series mapper adds the
- * series name and position to the returned builder; the author mapper applies the book's own featured
- * series.
+ * <p>A node qualifies only when it is the canonical English work. Audiobooks, deluxe and illustrated
+ * editions, boxed sets, omnibuses, split parts, and single comic issues are rejected.
  */
 final class HardcoverBookNodeMapper {
 
@@ -80,9 +77,8 @@ final class HardcoverBookNodeMapper {
     /**
      * Returns true for a prose bind-up of two or more works, such as "Animal Farm and 1984".
      *
-     * <p>Hardcover sets {@code compilation} on a graphic-novel volume too, where it means collected
-     * issues that form one book, so a graphic novel is left to {@link #isSingleComicIssue} and only a
-     * prose compilation is rejected here.
+     * <p>Hardcover sets {@code compilation} on graphic-novel volumes too, where it means collected
+     * issues forming one book, so the flag counts only outside the graphic-novel category.
      */
     private static boolean isCompilation(final HardcoverBookNode node) {
         if (!Boolean.TRUE.equals(node.compilation())) {
@@ -101,9 +97,7 @@ final class HardcoverBookNodeMapper {
     }
 
     /**
-     * Returns the built book with its featured series applied, for the author path where the book is
-     * not enumerated under one position. The series path sets position itself and uses
-     * {@link #toBuilder} instead.
+     * Returns the book with its featured series applied.
      *
      * <p>The series is applied only when the featured membership carries a numbered volume position.
      * A companion, guide, or anthology is tagged to the series with a null position, which would
@@ -140,9 +134,9 @@ final class HardcoverBookNodeMapper {
     }
 
     /**
-     * Returns true for a single graphic-novel issue: category Graphic Novel and not a compilation.
-     * A collected volume is the same category but flagged a compilation and is kept; a prose book is
-     * a different category and is kept regardless.
+     * Returns true for a single graphic-novel issue: category Graphic Novel with no compilation
+     * flag. A collected volume carries the flag on the same category, and prose books sit under a
+     * different category.
      */
     private static boolean isSingleComicIssue(final HardcoverBookNode node) {
         final Integer category = node.bookCategoryId();

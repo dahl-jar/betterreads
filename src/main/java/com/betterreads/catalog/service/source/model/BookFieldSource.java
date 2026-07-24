@@ -1,8 +1,6 @@
 package com.betterreads.catalog.service.source.model;
 
-/**
- * Identifies a metadata source for provenance columns and trust-map keys.
- */
+/** Identifies a metadata source for provenance columns and priority-chain keys. */
 public enum BookFieldSource {
     OPEN_LIBRARY,
     GOOGLE_BOOKS,

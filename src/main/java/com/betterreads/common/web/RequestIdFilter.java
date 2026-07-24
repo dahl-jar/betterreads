@@ -40,9 +40,9 @@ public final class RequestIdFilter extends OncePerRequestFilter {
         final HttpServletResponse response,
         final FilterChain filterChain
     ) throws ServletException, IOException {
-        final String resolved = resolve(request.getHeader(HEADER));
-        response.setHeader(HEADER, resolved);
-        MDC.put(MDC_KEY, resolved);
+        final String requestId = requestIdFrom(request.getHeader(HEADER));
+        response.setHeader(HEADER, requestId);
+        MDC.put(MDC_KEY, requestId);
         try {
             filterChain.doFilter(request, response);
         } finally {
@@ -50,7 +50,7 @@ public final class RequestIdFilter extends OncePerRequestFilter {
         }
     }
 
-    private static String resolve(@Nullable final String inbound) {
+    private static String requestIdFrom(@Nullable final String inbound) {
         if (inbound != null && VALID_ID.matcher(inbound).matches()) {
             return inbound;
         }

@@ -10,11 +10,10 @@ import org.springframework.stereotype.Component;
  * Drains the {@code mail_outbox} table.
  *
  * <p>Each row goes through three steps: claim, send, resolve. The send step runs outside any
- * transaction so a JVM crash mid-call still leaves the row claimed until the timeout passes.
- * {@code FOR UPDATE SKIP LOCKED} on the claim query lets multiple workers run on the same VM
- * without competing.
+ * transaction so a JVM crash mid-call leaves the row claimed until the timeout passes.
+ * {@code FOR UPDATE SKIP LOCKED} on the claim query lets workers drain concurrently without two
+ * claiming the same row.
  */
-// TODO(when scaling beyond one app instance): add leader election so only one replica drains the outbox
 @Component
 public class MailOutboxWorker {
 

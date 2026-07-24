@@ -20,7 +20,7 @@ public final class SkipIfRunningExecutor {
 
     /**
      * Runs the job on the delegate and returns {@code true}, or returns {@code false} without running
-     * it when a previous job is still in progress.
+     * it when a previous job is in progress.
      *
      * <p>The slot is freed when the job completes, throws, or is rejected by the delegate; an unfreed
      * slot would skip every later run until restart.

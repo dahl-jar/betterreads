@@ -15,10 +15,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.springframework.web.reactive.function.client.WebClient;
 
 /**
- * Fetches cover bytes from a stubbed origin: a 200 returns the body and content type, a 404 resolves
- * to empty so the mirror leaves the book on its external URL.
+ * Fetches cover bytes from a stubbed origin: a 200 returns the body and content type; a 404, an
+ * oversized body, a refused redirect target, and a redirect loop each resolve to empty.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class CoverFetchClientWireMockTest {
@@ -53,6 +54,8 @@ class CoverFetchClientWireMockTest {
 
     private WireMockServer wireMock;
 
+    private WebClient webClient;
+
     private CoverFetchClient client;
 
     @BeforeAll
@@ -61,8 +64,8 @@ class CoverFetchClientWireMockTest {
         wireMock.start();
         final CoverFetchProperties properties =
             new CoverFetchProperties(CONNECT_TIMEOUT_MS, READ_TIMEOUT_MS, MAX_FETCH_BYTES);
-        client = new CoverFetchClient(
-            new CoverFetchWebClientConfig(properties).coverFetchWebClient(), allowAllGuard());
+        webClient = new CoverFetchWebClientConfig(properties).coverFetchWebClient();
+        client = new CoverFetchClient(webClient, allowAllGuard());
     }
 
     @BeforeEach
@@ -132,7 +135,7 @@ class CoverFetchClientWireMockTest {
     }
 
     @Test
-    @DisplayName("a cover past the sources' default decode buffer still downloads")
+    @DisplayName("a cover larger than the default codec buffer downloads in full")
     void coverPastDefaultBufferDownloads() {
         wireMock.stubFor(get(urlPathEqualTo(COVER_PATH)).willReturn(aResponse()
             .withStatus(HTTP_OK)
@@ -142,7 +145,7 @@ class CoverFetchClientWireMockTest {
         final Optional<FetchedImage> fetched = client.fetch(baseUrl() + COVER_PATH);
 
         assertThat(fetched)
-            .as("the cover client's own byte limit applies, not the shared source default")
+            .as("the client's configured byte limit sizes the buffer")
             .get()
             .satisfies(image -> assertThat(image.bytes()).hasSize(PAST_DEFAULT_BUFFER_BYTES));
     }
@@ -158,7 +161,31 @@ class CoverFetchClientWireMockTest {
         final Optional<FetchedImage> fetched = client.fetch(baseUrl() + COVER_PATH);
 
         assertThat(fetched)
-            .as("an oversized cover is skipped, it must not error the request")
+            .as("an oversized cover is skipped, the fetch does not error")
+            .isEmpty();
+    }
+
+    @Test
+    @DisplayName("a redirect to a target the guard refuses resolves to empty")
+    void redirectToRefusedTargetIsEmpty() {
+        wireMock.stubFor(get(urlPathEqualTo(COVER_PATH)).willReturn(aResponse()
+            .withStatus(HTTP_FOUND)
+            .withHeader(LOCATION_HEADER, baseUrl() + REDIRECT_PATH)));
+        wireMock.stubFor(get(urlPathEqualTo(REDIRECT_PATH)).willReturn(aResponse()
+            .withStatus(HTTP_OK)
+            .withHeader(CONTENT_TYPE_HEADER, JPEG_TYPE)
+            .withBody(JPEG)));
+        final CoverFetchClient guarded = new CoverFetchClient(webClient, new CoverUrlGuard() {
+            @Override
+            public boolean isAllowed(final String url) {
+                return !url.endsWith(REDIRECT_PATH);
+            }
+        });
+
+        final Optional<FetchedImage> fetched = guarded.fetch(baseUrl() + COVER_PATH);
+
+        assertThat(fetched)
+            .as("the redirect target goes through the guard before the hop")
             .isEmpty();
     }
 

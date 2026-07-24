@@ -35,14 +35,7 @@ public class BookSearchController {
 
     private final SearchMissStager searchMissStager;
 
-    /**
-     * Returns books matching the query, ordered by relevance.
-     *
-     * <p>The first page of every successful search resolves the query's series and author in the
-     * background and stages what it finds. The stager dedupes per query, resolving a paginated or
-     * repeated query at most once per dedup window. A degraded search (Meilisearch down) and any
-     * page past the first do not trigger it.
-     */
+    /** Returns books matching the query, ordered by relevance. */
     @GetMapping("/books")
     @Operation(summary = "Search the book catalog")
     public BookSearchResult search(

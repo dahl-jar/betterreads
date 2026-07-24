@@ -90,6 +90,16 @@ class BookSearchDocumentMapperTest {
         assertThat(document.popularityScore()).isZero();
     }
 
+    @Test
+    @DisplayName("scores zero popularity when a rated book carries no average")
+    void scoresZeroWhenRatedBookHasNoAverage() {
+        final BookIndexView book = view("hc-4", "Oathbringer", RATING_COUNT, null);
+
+        final BookSearchDocument document = mapper.toDocument(book);
+
+        assertThat(document.popularityScore()).isZero();
+    }
+
     private static BookIndexView view(
         final String dedupKey, final String title,
         final @Nullable Integer ratingCount, final @Nullable BigDecimal averageRating) {

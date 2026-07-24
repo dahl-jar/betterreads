@@ -25,11 +25,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 /**
- * Search against a real Meilisearch: an indexed book is found by title, typos still match, paging
+ * Search against a real Meilisearch: an indexed book is found by title, typos match, paging
  * slices the hits with the true total, and a removed book drops out of results.
- *
- * <p>The container master key is a deterministic test fixture, unrelated to any production
- * credential.
  */
 @SpringBootTest
 @Testcontainers
@@ -148,8 +145,8 @@ class MeilisearchBookSearchServiceIntegrationTest extends ContainerizedTest {
             final BookSearchResult result = searchService.search("the hobbit dragons", 0, FULL_PAGE);
 
             assertThat(result.hits())
-                .as("'The Hobbit' has 'the' and 'hobbit' but not 'dragons', so the all-words "
-                    + "strategy drops it rather than matching on the shared word")
+                .as("'The Hobbit' has 'the' and 'hobbit' but not 'dragons', and the all-words "
+                    + "strategy needs every word")
                 .isEmpty();
         }
 

@@ -22,11 +22,11 @@ class EnglishTextTest {
         + "to be given command of the royal bodyguards, a controversial first for a low-status "
         + "darkeyes. Now he must protect the king and Dalinar from every common peril.";
 
-    private static final String LATIN_EPIGRAPH_LEAD =
-        "AUDI. VIDE. TACE. The Catenan Republic, the Hierarchy, may rule the world now, but they "
-        + "do not know everything. I tell them my name is Vis Telimus. I tell them I was orphaned "
-        + "after a tragic accident three years ago, and that good fortune alone has led to my "
-        + "acceptance into their most prestigious school.";
+    private static final String NOUN_HEAVY_FRONT_MATTER =
+        "Collected essays, letters, notebooks, marginalia. Translated by Valka Onderra. "
+        + "Introduction, chronology, textual notes, appendices, bibliography, index. Illustrated "
+        + "throughout, including thirty-two colour plates and the author's own annotated maps of "
+        + "the archipelago.";
 
     private static final String SPARSE_ANCHOR_ENGLISH =
         "These exceptional stories show that science fiction is no longer a field completely "
@@ -44,9 +44,9 @@ class EnglishTextTest {
     }
 
     @Test
-    @DisplayName("an English blurb opening with a Latin epigraph passes")
-    void latinEpigraphLeadPasses() {
-        assertThat(EnglishText.isEnglish(LATIN_EPIGRAPH_LEAD)).isTrue();
+    @DisplayName("noun-heavy English front matter passes on its anchor words")
+    void nounHeavyFrontMatterPasses() {
+        assertThat(EnglishText.isEnglish(NOUN_HEAVY_FRONT_MATTER)).isTrue();
     }
 
     @Test

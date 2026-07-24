@@ -157,9 +157,12 @@ class LocMapperTest {
                 .as("the marc-encoded year, or null when the record has none")
                 .isEqualTo(expected.marcYear());
             assertThat(book.pageCount())
-                .as("the page count from the extent, or null for an unpaged extent")
+                .as("the leading page count from the extent, ahead of a plate count, or null for an "
+                    + "unpaged extent")
                 .isEqualTo(expected.pageCount());
-            assertThat(book.seriesName()).isEqualTo(expected.seriesName());
+            assertThat(book.seriesName())
+                .as("the series block carrying a part number wins over a bare imprint block")
+                .isEqualTo(expected.seriesName());
             assertThat(book.seriesPosition()).isEqualTo(expected.seriesPosition());
         }
 
@@ -171,14 +174,6 @@ class LocMapperTest {
                 .extracting(SourceBook::authorNames, as(InstanceOfAssertFactories.list(String.class)))
                 .as("only the primary name is taken, trailing punctuation stripped")
                 .containsExactly(expected.name());
-        }
-
-        @Test
-        @DisplayName("takes the leading page count ahead of a later plate count")
-        void takesPageCountAheadOfPlateCount() {
-            assertThat(map(HOBBIT).pageCount())
-                .as("272 pages, then 36 pages of plates, parses to 272")
-                .isEqualTo(HOBBIT_PAGES);
         }
 
         @Test
@@ -197,14 +192,6 @@ class LocMapperTest {
                 <identifier type="lccn">89015952</identifier>""");
 
             assertThat(map(stranger).title()).isEqualTo("L'étranger");
-        }
-
-        @Test
-        @DisplayName("picks the series title carrying the part number over the imprint title")
-        void picksTheNumberedSeriesTitle() {
-            assertThat(map(EYE).seriesName())
-                .as("Wheel of time carries bk. 1; TOR fantasy has no part number")
-                .isEqualTo(WHEEL_OF_TIME);
         }
 
         @Test

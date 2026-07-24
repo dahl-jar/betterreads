@@ -10,9 +10,8 @@ import tools.jackson.databind.annotation.JsonNaming;
 /**
  * One book hit from Hardcover's search index.
  *
- * <p>The top hit is often a comic, audio, or stub edition; the client picks the canonical work by
- * {@code usersReadCount}. Hardcover's JSON is snake_case, mapped to these camelCase components by
- * {@link JsonNaming}.
+ * <p>{@code usersReadCount} separates the canonical work from the comic, audio, and stub editions
+ * that share its title.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonNaming(SnakeCaseStrategy.class)

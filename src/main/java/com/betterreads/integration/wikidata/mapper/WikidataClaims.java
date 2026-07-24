@@ -1,6 +1,5 @@
 package com.betterreads.integration.wikidata.mapper;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
 
@@ -23,7 +22,7 @@ public final class WikidataClaims {
     private WikidataClaims() {
     }
 
-    /** Returns the entity's display name via {@link WikidataLabels}, or null when the entity is empty. */
+    /** Returns the entity's display name, or null when it is empty or carries no id. */
     public static @Nullable String label(final JsonNode entity) {
         if (entity.isMissingNode() || entity.isEmpty()) {
             return null;
@@ -46,8 +45,8 @@ public final class WikidataClaims {
 
     /** Returns the publication year, honoring a {@code preferred}-rank P577 claim over normal ones. */
     static @Nullable Integer publicationYear(final JsonNode entity) {
-        final List<JsonNode> claims = new ArrayList<>();
-        entity.path(CLAIMS).path(PUBLICATION_DATE_PROPERTY).forEach(claims::add);
+        final List<JsonNode> claims =
+            entity.path(CLAIMS).path(PUBLICATION_DATE_PROPERTY).valueStream().toList();
         return claims.stream()
             .filter(claim -> PREFERRED_RANK.equals(WikidataTree.text(claim.path("rank"))))
             .findFirst()

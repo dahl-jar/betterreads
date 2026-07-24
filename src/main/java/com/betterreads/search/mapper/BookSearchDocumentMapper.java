@@ -8,13 +8,12 @@ import org.springframework.stereotype.Component;
  * Maps a catalog {@link BookIndexView} to its search document.
  *
  * <p>The document id is the same key the detail endpoint resolves by, the first present source
- * identifier, so a search hit links straight to its detail page. Popularity scores rating volume and
- * average together so a widely loved book outranks an obscure one on a tie.
+ * identifier, so a search hit links to its detail page. Popularity scores rating volume and average
+ * together so a widely loved book outranks an obscure one on a tie.
  */
 @Component
 public class BookSearchDocumentMapper {
 
-    /** Builds the search document for the given book. */
     public BookSearchDocument toDocument(final BookIndexView book) {
         return BookSearchDocument.builder(book.dedupKey())
             .title(book.title())

@@ -9,10 +9,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * One work-level result from OpenLibrary {@code search.json}.
  *
- * <p>{@code firstPublishYear} is the original-edition year, the reason OpenLibrary is queried
- * alongside Google Books, which returns the most recent reprint year instead. {@code isbn} is
- * every edition's ISBN aggregated into one array (often 100+), not a single canonical value.
- * {@code coverId} of {@code 0} means no cover exists.
+ * <p>{@code firstPublishYear} is the original edition's year. {@code isbn} aggregates every
+ * edition's ISBN into one array, often 100 or more.
  *
  * @param key work key including the {@code /works/} prefix, e.g. {@code /works/OL27482W}
  * @param coverId OpenLibrary cover id, {@code 0} when no cover exists

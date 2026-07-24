@@ -196,6 +196,27 @@ class OpenLibraryClientWireMockTest {
     }
 
     @Nested
+    @DisplayName("fetchByIsbn")
+    class FetchByIsbn {
+
+        @Test
+        void mapsFirstHit() {
+            WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH)).willReturn(json(HOBBIT_SEARCH_JSON)));
+            WIREMOCK.stubFor(get(urlPathEqualTo(HOBBIT_WORK_PATH)).willReturn(json(HOBBIT_WORK_JSON)));
+
+            final Optional<SourceBook> result = client.fetchByIsbn("9780395282656");
+
+            assertThat(result)
+                .isPresent()
+                .get()
+                .satisfies(book -> {
+                    assertThat(book.openLibraryWorkKey()).isEqualTo(HOBBIT_WORK_KEY);
+                    assertThat(book.title()).isEqualTo(HOBBIT_TITLE);
+                });
+        }
+    }
+
+    @Nested
     @DisplayName("search: multi-result discovery list")
     class Search {
 

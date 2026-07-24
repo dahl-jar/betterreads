@@ -27,9 +27,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Verifies the operational endpoints exposed on the public API port. The actuator port lives at
- * {@code 127.0.0.1:8081} and ops tooling reaches it through Cloudflare Tunnel and Access, so
- * those paths are not reachable through {@code MockMvc} in this test.
+ * Verifies the operational endpoints served on the public API port. The actuator endpoints are
+ * served on the management port, which {@code MockMvc} does not reach.
  */
 @SpringBootTest
 @Testcontainers

@@ -4,12 +4,12 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * Builds the cover URL the API serves to clients, pointing at this service's image endpoint rather
- * than the external source, so the browser fetches covers only from here.
+ * Builds the cover URL the API serves to clients, pointing at this API's image endpoint so the
+ * browser never requests the external source directly.
  *
- * <p>The URL is absolute on the configured public API origin: the SPA runs on a different host and
- * sets the value directly as an image source, so a root-relative path would resolve against the SPA
- * origin instead of this API.
+ * <p>The URL is absolute on the configured public API origin: the client runs on a different
+ * origin and sets the value directly as an image source, so a root-relative path would resolve
+ * against the client's origin.
  */
 @Component
 public class CoverImages {

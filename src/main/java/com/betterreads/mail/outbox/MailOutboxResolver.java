@@ -49,6 +49,7 @@ class MailOutboxResolver {
         this.properties = properties;
     }
 
+    /** Clears the payload when stamping the row sent. */
     @Transactional
     public void markSent(final long outboxId) {
         repository.findById(outboxId).ifPresent(row -> {
@@ -59,6 +60,7 @@ class MailOutboxResolver {
         });
     }
 
+    /** Schedules a retry, or gives up on a permanent failure or the last attempt. */
     @Transactional
     public void recordFailure(final long outboxId, final int currentAttempt, final MailSendException failure) {
         final String errorText = truncate(failure.getMessage() == null

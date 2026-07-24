@@ -61,6 +61,7 @@ final class CidrRange {
             && Arrays.equals(maskToPrefix(candidateBytes, prefixLength), networkBytes);
     }
 
+    // PMD.AvoidArrayLoops: masks each byte against the prefix, not an array copy.
     @SuppressWarnings("PMD.AvoidArrayLoops")
     private static byte[] maskToPrefix(final byte[] addressBytes, final int prefix) {
         final byte[] masked = new byte[addressBytes.length];

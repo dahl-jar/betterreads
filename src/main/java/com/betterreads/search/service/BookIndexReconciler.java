@@ -15,8 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Pushes the full catalog into the Meilisearch index nightly.
  *
- * <p>Safe to re-run at any cadence because documents are upserted by id. This is the floor that
- * heals any book the per-promotion index hook missed, for example after a Meilisearch outage.
+ * <p>Documents are upserted by id, so a re-run at any cadence is safe. Picks up any book the
+ * per-promotion listener missed, for example after a Meilisearch outage.
  */
 @Component
 @RequiredArgsConstructor

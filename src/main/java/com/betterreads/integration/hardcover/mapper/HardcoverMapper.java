@@ -16,13 +16,14 @@ import org.springframework.stereotype.Component;
 /**
  * Maps a Hardcover search document into the catalog's {@link SourceBook}.
  *
- * <p>The genre list is reduced to canonical shelf genres via {@link CatalogGenres}, and the ISBN-13
- * is filtered out of the bulk ISBN array, which interleaves ISBN-10 and ISBN-13.
+ * <p>The ISBN-13 is matched out of the bulk ISBN array, which interleaves ISBN-10 and ISBN-13.
  */
 @Component
 public class HardcoverMapper {
 
     static final int MAX_GENRES = 25;
+
+    private static final int FIRST_VOLUME = 1;
 
     private static final Pattern ISBN_13 = Pattern.compile("97[89]\\d{10}");
 
@@ -66,17 +67,11 @@ public class HardcoverMapper {
         return CatalogGenres.reduceToCanonical(genres, MAX_GENRES);
     }
 
-    /**
-     * Returns the integer volume number, or null when the position is absent or a sub-volume.
-     *
-     * <p>A whole number is a numbered volume. A fractional position is a prologue or split part
-     * tagged to the series, which is not a volume the catalog stores as book N.
-     */
+    /** Returns the volume number, or null when the position is absent, fractional, or below one. */
     static @Nullable Integer seriesPosition(final @Nullable Double position) {
-        if (position == null || Double.compare(position, Math.floor(position)) != 0 || position < 1) {
-            return null;
-        }
-        return position.intValue();
+        return VolumeNumber.fromPosition(position)
+            .filter(volume -> volume >= FIRST_VOLUME)
+            .orElse(null);
     }
 
     private static @Nullable String coverUrl(final HardcoverDocument document) {

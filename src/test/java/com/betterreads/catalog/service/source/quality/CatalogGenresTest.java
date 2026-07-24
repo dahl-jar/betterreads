@@ -14,10 +14,10 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Tests for the genre allowlist that separates real catalog genres from the plot-element noise
  * OpenLibrary mixes into its subject array.
  *
- * <p>The kept/dropped fixtures are the real subjects observed on the live Hobbit (OL27482W) and
- * Dune (OL893415W) works on 2026-05-28. The point of the allowlist is that {@code thrushes},
- * {@code arkenstone}, and {@code the one ring} are plot elements, not genres, and must never reach
- * the catalog as shelf categories, while {@code fantasy fiction} and {@code science fiction} must.
+ * <p>The kept and dropped fixtures are the real subjects observed on the live Hobbit (OL27482W) and
+ * Dune (OL893415W) works on 2026-05-28. {@code thrushes}, {@code arkenstone}, and
+ * {@code the one ring} are plot elements and must never reach the catalog as shelf categories;
+ * {@code fantasy fiction} and {@code science fiction} must.
  */
 class CatalogGenresTest {
 
@@ -107,9 +107,8 @@ class CatalogGenresTest {
         })
         void rejectsTagsThatEmbedGenreWords(final String subject) {
             assertThat(CatalogGenres.isGenre(subject))
-                .as("\"%s\" contains 'fiction'/'nonfiction' as a substring but is a machine tag "
-                    + "(has ':' or '='); the seed showed these leak past a naive substring match",
-                    subject)
+                .as("\"%s\" carries ':' or '=', so it is a machine tag even though a genre word "
+                    + "appears inside it", subject)
                 .isFalse();
         }
 

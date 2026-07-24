@@ -73,7 +73,7 @@ class GoogleBooksClientLiveTest {
         final Optional<SourceBook> result = client.fetchByTitleAuthor(titleQuery, authorQuery);
 
         assertThat(result)
-            .as("Google Books returns every book in the slate")
+            .as("Google Books returns the book")
             .isPresent()
             .get()
             .satisfies(book -> assertExpectedMetadata(book, titleQuery, authorQuery, kind));

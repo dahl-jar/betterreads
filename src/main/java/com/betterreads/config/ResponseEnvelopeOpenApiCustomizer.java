@@ -3,6 +3,7 @@ package com.betterreads.config;
 import com.betterreads.common.dto.ResponseMeta;
 
 import io.swagger.v3.core.converter.ModelConverters;
+import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.media.ArraySchema;
 import io.swagger.v3.oas.models.media.ObjectSchema;
@@ -17,10 +18,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Rewrites every documented 2xx JSON body to the runtime {@code ApiResponse} envelope, which the
- * {@code ApiResponseBodyAdvice} adds after springdoc reads the controller return types. A paged
- * response documents {@code data} as the item array plus {@code meta}; any other response documents
- * {@code data} as the original schema.
+ * Rewrites every documented 2xx JSON body to the {@code ApiResponse} shape that
+ * {@code ApiResponseBodyAdvice} applies at runtime, after springdoc has read the controller return
+ * types. A paged response documents {@code data} as the item array plus {@code meta}; any other
+ * response documents {@code data} as the original schema.
  */
 @Configuration
 public class ResponseEnvelopeOpenApiCustomizer {
@@ -47,7 +48,7 @@ public class ResponseEnvelopeOpenApiCustomizer {
         };
     }
 
-    private static void registerResponseMeta(final io.swagger.v3.oas.models.OpenAPI openApi) {
+    private static void registerResponseMeta(final OpenAPI openApi) {
         ModelConverters.getInstance().readAll(ResponseMeta.class)
             .forEach((name, schema) -> openApi.getComponents().addSchemas(name, schema));
     }
@@ -69,12 +70,12 @@ public class ResponseEnvelopeOpenApiCustomizer {
             if (original != null
                 && !EVENT_STREAM.equals(contentType)
                 && !NOT_WRAPPED.contains(refName(original))) {
-                media.setSchema(envelope(original));
+                media.setSchema(wrapperSchema(original));
             }
         });
     }
 
-    private static Schema<Object> envelope(final Schema<?> original) {
+    private static Schema<Object> wrapperSchema(final Schema<?> original) {
         final ObjectSchema wrapper = new ObjectSchema();
         final String item = PAGED_ITEM_BY_TYPE.get(refName(original));
         if (item == null) {

@@ -5,7 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Builds the {@link MinioClient} for the in-cluster MinIO from {@link MinioProperties}.
+ * Builds the {@link MinioClient} from {@link MinioProperties}.
  */
 @Configuration
 public class MinioConfig {

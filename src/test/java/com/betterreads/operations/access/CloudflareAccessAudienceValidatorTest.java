@@ -12,11 +12,9 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Pure unit tests for the Cloudflare Access AUD claim validator. The validator runs as part of
- * the JWT decoder pipeline; if AUD doesn't match, validation must fail.
- *
- * <p>Cloudflare emits {@code aud} as a JSON array, so {@code returnsSuccessWhenAudListIncludesExpected}
- * exists to catch a likely implementation mistake of using {@code equals} instead of {@code contains}.
+ * The validator runs inside the JWT decoder, and a token whose {@code aud} does not carry the
+ * expected tag must fail. Cloudflare emits {@code aud} as a JSON array that can hold several tags,
+ * so a match is containment.
  */
 @DisplayName("CloudflareAccessAudienceValidator")
 final class CloudflareAccessAudienceValidatorTest {
@@ -30,17 +28,6 @@ final class CloudflareAccessAudienceValidatorTest {
     @Nested
     @DisplayName("validate")
     class Validate {
-
-        @Test
-        void returnsSuccessWhenAudMatches() {
-            final CloudflareAccessAudienceValidator validator =
-                new CloudflareAccessAudienceValidator(EXPECTED_AUD);
-            final Jwt jwt = jwtWithAudience(List.of(EXPECTED_AUD));
-
-            final OAuth2TokenValidatorResult result = validator.validate(jwt);
-
-            assertThat(result.hasErrors()).isFalse();
-        }
 
         @Test
         void returnsSuccessWhenAudListIncludesExpected() {

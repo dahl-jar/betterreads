@@ -257,7 +257,7 @@ class CatalogSearchServiceIntegrationTest extends ContainerizedTest {
         searchService.searchAndStage(STANDALONE_QUERY);
 
         assertThat(pendingBooks.findAll())
-            .as("the study guide, adaptation, combo, and 2021 reprint are rejected, leaving the 1949 work")
+            .as("the study guide, adaptation, and combo are filtered out and the reprint loses on year")
             .singleElement()
             .satisfies(staged -> {
                 assertThat(staged.getOpenLibraryWorkKey()).isEqualTo(CANONICAL_KEY);

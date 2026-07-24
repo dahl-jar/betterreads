@@ -15,8 +15,7 @@ import org.springframework.stereotype.Component;
  * <p>Runs at 02:00, before the 03:30 index reconcile, so a newly staged book is promoted and
  * indexed in the same night. The run is handed to a dedicated executor because re-resolving
  * thousands of authors takes hours; on the shared scheduler thread it delayed every later trigger
- * by that long. A run still in progress when the next trigger fires is skipped rather than queued.
- * Disabled by {@code betterreads.catalog.refresh.enabled=false}.
+ * by that long. Disabled by {@code betterreads.catalog.refresh.enabled=false}.
  */
 @Component
 class CatalogRefreshScheduler {

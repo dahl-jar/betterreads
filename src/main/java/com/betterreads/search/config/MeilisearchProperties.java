@@ -7,7 +7,7 @@ import org.springframework.validation.annotation.Validated;
 /**
  * Meilisearch connection settings bound from {@code meilisearch.*}.
  *
- * @param host base URL including scheme and port, e.g. http://meilisearch:7700
+ * @param host base URL including scheme and port
  * @param masterKey shared master key used for both admin and search calls
  * @param indexName name of the books index
  */
@@ -19,10 +19,7 @@ public record MeilisearchProperties(
     @NotBlank String indexName
 ) {
 
-    /**
-     * Replaces the default record {@code toString} so the master key never
-     * appears in logs, exception messages, or debug output.
-     */
+    /** Redacts the master key so it cannot reach a log line or an exception message. */
     @Override
     public String toString() {
         return "MeilisearchProperties[host=" + host + ", indexName=" + indexName + ", masterKey=***]";

@@ -10,10 +10,9 @@ import org.jspecify.annotations.Nullable;
  * @param title book title
  * @param subtitle book subtitle if any
  * @param seriesName name of the series the book belongs to, if any
- * @param seriesPosition the book's position within its series, so a client can group a series in
- *     reading order
+ * @param seriesPosition the book's position within its series
  * @param authors author display names
- * @param subjects BISAC subjects assigned by the catalog mapper
+ * @param subjects BISAC subjects
  * @param language ISO 639-1 code
  * @param coverUrl cover image URL
  * @param publicationYear year of original publication
@@ -51,15 +50,15 @@ public record BookSearchDocument(
         return List.copyOf(subjects);
     }
 
-    /** Returns a builder for the document with the given book id. */
     public static Builder builder(final String bookId) {
         return new Builder(bookId);
     }
 
     /**
-     * Builds a {@link BookSearchDocument} field by field so the mapper sets each field by name
-     * instead of by position, where two same-typed fields could be swapped unnoticed.
+     * Builds a {@link BookSearchDocument} field by field, so two same-typed fields cannot be
+     * swapped by position.
      */
+    // PMD.AvoidFieldNameMatchingMethodName: a builder field and its setter share a name by design.
     @SuppressWarnings("PMD.AvoidFieldNameMatchingMethodName")
     public static final class Builder {
 

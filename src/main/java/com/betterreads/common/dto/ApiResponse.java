@@ -3,12 +3,9 @@ package com.betterreads.common.dto;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The success envelope every JSON response is wrapped in. {@code data} holds the resource or the
- * list of resources; {@code meta} carries pagination on a collection and is absent on a single
- * resource. Error responses use {@code application/problem+json} (RFC 9457) instead of this shape.
- *
- * @param data the resource, or the list of resources for a collection
- * @param meta pagination for a collection, null for a single resource
+ * Wraps every successful JSON response. {@code data} holds the resource or the list of resources;
+ * {@code meta} carries pagination on a collection and is null on a single resource. Errors are
+ * returned as {@code application/problem+json} (RFC 9457).
  */
 public record ApiResponse<T>(
     T data,

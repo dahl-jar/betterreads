@@ -3,12 +3,7 @@ package com.betterreads.integration.loc.discovery;
 import java.time.LocalDate;
 import java.util.List;
 
-/**
- * Surfaces newly-cataloged books from the Library of Congress SRU endpoint for the discovery cron.
- *
- * <p>Separate from {@code BookSourceClient}: enrichment clients fetch one known book, the discovery
- * client walks a date-and-subject bucket for unknown new releases.
- */
+/** Surfaces newly-cataloged books from the Library of Congress SRU endpoint for the discovery cron. */
 // PMD.ImplicitFunctionalInterface: a Spring service abstraction the cron depends on, not a lambda target.
 @SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface LocDiscoveryClient {

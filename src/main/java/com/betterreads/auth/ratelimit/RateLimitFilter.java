@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -154,17 +155,16 @@ public final class RateLimitFilter extends OncePerRequestFilter {
 
     /** Deletes every rate-limit bucket from Redis, so the next request starts at full. For tests. */
     public void reset() {
-        final List<String> prefixes = new ArrayList<>();
-        endpoints.values().forEach(e -> prefixes.add(e.keyPrefix()));
-        prefixes.add(detailEndpoint.keyPrefix());
-        prefixes.add(eventStreamEndpoint.keyPrefix());
-        prefixes.add(commentWriteEndpoint.keyPrefix());
-        prefixes.forEach(prefix -> {
-            final List<String> keys = redis.sync().keys(prefix + ":*");
-            if (!keys.isEmpty()) {
-                redis.sync().del(keys.toArray(new String[0]));
-            }
-        });
+        Stream.concat(
+                endpoints.values().stream(),
+                Stream.of(detailEndpoint, eventStreamEndpoint, commentWriteEndpoint))
+            .map(Endpoint::keyPrefix)
+            .forEach(prefix -> {
+                final List<String> keys = redis.sync().keys(prefix + ":*");
+                if (!keys.isEmpty()) {
+                    redis.sync().del(keys.toArray(new String[0]));
+                }
+            });
     }
 
     @Override
@@ -219,15 +219,13 @@ public final class RateLimitFilter extends OncePerRequestFilter {
         return uri.endsWith(EVENT_STREAM_SUFFIX) ? eventStreamEndpoint : detailEndpoint;
     }
 
-    /** The HTTP method and Redis key prefix that isolate one endpoint's buckets, plus its recipe. */
+    /** One endpoint's bucket settings, keyed in Redis under {@code keyPrefix}. */
     private record Endpoint(HttpMethod method, String keyPrefix, BucketConfiguration config) { }
 
     /**
-     * Resolves the bucket key from the incoming request.
-     *
-     * <p>Prefers {@code CF-Connecting-IP} because Cloudflare overwrites any client-supplied
-     * value, making it unforgeable behind the tunnel. Falls back to trusted-proxy-gated
-     * {@code X-Forwarded-For} for local dev and tests.
+     * Prefers {@code CF-Connecting-IP}, which Cloudflare overwrites on every request so a caller
+     * cannot forge it. Falls back to {@code X-Forwarded-For}, honored only when the immediate
+     * client sits in a trusted-proxy CIDR.
      */
     private String clientIp(final HttpServletRequest request) {
         final String cfConnectingIp = request.getHeader(CF_CONNECTING_IP_HEADER);

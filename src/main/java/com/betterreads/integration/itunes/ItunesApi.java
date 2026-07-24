@@ -19,10 +19,10 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * Apple Books search over the iTunes Search API.
  *
- * <p>A shared rate limiter paces calls under the unauthenticated cap across every replica: when the
- * budget empties a call waits up to {@link #MAX_TOKEN_WAIT} for a permit and skips the source when
- * none frees, so a backfill drains then continues at the refill rate without holding a thread for a
- * full window. A 4xx resolves to empty; 5xx and network failures propagate.
+ * <p>A shared rate limiter paces calls under the unauthenticated cap. A call waits up to
+ * {@link #MAX_TOKEN_WAIT} for a permit, then skips the source, so a drained budget never holds an
+ * enrichment thread for a full refill window; the backfill retries the book later. A 4xx resolves
+ * to empty; 5xx and network failures propagate.
  */
 @Component
 public class ItunesApi {
@@ -52,8 +52,8 @@ public class ItunesApi {
     }
 
     /** Returns the search's results that carry a description, at most {@link #SEARCH_LIMIT}. */
-    public List<ItunesResult> results(final String term) {
-        return search(term).stream()
+    public List<ItunesResult> resultsWithDescriptions(final String term) {
+        return searchBody(term).stream()
             .flatMap(body -> JSON.readTree(body).path("results").valueStream())
             .map(node -> new ItunesResult(
                 node.path("trackName").asString(""), node.path("description").asString("")))
@@ -61,8 +61,8 @@ public class ItunesApi {
             .toList();
     }
 
-    private Optional<String> search(final String term) {
-        if (!acquireToken()) {
+    private Optional<String> searchBody(final String term) {
+        if (!rateLimiter.tryAcquire(MAX_TOKEN_WAIT)) {
             LOG.debug("itunes.search skipped: rate budget exhausted, falling through");
             return Optional.empty();
         }
@@ -72,15 +72,6 @@ public class ItunesApi {
             .queryParam("media", EBOOK_MEDIA)
             .queryParam("limit", SEARCH_LIMIT)
             .build());
-    }
-
-    /**
-     * Takes a rate-limit permit, waiting up to {@link #MAX_TOKEN_WAIT}, returning false when none
-     * frees in time. The bounded wait keeps a drained budget from holding an enrichment thread for a
-     * full refill window; the description is optional and the backfill retries the book later.
-     */
-    private boolean acquireToken() {
-        return rateLimiter.tryAcquire(MAX_TOKEN_WAIT);
     }
 
     private Optional<String> get(final Function<UriBuilder, URI> uri) {

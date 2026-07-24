@@ -1,12 +1,11 @@
 package com.betterreads.auth.refresh;
 
 import com.betterreads.auth.jwt.JwtProperties;
+import com.betterreads.auth.token.TokenGenerator;
 import com.betterreads.common.crypto.HmacTokenHasher;
 
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -33,8 +32,6 @@ public class RefreshTokenService {
 
     private final RefreshTokenChainRevoker chainRevoker;
 
-    private final SecureRandom random;
-
     private final Duration lifetime;
 
     public RefreshTokenService(
@@ -46,14 +43,13 @@ public class RefreshTokenService {
         this.repository = repository;
         this.hasher = hasher;
         this.chainRevoker = chainRevoker;
-        this.random = new SecureRandom();
         this.lifetime = Duration.ofDays(jwtProperties.refreshExpirationDays());
     }
 
     /** Issues a refresh token for the user and returns its plaintext. */
     @Transactional
     public String issue(final long userId) {
-        final String plaintext = generatePlaintext();
+        final String plaintext = TokenGenerator.randomToken(TOKEN_BYTES);
         final RefreshToken row = new RefreshToken();
         row.setUserId(userId);
         row.setTokenHash(hasher.hash(plaintext));
@@ -91,7 +87,7 @@ public class RefreshTokenService {
             return Optional.empty();
         }
 
-        final String newPlaintext = generatePlaintext();
+        final String newPlaintext = TokenGenerator.randomToken(TOKEN_BYTES);
         final RefreshToken successor = new RefreshToken();
         successor.setUserId(row.getUserId());
         successor.setTokenHash(hasher.hash(newPlaintext));
@@ -125,11 +121,5 @@ public class RefreshTokenService {
         row.setRevokedAt(Instant.now());
         repository.save(row);
         LOG.info("Revoked refresh token userId={}", row.getUserId());
-    }
-
-    private String generatePlaintext() {
-        final byte[] bytes = new byte[TOKEN_BYTES];
-        random.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 }

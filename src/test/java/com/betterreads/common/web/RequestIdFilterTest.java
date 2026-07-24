@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 import org.assertj.core.api.AbstractStringAssert;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,7 +48,7 @@ class RequestIdFilterTest {
         MDC.clear();
     }
 
-    static java.util.stream.Stream<Arguments> resolutionCases() {
+    static Stream<Arguments> resolutionCases() {
         final Consumer<AbstractStringAssert<?>> mustBeFreshUuid = id -> id
             .isNotBlank()
             .satisfies(RequestIdFilterTest::assertParsesAsUuid);
@@ -55,7 +56,7 @@ class RequestIdFilterTest {
         final Consumer<AbstractStringAssert<?>> mustBeBoundedFreshUuid = id -> id
             .hasSizeLessThanOrEqualTo(MAX_ID_LENGTH)
             .satisfies(RequestIdFilterTest::assertParsesAsUuid);
-        return java.util.stream.Stream.of(
+        return Stream.of(
             Arguments.of("no header generates a UUID", null, mustBeFreshUuid),
             Arguments.of("valid header is reused as-is", VALID_INCOMING_ID, mustBeIncoming),
             Arguments.of("header with CR/LF is replaced by a UUID", ILLEGAL_ID, mustBeFreshUuid),
@@ -114,10 +115,7 @@ class RequestIdFilterTest {
                 .isNull();
             return;
         }
-        throw new AssertionError(
-            "expected the chain exception to propagate; that contract is covered by "
-                + "chainExceptionPropagatesThroughFilter; this test only exists to assert MDC cleanup"
-        );
+        throw new AssertionError("expected the chain to throw so the cleanup path runs");
     }
 
     private static void assertParsesAsUuid(final String value) {

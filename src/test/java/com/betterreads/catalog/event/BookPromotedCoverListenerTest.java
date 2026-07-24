@@ -20,7 +20,8 @@ import org.springframework.dao.DataAccessResourceFailureException;
 
 /**
  * After a book is promoted, the listener mirrors its cover and records the object key. A book the
- * sources cannot mirror is stamped as checked, and a mirror failure does not propagate.
+ * sources cannot mirror is stamped as checked, a book with no cover is left alone, and a mirror
+ * failure does not propagate.
  */
 class BookPromotedCoverListenerTest {
 
@@ -64,6 +65,16 @@ class BookPromotedCoverListenerTest {
     }
 
     @Test
+    @DisplayName("a promoted book with no cover url is never sent to the mirror")
+    void skipsBookWithoutCover() {
+        when(books.findByDedupKey(KEY)).thenReturn(Optional.of(coverlessBook()));
+
+        listener.onBookPromoted(new BookPromotedEvent(KEY));
+
+        verify(coverMirror, never()).mirror(any(), any());
+    }
+
+    @Test
     @DisplayName("a mirror failure does not propagate out of the listener")
     void mirrorFailureIsContained() {
         when(books.findByDedupKey(KEY)).thenReturn(Optional.of(book()));
@@ -76,10 +87,15 @@ class BookPromotedCoverListenerTest {
     }
 
     private static Book book() {
+        final Book book = coverlessBook();
+        book.setCoverUrl(COVER_URL);
+        return book;
+    }
+
+    private static Book coverlessBook() {
         final Book book = new Book();
         book.setBookId(BOOK_ID);
         book.setDedupKey(KEY);
-        book.setCoverUrl(COVER_URL);
         return book;
     }
 }

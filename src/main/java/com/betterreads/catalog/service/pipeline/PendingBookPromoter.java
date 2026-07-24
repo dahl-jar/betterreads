@@ -18,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Writes one collected candidate: re-applies the merged view to its row, then promotes it into
- * {@code book} if it now carries every required field, or records what is still missing.
+ * {@code book} when it carries every required field, or records what is missing.
  *
  * <p>Separate bean so each candidate's write runs in its own short transaction through the Spring
  * proxy. The slow source fetches happen in {@link PendingBookService} outside any transaction, so a
@@ -64,7 +64,7 @@ public class PendingBookPromoter {
      * retirement cap.
      *
      * <p>Runs in its own transaction: the failed promote's transaction rolled back, so a stamp written
-     * there is lost, and an unstamped candidate re-enters every poll at full source cost.
+     * inside it is lost, and an unstamped candidate re-enters every poll at full source cost.
      */
     @Transactional
     public void recordFailedAttempt(final String dedupKey) {

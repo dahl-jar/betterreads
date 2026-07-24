@@ -16,13 +16,13 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    /** Returns the user whose username matches case-insensitively, or empty if none does. */
+    /** Matches the username case-insensitively. */
     @Query("SELECT u FROM User u WHERE lower(u.username) = lower(:username)")
     Optional<User> findByUsername(@Param("username") String username);
 
     Optional<User> findByEmail(String email);
 
-    /** Returns true if a user already holds the username, compared case-insensitively. */
+    /** Compares the username case-insensitively. */
     @Query("SELECT count(u) > 0 FROM User u WHERE lower(u.username) = lower(:username)")
     boolean existsByUsername(@Param("username") String username);
 

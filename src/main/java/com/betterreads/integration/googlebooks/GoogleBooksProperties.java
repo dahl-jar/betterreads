@@ -10,8 +10,7 @@ import org.springframework.validation.annotation.Validated;
  * Google Books REST API config bound from {@code googlebooks.*}.
  *
  * <p>{@code apiKey} is not {@code @NotBlank} so the app boots without a key in profiles
- * that never call Google Books; {@code GoogleBooksWebClientConfig} fails fast on the first
- * request if the key is missing.
+ * that never call Google Books; without one, requests go out on Google's keyless quota.
  *
  * @param baseUrl Books API base, e.g. {@code https://www.googleapis.com/books/v1}
  * @param apiKey Google Cloud API key with the Books API enabled

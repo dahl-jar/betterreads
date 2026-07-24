@@ -5,7 +5,7 @@ import jakarta.persistence.Converter;
 
 import org.jspecify.annotations.Nullable;
 
-/** Persists {@link ReadingStatus} as its lowercase {@code dbValue} rather than the enum name. */
+/** Persists {@link ReadingStatus} as its lowercase {@code dbValue}. */
 @Converter(autoApply = true)
 public class ReadingStatusConverter implements AttributeConverter<ReadingStatus, String> {
 

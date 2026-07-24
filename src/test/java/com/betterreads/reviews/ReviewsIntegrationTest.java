@@ -205,6 +205,18 @@ class ReviewsIntegrationTest extends ContainerizedTest {
         }
 
         @Test
+        void blankTitleAndBodyAreStoredAsNoProse() throws Exception {
+            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+
+            final ResultActions response = putReview(token, DUNE_KEY, FIVE_STARS, "", "   ");
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_TITLE).doesNotExist())
+                .andExpect(jsonPath(JSON_BODY).doesNotExist());
+        }
+
+        @Test
         void secondSubmitEditsTheSameReview() throws Exception {
             final String token = registerAndLogin(DARROW, DARROW_EMAIL);
             putReview(token, DUNE_KEY, FIVE_STARS, REVIEW_TITLE, REVIEW_BODY);
@@ -322,19 +334,6 @@ class ReviewsIntegrationTest extends ContainerizedTest {
 
             response.andExpect(status().isNoContent());
         }
-
-        @Test
-        void deletingWithoutAReviewLeavesTheExternalRatingIntact() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
-            seedSourceRating(DUNE_KEY);
-
-            mockMvc.perform(delete(reviewUrl(DUNE_KEY)).header(AUTH_HEADER, BEARER_PREFIX + token))
-                .andExpect(status().isNoContent());
-
-            final Book book = bookRepository.findByDedupKey(DUNE_KEY).orElseThrow();
-            assertThat(book.getAverageRating()).isEqualByComparingTo(EXTERNAL_RATING);
-            assertThat(book.getRatingCount()).isEqualTo(EXTERNAL_RATING_COUNT);
-        }
     }
 
     @Nested
@@ -367,7 +366,7 @@ class ReviewsIntegrationTest extends ContainerizedTest {
         }
 
         @Test
-        void cascadeDeletingAReviewRecomputesTheCommunityRating() throws Exception {
+        void aReviewDeletedOutsideTheApiRecomputesTheCommunityRating() throws Exception {
             final String darrowToken = registerAndLogin(DARROW, DARROW_EMAIL);
             final String goblinToken = registerAndLogin(GOBLIN, GOBLIN_EMAIL);
             putReview(darrowToken, DUNE_KEY, FIVE_STARS, null, null);

@@ -37,7 +37,7 @@ class GoogleBooksMapperTest {
         }
 
         @Test
-        @DisplayName("input not starting with four digits is null, not Integer.valueOf(null) throwing")
+        @DisplayName("a date without a leading four-digit year is null")
         void garbageInputReturnsNull() {
             assertThat(GoogleBooksMapper.parseYear("circa 1990")).isNull();
         }
@@ -54,7 +54,7 @@ class GoogleBooksMapperTest {
     class FindIsbn13 {
 
         @Test
-        @DisplayName("picks ISBN_13 when present alongside ISBN_10, never synthesizes from the 10")
+        @DisplayName("picks ISBN_13 when present alongside ISBN_10")
         void picksIsbn13OverIsbn10() {
             final String isbn13 = "9781250832368";
             final List<IndustryIdentifier> identifiers = List.of(
@@ -86,6 +86,16 @@ class GoogleBooksMapperTest {
     }
 
     @Test
+    @DisplayName("falls back to the small thumbnail when the full-size one is absent")
+    void fallsBackToSmallThumbnail() {
+        final String smallThumbnail = "https://books.google.com/books/content?id=x&img=1&zoom=5";
+
+        final SourceBook book = mapWith(info -> withImageLinks(info, new ImageLinks(null, smallThumbnail)));
+
+        assertThat(book.coverUrl()).isEqualTo(smallThumbnail);
+    }
+
+    @Test
     @DisplayName("no image links leaves the cover null so another source can supply it")
     void noImageLinksLeavesCoverNull() {
         final SourceBook book = mapWith(info -> info);
@@ -113,7 +123,7 @@ class GoogleBooksMapperTest {
                 info -> withCategories(info, List.of("Comics & Graphic Novels", "Fiction")));
 
             assertThat(book.rawSubjects())
-                .as("Google's coarse shelf must reach subjects, not sit in an unread field")
+                .as("Google's coarse shelf reduces into catalog subjects")
                 .contains("comics", "fiction");
         }
 
@@ -129,12 +139,12 @@ class GoogleBooksMapperTest {
     }
 
     @Test
-    @DisplayName("Google rating is not mapped; rating is Hardcover-only")
+    @DisplayName("a volume's rating stays out of the mapped book")
     void googleRatingIsNotMapped() {
         final SourceBook book = mapWith(info -> info);
 
         assertThat(book.averageRating())
-            .as("Google's rating is not trusted; only Hardcover supplies a rating")
+            .as("the catalog takes ratings from Hardcover")
             .isNull();
         assertThat(book.ratingCount()).isNull();
     }

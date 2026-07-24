@@ -11,8 +11,7 @@ import tools.jackson.databind.JsonNode;
  *
  * <p>The records sit in a default XML namespace inside the {@code zs:} SRU wrapper. Jackson's XML
  * mapper parses repeated elements as either a single node or an array, and folds element text into a
- * {@code ""} child when the element also carries attributes. These helpers smooth over both shapes
- * so callers read fields without minding namespaces or arity.
+ * {@code ""} child when the element also carries attributes.
  */
 public final class SruTree {
 
@@ -75,7 +74,7 @@ public final class SruTree {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    /** Returns the integer value of a tag's text, or null if absent or non-numeric. */
+    /** Returns the text parsed as an integer, or empty when absent or non-numeric. */
     public static Optional<Integer> intValue(final @Nullable String value) {
         if (value == null) {
             return Optional.empty();

@@ -1,2 +1,2 @@
-/** Wikidata integration over the SPARQL endpoint and REST entity API. */
+/** Wikidata integration over the entity search and entity document endpoints. */
 package com.betterreads.integration.wikidata;

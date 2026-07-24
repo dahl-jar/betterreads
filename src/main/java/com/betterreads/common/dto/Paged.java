@@ -3,9 +3,8 @@ package com.betterreads.common.dto;
 import java.util.List;
 
 /**
- * A paged collection response. {@link com.betterreads.common.web.ApiResponseBodyAdvice} lifts the
- * items into the envelope's {@code data} and the counts into its {@code meta}, so a paged record
- * serializes as {@code {data: [...], meta: {...}}} like any other collection.
+ * A paged collection response. The items serialize as {@link ApiResponse}'s {@code data} and the
+ * counts as its {@code meta}.
  *
  * @param <T> the item type
  */

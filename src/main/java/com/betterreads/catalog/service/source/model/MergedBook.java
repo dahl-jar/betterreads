@@ -11,8 +11,8 @@ import org.jspecify.annotations.Nullable;
  * provenance field, the set of sources that contributed subjects, and the set of sources that
  * resolved successfully on this collect.
  *
- * <p>Subjects are unioned across sources rather than taken from one source, so they carry a set of
- * contributors instead of a single entry in {@code fieldSources}.
+ * <p>Subjects are unioned across sources, so {@code subjectSources} lists every contributor while
+ * {@code fieldSources} records only the first.
  *
  * <p>{@code resolvedSources} separates "the source ran and returned an answer, including a clean
  * empty" from "the source failed or was not consulted". A field-clearing write depends on this: a
@@ -71,7 +71,10 @@ public record MergedBook(
         return new MergedBook(replacement, updated, subjectSources, resolvedSources);
     }
 
-    /** Returns a copy with {@code resolvedSources} set to {@code sources}. */
+    /**
+     * Returns a copy carrying every source that ran, including one whose clean empty contributed no
+     * book for the merge to infer it from.
+     */
     public MergedBook withResolvedSources(final Set<BookFieldSource> sources) {
         return new MergedBook(book, fieldSources, subjectSources, sources);
     }

@@ -27,8 +27,8 @@ import org.springframework.web.util.UriBuilder;
  *
  * <p>A lookup is two calls: {@code search.json} resolves the work, then {@code /works/{key}.json}
  * adds the description and subjects the search omits. The search ranks fuzzily and can return a
- * related work, so {@link #titleMatches} rejects drift. 4xx resolves to {@link Optional#empty()};
- * 5xx and network failures propagate.
+ * related work, so a hit whose title drifts from the query is dropped. 4xx resolves to
+ * {@link Optional#empty()}; 5xx and network failures propagate.
  */
 @Component
 public class OpenLibraryClientImpl implements OpenLibraryClient {
@@ -77,7 +77,8 @@ public class OpenLibraryClientImpl implements OpenLibraryClient {
 
     @Override
     public Optional<SourceBook> fetchByTitleAuthor(final String title, final String author) {
-        return candidates(builder -> builder.queryParam("title", title).queryParam("author", author))
+        return searchDocs(CANDIDATE_LIMIT,
+                builder -> builder.queryParam("title", title).queryParam("author", author))
             .stream()
             .filter(doc -> titleMatches(doc, title))
             .min(Comparator.comparing(OpenLibraryClientImpl::publishYearOrMax))
@@ -86,30 +87,10 @@ public class OpenLibraryClientImpl implements OpenLibraryClient {
 
     @Override
     public List<SourceBook> search(final String query, final int limit) {
-        try {
-            final SearchResponse response = openLibraryWebClient.get()
-                .uri(builder -> builder.path(SEARCH_PATH)
-                    .queryParam("q", query)
-                    .queryParam(LIMIT_PARAM, limit)
-                    .queryParam(FIELDS_PARAM, SEARCH_FIELDS)
-                    .build())
-                .retrieve()
-                .bodyToMono(SearchResponse.class)
-                .block();
-            if (response == null || response.docs() == null) {
-                return List.of();
-            }
-            return response.docs().stream()
-                .map(doc -> mapper.toSourceBook(doc, null))
-                .filter(book -> book != null)
-                .toList();
-        } catch (WebClientResponseException ex) {
-            if (ex.getStatusCode().is4xxClientError()) {
-                LOG.debug(SEARCH_4XX_LOG, ex.getStatusCode().value());
-                return List.of();
-            }
-            throw ex;
-        }
+        return searchDocs(limit, builder -> builder.queryParam("q", query)).stream()
+            .map(doc -> mapper.toSourceBook(doc, null))
+            .filter(book -> book != null)
+            .toList();
     }
 
     @Override
@@ -124,43 +105,22 @@ public class OpenLibraryClientImpl implements OpenLibraryClient {
     }
 
     private Optional<SourceBook> enrichAndMap(final SearchDoc doc) {
-        final String workKey = stripWorksPrefix(doc.key());
+        final String workKey = OpenLibraryMapper.stripWorksPrefix(doc.key());
         final WorkDetail work = workKey == null ? null : fetchWork(workKey);
         return Optional.ofNullable(mapper.toSourceBook(doc, work));
     }
 
     private Optional<SearchDoc> firstMatch(final Consumer<UriBuilder> queryCustomizer) {
-        try {
-            final SearchResponse response = openLibraryWebClient.get()
-                .uri(builder -> {
-                    builder.path(SEARCH_PATH)
-                        .queryParam(LIMIT_PARAM, 1)
-                        .queryParam(FIELDS_PARAM, SEARCH_FIELDS);
-                    queryCustomizer.accept(builder);
-                    return builder.build();
-                })
-                .retrieve()
-                .bodyToMono(SearchResponse.class)
-                .block();
-            if (response == null || response.docs() == null || response.docs().isEmpty()) {
-                return Optional.empty();
-            }
-            return Optional.ofNullable(response.docs().get(0));
-        } catch (WebClientResponseException ex) {
-            if (ex.getStatusCode().is4xxClientError()) {
-                LOG.debug(SEARCH_4XX_LOG, ex.getStatusCode().value());
-                return Optional.empty();
-            }
-            throw ex;
-        }
+        final List<SearchDoc> docs = searchDocs(1, queryCustomizer);
+        return docs.isEmpty() ? Optional.empty() : Optional.ofNullable(docs.get(0));
     }
 
-    private List<SearchDoc> candidates(final Consumer<UriBuilder> queryCustomizer) {
+    private List<SearchDoc> searchDocs(final int limit, final Consumer<UriBuilder> queryCustomizer) {
         try {
             final SearchResponse response = openLibraryWebClient.get()
                 .uri(builder -> {
                     builder.path(SEARCH_PATH)
-                        .queryParam(LIMIT_PARAM, CANDIDATE_LIMIT)
+                        .queryParam(LIMIT_PARAM, limit)
                         .queryParam(FIELDS_PARAM, SEARCH_FIELDS);
                     queryCustomizer.accept(builder);
                     return builder.build();
@@ -205,12 +165,5 @@ public class OpenLibraryClientImpl implements OpenLibraryClient {
     private static boolean titleMatches(final SearchDoc doc, final String queryTitle) {
         final String docTitle = doc.title();
         return docTitle != null && TextMatch.titleWithinQuery(docTitle, queryTitle);
-    }
-
-    private static @Nullable String stripWorksPrefix(final @Nullable String key) {
-        if (key == null) {
-            return null;
-        }
-        return key.startsWith(WORKS_PREFIX) ? key.substring(WORKS_PREFIX.length()) : key;
     }
 }

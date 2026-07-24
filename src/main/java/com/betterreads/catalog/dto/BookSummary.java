@@ -6,10 +6,10 @@ import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A book as shown on a shelf entry or a reader's review list, with the cover already resolved to
- * the served URL.
+ * A book as shown on a shelf entry or a reader's review list, with the cover resolved to the served
+ * URL.
  *
- * @param bookId the local catalog id, for keying the book to a per-user row
+ * @param bookId the catalog id, which links the book to the reader's own shelf and review entries
  * @param dedupKey the public lookup key, shared with search and detail
  * @param title the book title
  * @param authors the author names, sorted

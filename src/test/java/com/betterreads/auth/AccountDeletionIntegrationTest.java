@@ -48,14 +48,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Verifies the account-deletion flow end-to-end: self-service soft-delete via
- * {@code DELETE /api/v1/auth/me}, the side effects on refresh and email tokens, the
- * grace-window-block on re-registration, and the scheduled hard-delete sweep.
+ * Covers self-service deletion through {@code DELETE /api/v1/auth/me} and the hard-delete sweep
+ * that follows the grace period.
  *
- * <p>Grace period is overridden to 6 hours via {@code betterreads.auth.deletion.grace-period-hours}
- * so tests can shape timelines around a known cutoff without waiting real wall-clock time.
- * The {@code deleted_at} column is written directly via {@link JdbcTemplate} where the test
- * needs a soft-delete with a specific timestamp (the API path always uses {@code now()}).
+ * <p>The grace period is 6 hours ({@code betterreads.auth.deletion.grace-period-hours}) so a test
+ * can put a timestamp either side of the cutoff without waiting. {@code deleted_at} is written
+ * through {@link JdbcTemplate} when a test needs a specific timestamp; the API path always
+ * stamps {@code now()}.
  */
 @SpringBootTest
 @Testcontainers
@@ -98,15 +97,15 @@ class AccountDeletionIntegrationTest extends ContainerizedTest {
 
     private static final String BEARER_PREFIX = "Bearer ";
 
-    private static final String USERNAME = "alice";
+    private static final String USERNAME = "darrow";
 
-    private static final String EMAIL = "alice@example.com";
+    private static final String EMAIL = "darrow@example.com";
 
     private static final String PASSWORD = "Sup3rSecret!";
 
-    private static final String OTHER_USERNAME = "bob";
+    private static final String OTHER_USERNAME = "mustang";
 
-    private static final String OTHER_EMAIL = "bob@example.com";
+    private static final String OTHER_EMAIL = "mustang@example.com";
 
     private static final String FIELD_USERNAME = "username";
 
@@ -272,21 +271,21 @@ class AccountDeletionIntegrationTest extends ContainerizedTest {
         @Test
         void deleteDoesNotTouchOtherUsersAuthMaterial() throws Exception {
             registerUser(USERNAME, EMAIL, PASSWORD);
-            final long bobId = registerUser(OTHER_USERNAME, OTHER_EMAIL, PASSWORD);
+            final long mustangId = registerUser(OTHER_USERNAME, OTHER_EMAIL, PASSWORD);
             passwordResetService.requestReset(OTHER_EMAIL);
-            final Tokens aliceTokens = loginAndCapture(USERNAME, PASSWORD);
-            final Tokens bobTokens = loginAndCapture(OTHER_USERNAME, PASSWORD);
+            final Tokens darrowTokens = loginAndCapture(USERNAME, PASSWORD);
+            final Tokens mustangTokens = loginAndCapture(OTHER_USERNAME, PASSWORD);
 
-            mockMvc.perform(delete(ME_URL).header(AUTH_HEADER, BEARER_PREFIX + aliceTokens.accessToken()))
+            mockMvc.perform(delete(ME_URL).header(AUTH_HEADER, BEARER_PREFIX + darrowTokens.accessToken()))
                 .andExpect(status().isNoContent());
 
-            assertThat(activeRefreshTokenCount(bobId))
-                .as("bob's refresh tokens are untouched when alice deletes her account")
+            assertThat(activeRefreshTokenCount(mustangId))
+                .as("mustang's refresh tokens are untouched when darrow deletes their account")
                 .isPositive();
-            assertThat(activeEmailTokenCount(bobId))
-                .as("bob's outstanding password-reset token is untouched")
+            assertThat(activeEmailTokenCount(mustangId))
+                .as("mustang's outstanding password-reset token is untouched")
                 .isPositive();
-            mockMvc.perform(post(REFRESH_URL).cookie(new Cookie(COOKIE_NAME, bobTokens.refreshCookieValue())))
+            mockMvc.perform(post(REFRESH_URL).cookie(new Cookie(COOKIE_NAME, mustangTokens.refreshCookieValue())))
                 .andExpect(status().isOk());
         }
     }

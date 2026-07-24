@@ -7,11 +7,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.betterreads.catalog.service.source.model.BookFieldSource;
 import com.betterreads.integration.hardcover.HardcoverProperties;
-import org.assertj.core.api.Assertions;
 import com.betterreads.integration.hardcover.HardcoverWebClientConfig;
 import com.betterreads.integration.hardcover.mapper.HardcoverMapper;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,12 +25,10 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 /**
- * Exercises the Hardcover client request path against a stubbed GraphQL boundary, so hit selection,
- * the title-drift guard, and 401/5xx handling run in CI with no live API and no Docker.
+ * Exercises the Hardcover client request path against a stubbed GraphQL boundary.
  *
- * <p>The stub bodies are trimmed copies of the real typesense payload observed on 2026-05-31,
- * including the case that matters most: the top hit is a one-rating stub and the canonical work is
- * a later hit with thousands of reads.
+ * <p>The stub bodies are trimmed copies of the real typesense payload observed on 2026-05-31, where
+ * the top hit is a one-rating stub and the canonical work is a later hit with thousands of reads.
  */
 @SpringBootTest(
     classes = {
