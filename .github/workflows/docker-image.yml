@@ -103,19 +103,19 @@ jobs:
       - name: Checkout manifests repo
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
-          repository: dahl-jar/homelab
+          repository: ${{ secrets.MANIFESTS_REPO }}
           ssh-key: ${{ secrets.HOMELAB_DEPLOY_KEY }}
-          path: homelab
+          path: manifests
 
       - name: Pin app image to this commit and digest
-        working-directory: homelab/versions/betterreads
+        working-directory: manifests/versions/betterreads
         run: |
           set -euo pipefail
           test -n "${DIGEST}"
           kustomize edit set image "ghcr.io/dahl-jar/betterreads=ghcr.io/dahl-jar/betterreads:sha-${GITHUB_SHA}@${DIGEST}"
 
       - name: Commit and push if changed
-        working-directory: homelab
+        working-directory: manifests
         run: |
           set -euo pipefail
           if git diff --quiet -- versions/betterreads/kustomization.yaml; then
