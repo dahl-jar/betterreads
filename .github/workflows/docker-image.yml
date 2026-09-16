@@ -104,7 +104,7 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
           repository: ${{ secrets.MANIFESTS_REPO }}
-          ssh-key: ${{ secrets.HOMELAB_DEPLOY_KEY }}
+          ssh-key: ${{ secrets.MANIFESTS_DEPLOY_KEY }}
           path: manifests
 
       - name: Pin app image to this commit and digest
