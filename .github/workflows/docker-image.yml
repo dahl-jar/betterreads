@@ -54,6 +54,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
@@ -78,6 +80,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push
+        id: build
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6.19.2
         with:
           context: .
@@ -94,6 +97,8 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
+    env:
+      DIGEST: ${{ needs.build-and-push.outputs.digest }}
     steps:
       - name: Checkout manifests repo
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
@@ -102,18 +107,23 @@ jobs:
           ssh-key: ${{ secrets.HOMELAB_DEPLOY_KEY }}
           path: homelab
 
-      - name: Pin app image to this commit
-        working-directory: homelab/projects/betterreads
-        run: kustomize edit set image ghcr.io/dahl-jar/betterreads:sha-${{ github.sha }}
+      - name: Pin app image to this commit and digest
+        working-directory: homelab/versions/betterreads
+        run: |
+          set -euo pipefail
+          test -n "${DIGEST}"
+          kustomize edit set image "ghcr.io/dahl-jar/betterreads=ghcr.io/dahl-jar/betterreads:sha-${GITHUB_SHA}@${DIGEST}"
 
       - name: Commit and push if changed
         working-directory: homelab
         run: |
-          if git diff --quiet; then
+          set -euo pipefail
+          if git diff --quiet -- versions/betterreads/kustomization.yaml; then
             echo "image already pinned to sha-${GITHUB_SHA}, nothing to do"
             exit 0
           fi
           git config user.name "betterreads-ci"
           git config user.email "ci@betterreadsapp.com"
-          git commit -am "Deploy betterreads sha-${GITHUB_SHA}"
+          git add versions/betterreads/kustomization.yaml
+          git commit -m "Deploy betterreads sha-${GITHUB_SHA}" -- versions/betterreads/kustomization.yaml
           git push
