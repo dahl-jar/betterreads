@@ -61,7 +61,10 @@
     </Match>
     <Match>
         <Bug pattern="EI_EXPOSE_REP2"/>
-        <Package name="com.betterreads.catalog.read.sse"/>
+        <Or>
+            <Package name="com.betterreads.catalog.read.sse"/>
+            <Package name="com.betterreads.search.sse"/>
+        </Or>
     </Match>
     <Match>
         <Bug pattern="EI_EXPOSE_REP2"/>

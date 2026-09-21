@@ -7,6 +7,9 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +21,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -41,6 +45,10 @@ class OpenApiEnvelopeTest extends ContainerizedTest {
     static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
 
     private static final String API_DOCS = "/v3/api-docs";
+
+    private static final Path SPEC_FILE = Path.of("openapi.yaml");
+
+    private static final boolean WRITE_SPEC = Boolean.getBoolean("openapi.write");
 
     private static final String BOOK_DETAIL_200 =
         "$.paths.['/api/v1/books/{key}'].get.responses.200.content.['*/*'].schema";
@@ -90,5 +98,21 @@ class OpenApiEnvelopeTest extends ContainerizedTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath(HEALTHZ_200 + ".$ref").value("#/components/schemas/HealthResponse"))
             .andExpect(jsonPath(HEALTHZ_200 + DATA_PROPERTY).doesNotExist());
+    }
+
+    @Test
+    void shouldMatchCommittedSpec() throws Exception {
+        final String generated = MockMvcBuilders.webAppContextSetup(webApplicationContext).build()
+            .perform(get(API_DOCS + ".yaml"))
+            .andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+
+        if (WRITE_SPEC) {
+            Files.writeString(SPEC_FILE, generated, StandardCharsets.UTF_8);
+            return;
+        }
+        assertThat(Files.readString(SPEC_FILE, StandardCharsets.UTF_8))
+            .as("openapi.yaml is stale, run ./gradlew openApiSpec and commit the result")
+            .isEqualTo(generated);
     }
 }

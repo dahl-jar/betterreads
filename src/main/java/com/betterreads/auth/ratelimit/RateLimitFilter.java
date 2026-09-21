@@ -212,11 +212,14 @@ public final class RateLimitFilter extends OncePerRequestFilter {
         if (HttpMethod.POST.matches(request.getMethod())) {
             return uri.endsWith(COMMENTS_SUFFIX) ? commentWriteEndpoint : null;
         }
-        final boolean publicRead = PUBLIC_READ_PREFIXES.stream().anyMatch(uri::startsWith);
-        if (!HttpMethod.GET.matches(request.getMethod()) || !publicRead) {
+        if (!HttpMethod.GET.matches(request.getMethod())) {
             return null;
         }
-        return uri.endsWith(EVENT_STREAM_SUFFIX) ? eventStreamEndpoint : detailEndpoint;
+        if (uri.endsWith(EVENT_STREAM_SUFFIX)) {
+            return eventStreamEndpoint;
+        }
+        final boolean publicRead = PUBLIC_READ_PREFIXES.stream().anyMatch(uri::startsWith);
+        return publicRead ? detailEndpoint : null;
     }
 
     /** One endpoint's bucket settings, keyed in Redis under {@code keyPrefix}. */

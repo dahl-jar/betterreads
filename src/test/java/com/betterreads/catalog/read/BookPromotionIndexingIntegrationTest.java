@@ -2,6 +2,8 @@ package com.betterreads.catalog.read;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 
 import com.betterreads.catalog.repository.BookRepository;
 import com.betterreads.catalog.repository.PendingBookRepository;
@@ -26,6 +28,10 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
@@ -59,6 +65,8 @@ class BookPromotionIndexingIntegrationTest extends ContainerizedTest {
 
     private static final int ONE_HIT = 1;
 
+    private static final String DUNE_QUERY = "dune";
+
     static final GenericContainer<?> MEILISEARCH = new GenericContainer<>(
             DockerImageName.parse("getmeili/meilisearch:v1.11"))
         .withExposedPorts(MEILISEARCH_PORT)
@@ -85,6 +93,9 @@ class BookPromotionIndexingIntegrationTest extends ContainerizedTest {
     @Autowired
     private PendingBookRepository pendingBooks;
 
+    @Autowired
+    private WebApplicationContext webApplicationContext;
+
     @DynamicPropertySource
     static void meilisearchProps(final DynamicPropertyRegistry registry) {
         registry.add("meilisearch.host",
@@ -100,6 +111,22 @@ class BookPromotionIndexingIntegrationTest extends ContainerizedTest {
     }
 
     @Test
+    void shouldPushPromotedBookToOpenSearchStream() throws Exception {
+        final MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+        final MvcResult stream = mockMvc.perform(get("/api/v1/search/books/events").param("q", DUNE_QUERY))
+            .andExpect(request().asyncStarted())
+            .andReturn();
+        pendingBookService.stage(merger.merge(List.of(SourceBooks.dune())));
+
+        pendingBookService.promoteReady();
+
+        await().atMost(Duration.ofSeconds(INDEX_WAIT_SECONDS)).untilAsserted(() ->
+            assertThat(stream.getResponse().getContentAsString())
+                .contains("event:search-hit")
+                .contains(SourceBooks.dune().dedupKey()));
+    }
+
+    @Test
     @DisplayName("a promoted book is searchable right after promotion")
     void promotedBookIsSearchable() {
         pendingBookService.stage(merger.merge(List.of(SourceBooks.dune())));
@@ -107,7 +134,7 @@ class BookPromotionIndexingIntegrationTest extends ContainerizedTest {
         pendingBookService.promoteReady();
 
         await().atMost(Duration.ofSeconds(INDEX_WAIT_SECONDS)).untilAsserted(() -> {
-            final BookSearchResult result = searchService.search("dune", 0, FULL_PAGE);
+            final BookSearchResult result = searchService.search(DUNE_QUERY, 0, FULL_PAGE);
             assertThat(result.hits()).hasSize(ONE_HIT);
         });
     }

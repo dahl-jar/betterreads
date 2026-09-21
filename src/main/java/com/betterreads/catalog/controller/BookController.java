@@ -1,8 +1,10 @@
 package com.betterreads.catalog.controller;
 
 import com.betterreads.catalog.dto.BookCardResponse;
+import com.betterreads.catalog.dto.BookCountResponse;
 import com.betterreads.catalog.dto.BookDetailResponse;
 import com.betterreads.catalog.read.sse.BookUpdateEmitters;
+import com.betterreads.catalog.service.read.BookCountReader;
 import com.betterreads.catalog.service.read.BookListService;
 import com.betterreads.catalog.service.read.BookListType;
 import com.betterreads.catalog.service.read.BookReadService;
@@ -40,13 +42,23 @@ public class BookController {
 
     private final BookUpdateEmitters emitters;
 
+    private final BookCountReader bookCountReader;
+
     public BookController(
         final BookReadService bookReadService,
         final BookListService bookListService,
-        final BookUpdateEmitters emitters) {
+        final BookUpdateEmitters emitters,
+        final BookCountReader bookCountReader) {
         this.bookReadService = bookReadService;
         this.bookListService = bookListService;
         this.emitters = emitters;
+        this.bookCountReader = bookCountReader;
+    }
+
+    @GetMapping("/count")
+    @Operation(summary = "Count the books in the catalog")
+    public BookCountResponse count() {
+        return bookCountReader.count();
     }
 
     /** @param limit the maximum number of cards, capped at {@value #MAX_LIST_SIZE} */

@@ -1,16 +1,10 @@
 package com.betterreads.catalog.read.sse;
 
 import com.betterreads.catalog.dto.BookDetailResponse;
-import com.betterreads.common.util.LogSanitizer;
-import java.io.IOException;
-import java.util.Map;
+import com.betterreads.common.sse.HeartbeatStreams;
+import com.betterreads.common.sse.SseStreams;
 import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -23,29 +17,15 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * timeout, or error.
  */
 @Component
-public class BookUpdateEmitters {
-
-    private static final Logger LOG = LoggerFactory.getLogger(BookUpdateEmitters.class);
+public class BookUpdateEmitters implements HeartbeatStreams {
 
     private static final String EVENT_NAME = "book-updated";
 
-    private static final long DEFAULT_TIMEOUT_MILLIS = 300_000L;
-
-    private static final int MAX_OPEN_STREAMS = 500;
-
-    private final Map<String, Set<SseEmitter>> byKey = new ConcurrentHashMap<>();
-
-    private final AtomicInteger openStreams = new AtomicInteger();
+    private final SseStreams streams = new SseStreams();
 
     /** Registers a new stream for the key and removes it again when it ends. */
     public SseEmitter register(final String key) {
-        final SseEmitter emitter = new SseEmitter(DEFAULT_TIMEOUT_MILLIS);
-        openStreams.incrementAndGet();
-        byKey.computeIfAbsent(key, ignored -> ConcurrentHashMap.newKeySet()).add(emitter);
-        emitter.onCompletion(() -> remove(key, emitter));
-        emitter.onTimeout(() -> remove(key, emitter));
-        emitter.onError(ignored -> remove(key, emitter));
-        return emitter;
+        return streams.register(key);
     }
 
     /**
@@ -64,89 +44,39 @@ public class BookUpdateEmitters {
         final boolean complete,
         final Supplier<Optional<BookDetailResponse>> reread
     ) {
-        if (complete || openStreams.get() >= MAX_OPEN_STREAMS) {
-            final SseEmitter emitter = new SseEmitter(DEFAULT_TIMEOUT_MILLIS);
+        if (complete || streams.atCapacity()) {
+            final SseEmitter emitter = streams.newEmitter();
             send(emitter, current);
             return emitter;
         }
-        final SseEmitter emitter = register(key);
-        connectComment(emitter);
+        final SseEmitter emitter = streams.register(key);
         reread.get()
             .filter(BookDetailResponse::complete)
             .ifPresent(detail -> publish(key, detail));
         return emitter;
     }
 
-    /**
-     * Sends the filled-in book to every stream on the key, then completes them.
-     *
-     * <p>Removing the key's set before the sends stops each emitter's completion callback from
-     * decrementing the open count a second time.
-     */
+    /** Sends the filled-in book to every stream on the key, then completes them. */
     public void publish(final String key, final BookDetailResponse detail) {
-        final Set<SseEmitter> streams = byKey.remove(key);
-        if (streams == null) {
-            return;
-        }
-        for (final SseEmitter emitter : streams) {
-            openStreams.decrementAndGet();
-            send(emitter, detail);
-        }
+        streams.take(key).forEach(emitter -> send(emitter, detail));
     }
 
     /** Returns the number of open streams on the key. */
     public int openCount(final String key) {
-        final Set<SseEmitter> streams = byKey.get(key);
-        return streams == null ? 0 : streams.size();
+        return streams.openCount(key);
     }
 
     /** Returns the total open streams across every key, the value the cap is checked against. */
     public int openStreamCount() {
-        return openStreams.get();
+        return streams.openStreamCount();
     }
 
-    /** Sends a keepalive comment to every open stream so an idle connection is not cut. */
+    @Override
     public void heartbeat() {
-        byKey.values().forEach(streams -> streams.forEach(this::keepAlive));
+        streams.heartbeat();
     }
 
     private void send(final SseEmitter emitter, final BookDetailResponse detail) {
-        if (emit(emitter, SseEmitter.event().name(EVENT_NAME).data(detail))) {
-            try {
-                emitter.complete();
-            } catch (IllegalStateException ex) {
-                emitter.completeWithError(ex);
-            }
-        }
-    }
-
-    private void keepAlive(final SseEmitter emitter) {
-        emit(emitter, SseEmitter.event().comment("keepalive"));
-    }
-
-    private void connectComment(final SseEmitter emitter) {
-        emit(emitter, SseEmitter.event().comment("connected"));
-    }
-
-    private boolean emit(final SseEmitter emitter, final SseEmitter.SseEventBuilder event) {
-        try {
-            emitter.send(event);
-            return true;
-        } catch (IOException | IllegalStateException ex) {
-            emitter.completeWithError(ex);
-            return false;
-        }
-    }
-
-    private void remove(final String key, final SseEmitter emitter) {
-        final boolean[] removed = {false};
-        byKey.computeIfPresent(key, (ignored, streams) -> {
-            removed[0] = streams.remove(emitter);
-            return streams.isEmpty() ? null : streams;
-        });
-        if (removed[0]) {
-            openStreams.decrementAndGet();
-        }
-        LOG.debug("catalog.sse stream closed key={}", LogSanitizer.forLog(key));
+        streams.sendAndComplete(emitter, EVENT_NAME, detail);
     }
 }

@@ -16,6 +16,7 @@ import com.betterreads.search.service.BookSearchService;
 import com.betterreads.search.service.SearchIndexException;
 import com.betterreads.support.ContainerizedTest;
 import java.util.Collection;
+import java.util.Optional;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -107,6 +108,11 @@ class PromotionIndexOutageIntegrationTest extends ContainerizedTest {
         @Override
         public SearchOutcome searchOutcome(final String query, final int offset, final int limit) {
             return new SearchOutcome(search(query, offset, limit), false);
+        }
+
+        @Override
+        public Optional<BookSearchDocument> hitFor(final String query, final String bookId) {
+            return Optional.empty();
         }
 
         @Override

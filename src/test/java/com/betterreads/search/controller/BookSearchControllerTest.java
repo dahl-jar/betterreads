@@ -8,6 +8,7 @@ import com.betterreads.catalog.service.pipeline.SearchMissStager;
 import com.betterreads.search.dto.BookSearchResult;
 import com.betterreads.search.dto.SearchOutcome;
 import com.betterreads.search.service.BookSearchService;
+import com.betterreads.search.sse.SearchHitEmitters;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,7 +35,8 @@ class BookSearchControllerTest {
 
     private final SearchMissStager stager = Mockito.mock(SearchMissStager.class);
 
-    private final BookSearchController controller = new BookSearchController(searchService, stager);
+    private final BookSearchController controller = new BookSearchController(
+        searchService, stager, Mockito.mock(SearchHitEmitters.class));
 
     @Test
     @DisplayName("the first page stages the query even when the search returns hits")

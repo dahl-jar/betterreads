@@ -32,7 +32,8 @@ public class MeilisearchIndexInitializer implements ApplicationRunner {
 
     private static final String[] SORTABLE = {"popularityScore", PUBLICATION_YEAR};
 
-    private static final String[] FILTERABLE = {"language", PUBLICATION_YEAR};
+    private static final String[] FILTERABLE =
+        {BookSearchDocument.PRIMARY_KEY, "language", PUBLICATION_YEAR};
 
     private final Client client;
 

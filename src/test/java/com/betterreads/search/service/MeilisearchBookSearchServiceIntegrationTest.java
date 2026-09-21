@@ -9,6 +9,7 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -68,6 +69,14 @@ class MeilisearchBookSearchServiceIntegrationTest extends ContainerizedTest {
     private static final String SERIES_QUERY = "lord of the rings";
 
     private static final int LOTR_VOLUMES = 3;
+
+    private static final String ANDERSON_ID = "ande";
+
+    private static final String ANDERSON_TITLE = "Dune: House Atreides";
+
+    private static final String ANDERSON = "Kevin J. Anderson";
+
+    private static final String SANDERSON_QUERY = "sanderson";
 
     static final GenericContainer<?> MEILISEARCH = new GenericContainer<>(
             DockerImageName.parse("getmeili/meilisearch:v1.11"))
@@ -154,12 +163,11 @@ class MeilisearchBookSearchServiceIntegrationTest extends ContainerizedTest {
         @DisplayName("a typo cross-match to a different author scores too low and is dropped")
         void dropsTypoCrossMatchToAnotherAuthor() {
             final String sandersonId = "sand";
-            final String andersonId = "ande";
             searchService.index(List.of(
                 doc(sandersonId, "Mistborn", "Brandon Sanderson", null),
-                doc(andersonId, "Dune: House Atreides", "Kevin J. Anderson", null)));
+                doc(ANDERSON_ID, ANDERSON_TITLE, ANDERSON, null)));
             try {
-                final BookSearchResult result = searchService.search("sanderson", 0, FULL_PAGE);
+                final BookSearchResult result = searchService.search(SANDERSON_QUERY, 0, FULL_PAGE);
 
                 assertThat(result.hits())
                     .as("'sanderson' fuzzy-matches 'Anderson', but that hit scores below the "
@@ -168,7 +176,7 @@ class MeilisearchBookSearchServiceIntegrationTest extends ContainerizedTest {
                     .containsExactly(sandersonId);
             } finally {
                 searchService.remove(sandersonId);
-                searchService.remove(andersonId);
+                searchService.remove(ANDERSON_ID);
             }
         }
 
@@ -182,6 +190,37 @@ class MeilisearchBookSearchServiceIntegrationTest extends ContainerizedTest {
             assertThat(secondPage.hits()).hasSize(PAGE_SIZE);
             assertThat(firstPage.totalHits()).isEqualTo(CORPUS_SIZE);
             assertThat(secondPage.offset()).isEqualTo(PAGE_SIZE);
+        }
+    }
+
+    @Nested
+    @DisplayName("hitFor")
+    class HitFor {
+
+        @Test
+        void shouldReturnDocumentWhenBookMatchesQuery() {
+            final Optional<BookSearchDocument> hit = searchService.hitFor(HOBBIT_QUERY, "1");
+
+            assertThat(hit).map(BookSearchDocument::title).contains(HOBBIT_TITLE);
+        }
+
+        @Test
+        void shouldReturnEmptyForBookOutsideQueryMatches() {
+            final Optional<BookSearchDocument> hit = searchService.hitFor(HOBBIT_QUERY, "2");
+
+            assertThat(hit).isEmpty();
+        }
+
+        @Test
+        void shouldReturnEmptyBelowRankingThreshold() {
+            searchService.index(List.of(doc(ANDERSON_ID, ANDERSON_TITLE, ANDERSON, null)));
+            try {
+                final Optional<BookSearchDocument> hit = searchService.hitFor(SANDERSON_QUERY, ANDERSON_ID);
+
+                assertThat(hit).isEmpty();
+            } finally {
+                searchService.remove(ANDERSON_ID);
+            }
         }
     }
 

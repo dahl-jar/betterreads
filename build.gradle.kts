@@ -326,6 +326,16 @@ tasks.register<Test>("localDbVerification") {
 	forwardEnvironmentVariables(localDbVerificationEnvironmentVariables)
 }
 
+tasks.register<Test>("openApiSpec") {
+	description = "Regenerates openapi.yaml from the running controllers."
+	group = "documentation"
+	testClassesDirs = testSourceSet.output.classesDirs
+	classpath = testSourceSet.runtimeClasspath
+	filter { includeTestsMatching("com.betterreads.config.OpenApiEnvelopeTest.shouldMatchCommittedSpec") }
+	systemProperty("openapi.write", "true")
+	outputs.upToDateWhen { false }
+}
+
 tasks.withType<Test> {
 	useJUnitPlatform()
 

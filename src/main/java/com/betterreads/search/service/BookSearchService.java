@@ -4,6 +4,7 @@ import com.betterreads.search.dto.BookSearchDocument;
 import com.betterreads.search.dto.BookSearchResult;
 import com.betterreads.search.dto.SearchOutcome;
 import java.util.Collection;
+import java.util.Optional;
 
 /** Full-text search over the book catalog. */
 public interface BookSearchService {
@@ -25,6 +26,8 @@ public interface BookSearchService {
      * @param limit page size, capped by the implementation
      */
     SearchOutcome searchOutcome(String query, int offset, int limit);
+
+    Optional<BookSearchDocument> hitFor(String query, String bookId);
 
     /** Inserts or replaces the given documents in the books index. */
     void index(Collection<BookSearchDocument> documents);

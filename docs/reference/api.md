@@ -1,6 +1,6 @@
 # API reference
 
-Public HTTP endpoints. Request and response shapes for every endpoint are in Swagger UI at `/swagger-ui.html`.
+Public HTTP endpoints. Request and response shapes for every endpoint are in Swagger UI at `/swagger-ui.html` and in the committed spec at `openapi.yaml`, regenerated with `./gradlew openApiSpec`.
 
 ## Search
 

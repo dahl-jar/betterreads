@@ -1,10 +1,10 @@
 package com.betterreads.catalog.service.pipeline;
 
 import com.betterreads.common.util.LogSanitizer;
+import com.betterreads.common.util.SearchQueryKey;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import java.time.Duration;
-import java.util.Locale;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import org.slf4j.Logger;
@@ -49,7 +49,7 @@ public class SearchMissStager {
 
     /** Stages the query off-thread once per dedup window, dropping repeats within the window. */
     public void stage(final String query) {
-        final String key = normalize(query);
+        final String key = SearchQueryKey.of(query);
         if (recentlyStaged.asMap().putIfAbsent(key, Boolean.TRUE) != null) {
             return;
         }
@@ -77,9 +77,5 @@ public class SearchMissStager {
         }
         final String host = LogSanitizer.forLog(ex.getRequest().getURI().getHost());
         return host == null ? UNKNOWN_SOURCE : host;
-    }
-
-    private static String normalize(final String query) {
-        return query.strip().toLowerCase(Locale.ROOT);
     }
 }

@@ -1,0 +1,1707 @@
+openapi: 3.1.0
+info:
+  title: BetterReads API
+  description: Book tracking and review API.
+  contact:
+    name: BetterReads
+  license:
+    name: Apache 2.0
+    url: https://github.com/dahl-jar/betterreads/blob/main/LICENSE
+  version: v1
+servers:
+- url: http://localhost:8080
+  description: Production
+security:
+- bearer-jwt: []
+tags:
+- name: Search
+  description: Catalog full-text search
+- name: Operations
+  description: Public probes used by external monitors
+- name: Comments
+  description: Comments on books and reviews
+- name: Images
+  description: Book cover images
+- name: Catalog
+  description: Public book detail and lists
+- name: Reviews
+  description: Book reviews and ratings
+- name: Authentication
+  description: "Register, log in, and look up the current user"
+- name: Shelf
+  description: The current user's reading shelf
+paths:
+  /api/v1/me/books/{key}/status:
+    put:
+      tags:
+      - Shelf
+      summary: Set the shelf status for a book
+      operationId: changeStatus
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetStatusRequest"
+        required: true
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: The updated shelf entry
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ShelfEntryResponse"
+        "400":
+          description: Unknown status value
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "401":
+          description: Missing or invalid access token
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: No book with that key
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/me/books/{key}/favorite:
+    put:
+      tags:
+      - Shelf
+      summary: Set the favorite flag for a book
+      operationId: markFavorite
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetFavoriteRequest"
+        required: true
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: The updated shelf entry
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ShelfEntryResponse"
+        "401":
+          description: Missing or invalid access token
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: No book with that key
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/books/{key}/reviews/me:
+    put:
+      tags:
+      - Reviews
+      summary: Post or edit the caller's review of a book
+      operationId: upsert
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertReviewRequest"
+        required: true
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: The saved review
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ReviewResponse"
+        "400":
+          description: Rating out of range or text too long
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "401":
+          description: Missing or invalid access token
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: No book with that key
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    delete:
+      tags:
+      - Reviews
+      summary: Remove the caller's review of a book
+      operationId: remove
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "503":
+          description: Service Unavailable
+        "204":
+          description: Review removed or already absent
+        "401":
+          description: Missing or invalid access token
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: No book with that key
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/reviews/{reviewId}/comments:
+    get:
+      tags:
+      - Comments
+      summary: List a review's comments
+      operationId: listForReview
+      parameters:
+      - name: reviewId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          minimum: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          maximum: 100
+          minimum: 1
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: A page of comments
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CommentResponse"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+        "404":
+          description: No review with that id
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    post:
+      tags:
+      - Comments
+      summary: Post a comment on a review
+      operationId: commentOnReview
+      parameters:
+      - name: reviewId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCommentRequest"
+        required: true
+      responses:
+        "503":
+          description: Service Unavailable
+        "201":
+          description: The created comment
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/CommentResponse"
+        "400":
+          description: Empty body or reply to a reply
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "401":
+          description: Missing or invalid access token
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: No review with that id
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/books/{key}/comments:
+    get:
+      tags:
+      - Comments
+      summary: List a book's comments
+      operationId: listForBook
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          minimum: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          maximum: 100
+          minimum: 1
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: A page of comments
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CommentResponse"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+        "404":
+          description: No book with that key
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    post:
+      tags:
+      - Comments
+      summary: Post a comment on a book
+      operationId: commentOnBook
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCommentRequest"
+        required: true
+      responses:
+        "503":
+          description: Service Unavailable
+        "201":
+          description: The created comment
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/CommentResponse"
+        "400":
+          description: Empty body or reply to a reply
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "401":
+          description: Missing or invalid access token
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: No book with that key
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/auth/verify-email:
+    post:
+      tags:
+      - Authentication
+      summary: Confirm an email address
+      operationId: verifyEmail
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyEmailRequest"
+        required: true
+      responses:
+        "503":
+          description: Service Unavailable
+        "204":
+          description: Email verified or replay accepted
+        "400":
+          description: Invalid or expired token
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Rate limited
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/auth/reset-password:
+    post:
+      tags:
+      - Authentication
+      summary: Complete a password reset
+      operationId: resetPassword
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequest"
+        required: true
+      responses:
+        "503":
+          description: Service Unavailable
+        "204":
+          description: Password replaced
+        "400":
+          description: "Invalid, expired, or already-consumed token"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Rate limited
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/auth/resend-verification:
+    post:
+      tags:
+      - Authentication
+      summary: Resend an email-verification link
+      operationId: resendVerification
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResendVerificationRequest"
+        required: true
+      responses:
+        "503":
+          description: Service Unavailable
+        "204":
+          description: Resend email dispatched if account is unverified
+        "400":
+          description: Validation failed
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Rate limited
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/auth/register:
+    post:
+      tags:
+      - Authentication
+      summary: Register a new user
+      operationId: register
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+        required: true
+      responses:
+        "503":
+          description: Service Unavailable
+        "201":
+          description: Account created
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation failed
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Username or email already taken
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Rate limited
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/auth/refresh:
+    post:
+      tags:
+      - Authentication
+      summary: Rotate access and refresh tokens
+      operationId: refresh
+      parameters:
+      - name: br_refresh
+        in: cookie
+        required: false
+        schema:
+          type: string
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: New access token; refresh cookie rotated
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: "Missing, expired, or already-rotated refresh token"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/auth/logout:
+    post:
+      tags:
+      - Authentication
+      summary: Revoke a refresh token
+      operationId: logout
+      parameters:
+      - name: br_refresh
+        in: cookie
+        required: false
+        schema:
+          type: string
+      responses:
+        "503":
+          description: Service Unavailable
+        "204":
+          description: Refresh cookie cleared
+      security: []
+  /api/v1/auth/login:
+    post:
+      tags:
+      - Authentication
+      summary: Log in with username or email
+      operationId: login
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+        required: true
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: Authenticated
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation failed
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "401":
+          description: Invalid credentials
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Rate limited
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/auth/forgot-password:
+    post:
+      tags:
+      - Authentication
+      summary: Start a password reset
+      operationId: forgotPassword
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordRequest"
+        required: true
+      responses:
+        "503":
+          description: Service Unavailable
+        "204":
+          description: Reset email dispatched if account exists
+        "400":
+          description: Validation failed
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Rate limited
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/me/books/{key}:
+    delete:
+      tags:
+      - Shelf
+      summary: Remove a book from the shelf
+      operationId: remove_1
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "503":
+          description: Service Unavailable
+        "204":
+          description: Book removed or already absent
+        "401":
+          description: Missing or invalid access token
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    patch:
+      tags:
+      - Shelf
+      summary: Update reading dates and note
+      operationId: update
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEntryRequest"
+        required: true
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: The updated shelf entry
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ShelfEntryResponse"
+        "400":
+          description: Finished date before started date
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "401":
+          description: Missing or invalid access token
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Book is not on the shelf
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /healthz:
+    get:
+      tags:
+      - Operations
+      summary: Health check
+      operationId: healthz
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /api/v1/search/books:
+    get:
+      tags:
+      - Search
+      summary: Search the book catalog
+      operationId: search
+      parameters:
+      - name: q
+        in: query
+        required: true
+        schema:
+          type: string
+          maxLength: 200
+          minLength: 0
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BookSearchDocument"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+      security: []
+  /api/v1/search/books/events:
+    get:
+      tags:
+      - Search
+      summary: Stream books that finish staging and match the query
+      operationId: streamHits
+      parameters:
+      - name: q
+        in: query
+        required: true
+        schema:
+          type: string
+          maxLength: 200
+          minLength: 0
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: OK
+          content:
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/SseEmitter"
+      security: []
+  /api/v1/me/reviews:
+    get:
+      tags:
+      - Reviews
+      summary: List the caller's reviews
+      operationId: listOwn
+      parameters:
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          minimum: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          maximum: 100
+          minimum: 1
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: A page of the caller's reviews
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ReviewResponse"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+        "401":
+          description: Missing or invalid access token
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/me/books:
+    get:
+      tags:
+      - Shelf
+      summary: List the current user's shelf
+      operationId: list
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - WANT_TO_READ
+          - CURRENTLY_READING
+          - FINISHED
+          - DROPPED
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: "The shelf, newest first"
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ShelfEntryResponse"
+        "401":
+          description: Missing or invalid access token
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/images/covers/{key}:
+    get:
+      tags:
+      - Images
+      summary: Get a book cover image
+      operationId: cover
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: If-None-Match
+        in: header
+        required: false
+        schema:
+          type: string
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: string
+                    format: byte
+      security: []
+  /api/v1/comments/{commentId}/replies:
+    get:
+      tags:
+      - Comments
+      summary: List a comment's replies
+      operationId: listReplies
+      parameters:
+      - name: commentId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          minimum: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          maximum: 100
+          minimum: 1
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: A page of replies
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CommentResponse"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+  /api/v1/books:
+    get:
+      tags:
+      - Catalog
+      summary: Get a homepage book list
+      operationId: list_1
+      parameters:
+      - name: list
+        in: query
+        required: true
+        schema:
+          type: string
+          enum:
+          - RECENTLY_ADDED
+          - TOP_RATED
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 12
+          maximum: 50
+          minimum: 1
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BookCardResponse"
+      security: []
+  /api/v1/books/{key}:
+    get:
+      tags:
+      - Catalog
+      summary: Get book detail by key
+      operationId: getBook
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/BookDetailResponse"
+      security: []
+  /api/v1/books/{key}/reviews:
+    get:
+      tags:
+      - Reviews
+      summary: List a book's reviews
+      operationId: listForBook_1
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          minimum: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          maximum: 100
+          minimum: 1
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: A page of reviews
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ReviewResponse"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+        "404":
+          description: No book with that key
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/books/{key}/events:
+    get:
+      tags:
+      - Catalog
+      summary: Stream book detail updates by key
+      operationId: streamBook
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: OK
+          content:
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/SseEmitter"
+      security: []
+  /api/v1/books/{key}/community-rating:
+    get:
+      tags:
+      - Reviews
+      summary: Get a book's community rating breakdown
+      operationId: communityRating
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: The community rating
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/CommunityRatingResponse"
+        "404":
+          description: No book with that key
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/books/count:
+    get:
+      tags:
+      - Catalog
+      summary: Count the books in the catalog
+      operationId: count
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/BookCountResponse"
+      security: []
+  /api/v1/auth/me:
+    get:
+      tags:
+      - Authentication
+      summary: Get the current authenticated user
+      operationId: me
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: Current user profile
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/UserResponse"
+        "401":
+          description: Missing or invalid access token
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    delete:
+      tags:
+      - Authentication
+      summary: Delete the current account
+      operationId: deleteMe
+      responses:
+        "503":
+          description: Service Unavailable
+        "204":
+          description: Account deleted
+        "401":
+          description: Missing or invalid access token
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/comments/{commentId}:
+    delete:
+      tags:
+      - Comments
+      summary: Remove the caller's comment
+      operationId: remove_2
+      parameters:
+      - name: commentId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "503":
+          description: Service Unavailable
+        "204":
+          description: Comment removed or already absent
+        "401":
+          description: Missing or invalid access token
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: The comment belongs to another user
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+components:
+  schemas:
+    SetStatusRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+          - WANT_TO_READ
+          - CURRENTLY_READING
+          - FINISHED
+          - DROPPED
+      required:
+      - status
+    ProblemDetail:
+      type: object
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+          format: int32
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri
+        properties:
+          type: object
+          additionalProperties: {}
+    ShelfEntryResponse:
+      type: object
+      properties:
+        key:
+          type: string
+        title:
+          type: string
+        authors:
+          type: array
+          items:
+            type: string
+        coverUrl:
+          type: string
+        status:
+          type: string
+          enum:
+          - WANT_TO_READ
+          - CURRENTLY_READING
+          - FINISHED
+          - DROPPED
+        favorite:
+          type: boolean
+        startedAt:
+          type: string
+          format: date
+        finishedAt:
+          type: string
+          format: date
+        notes:
+          type: string
+        addedAt:
+          type: string
+          format: date
+        averageRating:
+          type: number
+        myRating:
+          type: integer
+          format: int32
+    SetFavoriteRequest:
+      type: object
+      properties:
+        favorite:
+          type: boolean
+      required:
+      - favorite
+    UpsertReviewRequest:
+      type: object
+      properties:
+        rating:
+          type: integer
+          format: int32
+          maximum: 5
+          minimum: 1
+        title:
+          type: string
+          maxLength: 255
+          minLength: 0
+        body:
+          type: string
+          maxLength: 5000
+          minLength: 0
+      required:
+      - rating
+    ReviewResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        bookKey:
+          type: string
+        rating:
+          type: integer
+          format: int32
+        title:
+          type: string
+        body:
+          type: string
+        createdAt:
+          type: string
+          format: date
+    CreateCommentRequest:
+      type: object
+      properties:
+        body:
+          type: string
+          maxLength: 5000
+          minLength: 0
+        parentCommentId:
+          type: integer
+          format: int64
+      required:
+      - body
+    CommentResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        body:
+          type: string
+        author:
+          type: string
+        createdAt:
+          type: string
+          format: date
+        replyCount:
+          type: integer
+          format: int64
+    VerifyEmailRequest:
+      type: object
+      properties:
+        token:
+          type: string
+          description: Verification token from the email link
+          example: 8f2a3c4e5d6b7a8f2a3c4e5d6b7a8f2a
+          maxLength: 128
+          minLength: 0
+      required:
+      - token
+    ResetPasswordRequest:
+      type: object
+      properties:
+        token:
+          type: string
+          description: Reset token from the email link
+          example: 8f2a3c4e5d6b7a8f2a3c4e5d6b7a8f2a
+          maxLength: 128
+          minLength: 0
+        newPassword:
+          type: string
+          description: 8-72 bytes
+          example: '********'
+          maxLength: 72
+          minLength: 8
+      required:
+      - newPassword
+      - token
+    ResendVerificationRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          example: john.doe@example.com
+          maxLength: 255
+          minLength: 0
+      required:
+      - email
+    RegisterRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          description: "3-50 chars: letters, digits, '.', '_', '-'"
+          example: john.doe
+          maxLength: 50
+          minLength: 3
+          pattern: "[A-Za-z0-9._-]+"
+        email:
+          type: string
+          format: email
+          example: john.doe@example.com
+          maxLength: 255
+          minLength: 0
+        password:
+          type: string
+          description: 8-72 bytes
+          example: '********'
+          maxLength: 72
+          minLength: 8
+      required:
+      - email
+      - password
+      - username
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          description: Short-lived access JWT
+          example: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwiaWF0IjoxNzMwMDAwMDAwfQ.signature
+        user:
+          $ref: "#/components/schemas/UserResponse"
+    UserResponse:
+      type: object
+      properties:
+        username:
+          type: string
+          example: john.doe
+        email:
+          type: string
+          example: john.doe@example.com
+        emailVerified:
+          type: boolean
+          example: true
+        displayName:
+          type: string
+          example: John Doe
+        avatarUrl:
+          type: string
+          example: https://cdn.example.com/u/john-doe.png
+        bio:
+          type: string
+          example: Reads mostly sci-fi.
+    LoginRequest:
+      type: object
+      properties:
+        identifier:
+          type: string
+          description: Username or email
+          example: john.doe@example.com
+          minLength: 1
+        password:
+          type: string
+          description: Account password
+          example: '********'
+          minLength: 1
+      required:
+      - identifier
+      - password
+    ForgotPasswordRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          example: john.doe@example.com
+          maxLength: 255
+          minLength: 0
+      required:
+      - email
+    UpdateEntryRequest:
+      type: object
+      properties:
+        startedAt:
+          type: string
+          format: date
+        finishedAt:
+          type: string
+          format: date
+        notes:
+          type: string
+          maxLength: 2000
+          minLength: 0
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: UP
+        service:
+          type: string
+          example: betterreads
+        timestamp:
+          type: string
+          format: date-time
+          example: 2026-06-02T10:15:30Z
+    BookSearchDocument:
+      type: object
+      properties:
+        bookId:
+          type: string
+        title:
+          type: string
+        subtitle:
+          type: string
+        seriesName:
+          type: string
+        seriesPosition:
+          type: integer
+          format: int32
+        authors:
+          type: array
+          items:
+            type: string
+        subjects:
+          type: array
+          items:
+            type: string
+        language:
+          type: string
+        coverUrl:
+          type: string
+        publicationYear:
+          type: integer
+          format: int32
+        popularityScore:
+          type: number
+          format: double
+    BookSearchResult:
+      type: object
+      properties:
+        hits:
+          type: array
+          items:
+            $ref: "#/components/schemas/BookSearchDocument"
+        totalHits:
+          type: integer
+          format: int64
+        offset:
+          type: integer
+          format: int32
+        limit:
+          type: integer
+          format: int32
+    SseEmitter:
+      type: object
+      properties:
+        timeout:
+          type: integer
+          format: int64
+    CommentPage:
+      type: object
+      properties:
+        comments:
+          type: array
+          items:
+            $ref: "#/components/schemas/CommentResponse"
+        total:
+          type: integer
+          format: int64
+        offset:
+          type: integer
+          format: int32
+        limit:
+          type: integer
+          format: int32
+    ReviewPage:
+      type: object
+      properties:
+        reviews:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewResponse"
+        total:
+          type: integer
+          format: int64
+        offset:
+          type: integer
+          format: int32
+        limit:
+          type: integer
+          format: int32
+    BookCardResponse:
+      type: object
+      properties:
+        key:
+          type: string
+        title:
+          type: string
+        authors:
+          type: array
+          items:
+            type: string
+        coverUrl:
+          type: string
+        firstPublishYear:
+          type: integer
+          format: int32
+        averageRating:
+          type: number
+        ratingCount:
+          type: integer
+          format: int32
+    BookDetailResponse:
+      type: object
+      properties:
+        key:
+          type: string
+        complete:
+          type: boolean
+        title:
+          type: string
+        subtitle:
+          type: string
+        authors:
+          type: array
+          items:
+            type: string
+        description:
+          type: string
+        coverUrl:
+          type: string
+        firstPublishYear:
+          type: integer
+          format: int32
+        isbn:
+          type: string
+        pageCount:
+          type: integer
+          format: int32
+        language:
+          type: string
+        averageRating:
+          type: number
+        ratingCount:
+          type: integer
+          format: int32
+        seriesName:
+          type: string
+        seriesPosition:
+          type: integer
+          format: int32
+        subjects:
+          type: array
+          items:
+            type: string
+        awards:
+          type: array
+          items:
+            type: string
+    CommunityRatingResponse:
+      type: object
+      properties:
+        average:
+          type: number
+        count:
+          type: integer
+          format: int64
+        distribution:
+          type: array
+          items:
+            $ref: "#/components/schemas/StarCount"
+    StarCount:
+      type: object
+      properties:
+        star:
+          type: integer
+          format: int32
+        count:
+          type: integer
+          format: int64
+    BookCountResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+    ResponseMeta:
+      properties:
+        total:
+          type: integer
+          format: int64
+          example: 142
+        offset:
+          type: integer
+          format: int32
+          example: 0
+        limit:
+          type: integer
+          format: int32
+          example: 20
+  securitySchemes:
+    bearer-jwt:
+      type: http
+      description: Access JWT from POST /api/v1/auth/login.
+      scheme: bearer
+      bearerFormat: JWT

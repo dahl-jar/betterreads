@@ -205,6 +205,21 @@ class BookListIntegrationTest extends ContainerizedTest {
         }
     }
 
+    @Nested
+    @DisplayName("GET /api/v1/books/count")
+    class Count {
+
+        @Test
+        void shouldReturnNumberOfBooksInCatalog() throws Exception {
+            saveBook("red-rising", "Red Rising", FOUR_POINT_ZERO, WELL_RATED_COUNT);
+            saveBook("golden-son", "Golden Son", null, 0);
+
+            mockMvc.perform(get(LIST_PATH + "/count"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(2));
+        }
+    }
+
     private void saveBook(
         final String key, final String title, final BigDecimal average, final int ratingCount) {
         final Author author = new Author();

@@ -13,6 +13,7 @@ import com.meilisearch.sdk.model.MatchingStrategy;
 import com.meilisearch.sdk.model.SearchResult;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,6 +39,8 @@ public class MeilisearchBookSearchService implements BookSearchService {
      */
     private static final double RANKING_SCORE_THRESHOLD = 0.4;
 
+    private static final String BOOK_ID_FILTER = BookSearchDocument.PRIMARY_KEY + " = \"%s\"";
+
     private final Client client;
 
     private final MeilisearchProperties props;
@@ -54,22 +57,28 @@ public class MeilisearchBookSearchService implements BookSearchService {
         unless = "#result.degraded() || #result.result().totalHits() == 0")
     public SearchOutcome searchOutcome(final String query, final int offset, final int limit) {
         try {
-            final SearchRequest request = new SearchRequest(query)
-                .setOffset(offset)
-                .setLimit(limit)
-                .setMatchingStrategy(MatchingStrategy.ALL)
-                .setRankingScoreThreshold(RANKING_SCORE_THRESHOLD);
-            final SearchResult result = (SearchResult) booksIndex().search(request);
-            final List<BookSearchDocument> hits = result.getHits().stream()
-                .map(hit -> objectMapper.convertValue(hit, BookSearchDocument.class))
-                .toList();
+            final SearchResult result = run(rankedRequest(query).setOffset(offset).setLimit(limit));
             final BookSearchResult page =
-                new BookSearchResult(hits, result.getEstimatedTotalHits(), offset, limit);
+                new BookSearchResult(hits(result), result.getEstimatedTotalHits(), offset, limit);
             return new SearchOutcome(page, false);
         } catch (MeilisearchException ex) {
             LOG.warn("search.query failed, returning no results query={} ({})",
                 LogSanitizer.forLog(query), ex.getClass().getSimpleName());
             return new SearchOutcome(new BookSearchResult(List.of(), 0, offset, limit), true);
+        }
+    }
+
+    @Override
+    public Optional<BookSearchDocument> hitFor(final String query, final String bookId) {
+        try {
+            final SearchRequest request = rankedRequest(query)
+                .setLimit(1)
+                .setFilter(new String[] {String.format(BOOK_ID_FILTER, bookId)});
+            return hits(run(request)).stream().findFirst();
+        } catch (MeilisearchException ex) {
+            LOG.warn("search.hit-check failed query={} bookId={} ({})",
+                LogSanitizer.forLog(query), LogSanitizer.forLog(bookId), ex.getClass().getSimpleName());
+            return Optional.empty();
         }
     }
 
@@ -95,6 +104,22 @@ public class MeilisearchBookSearchService implements BookSearchService {
         } catch (MeilisearchException ex) {
             throw new SearchIndexException("removing book " + bookId + " from the index failed", ex);
         }
+    }
+
+    private static SearchRequest rankedRequest(final String query) {
+        return new SearchRequest(query)
+            .setMatchingStrategy(MatchingStrategy.ALL)
+            .setRankingScoreThreshold(RANKING_SCORE_THRESHOLD);
+    }
+
+    private SearchResult run(final SearchRequest request) {
+        return (SearchResult) booksIndex().search(request);
+    }
+
+    private List<BookSearchDocument> hits(final SearchResult result) {
+        return result.getHits().stream()
+            .map(hit -> objectMapper.convertValue(hit, BookSearchDocument.class))
+            .toList();
     }
 
     private Index booksIndex() {

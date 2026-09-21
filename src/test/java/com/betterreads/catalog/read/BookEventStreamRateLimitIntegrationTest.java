@@ -7,8 +7,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.betterreads.auth.ratelimit.RateLimitFilter;
 import com.betterreads.support.ContainerizedTest;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -43,6 +43,14 @@ class BookEventStreamRateLimitIntegrationTest extends ContainerizedTest {
 
     private static final String EVENTS_URL = "/api/v1/books/9780000000404/events";
 
+    private static final String SEARCH_EVENTS_URL = "/api/v1/search/books/events";
+
+    private static final String QUERY_PARAM = "q";
+
+    private static final String QUERY = "dune";
+
+    private static final String RETRY_AFTER = "Retry-After";
+
     private static final int CAPACITY = 3;
 
     @Autowired
@@ -64,15 +72,15 @@ class BookEventStreamRateLimitIntegrationTest extends ContainerizedTest {
         rateLimitFilter.reset();
     }
 
-    @Test
-    @DisplayName("rejects a burst of stream opens past capacity with 429 and Retry-After")
-    void rejectsStreamBurstPastCapacity() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {EVENTS_URL, SEARCH_EVENTS_URL})
+    void shouldRejectStreamBurstPastCapacity(final String url) throws Exception {
         for (int i = 0; i < CAPACITY; i++) {
-            mockMvc.perform(get(EVENTS_URL));
+            mockMvc.perform(get(url).param(QUERY_PARAM, QUERY));
         }
 
-        mockMvc.perform(get(EVENTS_URL))
+        mockMvc.perform(get(url).param(QUERY_PARAM, QUERY))
             .andExpect(status().isTooManyRequests())
-            .andExpect(header().exists("Retry-After"));
+            .andExpect(header().exists(RETRY_AFTER));
     }
 }
