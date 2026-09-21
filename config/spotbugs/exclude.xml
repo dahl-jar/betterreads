@@ -277,6 +277,15 @@
     </Match>
 
     <!--
+      IMPROPER_UNICODE on the language-code lookup. The input is a source's ISO 639 code, lower-cased
+      to hit a fixed ASCII table; it is not a security decision.
+    -->
+    <Match>
+        <Bug pattern="IMPROPER_UNICODE"/>
+        <Class name="com.betterreads.catalog.service.source.quality.LanguageCodes"/>
+    </Match>
+
+    <!--
       REDOS on the description-cleaning patterns. Every quantifier in these regexes is possessive
       (++, *+), which by definition does no backtracking, so catastrophic backtracking is impossible.
       FindSecBugs does not model possessive quantifiers and flags the nested character classes

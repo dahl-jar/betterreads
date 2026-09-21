@@ -39,6 +39,8 @@ public class ResponseEnvelopeOpenApiCustomizer {
 
     private static final String EVENT_STREAM = "text/event-stream";
 
+    private static final String IMAGE_PREFIX = "image/";
+
     @Bean
     OpenApiCustomizer responseEnvelopeCustomizer() {
         return openApi -> {
@@ -69,6 +71,7 @@ public class ResponseEnvelopeOpenApiCustomizer {
             final Schema<?> original = media.getSchema();
             if (original != null
                 && !EVENT_STREAM.equals(contentType)
+                && !contentType.startsWith(IMAGE_PREFIX)
                 && !NOT_WRAPPED.contains(refName(original))) {
                 media.setSchema(wrapperSchema(original));
             }

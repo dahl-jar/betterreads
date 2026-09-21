@@ -6,7 +6,9 @@ import static org.assertj.core.api.Assertions.within;
 import java.util.List;
 import java.util.stream.Stream;
 
+import com.betterreads.catalog.service.source.model.SourceAuthor;
 import com.betterreads.catalog.service.source.model.SourceBook;
+import com.betterreads.integration.hardcover.dto.HardcoverBookNode;
 import com.betterreads.integration.hardcover.dto.HardcoverDocument;
 import com.betterreads.integration.hardcover.dto.HardcoverDocument.FeaturedSeries;
 import com.betterreads.integration.hardcover.dto.HardcoverDocument.Image;
@@ -166,6 +168,37 @@ class HardcoverMapperTest {
                 .extracting(SourceBook::rawSubjects)
                 .as("empty would clear book_subject rows; null leaves another source's subjects intact")
                 .isNull();
+        }
+    }
+
+    @Nested
+    @DisplayName("toSourceBook from a book node")
+    class ToSourceBookFromNode {
+
+        private static final String ROTHFUSS = "Patrick Rothfuss";
+
+        private static final String UNCREDITED = "Uncredited";
+
+        private final HardcoverMapper mapper = new HardcoverMapper();
+
+        @Test
+        void shouldKeepOnlyAuthorContributions() {
+            final HardcoverBookNode node = new HardcoverBookNode(
+                379_217L, "The Name of the Wind", null, null, null, null, 2007, null, null, null, null,
+                null,
+                new HardcoverBookNode.Edition(new HardcoverBookNode.Language("English"), null),
+                List.of(
+                    new HardcoverBookNode.Contribution("Author", new HardcoverBookNode.Author(ROTHFUSS)),
+                    new HardcoverBookNode.Contribution("Illustrator", new HardcoverBookNode.Author("Marc Simonetti")),
+                    new HardcoverBookNode.Contribution(null, new HardcoverBookNode.Author(UNCREDITED))),
+                null);
+
+            final SourceBook book = mapper.toSourceBook(node);
+
+            assertThat(book).isNotNull();
+            assertThat(book.authors())
+                .extracting(SourceAuthor::name)
+                .containsExactly(ROTHFUSS, UNCREDITED);
         }
     }
 }

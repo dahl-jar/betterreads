@@ -16,6 +16,7 @@ import com.betterreads.catalog.service.source.model.BookFieldSource;
 import com.betterreads.catalog.service.source.model.MergedBook;
 import com.betterreads.catalog.service.source.model.SourceBook;
 import com.betterreads.catalog.service.source.quality.DescriptionQuality;
+import com.betterreads.catalog.service.source.quality.LanguageCodes;
 import com.betterreads.catalog.service.source.quality.TitleCleaner;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
@@ -66,8 +67,8 @@ public class SourceMerger {
         BookFieldSource.STAGED);
 
     private static final List<BookFieldSource> AUTHORS_CHAIN =
-        List.of(BookFieldSource.OPEN_LIBRARY, BookFieldSource.GOOGLE_BOOKS,
-            BookFieldSource.WIKIDATA, BookFieldSource.HARDCOVER, BookFieldSource.LOC,
+        List.of(BookFieldSource.HARDCOVER, BookFieldSource.GOOGLE_BOOKS,
+            BookFieldSource.WIKIDATA, BookFieldSource.OPEN_LIBRARY, BookFieldSource.LOC,
             BookFieldSource.STAGED);
 
     /** No staged entry: a staged rating is restored after the merge when Hardcover misses. */
@@ -146,7 +147,8 @@ public class SourceMerger {
             .publicationYear(valueOf(resolved.year()))
             .publisher(valueOf(pick(bySource, PUBLISHER_CHAIN, SourceMerger::usableText, SourceBook::publisher)))
             .pageCount(valueOf(pick(bySource, PAGE_COUNT_CHAIN, SourceBook::pageCount)))
-            .language(valueOf(pick(bySource, LANGUAGE_CHAIN, SourceMerger::usableText, SourceBook::language)))
+            .language(LanguageCodes.iso6391(
+                valueOf(pick(bySource, LANGUAGE_CHAIN, SourceMerger::usableText, SourceBook::language))))
             .authors(valueOf(pick(bySource, AUTHORS_CHAIN, SourceMerger::nonEmpty, SourceBook::authors)))
             .rawSubjects(subjects.values().isEmpty() ? null : subjects.values())
             .awards(valueOf(pick(bySource, AWARDS_CHAIN, SourceMerger::nonEmpty, SourceBook::awards)))

@@ -247,6 +247,7 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+      security: []
     post:
       tags:
       - Comments
@@ -344,6 +345,7 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+      security: []
     post:
       tags:
       - Comments
@@ -731,6 +733,7 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/HealthResponse"
+      security: []
   /api/v1/search/books:
     get:
       tags:
@@ -797,11 +800,11 @@ paths:
         "503":
           description: Service Unavailable
         "200":
-          description: OK
+          description: A search-hit event for each newly added book matching q.
           content:
             text/event-stream:
               schema:
-                $ref: "#/components/schemas/SseEmitter"
+                $ref: "#/components/schemas/BookSearchDocument"
       security: []
   /api/v1/me/reviews:
     get:
@@ -905,15 +908,16 @@ paths:
         "503":
           description: Service Unavailable
         "200":
-          description: OK
+          description: The cover bytes
           content:
-            '*/*':
+            image/jpeg:
               schema:
-                type: object
-                properties:
-                  data:
-                    type: string
-                    format: byte
+                type: string
+                format: binary
+        "304":
+          description: Cached copy is current
+        "404":
+          description: No cover
       security: []
   /api/v1/comments/{commentId}/replies:
     get:
@@ -959,6 +963,7 @@ paths:
                       $ref: "#/components/schemas/CommentResponse"
                   meta:
                     $ref: "#/components/schemas/ResponseMeta"
+      security: []
   /api/v1/books:
     get:
       tags:
@@ -1014,7 +1019,7 @@ paths:
         "503":
           description: Service Unavailable
         "200":
-          description: OK
+          description: The book
           content:
             '*/*':
               schema:
@@ -1022,6 +1027,12 @@ paths:
                 properties:
                   data:
                     $ref: "#/components/schemas/BookDetailResponse"
+        "404":
+          description: No book with that key
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
       security: []
   /api/v1/books/{key}/reviews:
     get:
@@ -1072,6 +1083,7 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+      security: []
   /api/v1/books/{key}/events:
     get:
       tags:
@@ -1088,11 +1100,17 @@ paths:
         "503":
           description: Service Unavailable
         "200":
-          description: OK
+          description: One book-updated event with the full detail.
           content:
             text/event-stream:
               schema:
-                $ref: "#/components/schemas/SseEmitter"
+                $ref: "#/components/schemas/BookDetailResponse"
+        "404":
+          description: No book with that key
+          content:
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
       security: []
   /api/v1/books/{key}/community-rating:
     get:
@@ -1124,6 +1142,7 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+      security: []
   /api/v1/books/count:
     get:
       tags:
@@ -1552,12 +1571,6 @@ components:
         limit:
           type: integer
           format: int32
-    SseEmitter:
-      type: object
-      properties:
-        timeout:
-          type: integer
-          format: int64
     CommentPage:
       type: object
       properties:

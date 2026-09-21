@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springdoc.core.annotations.ParameterObject;
 
@@ -61,6 +62,7 @@ public class CommentController {
     /** Returns a page of a book's top-level comments. */
     @GetMapping("/api/v1/books/{key}/comments")
     @Operation(summary = "List a book's comments")
+    @SecurityRequirements
     @ApiResponse(responseCode = "200", description = "A page of comments")
     @ApiResponse(responseCode = "404", description = "No book with that key",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
@@ -88,6 +90,7 @@ public class CommentController {
     /** Returns a page of a review's top-level comments. */
     @GetMapping("/api/v1/reviews/{reviewId}/comments")
     @Operation(summary = "List a review's comments")
+    @SecurityRequirements
     @ApiResponse(responseCode = "200", description = "A page of comments")
     @ApiResponse(responseCode = "404", description = "No review with that id",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
@@ -100,6 +103,7 @@ public class CommentController {
     /** Returns a page of replies to a comment. */
     @GetMapping("/api/v1/comments/{commentId}/replies")
     @Operation(summary = "List a comment's replies")
+    @SecurityRequirements
     @ApiResponse(responseCode = "200", description = "A page of replies")
     public CommentPage listReplies(
         @PathVariable final Long commentId,

@@ -60,7 +60,7 @@ public class HardcoverSeriesClientImpl implements HardcoverSeriesClient {
                 is_partial_book
                 image { url }
                 default_physical_edition { language { language } reading_format { format } }
-                contributions { author { name } }
+                contributions { contribution author { name } }
               }
             }
           }

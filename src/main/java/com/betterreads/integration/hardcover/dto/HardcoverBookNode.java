@@ -68,7 +68,7 @@ public record HardcoverBookNode(
     public record ReadingFormat(@Nullable String format) { }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Contribution(@Nullable Author author) { }
+    public record Contribution(@Nullable String contribution, @Nullable Author author) { }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record SeriesMembership(

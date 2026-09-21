@@ -1,11 +1,15 @@
 package com.betterreads.search.controller;
 
 import com.betterreads.catalog.service.pipeline.SearchMissStager;
+import com.betterreads.search.dto.BookSearchDocument;
 import com.betterreads.search.dto.BookSearchResult;
 import com.betterreads.search.dto.SearchOutcome;
 import com.betterreads.search.service.BookSearchService;
 import com.betterreads.search.sse.SearchHitEmitters;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
@@ -44,6 +48,10 @@ public class BookSearchController {
 
     @GetMapping(value = "/books/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "Stream books that finish staging and match the query")
+    @ApiResponse(responseCode = "200",
+        description = "A search-hit event for each newly added book matching q.",
+        content = @Content(mediaType = MediaType.TEXT_EVENT_STREAM_VALUE,
+            schema = @Schema(implementation = BookSearchDocument.class)))
     public SseEmitter streamHits(@RequestParam("q") @NotBlank @Size(max = MAX_QUERY_LENGTH) final String query) {
         return searchHitEmitters.open(query);
     }

@@ -5,6 +5,9 @@ import java.time.Duration;
 import com.betterreads.catalog.service.read.CoverImageService;
 import com.betterreads.catalog.image.store.StoredImage;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.jspecify.annotations.Nullable;
@@ -43,6 +46,11 @@ public class ImageController {
      */
     @GetMapping("/covers/{key}")
     @Operation(summary = "Get a book cover image")
+    @ApiResponse(responseCode = "200", description = "The cover bytes",
+        content = @Content(mediaType = MediaType.IMAGE_JPEG_VALUE,
+            schema = @Schema(type = "string", format = "binary")))
+    @ApiResponse(responseCode = "304", description = "Cached copy is current", content = @Content)
+    @ApiResponse(responseCode = "404", description = "No cover", content = @Content)
     public ResponseEntity<byte[]> cover(
         @PathVariable final String key,
         @RequestHeader(name = HttpHeaders.IF_NONE_MATCH, required = false) final @Nullable String ifNoneMatch

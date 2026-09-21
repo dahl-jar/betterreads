@@ -56,6 +56,8 @@ class OpenApiEnvelopeTest extends ContainerizedTest {
     private static final String SEARCH_200 =
         "$.paths.['/api/v1/search/books'].get.responses.200.content.['*/*'].schema";
 
+    private static final String EVENT_STREAM_SCHEMA_REF = ".['text/event-stream'].schema.$ref";
+
     private static final String HEALTHZ_200 =
         "$.paths.['/healthz'].get.responses.200.content.['*/*'].schema";
 
@@ -114,5 +116,45 @@ class OpenApiEnvelopeTest extends ContainerizedTest {
         assertThat(Files.readString(SPEC_FILE, StandardCharsets.UTF_8))
             .as("openapi.yaml is stale, run ./gradlew openApiSpec and commit the result")
             .isEqualTo(generated);
+    }
+
+    @Test
+    void shouldMarkPublicReadsAsAnonymous() throws Exception {
+        mockMvc.perform(get(API_DOCS))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.paths.['/api/v1/books/{key}/reviews'].get.security.length()").value(0))
+            .andExpect(jsonPath("$.paths.['/api/v1/books/{key}/community-rating'].get.security.length()").value(0))
+            .andExpect(jsonPath("$.paths.['/api/v1/books/{key}/comments'].get.security.length()").value(0))
+            .andExpect(jsonPath("$.paths.['/api/v1/comments/{commentId}/replies'].get.security.length()").value(0))
+            .andExpect(jsonPath("$.paths.['/healthz'].get.security.length()").value(0));
+    }
+
+    @Test
+    void shouldDocumentStreamPayloadsAsTheirDocuments() throws Exception {
+        mockMvc.perform(get(API_DOCS))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.paths.['/api/v1/search/books/events'].get.responses.200.content"
+                + EVENT_STREAM_SCHEMA_REF).value("#/components/schemas/BookSearchDocument"))
+            .andExpect(jsonPath("$.paths.['/api/v1/books/{key}/events'].get.responses.200.content"
+                + EVENT_STREAM_SCHEMA_REF).value("#/components/schemas/BookDetailResponse"));
+    }
+
+    @Test
+    void shouldDocumentCoverAsBinaryImage() throws Exception {
+        final String cover = "$.paths.['/api/v1/images/covers/{key}'].get.responses";
+
+        mockMvc.perform(get(API_DOCS))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath(cover + ".200.content.['image/jpeg'].schema.format").value("binary"))
+            .andExpect(jsonPath(cover + ".200.content.['image/jpeg'].schema.properties").doesNotExist())
+            .andExpect(jsonPath(cover + ".304").exists())
+            .andExpect(jsonPath(cover + ".404").exists());
+    }
+
+    @Test
+    void shouldDocumentBookDetailNotFound() throws Exception {
+        mockMvc.perform(get(API_DOCS))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.paths.['/api/v1/books/{key}'].get.responses.404").exists());
     }
 }

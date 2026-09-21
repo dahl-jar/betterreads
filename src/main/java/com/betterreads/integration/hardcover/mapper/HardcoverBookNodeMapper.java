@@ -21,6 +21,8 @@ final class HardcoverBookNodeMapper {
 
     private static final String ENGLISH = "English";
 
+    private static final String AUTHOR_ROLE = "Author";
+
     private static final String AUDIOBOOK_FORMAT = "Listened";
 
     private static final int GRAPHIC_NOVEL_CATEGORY = 4;
@@ -164,10 +166,15 @@ final class HardcoverBookNodeMapper {
             return null;
         }
         final List<String> names = node.contributions().stream()
+            .filter(HardcoverBookNodeMapper::isAuthorContribution)
             .map(HardcoverBookNode.Contribution::author)
             .filter(author -> author != null && author.name() != null)
             .map(HardcoverBookNode.Author::name)
             .toList();
         return names.isEmpty() ? null : SourceAuthor.ofNames(names);
+    }
+
+    private static boolean isAuthorContribution(final HardcoverBookNode.Contribution contribution) {
+        return contribution.contribution() == null || AUTHOR_ROLE.equals(contribution.contribution());
     }
 }

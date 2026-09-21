@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springdoc.core.annotations.ParameterObject;
 
@@ -44,6 +45,7 @@ public class ReviewController {
     /** Returns a page of a book's reviews, newest edit first. */
     @GetMapping("/api/v1/books/{key}/reviews")
     @Operation(summary = "List a book's reviews")
+    @SecurityRequirements
     @ApiResponse(responseCode = "200", description = "A page of reviews")
     @ApiResponse(responseCode = "404", description = "No book with that key",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
@@ -56,6 +58,7 @@ public class ReviewController {
     /** Returns the book's community rating: the average, count, and per-star breakdown. */
     @GetMapping("/api/v1/books/{key}/community-rating")
     @Operation(summary = "Get a book's community rating breakdown")
+    @SecurityRequirements
     @ApiResponse(responseCode = "200", description = "The community rating")
     @ApiResponse(responseCode = "404", description = "No book with that key",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))

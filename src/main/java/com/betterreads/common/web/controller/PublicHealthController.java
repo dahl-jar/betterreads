@@ -3,6 +3,7 @@ package com.betterreads.common.web.controller;
 import com.betterreads.common.web.HealthResponse;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.time.Instant;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 /** Public health check endpoint. */
 @RestController
 @Tag(name = "Operations", description = "Public probes used by external monitors")
+@SecurityRequirements
 public class PublicHealthController {
 
     private static final String STATUS_UP = "UP";

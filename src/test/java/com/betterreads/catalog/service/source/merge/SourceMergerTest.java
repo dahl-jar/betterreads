@@ -86,6 +86,37 @@ class SourceMergerTest {
         }
 
         @Test
+        void shouldPreferHardcoverAuthorsOverOpenLibrary() {
+            final String author = "Patrick Rothfuss";
+            final SourceBook hardcover = SourceBook.builder(BookFieldSource.HARDCOVER)
+                .title(TITLE)
+                .authors(SourceAuthor.ofNames(List.of(author)))
+                .build();
+            final SourceBook openLibrary = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+                .title(TITLE)
+                .authors(SourceAuthor.ofNames(List.of(author, "Marc Simonetti")))
+                .build();
+
+            final MergedBook merged = merger.merge(List.of(openLibrary, hardcover));
+
+            assertThat(merged.book().authors())
+                .extracting(SourceAuthor::name)
+                .containsExactly(author);
+        }
+
+        @Test
+        void shouldNormalizeLanguageToTwoLetterCode() {
+            final SourceBook openLibrary = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+                .title(TITLE)
+                .language("eng")
+                .build();
+
+            final MergedBook merged = merger.merge(List.of(openLibrary));
+
+            assertThat(merged.book().language()).isEqualTo("en");
+        }
+
+        @Test
         @DisplayName("the merged title is cleaned of edition tags")
         void mergedTitleIsCleaned() {
             final SourceBook google = SourceBook.builder(BookFieldSource.GOOGLE_BOOKS)
