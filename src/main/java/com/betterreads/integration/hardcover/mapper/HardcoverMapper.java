@@ -1,23 +1,18 @@
 package com.betterreads.integration.hardcover.mapper;
 
 import java.util.List;
-import java.util.regex.Pattern;
 
 import com.betterreads.catalog.service.source.model.BookFieldSource;
 import com.betterreads.catalog.service.source.quality.CatalogGenres;
 import com.betterreads.catalog.service.source.model.SourceAuthor;
 import com.betterreads.catalog.service.source.model.SourceBook;
+import com.betterreads.common.util.Isbn13;
 import com.betterreads.integration.hardcover.dto.HardcoverBookNode;
 import com.betterreads.integration.hardcover.dto.HardcoverDocument;
 import com.betterreads.integration.hardcover.dto.HardcoverDocument.FeaturedSeries;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
-/**
- * Maps a Hardcover search document into the catalog's {@link SourceBook}.
- *
- * <p>The ISBN-13 is matched out of the bulk ISBN array, which interleaves ISBN-10 and ISBN-13.
- */
 @Component
 public class HardcoverMapper {
 
@@ -25,14 +20,10 @@ public class HardcoverMapper {
 
     private static final int FIRST_VOLUME = 1;
 
-    private static final Pattern ISBN_13 = Pattern.compile("97[89]\\d{10}");
-
-    /** Returns the {@link SourceBook} for a books-table node, or null when it does not qualify. */
     public @Nullable SourceBook toSourceBook(final @Nullable HardcoverBookNode node) {
         return HardcoverBookNodeMapper.toSourceBookWithSeries(node).orElse(null);
     }
 
-    /** Returns the {@link SourceBook} for a Hardcover document, or null if it has no title. */
     public @Nullable SourceBook toSourceBook(final @Nullable HardcoverDocument document) {
         if (document == null || document.title() == null) {
             return null;
@@ -47,7 +38,7 @@ public class HardcoverMapper {
             .publicationYear(document.releaseYear())
             .pageCount(document.pages())
             .coverUrl(coverUrl(document))
-            .authors(SourceAuthor.ofNames(document.authorNames()))
+            .authors(authors(document))
             .rawSubjects(document.genres() == null ? null : cleanGenres(document.genres()))
             .averageRating(document.rating())
             .ratingCount(document.ratingsCount())
@@ -56,22 +47,39 @@ public class HardcoverMapper {
             .build();
     }
 
+    public boolean hasIssueRunSeries(final HardcoverDocument document) {
+        final FeaturedSeries series = document.featuredSeries();
+        return series != null && series.series() != null
+            && HardcoverSeriesVolumes.isIssueRun(series.series().name(), document.title());
+    }
+
+    public SourceBook withSeriesOf(final SourceBook book, final HardcoverBookNode node) {
+        final SourceBook.Builder withoutSeries = book.toBuilder().seriesName(null).seriesPosition(null);
+        return HardcoverSeriesVolumes.withSeriesOf(withoutSeries, node).build();
+    }
+
     static @Nullable String firstIsbn13(final @Nullable List<String> isbns) {
         if (isbns == null) {
             return null;
         }
-        return isbns.stream().filter(isbn -> ISBN_13.matcher(isbn).matches()).findFirst().orElse(null);
+        return isbns.stream().filter(Isbn13::matches).findFirst().orElse(null);
     }
 
     static List<String> cleanGenres(final @Nullable List<String> genres) {
         return CatalogGenres.reduceToCanonical(genres, MAX_GENRES);
     }
 
-    /** Returns the volume number, or null when the position is absent, fractional, or below one. */
     static @Nullable Integer seriesPosition(final @Nullable Double position) {
         return VolumeNumber.fromPosition(position)
             .filter(volume -> volume >= FIRST_VOLUME)
             .orElse(null);
+    }
+
+    private static @Nullable List<SourceAuthor> authors(final HardcoverDocument document) {
+        final List<HardcoverBookNode.Contribution> contributions = document.contributions();
+        return contributions == null || contributions.isEmpty()
+            ? SourceAuthor.ofNames(document.authorNames())
+            : HardcoverContributors.authors(contributions);
     }
 
     private static @Nullable String coverUrl(final HardcoverDocument document) {

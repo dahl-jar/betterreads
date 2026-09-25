@@ -7,12 +7,7 @@ import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.PropertyNamingStrategies.SnakeCaseStrategy;
 import tools.jackson.databind.annotation.JsonNaming;
 
-/**
- * One book hit from Hardcover's search index.
- *
- * <p>{@code usersReadCount} separates the canonical work from the comic, audio, and stub editions
- * that share its title.
- */
+@SuppressWarnings("PMD.DataClass")
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonNaming(SnakeCaseStrategy.class)
 public record HardcoverDocument(
@@ -28,13 +23,21 @@ public record HardcoverDocument(
     @Nullable List<String> isbns,
     @Nullable List<String> genres,
     @Nullable Image image,
-    @Nullable FeaturedSeries featuredSeries
+    @Nullable FeaturedSeries featuredSeries,
+    @Nullable List<HardcoverBookNode.Contribution> contributions
 ) {
 
     public HardcoverDocument {
         authorNames = copyOrNull(authorNames);
         isbns = copyOrNull(isbns);
         genres = copyOrNull(genres);
+        contributions = copyOrNull(contributions);
+    }
+
+    @Override
+    @Nullable
+    public List<HardcoverBookNode.Contribution> contributions() {
+        return copyOrNull(contributions);
     }
 
     @Override
@@ -56,7 +59,7 @@ public record HardcoverDocument(
     }
 
     @Nullable
-    private static List<String> copyOrNull(final @Nullable List<String> values) {
+    private static <T> List<T> copyOrNull(final @Nullable List<T> values) {
         return values == null ? null : List.copyOf(values);
     }
 

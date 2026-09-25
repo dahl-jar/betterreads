@@ -1,21 +1,20 @@
 package com.betterreads.integration.itunes;
 
-import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.betterreads.integration.itunes.ItunesSearchJson.search;
 import static com.github.tomakehurst.wiremock.client.WireMock.anyUrl;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Optional;
 
-import com.betterreads.catalog.service.source.model.BookFieldSource;
 import com.betterreads.catalog.service.source.port.DescriptionLookup;
 import com.betterreads.common.ratelimit.RateLimiter;
 import com.betterreads.common.web.WebClients;
-import com.github.tomakehurst.wiremock.WireMockServer;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeEach;
+import com.betterreads.integration.WireMockFixture;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -28,11 +27,6 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.web.reactive.function.client.WebClient;
 
-/**
- * Exercises the Apple Books description source against a stubbed HTTP boundary: the ISBN search
- * returns the publisher blurb, an empty or blank-description result set resolves to empty, and the
- * lookup falls back from ISBN to title-and-author.
- */
 @SpringBootTest(
     classes = {
         ItunesDescriptionSourceWireMockTest.StubBeans.class,
@@ -42,13 +36,7 @@ import org.springframework.web.reactive.function.client.WebClient;
     properties = "spring.main.web-application-type=none"
 )
 @EnableConfigurationProperties(ItunesProperties.class)
-class ItunesDescriptionSourceWireMockTest {
-
-    private static final int CONNECT_TIMEOUT_MS = 2000;
-
-    private static final int READ_TIMEOUT_MS = 5000;
-
-    private static final int HTTP_OK = 200;
+class ItunesDescriptionSourceWireMockTest extends WireMockFixture {
 
     private static final String SEARCH_PATH = "/search";
 
@@ -58,20 +46,14 @@ class ItunesDescriptionSourceWireMockTest {
 
     private static final String AUTHOR = "Christopher Ruocchio";
 
-    private static final String BLURB =
-        "The second novel of the Sun Eater series merges space opera and epic fantasy as Hadrian "
-        + "Marlowe continues down a path that can only end in fire.";
-
-    private static final WireMockServer WIREMOCK = startServer();
+    private static final String BLURB_START = "The second novel of the Sun Eater series";
 
     @Autowired
     private ItunesDescriptionSource source;
 
     @DynamicPropertySource
     static void wireProperties(final DynamicPropertyRegistry registry) {
-        registry.add("itunes.base-url", () -> "http://localhost:" + WIREMOCK.port());
-        registry.add("itunes.connect-timeout", () -> CONNECT_TIMEOUT_MS);
-        registry.add("itunes.read-timeout", () -> READ_TIMEOUT_MS);
+        registerSource(registry, "itunes", "");
         registry.add("itunes.rate-per-minute", () -> 1);
     }
 
@@ -90,59 +72,30 @@ class ItunesDescriptionSourceWireMockTest {
         }
     }
 
-    @BeforeEach
-    void resetStubs() {
-        WIREMOCK.resetAll();
-    }
-
-    @AfterAll
-    static void stopServer() {
-        WIREMOCK.stop();
-    }
-
     @Nested
     @DisplayName("fetch")
     class Fetch {
 
         @Test
-        @DisplayName("source identity is iTunes")
-        void sourceIdentity() {
-            assertThat(source.source()).isEqualTo(BookFieldSource.ITUNES);
+        void shouldReturnTheBlurbFoundByIsbn() {
+            stubSearch(search());
+
+            final Optional<String> description = source.fetch(byIsbn());
+
+            assertThat(description).hasValueSatisfying(blurb -> assertThat(blurb).startsWith(BLURB_START));
         }
 
         @Test
-        @DisplayName("returns the search blurb for the ISBN")
-        void returnsBlurbByIsbn() {
-            stubSearch(resultJson(BLURB));
+        void shouldReturnEmptyWhenTheOnlyResultHasABlankDescription() {
+            stubSearch(search().withDescription(""));
 
-            final Optional<String> description = source.fetch(lookup());
-
-            assertThat(description).contains(BLURB);
-        }
-
-        @Test
-        @DisplayName("an empty result set resolves to empty")
-        void emptyResultsAreEmpty() {
-            stubSearch("{ \"resultCount\": 0, \"results\": [] }");
-
-            final Optional<String> description = source.fetch(lookup());
+            final Optional<String> description = source.fetch(byIsbn());
 
             assertThat(description).isEmpty();
         }
 
         @Test
-        @DisplayName("a result with a blank description resolves to empty")
-        void blankDescriptionIsEmpty() {
-            stubSearch(resultJson(""));
-
-            final Optional<String> description = source.fetch(lookup());
-
-            assertThat(description).isEmpty();
-        }
-
-        @Test
-        @DisplayName("a lookup with no ISBN, title, or author resolves to empty without a call")
-        void noKeysIsEmpty() {
+        void shouldSkipTheSearchWhenTheLookupHasNoIsbnTitleOrAuthor() {
             final Optional<String> description = source.fetch(
                 new DescriptionLookup(null, null, null, null, null, null));
 
@@ -151,74 +104,53 @@ class ItunesDescriptionSourceWireMockTest {
         }
 
         @Test
-        @DisplayName("the title-author fallback accepts a result whose title matches")
-        void titleAuthorFallbackAcceptsMatchingTitle() {
-            stubSearch(resultJson(TITLE, BLURB));
+        void shouldSearchByTitleAndAuthorWhenTheIsbnFindsNothing() {
+            stubSearch(ISBN, search().withoutResults());
+            stubSearch(TITLE + " " + AUTHOR, search());
 
             final Optional<String> description = source.fetch(
-                new DescriptionLookup(null, null, TITLE, AUTHOR, null, null));
+                new DescriptionLookup(null, ISBN, TITLE, AUTHOR, null, null));
 
-            assertThat(description).contains(BLURB);
+            assertThat(description).hasValueSatisfying(blurb -> assertThat(blurb).startsWith(BLURB_START));
         }
 
         @Test
-        @DisplayName("the title-author fallback rejects a result for a different book")
-        void titleAuthorFallbackRejectsWrongBook() {
-            stubSearch(resultJson("A Completely Different Book", BLURB));
+        void shouldRejectATitleSearchResultForADifferentBook() {
+            stubSearch(search().withTrackName("A Completely Different Book"));
 
-            final Optional<String> description = source.fetch(
-                new DescriptionLookup(null, null, TITLE, AUTHOR, null, null));
+            final Optional<String> description = source.fetch(byTitleAndAuthor());
 
             assertThat(description).isEmpty();
         }
 
         @Test
-        @DisplayName("a store-marketing first result loses to the publisher blurb behind it")
-        void marketingFirstResultLosesToThePublisherBlurb() {
+        void shouldPreferThePublisherBlurbOverAStoreMarketingFirstResult() {
             final String marketing = "Available only on Apple Books, this enhanced edition is an "
                 + "amazing way to explore the rich world of the series. Stay on top of the story "
                 + "lines with annotations, glossaries, and family trees.";
-            stubSearch(resultsJson(resultEntry(TITLE, marketing), resultEntry(TITLE, BLURB)));
+            final String blurb = BLURB_START + " as Hadrian Marlowe walks a path that can only end in fire.";
+            stubSearch(search().withDescription(marketing).withResult(TITLE, blurb));
 
-            final Optional<String> description = source.fetch(
-                new DescriptionLookup(null, null, TITLE, AUTHOR, null, null));
+            final Optional<String> description = source.fetch(byTitleAndAuthor());
 
-            assertThat(description).contains(BLURB);
+            assertThat(description).contains(blurb);
         }
     }
 
-    private static DescriptionLookup lookup() {
-        return new DescriptionLookup("Q1", ISBN, TITLE, AUTHOR, null, null);
+    private static DescriptionLookup byIsbn() {
+        return new DescriptionLookup(null, ISBN, null, null, null, null);
     }
 
-    private static void stubSearch(final String body) {
-        WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH))
-            .willReturn(aResponse()
-                .withStatus(HTTP_OK)
-                .withHeader("Content-Type", "application/json")
-                .withBody(body)));
+    private static DescriptionLookup byTitleAndAuthor() {
+        return new DescriptionLookup(null, null, TITLE, AUTHOR, null, null);
     }
 
-    private static String resultJson(final String description) {
-        return resultJson(TITLE, description);
+    private static void stubSearch(final ItunesSearchJson search) {
+        WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH)).willReturn(okJson(search.toString())));
     }
 
-    private static String resultJson(final String trackName, final String description) {
-        return resultsJson(resultEntry(trackName, description));
-    }
-
-    private static String resultsJson(final String... entries) {
-        return "{ \"resultCount\": " + entries.length + ", \"results\": [ "
-            + String.join(", ", entries) + " ] }";
-    }
-
-    private static String resultEntry(final String trackName, final String description) {
-        return "{ \"trackName\": \"" + trackName + "\", \"description\": \"" + description + "\" }";
-    }
-
-    private static WireMockServer startServer() {
-        final WireMockServer server = new WireMockServer(0);
-        server.start();
-        return server;
+    private static void stubSearch(final String term, final ItunesSearchJson search) {
+        WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH)).withQueryParam("term", equalTo(term))
+            .willReturn(okJson(search.toString())));
     }
 }

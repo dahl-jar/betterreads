@@ -17,6 +17,7 @@ import com.betterreads.integration.hardcover.dto.HardcoverDocument;
 import com.betterreads.integration.hardcover.dto.TypesenseHits;
 import com.betterreads.integration.hardcover.dto.TypesenseSearchResponse;
 import com.betterreads.integration.hardcover.mapper.HardcoverMapper;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
@@ -24,15 +25,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
-/**
- * Hardcover GraphQL client.
- *
- * <p>One search call resolves a book; the hit document carries every field. Hardcover ranks hits by
- * relevance, so the canonical work is the hit with the most reads, and a pick whose title drifted
- * off the query is rejected. A by-id fetch queries the books table directly, since the search index
- * does not match on ids. A 401 means the token expired or was revoked and resolves to empty; other
- * 4xx resolve to empty; 5xx and network failures propagate.
- */
 @Component
 public class HardcoverClientImpl implements HardcoverClient {
 
@@ -124,7 +116,19 @@ public class HardcoverClientImpl implements HardcoverClient {
         final String query,
         final Predicate<HardcoverDocument> accept
     ) {
-        return search(query).filter(accept).map(mapper::toSourceBook);
+        return search(query).filter(accept).map(this::toSourceBook);
+    }
+
+    private @Nullable SourceBook toSourceBook(final HardcoverDocument document) {
+        final SourceBook book = mapper.toSourceBook(document);
+        if (book == null || !mapper.hasIssueRunSeries(document)) {
+            return book;
+        }
+        final Integer id = HardcoverGraphQl.parseId(document.id());
+        if (id == null) {
+            return book;
+        }
+        return bookById(id).map(node -> mapper.withSeriesOf(book, node)).orElse(book);
     }
 
     private Optional<HardcoverDocument> search(final String query) {
@@ -152,7 +156,6 @@ public class HardcoverClientImpl implements HardcoverClient {
         return ratings == null ? 0 : ratings;
     }
 
-    /** Returns true if the picked title and the query each contain the other, ignoring case. */
     private static boolean titleMatches(final HardcoverDocument document, final String query) {
         final String title = document.title();
         if (title == null) {
@@ -164,14 +167,6 @@ public class HardcoverClientImpl implements HardcoverClient {
             || TextMatch.containsIgnoreCase(trimmedQuery, trimmedTitle);
     }
 
-    /**
-     * Returns true if one of the document's author names matches the query author.
-     *
-     * <p>Hardcover searches only by title, so a shared title can resolve to a different author's
-     * book; this rejects the pick when no author name contains the query (or the reverse), which
-     * tolerates the spelling variants Hardcover carries ({@code George R.R. Martin} vs
-     * {@code George R. R. Martin}).
-     */
     private static boolean authorMatches(final HardcoverDocument document, final String author) {
         final List<String> names = document.authorNames();
         if (names == null) {

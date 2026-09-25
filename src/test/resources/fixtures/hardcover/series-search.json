@@ -1,0 +1,6 @@
+{"data": {"search": {"results": {"hits": [
+  {"document": {"id": "404", "name": "Wheel of Time Parody",
+    "author_name": "Imposter", "primary_books_count": 2, "readers_count": 10}},
+  {"document": {"id": "1097", "name": "The Wheel of Time",
+    "author_name": "Robert Jordan", "primary_books_count": 3, "readers_count": 23085}}
+]}}}}

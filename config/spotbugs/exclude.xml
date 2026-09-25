@@ -285,6 +285,16 @@
         <Class name="com.betterreads.catalog.service.source.quality.LanguageCodes"/>
     </Match>
 
+    <Match>
+        <Bug pattern="IMPROPER_UNICODE"/>
+        <Class name="com.betterreads.catalog.service.source.quality.TitleCasing"/>
+    </Match>
+
+    <Match>
+        <Bug pattern="IMPROPER_UNICODE"/>
+        <Class name="com.betterreads.catalog.service.source.quality.IssueRunSeries"/>
+    </Match>
+
     <!--
       REDOS on the description-cleaning patterns. Every quantifier in these regexes is possessive
       (++, *+), which by definition does no backtracking, so catastrophic backtracking is impossible.

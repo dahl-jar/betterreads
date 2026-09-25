@@ -1,0 +1,44 @@
+{
+  "data": {
+    "books": [
+      {
+        "id": 2235304,
+        "title": "Absolute Batman, Vol. 2: Abomination",
+        "description": "Batman faces the Abomination in the ruins of Gotham.",
+        "rating": 4.09,
+        "ratings_count": 16,
+        "users_count": 40,
+        "release_year": 2026,
+        "default_physical_edition": {
+          "language": {
+            "language": "English"
+          }
+        },
+        "contributions": [
+          {
+            "contribution": "Author",
+            "author": {
+              "name": "Scott Snyder"
+            }
+          }
+        ],
+        "book_series": [
+          {
+            "position": 7,
+            "featured": true,
+            "series": {
+              "name": "Absolute Batman (2024) (Single Issues)"
+            }
+          },
+          {
+            "position": 2,
+            "featured": false,
+            "series": {
+              "name": "Absolute Batman (2024)"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

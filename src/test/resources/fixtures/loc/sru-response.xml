@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<zs:searchRetrieveResponse xmlns:zs="http://www.loc.gov/zing/srw/"><zs:records><zs:record><zs:recordData><mods xmlns="http://www.loc.gov/mods/v3" version="3.8">
+<titleInfo><title>Dune</title></titleInfo>
+<name type="personal" usage="primary"><namePart>Herbert, Frank,</namePart></name>
+<genre authority="lcgft">Science fiction.</genre>
+<genre authority="fast">Fiction.</genre>
+<language><languageTerm authority="iso639-2b" type="code">eng</languageTerm></language>
+<originInfo><dateIssued encoding="marc">2019</dateIssued></originInfo>
+<physicalDescription><extent>xxii, 658 pages : map ; 24 cm.</extent></physicalDescription>
+<abstract type="Summary">Follows the adventures of Paul Atreides, the son of a betrayed duke.</abstract>
+<relatedItem type="series"><titleInfo>
+<title>Dune chronicles</title><partNumber>bk. 1</partNumber></titleInfo></relatedItem>
+<identifier type="isbn">9780593099322</identifier>
+<identifier type="isbn">059309932X</identifier>
+<identifier type="lccn">2019287107</identifier></mods></zs:recordData></zs:record></zs:records></zs:searchRetrieveResponse>

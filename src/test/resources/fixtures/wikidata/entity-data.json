@@ -1,0 +1,180 @@
+{
+  "entities": {
+    "Q190192": {
+      "id": "Q190192",
+      "labels": {
+        "en": {
+          "value": "Dune"
+        }
+      },
+      "sitelinks": {
+        "enwiki": {
+          "title": "Dune (novel)"
+        }
+      },
+      "claims": {
+        "P31": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "datavalue": {
+                "value": {
+                  "id": "Q7725634"
+                }
+              }
+            }
+          }
+        ],
+        "P50": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "datavalue": {
+                "value": {
+                  "id": "Q7934"
+                }
+              }
+            }
+          }
+        ],
+        "P136": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "datavalue": {
+                "value": {
+                  "id": "Q905770"
+                }
+              }
+            }
+          },
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "datavalue": {
+                "value": {
+                  "id": "Q2630193"
+                }
+              }
+            }
+          },
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "datavalue": {
+                "value": {
+                  "id": "Q944250"
+                }
+              }
+            }
+          },
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "datavalue": {
+                "value": {
+                  "id": "Q24925"
+                }
+              }
+            }
+          },
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "datavalue": {
+                "value": {
+                  "id": "Q21802675"
+                }
+              }
+            }
+          }
+        ],
+        "P166": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "datavalue": {
+                "value": {
+                  "id": "Q266012"
+                }
+              }
+            }
+          },
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "datavalue": {
+                "value": {
+                  "id": "Q255032"
+                }
+              }
+            }
+          },
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "datavalue": {
+                "value": {
+                  "id": "Q27496509"
+                }
+              }
+            }
+          }
+        ],
+        "P179": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "datavalue": {
+                "value": {
+                  "id": "Q6095696"
+                }
+              }
+            },
+            "qualifiers": {
+              "P1545": [
+                {
+                  "datavalue": {
+                    "value": "1"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "P244": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "datavalue": {
+                "value": "no2006084758"
+              }
+            }
+          }
+        ],
+        "P577": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "datavalue": {
+                "value": {
+                  "time": "+1965-00-00T00:00:00Z"
+                }
+              }
+            }
+          }
+        ],
+        "P648": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "datavalue": {
+                "value": "OL893527W"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

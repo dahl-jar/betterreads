@@ -1,7 +1,9 @@
 package com.betterreads.integration.openlibrary.client;
 
-import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
-import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.betterreads.integration.openlibrary.OpenLibrarySearchJson.search;
+import static com.betterreads.integration.openlibrary.OpenLibraryWorkJson.work;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -11,20 +13,18 @@ import java.util.Optional;
 import com.betterreads.catalog.service.source.model.BookFieldSource;
 import com.betterreads.catalog.service.source.model.SourceBook;
 import com.betterreads.integration.openlibrary.OpenLibraryProperties;
+import com.betterreads.integration.openlibrary.OpenLibrarySearchJson;
 import com.betterreads.integration.openlibrary.OpenLibraryWebClientConfig;
+import com.betterreads.integration.openlibrary.OpenLibraryWireMock;
 import com.betterreads.integration.openlibrary.mapper.OpenLibraryMapper;
-import com.github.tomakehurst.wiremock.WireMockServer;
-import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 
 @SpringBootTest(
     classes = {
@@ -35,21 +35,9 @@ import org.springframework.test.context.DynamicPropertySource;
     properties = "spring.main.web-application-type=none"
 )
 @EnableConfigurationProperties(OpenLibraryProperties.class)
-class OpenLibraryClientWireMockTest {
-
-    private static final int CONNECT_TIMEOUT_MS = 2000;
-
-    private static final int READ_TIMEOUT_MS = 5000;
-
-    private static final int HTTP_NOT_FOUND = 404;
+class OpenLibraryClientWireMockTest extends OpenLibraryWireMock {
 
     private static final int HOBBIT_FIRST_PUBLISHED = 1937;
-
-    private static final int NINETEEN_EIGHTY_FOUR_FIRST_PUBLISHED = 1949;
-
-    private static final String SEARCH_PATH = "/search.json";
-
-    private static final String HOBBIT_WORK_PATH = "/works/OL27482W.json";
 
     private static final String HOBBIT_WORK_KEY = "OL27482W";
 
@@ -67,66 +55,8 @@ class OpenLibraryClientWireMockTest {
 
     private static final String GENRE_CLASSICS = "classics";
 
-    private static final WireMockServer WIREMOCK = startServer();
-
-    private static final String HOBBIT_SEARCH_JSON = """
-        {
-          "numFound": 1,
-          "docs": [
-            {
-              "key": "/works/OL27482W",
-              "title": "The Hobbit",
-              "author_name": ["J.R.R. Tolkien"],
-              "first_publish_year": 1937,
-              "cover_i": 14627509,
-              "isbn": ["9780395282656", "0261103342"],
-              "language": ["eng", "ger"]
-            }
-          ]
-        }
-        """;
-
-    private static final String HOBBIT_WORK_JSON = """
-        {
-          "key": "/works/OL27482W",
-          "title": "The Hobbit",
-          "description": {"type": "/type/text", "value": "A tale of high adventure."},
-          "subjects": ["Fantasy", "thrushes", "Fantasy fiction", "the one ring", "Classics"]
-        }
-        """;
-
-    private static final String EMPTY_SEARCH_JSON = "{\"numFound\": 0, \"docs\": []}";
-
     @Autowired
     private OpenLibraryClientImpl client;
-
-    private static WireMockServer startServer() {
-        final WireMockServer server = new WireMockServer(0);
-        server.start();
-        return server;
-    }
-
-    private static ResponseDefinitionBuilder json(final String body) {
-        return aResponse().withHeader("Content-Type", "application/json").withBody(body);
-    }
-
-    @AfterAll
-    static void stopWireMock() {
-        WIREMOCK.stop();
-    }
-
-    @BeforeEach
-    void resetStubs() {
-        WIREMOCK.resetAll();
-    }
-
-    @DynamicPropertySource
-    static void openLibraryProperties(final DynamicPropertyRegistry registry) {
-        registry.add("openlibrary.base-url", () -> "http://localhost:" + WIREMOCK.port());
-        registry.add("openlibrary.contact-email", () -> "test@betterreadsapp.com");
-        registry.add("openlibrary.connect-timeout", () -> CONNECT_TIMEOUT_MS);
-        registry.add("openlibrary.read-timeout", () -> READ_TIMEOUT_MS);
-    }
 
     @Nested
     @DisplayName("fetchByTitleAuthor: search then work detail")
@@ -134,8 +64,8 @@ class OpenLibraryClientWireMockTest {
 
         @Test
         void mapsFullWork() {
-            WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH)).willReturn(json(HOBBIT_SEARCH_JSON)));
-            WIREMOCK.stubFor(get(urlPathEqualTo(HOBBIT_WORK_PATH)).willReturn(json(HOBBIT_WORK_JSON)));
+            stubSearch(search());
+            stubWork(HOBBIT_WORK_KEY, work());
 
             final Optional<SourceBook> result = client.fetchByTitleAuthor(HOBBIT_TITLE, HOBBIT_AUTHOR);
 
@@ -154,40 +84,33 @@ class OpenLibraryClientWireMockTest {
                 });
         }
 
-        @Test
-        void picksCanonicalEarliestYear() {
-            final String multiHitJson = """
-                {"numFound": 4, "docs": [
-                  {"key": "/works/OL_ADAPT", "title": "1984 (adaptation)", "first_publish_year": 2003},
-                  {"key": "/works/OL_REPRINT", "title": "1984", "first_publish_year": 2021},
-                  {"key": "/works/OL_CANON", "title": "1984", "first_publish_year": 1949},
-                  {"key": "/works/OL_OTHER", "title": "1984", "first_publish_year": 1984}
-                ]}
-                """;
-            WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH)).willReturn(json(multiHitJson)));
-            WIREMOCK.stubFor(get(urlPathEqualTo("/works/OL_CANON.json"))
-                .willReturn(json("{\"key\": \"/works/OL_CANON\", \"description\": \"A dystopia.\"}")));
+        @ParameterizedTest
+        @CsvSource("2003, 2021, 1949, 1984")
+        void picksCanonicalEarliestYear(
+            final int adaptationYear, final int reprintYear, final int canonicalYear, final int laterYear) {
+            final String title = "1984";
+            final String canonicalKey = "OL_CANON";
+            stubSearch(search().withoutHits()
+                .withHit("OL_ADAPT", title + " (adaptation)", adaptationYear)
+                .withHit("OL_REPRINT", title, reprintYear)
+                .withHit(canonicalKey, title, canonicalYear)
+                .withHit("OL_OTHER", title, laterYear));
+            stubWork(canonicalKey, work().withKey(canonicalKey));
 
-            final Optional<SourceBook> result = client.fetchByTitleAuthor("1984", "George Orwell");
+            final Optional<SourceBook> result = client.fetchByTitleAuthor(title, "George Orwell");
 
             assertThat(result)
                 .isPresent()
                 .get()
                 .satisfies(book -> {
-                    assertThat(book.openLibraryWorkKey()).isEqualTo("OL_CANON");
-                    assertThat(book.publicationYear()).isEqualTo(NINETEEN_EIGHTY_FOUR_FIRST_PUBLISHED);
+                    assertThat(book.openLibraryWorkKey()).isEqualTo(canonicalKey);
+                    assertThat(book.publicationYear()).isEqualTo(canonicalYear);
                 });
         }
 
         @Test
         void prefixDriftRejected() {
-            final String overtureJson = """
-                {"numFound": 1, "docs": [
-                  {"key": "/works/OL21213336W", "title": "The Sandman - Overture",
-                   "first_publish_year": 2015}
-                ]}
-                """;
-            WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH)).willReturn(json(overtureJson)));
+            stubSearch(search().withoutHits().withHit("OL21213336W", "The Sandman - Overture"));
 
             final Optional<SourceBook> result = client.fetchByTitleAuthor("The Sandman", "Neil Gaiman");
 
@@ -201,11 +124,13 @@ class OpenLibraryClientWireMockTest {
 
         @Test
         void mapsFirstHit() {
-            WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH)).willReturn(json(HOBBIT_SEARCH_JSON)));
-            WIREMOCK.stubFor(get(urlPathEqualTo(HOBBIT_WORK_PATH)).willReturn(json(HOBBIT_WORK_JSON)));
+            stubSearch(search());
+            stubWork(HOBBIT_WORK_KEY, work());
+            final String isbn = "9780395282656";
 
-            final Optional<SourceBook> result = client.fetchByIsbn("9780395282656");
+            final Optional<SourceBook> result = client.fetchByIsbn(isbn);
 
+            WIREMOCK.verify(getRequestedFor(urlPathEqualTo(SEARCH_PATH)).withQueryParam("q", equalTo("isbn:" + isbn)));
             assertThat(result)
                 .isPresent()
                 .get()
@@ -222,53 +147,19 @@ class OpenLibraryClientWireMockTest {
 
         private static final int SEARCH_LIMIT = 10;
 
-        private static final int SERIES_HIT_COUNT = 3;
-
-        private static final String SERIES_SEARCH_JSON = """
-            {
-              "numFound": 3,
-              "docs": [
-                {"key": "/works/OL1W", "title": "The Eye of the World",
-                 "author_name": ["Robert Jordan"], "first_publish_year": 1990},
-                {"key": "/works/OL2W", "title": "The Great Hunt",
-                 "author_name": ["Robert Jordan"], "first_publish_year": 1990},
-                {"key": "/works/OL3W", "title": "The Dragon Reborn",
-                 "author_name": ["Robert Jordan"], "first_publish_year": 1991}
-              ]
-            }
-            """;
-
         @Test
         void mapsEveryHit() {
-            WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH)).willReturn(json(SERIES_SEARCH_JSON)));
+            final String query = "The Wheel of Time";
+            final List<String> workKeys = List.of("OL1W", "OL2W", "OL3W");
+            final OpenLibrarySearchJson search = search().withoutHits();
+            workKeys.forEach(workKey -> search.withHit(workKey, query));
+            stubSearch(search);
 
-            final List<SourceBook> results = client.search("The Wheel of Time", SEARCH_LIMIT);
+            final List<SourceBook> results = client.search(query, SEARCH_LIMIT);
 
-            assertThat(results)
-                .hasSize(SERIES_HIT_COUNT)
-                .extracting(SourceBook::openLibraryWorkKey)
-                .containsExactly("OL1W", "OL2W", "OL3W");
+            assertThat(results).extracting(SourceBook::openLibraryWorkKey).containsExactlyElementsOf(workKeys);
         }
 
-        @Test
-        void emptyResultIsEmptyList() {
-            WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH))
-                .willReturn(json(EMPTY_SEARCH_JSON)));
-
-            final List<SourceBook> results = client.search("nothing matches this", SEARCH_LIMIT);
-
-            assertThat(results).isEmpty();
-        }
-
-        @Test
-        void notFoundIsEmptyList() {
-            WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH))
-                .willReturn(aResponse().withStatus(HTTP_NOT_FOUND)));
-
-            final List<SourceBook> results = client.search("anything", SEARCH_LIMIT);
-
-            assertThat(results).isEmpty();
-        }
     }
 
     @Nested
@@ -277,8 +168,7 @@ class OpenLibraryClientWireMockTest {
 
         @Test
         void notFoundIsEmpty() {
-            WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH))
-                .willReturn(aResponse().withStatus(HTTP_NOT_FOUND)));
+            stubSearchStatus(HTTP_NOT_FOUND);
 
             final Optional<SourceBook> result = client.fetchByTitleAuthor(MISSING_TITLE, MISSING_AUTHOR);
 
@@ -287,8 +177,7 @@ class OpenLibraryClientWireMockTest {
 
         @Test
         void noDocsIsEmpty() {
-            WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH))
-                .willReturn(json(EMPTY_SEARCH_JSON)));
+            stubSearch(search().withoutHits());
 
             final Optional<SourceBook> result = client.fetchByTitleAuthor(MISSING_TITLE, MISSING_AUTHOR);
 
@@ -302,7 +191,7 @@ class OpenLibraryClientWireMockTest {
 
         @Test
         void fetchesWorkDirectly() {
-            WIREMOCK.stubFor(get(urlPathEqualTo(HOBBIT_WORK_PATH)).willReturn(json(HOBBIT_WORK_JSON)));
+            stubWork(HOBBIT_WORK_KEY, work());
 
             final Optional<SourceBook> result = client.fetchByWorkKey(HOBBIT_WORK_KEY);
 

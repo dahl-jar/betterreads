@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<zs:searchRetrieveResponse xmlns:zs="http://www.loc.gov/zing/srw/"><zs:version>1.1</zs:version><zs:numberOfRecords>1</zs:numberOfRecords><zs:records><zs:record><zs:recordSchema>marcxml</zs:recordSchema><zs:recordPacking>xml</zs:recordPacking><zs:recordData><record xmlns="http://www.loc.gov/MARC21/slim">
+<leader>01043cam a2200289 i 4500</leader>
+<controlfield tag="001">23157745</controlfield>
+<controlfield tag="005">20240129143455.0</controlfield>
+<controlfield tag="008">240129s2024    ncu           000 0 eng  </controlfield>
+<datafield tag="010" ind1=" " ind2=" "><subfield code="a">  2023042683</subfield></datafield>
+<datafield tag="020" ind1=" " ind2=" "><subfield code="a">9781478030683</subfield><subfield code="q">(paperback)</subfield></datafield>
+<datafield tag="100" ind1="1" ind2=" "><subfield code="a">Bisson, Terry,</subfield><subfield code="e">author.</subfield></datafield>
+<datafield tag="245" ind1="1" ind2="0"><subfield code="a">Tomorrowing /</subfield><subfield code="c">Terry Bisson.</subfield></datafield>
+<datafield tag="264" ind1=" " ind2="1"><subfield code="a">Durham :</subfield><subfield code="b">Duke University Press,</subfield><subfield code="c">2024.</subfield></datafield>
+<datafield tag="650" ind1=" " ind2="0"><subfield code="a">Science fiction</subfield><subfield code="x">History and criticism.</subfield></datafield>
+</record></zs:recordData><zs:recordPosition>1</zs:recordPosition></zs:record></zs:records></zs:searchRetrieveResponse>

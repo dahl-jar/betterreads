@@ -18,12 +18,6 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.dataformat.xml.XmlMapper;
 
-/**
- * Maps a Library of Congress SRU response into a {@link SourceBook}.
- *
- * <p>The MODS record is read as a parsed tree by {@link SruTree}, which keeps the MODS default
- * namespace and the {@code zs:} SRU wrapper out of Jackson XML bindings.
- */
 @Component
 public class LocMapper {
 
@@ -36,13 +30,7 @@ public class LocMapper {
     private static final String TYPE = "type";
 
     private static final Pattern PAGE_COUNT = Pattern.compile("(\\d+)\\s*(?:pages|p\\.)");
-    private static final Pattern TRAILING_COMMA = Pattern.compile(",\\s*$");
-    private static final Pattern TRAILING_PERIOD_AFTER_WORD = Pattern.compile("(?<=\\p{L}{2})\\.\\s*$");
 
-    /**
-     * Returns the first record in the SRU response as a {@link SourceBook}, or empty when the
-     * response holds no record or the XML does not parse.
-     */
     public Optional<SourceBook> toSourceBook(final String sruXml) {
         return firstMods(sruXml).map(LocMapper::mapRecord);
     }
@@ -73,10 +61,6 @@ public class LocMapper {
             .build();
     }
 
-    /**
-     * Returns the record's title with the leading article joined on. MODS files the article in a
-     * separate {@code nonSort} element; an elided article like {@code L'} joins without a space.
-     */
     private static @Nullable String title(final JsonNode mods) {
         final JsonNode titleInfo = SruTree.firstByTag(mods, "titleInfo");
         final String title = SruTree.firstText(titleInfo, "title");
@@ -92,23 +76,8 @@ public class LocMapper {
     }
 
     private static @Nullable List<String> authorNames(final JsonNode mods) {
-        return SruTree.elements(mods, "name")
-            .filter(name -> "primary".equals(SruTree.attribute(name, "usage")))
-            .map(LocMapper::displayNamePart)
-            .filter(namePart -> namePart != null)
-            .map(LocMapper::stripTrailingPunctuation)
-            .findFirst()
-            .map(List::of)
-            .orElse(null);
-    }
-
-    private static @Nullable String displayNamePart(final JsonNode name) {
-        return SruTree.elements(name, "namePart")
-            .filter(part -> SruTree.attribute(part, TYPE) == null)
-            .map(SruTree::text)
-            .filter(value -> value != null)
-            .findFirst()
-            .orElse(null);
+        final List<String> names = ModsNames.authorNames(mods);
+        return names.isEmpty() ? null : names;
     }
 
     private static Optional<Integer> marcYear(final JsonNode mods) {
@@ -154,10 +123,5 @@ public class LocMapper {
             .filter(value -> value != null)
             .toList();
         return CatalogGenres.reduceToCanonical(raw, MAX_GENRES);
-    }
-
-    private static String stripTrailingPunctuation(final String name) {
-        final String withoutComma = TRAILING_COMMA.matcher(name.trim()).replaceAll("");
-        return TRAILING_PERIOD_AFTER_WORD.matcher(withoutComma).replaceAll("");
     }
 }

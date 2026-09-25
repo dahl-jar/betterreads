@@ -1,0 +1,22 @@
+{
+  "totalItems": 1,
+  "items": [
+    {
+      "id": "TtkxEAAAQBAJ",
+      "volumeInfo": {
+        "title": "Dune",
+        "authors": ["Frank Herbert"],
+        "publishedDate": "2016-09-01",
+        "publisher": "Penguin",
+        "pageCount": 412,
+        "language": "en",
+        "industryIdentifiers": [
+          {"type": "ISBN_10", "identifier": "0143111582"},
+          {"type": "ISBN_13", "identifier": "9780143111580"}
+        ],
+        "categories": ["Fiction"],
+        "description": "<p>Set on the desert planet <b>Arrakis</b>.</p>"
+      }
+    }
+  ]
+}

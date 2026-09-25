@@ -1,0 +1,65 @@
+{
+  "data": {
+    "search": {
+      "results": {
+        "hits": [
+          {
+            "document": {
+              "id": "1",
+              "title": "The Hobbit",
+              "rating": 5.0,
+              "ratings_count": 1,
+              "users_read_count": 1,
+              "author_names": []
+            }
+          },
+          {
+            "document": {
+              "id": "9999",
+              "title": "The Hobbit, or There and Back Again",
+              "release_year": 1937,
+              "rating": 4.31,
+              "ratings_count": 6394,
+              "users_read_count": 8616,
+              "author_names": [
+                "J.R.R. Tolkien",
+                "Alan Lee"
+              ],
+              "isbns": [
+                "9788578276300"
+              ],
+              "genres": [
+                "Fantasy",
+                "Classics",
+                "Fiction"
+              ],
+              "image": {
+                "url": "https://assets.hardcover.app/hobbit.jpg"
+              },
+              "featured_series": {
+                "position": 0.0,
+                "series": {
+                  "name": "The Lord of the Rings"
+                }
+              },
+              "contributions": [
+                {
+                  "contribution": "Author",
+                  "author": {
+                    "name": "J.R.R. Tolkien"
+                  }
+                },
+                {
+                  "contribution": "Illustrator",
+                  "author": {
+                    "name": "Alan Lee"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}

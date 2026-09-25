@@ -1,0 +1,23 @@
+{
+  "resultCount": 1,
+  "results": [
+    {
+      "kind": "ebook",
+      "artistId": 1241826470,
+      "artistName": "Christopher Ruocchio",
+      "trackId": 1440121373,
+      "trackName": "Howling Dark",
+      "trackViewUrl": "https://books.apple.com/us/book/howling-dark/id1440121373?uo=4",
+      "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Publication/100x100bb.jpg",
+      "releaseDate": "2019-12-03T08:00:00Z",
+      "genres": ["Sci-Fi & Fantasy", "Books", "Science Fiction"],
+      "genreIds": ["9020", "38", "10043"],
+      "price": 9.99,
+      "formattedPrice": "$9.99",
+      "currency": "USD",
+      "averageUserRating": 4.5,
+      "userRatingCount": 312,
+      "description": "The second novel of the Sun Eater series merges space opera and epic fantasy as Hadrian Marlowe continues down a path that can only end in fire."
+    }
+  ]
+}

@@ -14,23 +14,18 @@ import java.util.function.Predicate;
 import com.betterreads.catalog.service.source.model.BookField;
 import com.betterreads.catalog.service.source.model.BookFieldSource;
 import com.betterreads.catalog.service.source.model.MergedBook;
+import com.betterreads.catalog.service.source.model.SourceAuthor;
 import com.betterreads.catalog.service.source.model.SourceBook;
+import com.betterreads.catalog.service.source.quality.CoAuthors;
 import com.betterreads.catalog.service.source.quality.DescriptionQuality;
+import com.betterreads.catalog.service.source.quality.IssueRunSeries;
+import com.betterreads.catalog.service.source.quality.IsbnLanguage;
 import com.betterreads.catalog.service.source.quality.LanguageCodes;
+import com.betterreads.catalog.service.source.quality.TitleCasing;
 import com.betterreads.catalog.service.source.quality.TitleCleaner;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
-/**
- * Combines several single-source books into one, resolving each field by its own priority chain.
- *
- * <p>Subjects are unioned across the live sources; a staged seed's subjects count only when no live
- * source carries any. Every other field takes the first source in its chain that supplies a value,
- * so a higher-priority source missing a field yields to a lower-priority one that has it. A staged
- * seed sits last in each chain, so stored values yield to any live source but keep a book promotable
- * when every live fetch fails. Identifiers are carried from whichever source holds them.
- */
-// PMD.TooManyMethods: an aggregator with one small private picker per field; splitting scatters the priority chains.
 @SuppressWarnings("PMD.TooManyMethods")
 @Component
 public class SourceMerger {
@@ -71,10 +66,8 @@ public class SourceMerger {
             BookFieldSource.WIKIDATA, BookFieldSource.OPEN_LIBRARY, BookFieldSource.LOC,
             BookFieldSource.STAGED);
 
-    /** No staged entry: a staged rating is restored after the merge when Hardcover misses. */
     private static final List<BookFieldSource> RATING_CHAIN = List.of(BookFieldSource.HARDCOVER);
 
-    /** No staged entry: a stale stored series must not outlive the live sources' answer. */
     private static final List<BookFieldSource> SERIES_CHAIN =
         List.of(BookFieldSource.HARDCOVER, BookFieldSource.WIKIDATA);
 
@@ -85,19 +78,10 @@ public class SourceMerger {
         BookFieldSource.GOOGLE_BOOKS, BookFieldSource.OPEN_LIBRARY,
         BookFieldSource.LOC, BookFieldSource.HARDCOVER, BookFieldSource.STAGED);
 
-    /** Merges the given books into one, or throws when no source carries a title. */
     public MergedBook merge(final List<SourceBook> sources) {
         return merge(null, sources);
     }
 
-    /**
-     * Merges the given books into one, preferring the seed's year.
-     *
-     * <p>The seed resolved the work itself: a discovery hit (the Hardcover series or author path) or
-     * the staged row being re-collected. The other sources resolve an edition by title or ISBN and
-     * drift to a reprint year, so when the seed carries a year it wins over {@link #YEAR_CHAIN};
-     * otherwise the chain resolves the year.
-     */
     public MergedBook merge(final @Nullable SourceBook seed, final List<SourceBook> sources) {
         final Map<BookFieldSource, SourceBook> bySource = new EnumMap<>(BookFieldSource.class);
         for (final SourceBook source : sources) {
@@ -107,7 +91,7 @@ public class SourceMerger {
         final Winner<String> title = pick(bySource, TITLE_CHAIN, SourceMerger::usableText, SourceBook::title);
         if (title == null) {
             throw new IllegalArgumentException(
-                "no source supplied a title; the merged book would be unshowable");
+                "no source supplied a title");
         }
         final Resolved resolved = new Resolved(
             title,
@@ -138,31 +122,48 @@ public class SourceMerger {
     ) {
         final Winner<String> title = resolved.title();
         final Subjects subjects = resolved.subjects();
-        final Optional<SourceBook> series = pickSeries(bySource);
+        final @Nullable String isbn13 =
+            valueOf(pick(bySource, ISBN_CHAIN, SourceMerger::usableText, SourceBook::isbn13));
+        final @Nullable String language = resolveLanguage(bySource, isbn13);
+        final String displayTitle =
+            TitleCleaner.clean(TitleCasing.capitalize(title.value(), titles(sources), language));
+        final Optional<SourceBook> series = pickSeries(bySource, displayTitle);
         return SourceBook.builder(title.source())
-            .title(TitleCleaner.clean(title.value()))
+            .title(displayTitle)
             .subtitle(valueOf(pick(bySource, SUBTITLE_CHAIN, SourceMerger::usableText, SourceBook::subtitle)))
             .description(valueOf(resolved.description()))
             .coverUrl(valueOf(resolved.cover()))
             .publicationYear(valueOf(resolved.year()))
             .publisher(valueOf(pick(bySource, PUBLISHER_CHAIN, SourceMerger::usableText, SourceBook::publisher)))
             .pageCount(valueOf(pick(bySource, PAGE_COUNT_CHAIN, SourceBook::pageCount)))
-            .language(LanguageCodes.iso6391(
-                valueOf(pick(bySource, LANGUAGE_CHAIN, SourceMerger::usableText, SourceBook::language))))
-            .authors(valueOf(pick(bySource, AUTHORS_CHAIN, SourceMerger::nonEmpty, SourceBook::authors)))
+            .language(language)
+            .authors(CoAuthors.addFrom(
+                valueOf(pick(bySource, AUTHORS_CHAIN, SourceMerger::nonEmpty, SourceBook::authors)),
+                authorsOf(bySource.get(BookFieldSource.LOC))))
             .rawSubjects(subjects.values().isEmpty() ? null : subjects.values())
             .awards(valueOf(pick(bySource, AWARDS_CHAIN, SourceMerger::nonEmpty, SourceBook::awards)))
             .averageRating(valueOf(pick(bySource, RATING_CHAIN, SourceBook::averageRating)))
             .ratingCount(valueOf(pick(bySource, RATING_CHAIN, SourceBook::ratingCount)))
             .seriesName(series.map(SourceBook::seriesName).orElse(null))
             .seriesPosition(series.map(SourceBook::seriesPosition).orElse(null))
-            .isbn13(valueOf(pick(bySource, ISBN_CHAIN, SourceMerger::usableText, SourceBook::isbn13)))
+            .isbn13(isbn13)
             .googleBooksVolumeId(firstId(sources, SourceBook::googleBooksVolumeId))
             .openLibraryWorkKey(firstId(sources, SourceBook::openLibraryWorkKey))
             .hardcoverId(firstId(sources, SourceBook::hardcoverId))
             .locLccn(firstId(sources, SourceBook::locLccn))
             .wikidataQid(firstId(sources, SourceBook::wikidataQid))
             .build();
+    }
+
+    private static @Nullable String resolveLanguage(
+        final Map<BookFieldSource, SourceBook> bySource, final @Nullable String isbn13) {
+        final String language = LanguageCodes.iso6391(
+            valueOf(pick(bySource, LANGUAGE_CHAIN, SourceMerger::usableText, SourceBook::language)));
+        return language != null ? language : IsbnLanguage.languageOf(isbn13);
+    }
+
+    private static List<String> titles(final List<SourceBook> sources) {
+        return sources.stream().map(SourceBook::title).filter(title -> title != null).toList();
     }
 
     private static <T> @Nullable Winner<T> pick(
@@ -184,7 +185,6 @@ public class SourceMerger {
         return null;
     }
 
-    /** Picks the first source in the chain whose field is non-null, for fields with no blank state. */
     private static <T> @Nullable Winner<T> pick(
         final Map<BookFieldSource, SourceBook> bySource,
         final List<BookFieldSource> chain,
@@ -193,24 +193,21 @@ public class SourceMerger {
         return pick(bySource, chain, value -> true, field);
     }
 
-    /**
-     * Picks the source whose series tag is a numbered volume: a name and an integer position
-     * together. A source with a name but no position is a companion or guide grouped under the
-     * series, not a volume, so it is skipped and the series stays unset.
-     */
-    private static Optional<SourceBook> pickSeries(final Map<BookFieldSource, SourceBook> bySource) {
+    private static Optional<SourceBook> pickSeries(
+        final Map<BookFieldSource, SourceBook> bySource, final String bookTitle) {
         return SERIES_CHAIN.stream()
             .map(bySource::get)
             .filter(book -> book != null
                 && book.seriesName() != null && !book.seriesName().isBlank()
-                && book.seriesPosition() != null)
+                && book.seriesPosition() != null
+                && !IssueRunSeries.matches(book.seriesName(), bookTitle))
             .findFirst();
     }
 
-    /**
-     * Unions the live sources' subjects, falling back to the staged seed's when no live source
-     * carries any, so a fresh collect can shrink the stored set instead of re-accumulating it.
-     */
+    private static @Nullable List<SourceAuthor> authorsOf(final @Nullable SourceBook book) {
+        return book == null ? null : book.authors();
+    }
+
     private static Subjects unionSubjects(final Map<BookFieldSource, SourceBook> bySource) {
         final Set<String> values = new LinkedHashSet<>();
         final Set<BookFieldSource> contributors = new LinkedHashSet<>();
@@ -249,13 +246,6 @@ public class SourceMerger {
         return !value.isBlank();
     }
 
-    /**
-     * Picks the highest-quality description across the chain and returns it cleaned of markup.
-     *
-     * <p>Each source's raw description is scored by {@link DescriptionQuality}, and one it judges
-     * unusable is skipped. The chain is walked in priority order so a score tie breaks toward the
-     * higher-priority source.
-     */
     private static @Nullable Winner<String> pickBestDescription(
         final Map<BookFieldSource, SourceBook> bySource
     ) {

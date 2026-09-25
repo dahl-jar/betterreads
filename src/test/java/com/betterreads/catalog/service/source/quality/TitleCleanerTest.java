@@ -7,11 +7,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
-/**
- * Unit tests for {@link TitleCleaner}. Source titles carry edition and series tags that should not
- * be stored: Google appends {@code (2019 Edition)}, edition records append {@code (Series, Book N)}.
- * A clean work title is what the catalog stores.
- */
 class TitleCleanerTest {
 
     @ParameterizedTest(name = "\"{0}\" cleans to \"{1}\"")
@@ -34,19 +29,28 @@ class TitleCleanerTest {
         assertThat(TitleCleaner.clean(raw)).isEqualTo(expected);
     }
 
+    @ParameterizedTest(name = "\"{0}\" cleans to \"{1}\"")
+    @CsvSource({
+        "'30 Days of Night Movie Novelization',                  '30 Days of Night'",
+        "'30 Days of Night: Official Novelization of The Film',  '30 Days of Night'",
+        "'30 days of night : a novelization',                    '30 days of night'",
+        "'Alien Official Novelization',                          'Alien'"
+    })
+    void shouldStripANovelizationLabel(final String raw, final String expected) {
+        assertThat(TitleCleaner.clean(raw)).isEqualTo(expected);
+    }
+
     @ParameterizedTest(name = "\"{0}\" is left unchanged")
     @CsvSource({
         "'The Wheel of Time Book 5'",
         "'Dune'",
         "'The Lord of the Rings (The Fellowship of the Ring)'",
-        "'Dune: Messiah'"
+        "'Dune: Messiah'",
+        "'The Art of Novelization'"
     })
     @DisplayName("a title with no edition marker is returned unchanged")
     void leavesTitleWithoutEditionMarkerUnchanged(final String title) {
-        assertThat(TitleCleaner.clean(title))
-            .as("a series volume, a bare parenthetical, and an ordinary subtitle are all kept; "
-                + "only edition markers are stripped")
-            .isEqualTo(title);
+        assertThat(TitleCleaner.clean(title)).isEqualTo(title);
     }
 
     @Test

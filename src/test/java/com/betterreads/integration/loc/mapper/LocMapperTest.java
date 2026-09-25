@@ -1,214 +1,175 @@
 package com.betterreads.integration.loc.mapper;
 
-import static org.assertj.core.api.Assertions.as;
+import static com.betterreads.integration.loc.LocRecords.sruResponse;
 import static org.assertj.core.api.Assertions.assertThat;
-
-import java.util.stream.Stream;
 
 import com.betterreads.catalog.service.source.model.BookFieldSource;
 import com.betterreads.catalog.service.source.model.SourceBook;
-import org.assertj.core.api.InstanceOfAssertFactories;
+import com.betterreads.integration.loc.LocRecords;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.CsvSource;
 
-/**
- * Maps a MODS record onto a {@link SourceBook}.
- *
- * <p>Each record is an inline SRU response holding only the elements under test, in the {@code zs:}
- * wrapper and MODS namespace the parser navigates.
- */
+@SuppressWarnings("PMD.TooManyMethods")
 class LocMapperTest {
 
-    private static final int DUNE_YEAR = 2019;
-    private static final int DUNE_PAGES = 658;
-    private static final int WATCHMEN_YEAR = 2013;
-    private static final int WATCHMEN_PAGES = 414;
-    private static final int HOBBIT_YEAR = 2023;
-    private static final int HOBBIT_PAGES = 272;
-    private static final int SANDMAN_YEAR = 1991;
-    private static final int EYE_PAGES = 670;
-    private static final int CLASH_PAGES = 761;
-    private static final int CLASH_POSITION = 2;
-
-    private static final String WHEEL_OF_TIME = "Wheel of time";
-
-    private static final String DUNE = sru("""
-        <titleInfo><title>Dune</title></titleInfo>
-        <name type="personal" usage="primary"><namePart>Herbert, Frank,</namePart></name>
-        <genre authority="lcgft">Science fiction.</genre>
-        <genre authority="fast">Fiction.</genre>
-        <originInfo><dateIssued encoding="marc">2019</dateIssued></originInfo>
-        <physicalDescription><extent>xxii, 658 pages : map ; 24 cm.</extent></physicalDescription>
-        <abstract type="Summary">Follows the adventures of Paul Atreides, the son of a betrayed duke.</abstract>
-        <relatedItem type="series"><titleInfo>
-        <title>Dune chronicles</title><partNumber>bk. 1</partNumber></titleInfo></relatedItem>
-        <identifier type="isbn">9780593099322</identifier>
-        <identifier type="isbn">059309932X</identifier>
-        <identifier type="lccn">2019287107</identifier>""");
-
-    private static final String WATCHMEN = sru("""
-        <titleInfo><title>Watchmen</title></titleInfo>
-        <name type="personal" usage="primary"><namePart>Moore, Alan,</namePart></name>
-        <originInfo><dateIssued encoding="marc">2013</dateIssued></originInfo>
-        <physicalDescription><extent>414 pages : chiefly illustrations ; 26 cm.</extent></physicalDescription>
-        <identifier type="isbn">9781401238964</identifier>
-        <identifier type="lccn">2013003992</identifier>""");
-
-    private static final String HOBBIT = sru("""
-        <titleInfo><title>The Hobbit</title></titleInfo>
-        <name type="personal" usage="primary"><namePart>Tolkien, J. R. R. (John Ronald Reuel),</namePart></name>
-        <originInfo><dateIssued encoding="marc">2023</dateIssued></originInfo>
-        <physicalDescription>
-        <extent>xxxix, 272 pages, 36 pages of plates : illustrations ; 23 cm.</extent></physicalDescription>
-        <identifier type="isbn">9780063347533</identifier>
-        <identifier type="lccn">2024442463</identifier>""");
-
-    private static final String SANDMAN = sru("""
-        <titleInfo><title>The Sandman</title></titleInfo>
-        <name type="personal" usage="primary"><namePart>Gaiman, Neil,</namePart></name>
-        <originInfo><dateIssued encoding="marc">1991</dateIssued></originInfo>
-        <physicalDescription><extent>1 v. (unpaged) : col. ill. ; 26 cm.</extent></physicalDescription>
-        <identifier type="isbn">9781563890116</identifier>
-        <identifier type="lccn">92159876</identifier>""");
-
-    private static final String EYE = sru("""
-        <titleInfo><nonSort xml:space="preserve">The </nonSort><title>eye of the world</title></titleInfo>
-        <name type="personal" usage="primary"><namePart>Jordan, Robert.</namePart></name>
-        <physicalDescription><extent>xiv, 670 p., [3] p. of plates : maps ; 24 cm.</extent></physicalDescription>
-        <relatedItem type="series"><titleInfo><title>TOR fantasy</title></titleInfo></relatedItem>
-        <relatedItem type="series"><titleInfo>
-        <title>Wheel of time</title><partNumber>bk. 1</partNumber></titleInfo></relatedItem>
-        <identifier type="isbn">0312850093 :</identifier>
-        <identifier type="isbn">9780312850098</identifier>
-        <identifier type="lccn">89007939</identifier>""");
-
-    private static final String CLASH = sru("""
-        <titleInfo><title>A Clash of Kings</title></titleInfo>
-        <name type="personal" usage="primary"><namePart>Martin, George R. R.</namePart></name>
-        <physicalDescription><extent>761 p. : ill. ; 25 cm.</extent></physicalDescription>
-        <relatedItem type="series"><titleInfo>
-        <title>Song of ice and fire</title><partNumber>bk. 2</partNumber></titleInfo></relatedItem>
-        <identifier type="isbn">0553108034</identifier>
-        <identifier type="isbn">9780553108033</identifier>
-        <identifier type="lccn">98037954</identifier>""");
+    private static final int MARC_YEAR = 2019;
 
     private final LocMapper mapper = new LocMapper();
 
-    private static String sru(final String modsBody) {
-        return """
-            <?xml version="1.0"?>
-            <zs:searchRetrieveResponse xmlns:zs="http://www.loc.gov/zing/srw/"><zs:records><zs:record>\
-            <zs:recordData><mods xmlns="http://www.loc.gov/mods/v3" version="3.8">
-            """ + modsBody + """
-            </mods></zs:recordData></zs:record></zs:records></zs:searchRetrieveResponse>""";
-    }
-
-    private record Expected(
-        String record,
-        String name,
-        String lccn,
-        String isbn13,
-        Integer marcYear,
-        Integer pageCount,
-        String seriesName,
-        Integer seriesPosition
-    ) { }
-
-    private SourceBook map(final String record) {
-        return mapper.toSourceBook(record).orElseThrow();
+    private SourceBook map(final LocRecords record) {
+        return mapper.toSourceBook(record.xml()).orElseThrow();
     }
 
     @Nested
     @DisplayName("toSourceBook")
     class ToSourceBook {
 
-        static Stream<Arguments> slate() {
-            return Stream.of(
-                Arguments.of("dune", new Expected(DUNE, "Herbert, Frank", "2019287107",
-                    "9780593099322", DUNE_YEAR, DUNE_PAGES, "Dune chronicles", 1)),
-                Arguments.of("watchmen", new Expected(WATCHMEN, "Moore, Alan", "2013003992",
-                    "9781401238964", WATCHMEN_YEAR, WATCHMEN_PAGES, null, null)),
-                Arguments.of("hobbit", new Expected(HOBBIT, "Tolkien, J. R. R. (John Ronald Reuel)",
-                    "2024442463", "9780063347533", HOBBIT_YEAR, HOBBIT_PAGES, null, null)),
-                Arguments.of("sandman", new Expected(SANDMAN, "Gaiman, Neil", "92159876",
-                    "9781563890116", SANDMAN_YEAR, null, null, null)),
-                Arguments.of("eye", new Expected(EYE, "Jordan, Robert", "89007939",
-                    "9780312850098", null, EYE_PAGES, WHEEL_OF_TIME, 1)),
-                Arguments.of("clash", new Expected(CLASH, "Martin, George R. R.", "98037954",
-                    "9780553108033", null, CLASH_PAGES, "Song of ice and fire", CLASH_POSITION)));
-        }
-
-        @ParameterizedTest(name = "{0}")
-        @MethodSource("slate")
-        @DisplayName("each record yields its lccn, isbn-13, marc year, page count, and series")
-        void parsesEachRecord(final String name, final Expected expected) {
-            final SourceBook book = map(expected.record());
+        @Test
+        void shouldReadTheLccn() {
+            final SourceBook book = map(sruResponse());
 
             assertThat(book.source()).isEqualTo(BookFieldSource.LOC);
-            assertThat(book.locLccn()).isEqualTo(expected.lccn());
-            assertThat(book.isbn13())
-                .as("the 978 isbn is picked from the interleaved identifiers")
-                .isEqualTo(expected.isbn13());
-            assertThat(book.publicationYear())
-                .as("the marc-encoded year, or null when the record has none")
-                .isEqualTo(expected.marcYear());
-            assertThat(book.pageCount())
-                .as("the leading page count from the extent, ahead of a plate count, or null for an "
-                    + "unpaged extent")
-                .isEqualTo(expected.pageCount());
-            assertThat(book.seriesName())
-                .as("the series block carrying a part number wins over a bare imprint block")
-                .isEqualTo(expected.seriesName());
-            assertThat(book.seriesPosition()).isEqualTo(expected.seriesPosition());
+            assertThat(book.locLccn()).isEqualTo("2019287107");
+        }
+
+        @ParameterizedTest(name = "{1}")
+        @CsvSource(delimiter = '|', value = {
+            "059309932X   | 9780593099322         | 9780593099322",
+            "0312850093 : | 9780312850098 (v. 1)  | 9780312850098"
+        })
+        void shouldPickTheIsbn13AmongTheIsbns(final String isbn10, final String isbn13, final String expected) {
+            final SourceBook book = map(sruResponse().withIsbns(isbn10, isbn13));
+
+            assertThat(book.isbn13()).isEqualTo(expected);
         }
 
         @ParameterizedTest(name = "{0}")
-        @MethodSource("slate")
-        @DisplayName("strips a trailing comma or period from the primary author, keeps an initial")
-        void normalizesPrimaryAuthorName(final String name, final Expected expected) {
-            assertThat(map(expected.record()))
-                .extracting(SourceBook::authorNames, as(InstanceOfAssertFactories.list(String.class)))
-                .as("only the primary name is taken, trailing punctuation stripped")
-                .containsExactly(expected.name());
+        @CsvSource(delimiter = '|', value = {
+            "xxxix, 272 pages, 36 pages of plates : illustrations ; 23 cm. | 272",
+            "xiv, 670 p., [3] p. of plates : maps ; 24 cm.                 | 670",
+            "1 v. (unpaged) : col. ill. ; 26 cm.                           |",
+            "v. 1-3 : 658 pages                                            |"
+        })
+        void shouldReadTheLeadingPageCount(final String extent, final Integer pageCount) {
+            final SourceBook book = map(sruResponse().withExtent(extent));
+
+            assertThat(book.pageCount()).isEqualTo(pageCount);
         }
 
         @Test
-        @DisplayName("joins the nonSort article onto the title")
-        void joinsNonSortArticleOntoTitle() {
-            assertThat(map(EYE).title())
-                .as("MODS splits the leading article into nonSort")
-                .isEqualTo("The eye of the world");
+        void shouldReadTheMarcYear() {
+            final SourceBook book = map(sruResponse());
+
+            assertThat(book.publicationYear()).isEqualTo(MARC_YEAR);
+        }
+
+        @ParameterizedTest(name = "encoding={0} point={1}")
+        @CsvSource({", ", "marc, end"})
+        void shouldIgnoreAnIssuedDateThatIsNotTheMarcStartYear(final String encoding, final String point) {
+            final SourceBook book = map(sruResponse().withDateIssued("1965", encoding, point));
+
+            assertThat(book.publicationYear()).isNull();
         }
 
         @Test
-        @DisplayName("joins an elided nonSort onto the title without a space")
-        void joinsElidedNonSortWithoutSpace() {
-            final String stranger = sru("""
-                <titleInfo><nonSort xml:space="preserve">L'</nonSort><title>étranger</title></titleInfo>
-                <identifier type="lccn">89015952</identifier>""");
+        void shouldReadTheLanguageCode() {
+            final SourceBook book = map(sruResponse());
 
-            assertThat(map(stranger).title()).isEqualTo("L'étranger");
+            assertThat(book.language()).isEqualTo("eng");
         }
 
         @Test
-        @DisplayName("carries the MARC 520 summary as the description")
-        void carriesTheSummary() {
-            assertThat(map(DUNE).description())
-                .startsWith("Follows the adventures of Paul Atreides");
+        void shouldReadTheNumberedSeries() {
+            final SourceBook book = map(sruResponse());
+
+            assertThat(book.seriesName()).isEqualTo("Dune chronicles");
+            assertThat(book.seriesPosition()).isEqualTo(1);
         }
 
         @Test
-        @DisplayName("reduced genres land in rawSubjects, the slot the catalog persists")
-        void genresLandInRawSubjects() {
-            final SourceBook book = map(DUNE);
+        void shouldPreferTheNumberedSeriesOverAnImprint() {
+            final String series = "Song of ice and fire";
 
-            assertThat(book.rawSubjects())
-                .as("the lcgft and fast genre elements reduce to canonical genres")
-                .containsExactlyInAnyOrder("science fiction", "fiction");
+            final SourceBook book = map(sruResponse().withoutSeries()
+                .withSeries("Bantam spectra", null).withSeries(series, "bk. 2"));
+
+            assertThat(book.seriesName()).isEqualTo(series);
+            assertThat(book.seriesPosition()).isEqualTo(2);
+        }
+
+        @ParameterizedTest(name = "{0}")
+        @CsvSource(delimiter = '|', value = {
+            "Herbert, Frank,                        | Frank Herbert",
+            "Tolkien, J. R. R. (John Ronald Reuel), | J. R. R. Tolkien",
+            "Jordan, Robert.                        | Robert Jordan",
+            "Martin, George R. R.                   | George R. R. Martin",
+            "Homer                                  | Homer"
+        })
+        void shouldShowThePrimaryAuthorWithTheGivenNameFirst(final String namePart, final String author) {
+            final SourceBook book = map(sruResponse().withPrimaryNamePart(namePart));
+
+            assertThat(book.authorNames()).containsExactly(author);
+        }
+
+        @Test
+        void shouldListCoAuthorsAfterThePrimaryAuthor() {
+            final String author = "author";
+
+            final SourceBook book = map(sruResponse().withoutNames()
+                .withContributor("Jenkins, Christine,", author)
+                .withPrimaryContributor("Cart, Michael,", author)
+                .withContributor("Valka, Onderra,", "editor"));
+
+            assertThat(book.authorNames()).containsExactly("Michael Cart", "Christine Jenkins", "Onderra Valka");
+        }
+
+        @Test
+        void shouldDropNonWriterNames() {
+            final SourceBook book = map(sruResponse().withoutNames()
+                .withPrimaryContributor("David, Peter (Peter Allen),", "screenwriter")
+                .withContributor("Lee, Jae,", "illustrator")
+                .withContributor("Eliopoulos, Chris,", "letterer")
+                .withContributor("King, Stephen,", null));
+
+            assertThat(book.authorNames()).containsExactly("Peter David");
+        }
+
+        @ParameterizedTest(name = "{0}{1}")
+        @CsvSource(delimiter = '|', value = {
+            "'The ' | eye of the world | The eye of the world",
+            "L'     | étranger         | L'étranger"
+        })
+        void shouldJoinTheLeadingArticleOntoTheTitle(final String article, final String title, final String expected) {
+            final SourceBook book = map(sruResponse().withNonSort(article).withTitle(title));
+
+            assertThat(book.title()).isEqualTo(expected);
+        }
+
+        @Test
+        void shouldCarryTheSummaryAsTheDescription() {
+            final SourceBook book = map(sruResponse());
+
+            assertThat(book.description()).startsWith("Follows the adventures of Paul Atreides");
+        }
+
+        @Test
+        void shouldReduceTheGenresToCanonicalTerms() {
+            final SourceBook book = map(sruResponse());
+
+            assertThat(book.rawSubjects()).containsExactlyInAnyOrder("science fiction", "fiction");
+        }
+
+        @Test
+        void shouldReturnEmptyWhenTheResponseHasNoRecords() {
+            assertThat(mapper.toSourceBook(sruResponse().withoutRecords().xml())).isEmpty();
+        }
+
+        @Test
+        void shouldReturnEmptyWhenTheResponseIsNotXml() {
+            assertThat(mapper.toSourceBook("Service Unavailable")).isEmpty();
         }
     }
 }

@@ -11,17 +11,9 @@ import com.betterreads.catalog.service.source.model.SourceBook;
 import com.betterreads.integration.hardcover.dto.HardcoverBookNode;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Turns a {@link HardcoverBookNode} into a Hardcover-sourced {@link SourceBook} builder.
- *
- * <p>A node qualifies only when it is the canonical English work. Audiobooks, deluxe and illustrated
- * editions, boxed sets, omnibuses, split parts, and single comic issues are rejected.
- */
 final class HardcoverBookNodeMapper {
 
     private static final String ENGLISH = "English";
-
-    private static final String AUTHOR_ROLE = "Author";
 
     private static final String AUDIOBOOK_FORMAT = "Listened";
 
@@ -36,12 +28,10 @@ final class HardcoverBookNodeMapper {
     private HardcoverBookNodeMapper() {
     }
 
-    /** Returns the node's reader count, or zero when absent, for picking the canonical edition. */
     static int readers(final HardcoverBookNode node) {
         return node.usersCount() == null ? 0 : node.usersCount();
     }
 
-    /** Returns a builder seeded from the node when it is an English canonical single book. */
     static Optional<SourceBook.Builder> toBuilder(final @Nullable HardcoverBookNode node) {
         if (node == null || !qualifies(node)) {
             return Optional.empty();
@@ -76,12 +66,6 @@ final class HardcoverBookNodeMapper {
         return category != null && category == COLLECTION_CATEGORY;
     }
 
-    /**
-     * Returns true for a prose bind-up of two or more works, such as "Animal Farm and 1984".
-     *
-     * <p>Hardcover sets {@code compilation} on graphic-novel volumes too, where it means collected
-     * issues forming one book, so the flag counts only outside the graphic-novel category.
-     */
     private static boolean isCompilation(final HardcoverBookNode node) {
         if (!Boolean.TRUE.equals(node.compilation())) {
             return false;
@@ -98,48 +82,17 @@ final class HardcoverBookNodeMapper {
         return AUDIOBOOK_FORMAT.equals(edition.readingFormat().format());
     }
 
-    /**
-     * Returns the book with its featured series applied.
-     *
-     * <p>The series is applied only when the featured membership carries a numbered volume position.
-     * A companion, guide, or anthology is tagged to the series with a null position, which would
-     * otherwise stamp a series name with no volume and read as book one.
-     */
     static Optional<SourceBook> toSourceBookWithSeries(final @Nullable HardcoverBookNode node) {
         if (node == null) {
             return Optional.empty();
         }
-        return toBuilder(node).map(builder -> applyFeaturedSeries(builder, node).build());
-    }
-
-    private static SourceBook.Builder applyFeaturedSeries(
-        final SourceBook.Builder builder, final HardcoverBookNode node
-    ) {
-        final List<HardcoverBookNode.SeriesMembership> memberships = node.bookSeries();
-        if (memberships == null || memberships.isEmpty()) {
-            return builder;
-        }
-        final HardcoverBookNode.SeriesMembership membership = memberships.stream()
-            .filter(entry -> Boolean.TRUE.equals(entry.featured()))
-            .findFirst()
-            .orElse(memberships.get(0));
-        final HardcoverBookNode.Series series = membership.series();
-        final Integer position = membership.position();
-        if (series == null || series.name() == null || position == null || position < 1) {
-            return builder;
-        }
-        return builder.seriesName(series.name()).seriesPosition(position);
+        return toBuilder(node).map(builder -> HardcoverSeriesVolumes.withSeriesOf(builder, node).build());
     }
 
     private static boolean isCanonical(final HardcoverBookNode node) {
         return node.canonicalId() == null || node.canonicalId().equals(node.id());
     }
 
-    /**
-     * Returns true for a single graphic-novel issue: category Graphic Novel with no compilation
-     * flag. A collected volume carries the flag on the same category, and prose books sit under a
-     * different category.
-     */
     private static boolean isSingleComicIssue(final HardcoverBookNode node) {
         final Integer category = node.bookCategoryId();
         return category != null && category == GRAPHIC_NOVEL_CATEGORY
@@ -159,22 +112,8 @@ final class HardcoverBookNodeMapper {
         return image == null ? null : image.url();
     }
 
-    // PMD.ReturnEmptyCollectionRatherThanNull: null means authors omitted, kept distinct from empty.
-    @SuppressWarnings("PMD.ReturnEmptyCollectionRatherThanNull")
     private static @Nullable List<SourceAuthor> authors(final HardcoverBookNode node) {
-        if (node.contributions() == null) {
-            return null;
-        }
-        final List<String> names = node.contributions().stream()
-            .filter(HardcoverBookNodeMapper::isAuthorContribution)
-            .map(HardcoverBookNode.Contribution::author)
-            .filter(author -> author != null && author.name() != null)
-            .map(HardcoverBookNode.Author::name)
-            .toList();
-        return names.isEmpty() ? null : SourceAuthor.ofNames(names);
-    }
-
-    private static boolean isAuthorContribution(final HardcoverBookNode.Contribution contribution) {
-        return contribution.contribution() == null || AUTHOR_ROLE.equals(contribution.contribution());
+        final List<HardcoverBookNode.Contribution> contributions = node.contributions();
+        return contributions == null ? null : HardcoverContributors.authors(contributions);
     }
 }

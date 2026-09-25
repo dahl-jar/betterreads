@@ -1,0 +1,14 @@
+{
+  "numFound": 1,
+  "docs": [
+    {
+      "key": "/works/OL27482W",
+      "title": "The Hobbit",
+      "author_name": ["J.R.R. Tolkien"],
+      "first_publish_year": 1937,
+      "cover_i": 14627509,
+      "isbn": ["9780395282656", "0261103342"],
+      "language": ["eng", "ger"]
+    }
+  ]
+}

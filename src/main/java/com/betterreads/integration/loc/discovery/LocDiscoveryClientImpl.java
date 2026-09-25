@@ -6,9 +6,9 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import com.betterreads.common.util.Isbn13;
 import com.betterreads.integration.loc.LocSru;
 import com.betterreads.integration.loc.SruTree;
 import org.jspecify.annotations.Nullable;
@@ -19,13 +19,6 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.dataformat.xml.XmlMapper;
 
-/**
- * Walks the LoC SRU endpoint for newly-cataloged books in a year and subject bucket.
- *
- * <p>The walk requests {@code recordSchema=marcxml} because the MARC 008 cataloging date the recency
- * filter needs is absent from MODS. Each record is parsed independently, and an incomplete record is
- * skipped so one bad record cannot fail the bucket.
- */
 @Component
 public class LocDiscoveryClientImpl implements LocDiscoveryClient {
 
@@ -42,7 +35,6 @@ public class LocDiscoveryClientImpl implements LocDiscoveryClient {
     private static final String TAG = "tag";
     private static final String RECORDS = "records";
     private static final String RECORD = "record";
-    private static final Pattern ISBN_13 = Pattern.compile("97[89]\\d{10}");
 
     private final LocSru sru;
 
@@ -133,7 +125,7 @@ public class LocDiscoveryClientImpl implements LocDiscoveryClient {
     private static @Nullable String isbn13(final JsonNode sruRecord) {
         return subfieldsA(sruRecord, "020")
             .map(value -> value.replaceAll("\\D", ""))
-            .filter(value -> ISBN_13.matcher(value).matches())
+            .filter(Isbn13::matches)
             .findFirst()
             .orElse(null);
     }

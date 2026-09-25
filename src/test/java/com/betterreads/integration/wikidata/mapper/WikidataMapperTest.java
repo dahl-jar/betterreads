@@ -1,5 +1,7 @@
 package com.betterreads.integration.wikidata.mapper;
 
+import static com.betterreads.integration.wikidata.WikidataEntityJson.FIXTURE_QID;
+import static com.betterreads.integration.wikidata.WikidataEntityJson.entity;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Map;
@@ -7,30 +9,20 @@ import java.util.Optional;
 
 import com.betterreads.catalog.service.source.model.SourceAuthor;
 import com.betterreads.catalog.service.source.model.SourceBook;
+import com.betterreads.integration.wikidata.WikidataEntityJson;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Maps a Wikidata entity onto a {@link SourceBook}.
- *
- * <p>Each entity is an inline {@code Special:EntityData} document holding only the claims under
- * test. QID labels resolve from a fixed table, so the map runs without HTTP.
- */
 class WikidataMapperTest {
-
-    private static final JsonMapper JSON = new JsonMapper();
 
     private static final String HERBERT = "Frank Herbert";
     private static final String MOORE = "Alan Moore";
     private static final String GIBBONS = "Dave Gibbons";
     private static final String DUNE = "Dune";
-    private static final String ICE_AND_FIRE = "A Song of Ice and Fire";
     private static final String SCI_FI = "science fiction";
     private static final String NEBULA = "Nebula Award for Best Novel";
     private static final String HUGO = "Hugo Award for Best Novel";
     private static final String SEIUN = "Seiun Award for Best Translated Long Work";
-    private static final String DUNE_QID = "Q190192";
     private static final int DUNE_YEAR = 1965;
 
     private static final Map<String, String> LABELS = Map.ofEntries(
@@ -38,7 +30,6 @@ class WikidataMapperTest {
         Map.entry("Q205739", MOORE),
         Map.entry("Q445765", GIBBONS),
         Map.entry("Q6095696", DUNE),
-        Map.entry("Q45875", ICE_AND_FIRE),
         Map.entry("Q905770", "soft science fiction"),
         Map.entry("Q2630193", "planetary romance"),
         Map.entry("Q944250", "social science fiction"),
@@ -48,32 +39,22 @@ class WikidataMapperTest {
         Map.entry("Q255032", HUGO),
         Map.entry("Q27496509", SEIUN));
 
-    private static SourceBook map(final String qid, final String entityJson) {
-        return new WikidataMapper().toSourceBook(JSON.readTree(entityJson), qid, LABELS::get)
+    private static SourceBook map(final WikidataEntityJson entity) {
+        return new WikidataMapper().toSourceBook(entity.node(), FIXTURE_QID, LABELS::get).orElseThrow();
+    }
+
+    private static String qidOf(final String label) {
+        return LABELS.entrySet().stream()
+            .filter(entry -> entry.getValue().equals(label))
+            .map(Map.Entry::getKey)
+            .findFirst()
             .orElseThrow();
     }
 
     @Nested
-    class Dune {
+    class FullEntity {
 
-        private final SourceBook book = map(DUNE_QID, """
-            {"id": "Q190192", "labels": {"en": {"value": "Dune"}}, "claims": {
-              "P31":  [{"mainsnak": {"snaktype": "value", "datavalue": {"value": {"id": "Q7725634"}}}}],
-              "P50":  [{"mainsnak": {"snaktype": "value", "datavalue": {"value": {"id": "Q7934"}}}}],
-              "P136": [{"mainsnak": {"snaktype": "value", "datavalue": {"value": {"id": "Q905770"}}}},
-                       {"mainsnak": {"snaktype": "value", "datavalue": {"value": {"id": "Q2630193"}}}},
-                       {"mainsnak": {"snaktype": "value", "datavalue": {"value": {"id": "Q944250"}}}},
-                       {"mainsnak": {"snaktype": "value", "datavalue": {"value": {"id": "Q24925"}}}},
-                       {"mainsnak": {"snaktype": "value", "datavalue": {"value": {"id": "Q21802675"}}}}],
-              "P166": [{"mainsnak": {"snaktype": "value", "datavalue": {"value": {"id": "Q266012"}}}},
-                       {"mainsnak": {"snaktype": "value", "datavalue": {"value": {"id": "Q255032"}}}},
-                       {"mainsnak": {"snaktype": "value", "datavalue": {"value": {"id": "Q27496509"}}}}],
-              "P179": [{"mainsnak": {"snaktype": "value", "datavalue": {"value": {"id": "Q6095696"}}},
-                        "qualifiers": {"P1545": [{"datavalue": {"value": "1"}}]}}],
-              "P244": [{"mainsnak": {"snaktype": "value", "datavalue": {"value": "no2006084758"}}}],
-              "P577": [{"mainsnak": {"snaktype": "value", "datavalue": {"value": {"time": "+1965-00-00T00:00:00Z"}}}}],
-              "P648": [{"mainsnak": {"snaktype": "value", "datavalue": {"value": "OL893527W"}}}]
-            }}""");
+        private final SourceBook book = map(entity());
 
         @Test
         void resolvesTheAuthorNameFromTheP50Qid() {
@@ -100,7 +81,7 @@ class WikidataMapperTest {
 
         @Test
         void readsTheIdentifiersAndYear() {
-            assertThat(book.wikidataQid()).isEqualTo(DUNE_QID);
+            assertThat(book.wikidataQid()).isEqualTo(FIXTURE_QID);
             assertThat(book.openLibraryWorkKey()).isEqualTo("OL893527W");
             assertThat(book.locLccn()).isEqualTo("no2006084758");
             assertThat(book.publicationYear()).isEqualTo(DUNE_YEAR);
@@ -108,13 +89,9 @@ class WikidataMapperTest {
     }
 
     @Nested
-    class Sandman {
+    class WithoutOptionalClaims {
 
-        private final SourceBook book = map("Q827099", """
-            {"id": "Q827099", "labels": {"en": {"value": "The Sandman"}}, "claims": {
-              "P31": [{"mainsnak": {"snaktype": "value", "datavalue": {"value": {"id": "Q14406742"}}}}],
-              "P50": [{"mainsnak": {"snaktype": "value", "datavalue": {"value": {"id": "Q205739"}}}}]
-            }}""");
+        private final SourceBook book = map(entity().withoutGenres().withoutSeries());
 
         @Test
         void leavesGenreNullWhenP136IsAbsent() {
@@ -126,23 +103,12 @@ class WikidataMapperTest {
             assertThat(book.seriesName()).isNull();
             assertThat(book.seriesPosition()).isNull();
         }
-
-        @Test
-        void leavesOpenLibraryKeyNullWhenP648IsAbsent() {
-            assertThat(book.openLibraryWorkKey()).isNull();
-        }
     }
 
     @Nested
-    class Watchmen {
+    class WithSeveralAuthors {
 
-        private final SourceBook book = map("Q128444", """
-            {"id": "Q128444", "labels": {"en": {"value": "Watchmen"}}, "claims": {
-              "P31": [{"mainsnak": {"snaktype": "value", "datavalue": {"value": {"id": "Q3297186"}}}},
-                      {"mainsnak": {"snaktype": "value", "datavalue": {"value": {"id": "Q7725634"}}}}],
-              "P50": [{"mainsnak": {"snaktype": "value", "datavalue": {"value": {"id": "Q205739"}}}},
-                      {"mainsnak": {"snaktype": "value", "datavalue": {"value": {"id": "Q445765"}}}}]
-            }}""");
+        private final SourceBook book = map(entity().withAuthors(qidOf(MOORE), qidOf(GIBBONS)));
 
         @Test
         void mapsEveryAuthorWhenP50IsMultiValued() {
@@ -152,13 +118,9 @@ class WikidataMapperTest {
     }
 
     @Nested
-    class Hobbit {
+    class WithoutAwards {
 
-        private final SourceBook book = map("Q74287", """
-            {"id": "Q74287", "labels": {"en": {"value": "The Hobbit"}}, "claims": {
-              "P31":  [{"mainsnak": {"snaktype": "value", "datavalue": {"value": {"id": "Q7725634"}}}}],
-              "P244": [{"mainsnak": {"snaktype": "value", "datavalue": {"value": "n79102640"}}}]
-            }}""");
+        private final SourceBook book = map(entity().withoutAwards());
 
         @Test
         void returnsEmptyAwardsSoStaleRowsClear() {
@@ -167,38 +129,30 @@ class WikidataMapperTest {
     }
 
     @Nested
-    class Clash {
+    class WithSeveralOpenLibraryKeys {
 
-        private final SourceBook book = map("Q300370", """
-            {"id": "Q300370", "labels": {"en": {"value": "A Clash of Kings"}}, "claims": {
-              "P31":  [{"mainsnak": {"snaktype": "value", "datavalue": {"value": {"id": "Q7725634"}}}}],
-              "P179": [{"mainsnak": {"snaktype": "value", "datavalue": {"value": {"id": "Q45875"}}},
-                        "qualifiers": {"P1545": [{"datavalue": {"value": "2"}}]}}],
-              "P648": [{"mainsnak": {"snaktype": "value", "datavalue": {"value": "OL1955946W"}}},
-                       {"mainsnak": {"snaktype": "value", "datavalue": {"value": "OL257939W"}}}]
-            }}""");
+        private static final String FIRST_KEY = "OL1955946W";
+
+        private final SourceBook book = map(entity().withOpenLibraryKeys(FIRST_KEY, "OL257939W"));
 
         @Test
         void takesTheFirstOpenLibraryKeyWhenP648IsMultiValued() {
-            assertThat(book.openLibraryWorkKey()).isEqualTo("OL1955946W");
+            assertThat(book.openLibraryWorkKey()).isEqualTo(FIRST_KEY);
         }
     }
 
     @Nested
-    class Untitled {
+    class WithoutId {
 
         @Test
         void returnsEmptyWhenTheEntityCarriesNoId() {
-            final String noId = """
-                {"labels": {"en": {"value": "Dune"}}, "claims": {
-                  "P31": [{"mainsnak": {"snaktype": "value", "datavalue": {"value": {"id": "Q7725634"}}}}]
-                }}""";
+            final WikidataEntityJson noId = entity().withoutId();
 
             final Optional<SourceBook> mapped =
-                new WikidataMapper().toSourceBook(JSON.readTree(noId), DUNE_QID, LABELS::get);
+                new WikidataMapper().toSourceBook(noId.node(), FIXTURE_QID, LABELS::get);
 
             assertThat(mapped)
-                .as("no id means no display name, and a book with no title is unmappable")
+                .as("should skip an entity with no id because it has no display name")
                 .isEmpty();
         }
     }

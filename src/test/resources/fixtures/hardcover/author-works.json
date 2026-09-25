@@ -1,0 +1,31 @@
+{"data": {"authors": [{
+  "name": "Brandon Sanderson",
+  "contributions": [
+    {"book": {"id": 1, "title": "Mistborn: The Final Empire", "users_count": 9706,
+      "canonical_id": null,
+      "book_series": [
+        {"position": 5, "featured": false, "series": {"name": "The Cosmere"}},
+        {"position": 1, "featured": true, "series": {"name": "Mistborn"}}],
+      "default_physical_edition": {"language": {"language": "English"}}}},
+    {"book": {"id": 2, "title": "Ostatnie Imperium", "users_count": 50,
+      "canonical_id": 1,
+      "default_physical_edition": {"language": {"language": "Polish"}}}},
+    {"book": {"id": 3, "title": "Die Seele des Königs", "users_count": 40,
+      "canonical_id": null,
+      "default_physical_edition": {"language": {"language": "German"}}}},
+    {"book": {"id": 4, "title": "Dangerous Women (Boxed Set)", "users_count": 30,
+      "canonical_id": null,
+      "default_physical_edition": {"language": {"language": "English"}}}},
+    {"book": {"id": 6, "title": "Mistborn & The Stormlight Archive", "users_count": 9000,
+      "canonical_id": null, "book_category_id": 1, "compilation": true,
+      "default_physical_edition": {"language": {"language": "English"}}}},
+    {"book": {"id": 5, "title": "The Way of Kings", "users_count": 7897,
+      "canonical_id": null,
+      "default_physical_edition": {"language": {"language": "English"}}}},
+    {"book": {"id": 7, "title": "The World of Mistborn", "users_count": 20,
+      "canonical_id": null, "book_category_id": 1,
+      "book_series": [
+        {"position": null, "featured": true, "series": {"name": "Mistborn"}}],
+      "default_physical_edition": {"language": {"language": "English"}}}}
+  ]
+}]}}
