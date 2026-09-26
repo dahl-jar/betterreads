@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      packages: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -29,6 +30,13 @@ jobs:
 
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
+
+      - name: Log in to GHCR
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567  # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Pull test container images
         run: bash .github/scripts/pull-test-images.sh

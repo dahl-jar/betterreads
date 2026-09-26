@@ -42,7 +42,7 @@ class MinioImageStoreTest {
 
     @SuppressWarnings("resource")
     private final GenericContainer<?> minio =
-        new GenericContainer<>(DockerImageName.parse("quay.io/minio/minio:RELEASE.2024-01-16T16-07-38Z"))
+        new GenericContainer<>(DockerImageName.parse("ghcr.io/dahl-jar/minio@sha256:52dfd5c0bbd38d3219f2058c7af216d9f9a27a994b7b5baad09bbd38866015ff"))
             .withEnv("MINIO_ROOT_USER", CREDENTIAL)
             .withEnv("MINIO_ROOT_PASSWORD", CREDENTIAL)
             .withCommand("server", "/data")
