@@ -12,6 +12,7 @@ on:
       - "config/**"
       - "docker/Dockerfile"
       - ".github/workflows/docker-image.yml"
+      - ".github/scripts/**"
   workflow_dispatch: {}
 
 concurrency:
@@ -43,6 +44,9 @@ jobs:
 
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
+
+      - name: Pull test container images
+        run: bash .github/scripts/pull-test-images.sh
 
       - name: Run full quality gate
         run: ./gradlew check

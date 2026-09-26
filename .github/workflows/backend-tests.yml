@@ -8,6 +8,7 @@ on:
       - "settings.gradle.kts"
       - "gradle/**"
       - ".github/workflows/backend-tests.yml"
+      - ".github/scripts/**"
 
 jobs:
   test:
@@ -28,6 +29,9 @@ jobs:
 
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
+
+      - name: Pull test container images
+        run: bash .github/scripts/pull-test-images.sh
 
       - name: Run tests
         run: ./gradlew test
