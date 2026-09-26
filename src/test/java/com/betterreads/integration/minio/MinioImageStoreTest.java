@@ -26,6 +26,9 @@ import org.testcontainers.utility.DockerImageName;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class MinioImageStoreTest {
 
+    private static final String MINIO_IMAGE =
+        "ghcr.io/dahl-jar/minio@sha256:52dfd5c0bbd38d3219f2058c7af216d9f9a27a994b7b5baad09bbd38866015ff";
+
     private static final int API_PORT = 9000;
 
     private static final String CREDENTIAL = "minioadmin";
@@ -42,7 +45,7 @@ class MinioImageStoreTest {
 
     @SuppressWarnings("resource")
     private final GenericContainer<?> minio =
-        new GenericContainer<>(DockerImageName.parse("ghcr.io/dahl-jar/minio@sha256:52dfd5c0bbd38d3219f2058c7af216d9f9a27a994b7b5baad09bbd38866015ff"))
+        new GenericContainer<>(DockerImageName.parse(MINIO_IMAGE))
             .withEnv("MINIO_ROOT_USER", CREDENTIAL)
             .withEnv("MINIO_ROOT_PASSWORD", CREDENTIAL)
             .withCommand("server", "/data")
