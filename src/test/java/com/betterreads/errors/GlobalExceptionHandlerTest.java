@@ -14,6 +14,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.List;
 import java.util.Map;
@@ -30,6 +31,8 @@ class GlobalExceptionHandlerTest {
     private static final String BUSINESS_RULE_MESSAGE = "User already reviewed this book";
 
     private static final String UNEXPECTED_ERROR = "database connection lost";
+
+    private static final String UNKNOWN_PATH = "/api/v1/search";
 
     private static final String BINDING_TARGET = "request";
 
@@ -69,6 +72,20 @@ class GlobalExceptionHandlerTest {
             assertThat(problem)
                     .extracting(ProblemDetail::getStatus, ProblemDetail::getDetail)
                     .containsExactly(HttpStatus.NOT_FOUND.value(), "Resource not found");
+        }
+    }
+
+    @Nested
+    class WhenNoRouteMatches {
+
+        @Test
+        void shouldReturn404ForAnUnknownPath() {
+            final ProblemDetail problem = handler.handleNoResource(
+                    new NoResourceFoundException(HttpMethod.GET, UNKNOWN_PATH, UNKNOWN_PATH));
+
+            assertThat(problem)
+                    .extracting(ProblemDetail::getStatus, ProblemDetail::getDetail)
+                    .containsExactly(HttpStatus.NOT_FOUND.value(), "No endpoint matches this path");
         }
     }
 

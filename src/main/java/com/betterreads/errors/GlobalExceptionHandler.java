@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.Instant;
 import java.util.List;
@@ -51,6 +52,13 @@ class GlobalExceptionHandler {
     @ExceptionHandler(ResourceNotFoundException.class)
     public ProblemDetail handleNotFound(final ResourceNotFoundException exception) {
         return warnedProblem(HttpStatus.NOT_FOUND, "Resource not found", exception);
+    }
+
+    /** scanners probe unknown paths all day, so a miss logs at debug */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ProblemDetail handleNoResource(final NoResourceFoundException exception) {
+        LOG.debug("No endpoint for path={}", LogSanitizer.forLog(exception.getResourcePath()));
+        return problem(HttpStatus.NOT_FOUND, "No endpoint matches this path");
     }
 
     @ExceptionHandler(ForbiddenException.class)

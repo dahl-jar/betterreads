@@ -39,8 +39,8 @@ server:
   tomcat:
     accesslog:
       enabled: ${SERVER_TOMCAT_ACCESSLOG_ENABLED:true}
-      directory: /dev/stdout
-      prefix: ""
+      directory: /dev
+      prefix: stdout
       suffix: ""
       file-date-format: ""
       pattern: '%{X-Forwarded-For}i %t "%r" %s %b %D "%{Referer}i" "%{User-Agent}i"'
@@ -49,6 +49,9 @@ management:
   server:
     port: 8081
     address: 127.0.0.1
+    tomcat:
+      accesslog:
+        prefix: ""
   endpoints:
     web:
       exposure:
