@@ -14,10 +14,10 @@ servers:
 security:
 - bearer-jwt: []
 tags:
+- name: Operations
+  description: Service health
 - name: Search
   description: Catalog full-text search
-- name: Operations
-  description: Public probes used by external monitors
 - name: Comments
   description: Comments on books and reviews
 - name: Images
@@ -278,20 +278,21 @@ paths:
                 properties:
                   data:
                     $ref: "#/components/schemas/CommentResponse"
+        "404":
+          description: "No review with that id, or no parent comment with that id"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
         "400":
-          description: Empty body or reply to a reply
+          description: "Empty body, reply to a reply, or parent comment on another\
+            \ book or review"
           content:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
         "401":
           description: Missing or invalid access token
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-        "404":
-          description: No review with that id
           content:
             '*/*':
               schema:
@@ -375,20 +376,21 @@ paths:
                 properties:
                   data:
                     $ref: "#/components/schemas/CommentResponse"
+        "404":
+          description: "No book with that key, or no parent comment with that id"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
         "400":
-          description: Empty body or reply to a reply
+          description: "Empty body, reply to a reply, or parent comment on another\
+            \ book or review"
           content:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
         "401":
           description: Missing or invalid access token
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-        "404":
-          description: No book with that key
           content:
             '*/*':
               schema:
@@ -542,7 +544,7 @@ paths:
         "503":
           description: Service Unavailable
         "200":
-          description: New access token; refresh cookie rotated
+          description: "New access token, refresh cookie rotated"
           content:
             '*/*':
               schema:
@@ -671,6 +673,12 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: No book with that key
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
     patch:
       tags:
       - Shelf
@@ -786,7 +794,7 @@ paths:
     get:
       tags:
       - Search
-      summary: Stream books that finish staging and match the query
+      summary: Stream newly added books that match the query
       operationId: streamHits
       parameters:
       - name: q

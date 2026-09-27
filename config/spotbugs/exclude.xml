@@ -5,18 +5,15 @@
     xsi:schemaLocation="https://github.com/spotbugs/filter/3.0.0 https://raw.githubusercontent.com/spotbugs/spotbugs/3.1.0/spotbugs/etc/findbugsfilter.xsd">
 
     <!--
-      SPRING_ENDPOINT is informational. FindSecBugs flags every @RequestMapping method
-      so a reviewer can audit it. We already enforce auth via SecurityConfig and treat
-      controllers as scrutinized by code review; the noise outweighs the value.
+      SPRING_ENDPOINT flags every @RequestMapping method for review, and SecurityConfig already
+      guards each one.
     -->
     <Match>
         <Bug pattern="SPRING_ENDPOINT"/>
     </Match>
 
     <!--
-      SERVLET_HEADER fires whenever request headers are read. JWT auth requires reading
-      Authorization on every request; suppressing globally is correct because every
-      auth-aware filter would otherwise need an inline suppression with the same reason.
+      SERVLET_HEADER fires on every header read, and JWT auth reads Authorization on every request.
     -->
     <Match>
         <Bug pattern="SERVLET_HEADER"/>
@@ -33,142 +30,46 @@
     </Match>
 
     <!--
-      EI_EXPOSE_REP2 on Spring services that hold injected ObjectMapper, repositories, or
-      other singleton beans. Defensive copies are wrong here: the injected references are
-      Spring-managed singletons, never mutated post-construction, and shared across the
-      application by design. Suppression is narrow to the mail.outbox package and the one
-      auth service that talks to it.
+      EI_EXPOSE_REP2 on Spring beans holding injected singletons (WebClient, repositories, mappers)
+      that are never mutated after construction.
     -->
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Package name="com.betterreads.mail.outbox"/>
-    </Match>
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="com.betterreads.auth.passwordreset.PasswordResetService"/>
-    </Match>
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="com.betterreads.auth.emailverification.EmailVerificationService"/>
-    </Match>
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Package name="com.betterreads.auth.deletion"/>
-    </Match>
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="com.betterreads.auth.ratelimit.RateLimitFilter"/>
-    </Match>
     <Match>
         <Bug pattern="EI_EXPOSE_REP2"/>
         <Or>
-            <Package name="com.betterreads.catalog.read.sse"/>
-            <Package name="com.betterreads.search.sse"/>
+            <Class name="com.betterreads.mailoutbox.MailOutboxService"/>
+            <Class name="com.betterreads.features.account.PasswordResetService"/>
+            <Class name="com.betterreads.features.account.EmailVerificationService"/>
+            <Class name="com.betterreads.features.account.AccountDeletionSweep"/>
+            <Class name="com.betterreads.ratelimit.RateLimitFilter"/>
+            <Class name="com.betterreads.features.search.SearchHitListener"/>
+            <Class name="com.betterreads.features.bookdetail.BookDetailController"/>
+            <Class name="com.betterreads.book.BookUpsertServiceImpl"/>
+            <Class name="com.betterreads.features.shelves.ShelfController"/>
+            <Class name="com.betterreads.features.shelves.ShelfServiceImpl"/>
+            <Class name="com.betterreads.features.shelves.ShelfWriter"/>
+            <Class name="com.betterreads.ratelimit.DistributedRateLimiter"/>
+            <Class name="com.betterreads.clients.itunes.ItunesApi"/>
+            <Class name="com.betterreads.clients.wikipedia.WikipediaApi"/>
+            <Class name="com.betterreads.clients.minio.MinioImageStore"/>
+            <Class name="com.betterreads.clients.coverfetch.CoverFetchClient"/>
+            <Class name="com.betterreads.features.coverimages.CoverMirrorService"/>
+            <Class name="com.betterreads.features.coverimages.CoverImageService"/>
+            <Class name="com.betterreads.features.reviews.ReviewServiceImpl"/>
+            <Class name="com.betterreads.features.reviews.ReviewWriter"/>
+            <Class name="com.betterreads.features.reviews.ReaderRatingsImpl"/>
+            <Class name="com.betterreads.features.reviews.ReviewLookupImpl"/>
+            <Class name="com.betterreads.features.reviews.ReviewController"/>
+            <Class name="com.betterreads.features.comments.CommentServiceImpl"/>
+            <Class name="com.betterreads.features.comments.CommentController"/>
+            <Class name="com.betterreads.features.comments.CommentResponseAssembler"/>
+            <Class name="com.betterreads.clients.googlebooks.GoogleBooksClientImpl"/>
+            <Class name="com.betterreads.clients.hardcoverauthor.HardcoverAuthorClientImpl"/>
+            <Class name="com.betterreads.clients.hardcoverbook.HardcoverClientImpl"/>
+            <Class name="com.betterreads.clients.hardcoverseries.HardcoverSeriesClientImpl"/>
+            <Class name="com.betterreads.clients.openlibrary.OpenLibraryClientImpl"/>
+            <Class name="com.betterreads.clients.loc.LocSru"/>
+            <Class name="com.betterreads.clients.wikidata.WikidataApi"/>
         </Or>
-    </Match>
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="com.betterreads.catalog.controller.BookController"/>
-    </Match>
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="com.betterreads.catalog.service.write.BookUpsertServiceImpl"/>
-    </Match>
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="com.betterreads.collections.controller.ShelfController"/>
-    </Match>
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="com.betterreads.collections.service.ShelfServiceImpl"/>
-    </Match>
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="com.betterreads.collections.service.ShelfWriter"/>
-    </Match>
-
-    <!--
-      EI_EXPOSE_REP2 on the description sources and the shared rate limiter. Same rationale as the
-      service beans above: each holds Spring-managed singletons (the WebClient, the WikidataApi, the
-      Redis ProxyManager), never mutated after construction and shared by design.
-    -->
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="com.betterreads.common.ratelimit.DistributedRateLimiter"/>
-    </Match>
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="com.betterreads.integration.itunes.ItunesApi"/>
-    </Match>
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="com.betterreads.integration.wikipedia.WikipediaApi"/>
-    </Match>
-
-    <!--
-      EI_EXPOSE_REP2 on the cover-mirroring beans. Same rationale: each holds Spring-managed
-      singletons (the MinioClient, the cover WebClient, the ImageStore, repositories), never mutated
-      after construction and shared by design.
-    -->
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="com.betterreads.integration.minio.MinioImageStore"/>
-    </Match>
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="com.betterreads.integration.image.CoverFetchClient"/>
-    </Match>
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="com.betterreads.catalog.image.CoverMirrorService"/>
-    </Match>
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="com.betterreads.catalog.service.read.CoverImageService"/>
-    </Match>
-
-    <!--
-      EI_EXPOSE_REP2 on the review service, its writer, and controller. Same rationale as the
-      shelf beans above: each holds Spring-managed singleton repositories, the mapper, and the
-      writer, none mutated after construction. A defensive copy is meaningless for these.
-    -->
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="com.betterreads.reviews.service.ReviewServiceImpl"/>
-    </Match>
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="com.betterreads.reviews.service.ReviewWriter"/>
-    </Match>
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="com.betterreads.reviews.service.ReaderRatings"/>
-    </Match>
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="com.betterreads.reviews.service.ReviewLookup"/>
-    </Match>
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="com.betterreads.reviews.controller.ReviewController"/>
-    </Match>
-
-    <!--
-      EI_EXPOSE_REP2 on the comment service and controller. Same rationale as the shelf and review
-      beans above: Spring-managed singleton repositories and the mapper, never mutated after
-      construction. A defensive copy is meaningless for these.
-    -->
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="com.betterreads.comments.service.CommentServiceImpl"/>
-    </Match>
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="com.betterreads.comments.controller.CommentController"/>
-    </Match>
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="com.betterreads.comments.service.CommentResponseAssembler"/>
     </Match>
 
     <!--
@@ -178,7 +79,11 @@
     -->
     <Match>
         <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
-        <Package name="com.betterreads.catalog.entity"/>
+        <Or>
+            <Class name="com.betterreads.book.Book"/>
+            <Class name="com.betterreads.book.BookAward"/>
+            <Class name="com.betterreads.book.BookSubject"/>
+        </Or>
     </Match>
 
     <!--
@@ -192,46 +97,17 @@
     </Match>
 
     <!--
-      EI_EXPOSE_REP2 on integration clients (enrichment under .client, discovery under
-      .discovery) and the shared SRU/REST gateways, all holding their injected WebClient and
-      mapper. These are Spring-managed singletons, never mutated after construction and shared
-      by design. A defensive copy is meaningless for a WebClient. Same rationale as the
-      mail.outbox and auth-service suppressions above.
-    -->
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Package name="~com\.betterreads\.integration\..*\.(client|discovery)"/>
-    </Match>
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="com.betterreads.integration.loc.LocSru"/>
-    </Match>
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="com.betterreads.integration.wikidata.WikidataApi"/>
-    </Match>
-
-    <!--
-      CRLF_INJECTION_LOGS on the opt-in seed and pipeline verification. The logged title is passed
-      through LogSanitizer.forLog, but FindSecBugs does not recognize that helper as a sanitizer
-      through the static-import indirection in these classes (it accepts the same helper in the
-      integration clients). Test-only verification code; the value is genuinely scrubbed.
+      CRLF_INJECTION_LOGS on the opt-in verification suites. FindSecBugs misses LogSanitizer.forLog
+      behind the static import, and the title is sanitized.
     -->
     <Match>
         <Bug pattern="CRLF_INJECTION_LOGS"/>
-        <Class name="com.betterreads.catalog.source.CatalogOpenLibrarySeedVerification"/>
-    </Match>
-    <Match>
-        <Bug pattern="CRLF_INJECTION_LOGS"/>
-        <Class name="com.betterreads.catalog.pipeline.CatalogPipelineLiveE2eTest"/>
-    </Match>
-    <Match>
-        <Bug pattern="CRLF_INJECTION_LOGS"/>
-        <Class name="com.betterreads.catalog.pipeline.CatalogPipelineLocalDbVerification"/>
-    </Match>
-    <Match>
-        <Bug pattern="CRLF_INJECTION_LOGS"/>
-        <Class name="com.betterreads.catalog.pipeline.DescriptionBackfillLocalDbVerification"/>
+        <Or>
+            <Class name="com.betterreads.book.CatalogOpenLibrarySeedVerification"/>
+            <Class name="com.betterreads.features.bookstaging.CatalogPipelineLiveE2eTest"/>
+            <Class name="com.betterreads.features.bookstaging.CatalogPipelineLocalDbVerification"/>
+            <Class name="com.betterreads.features.descriptionbackfill.DescriptionBackfillLocalDbVerification"/>
+        </Or>
     </Match>
 
     <!--
@@ -242,72 +118,56 @@
     -->
     <Match>
         <Bug pattern="CRLF_INJECTION_LOGS"/>
-        <Class name="com.betterreads.catalog.service.pipeline.SourceCollector"/>
-    </Match>
-    <Match>
-        <Bug pattern="CRLF_INJECTION_LOGS"/>
-        <Class name="com.betterreads.catalog.service.pipeline.CatalogSearchService"/>
-    </Match>
-    <Match>
-        <Bug pattern="CRLF_INJECTION_LOGS"/>
-        <Class name="com.betterreads.catalog.service.pipeline.DescriptionSelector"/>
+        <Or>
+            <Class name="com.betterreads.features.bookstaging.SourceCollector"/>
+            <Class name="com.betterreads.features.bookstaging.BookDiscoveryService"/>
+            <Class name="com.betterreads.bookdescription.DescriptionSelector"/>
+        </Or>
     </Match>
 
     <!--
-      CRLF_INJECTION_LOGS on the shared upsert-retry warn. The shelf and review services build the
-      log event from userId and bookId, both Long, and pass it as the event String. FindSecBugs
-      taints the parameter because it cannot see the callers only pass machine-built strings; no
-      external value reaches the log, so none can carry CRLF.
+      CRLF_INJECTION_LOGS on ConflictRetry. The shelf and review services pass an event string built
+      from two Long ids, so it cannot carry CRLF.
     -->
     <Match>
         <Bug pattern="CRLF_INJECTION_LOGS"/>
-        <Class name="com.betterreads.common.util.ConflictRetry"/>
+        <Class name="com.betterreads.db.ConflictRetry"/>
     </Match>
 
     <!--
-      IMPROPER_UNICODE on the shared title-versus-query comparison. FindSecBugs flags any
-      case-insensitive comparison as a Unicode case-folding risk. The comparison here is a book
-      title against a free-form search query for a best-effort drift check, used by the OpenLibrary
-      client and the standalone-fallback staging; it is not a security token or authorization
-      decision, so a Unicode collision has no exploitable consequence.
+      IMPROPER_UNICODE on TextMatch. It compares a book title with a search query, so a Unicode
+      case-folding collision only skews a match.
     -->
     <Match>
         <Bug pattern="IMPROPER_UNICODE"/>
-        <Class name="com.betterreads.common.util.TextMatch"/>
+        <Class name="com.betterreads.text.TextMatch"/>
     </Match>
 
     <!--
       IMPROPER_UNICODE on the language-code lookup. The input is a source's ISO 639 code, lower-cased
-      to hit a fixed ASCII table; it is not a security decision.
+      to look up a fixed ASCII table.
     -->
     <Match>
         <Bug pattern="IMPROPER_UNICODE"/>
-        <Class name="com.betterreads.catalog.service.source.quality.LanguageCodes"/>
+        <Class name="com.betterreads.bookmerge.LanguageCodes"/>
     </Match>
 
     <Match>
         <Bug pattern="IMPROPER_UNICODE"/>
-        <Class name="com.betterreads.catalog.service.source.quality.TitleCasing"/>
-    </Match>
-
-    <Match>
-        <Bug pattern="IMPROPER_UNICODE"/>
-        <Class name="com.betterreads.catalog.service.source.quality.IssueRunSeries"/>
+        <Or>
+            <Class name="com.betterreads.bookmerge.TitleCasing"/>
+            <Class name="com.betterreads.booksource.IssueRunSeries"/>
+        </Or>
     </Match>
 
     <!--
-      REDOS on the description-cleaning patterns. Every quantifier in these regexes is possessive
-      (++, *+), which by definition does no backtracking, so catastrophic backtracking is impossible.
-      FindSecBugs does not model possessive quantifiers and flags the nested character classes
-      anyway. The patterns only ever run over a bounded book description (capped well under 3 KB by
-      the quality check), so even a greedy form would be safe.
+      REDOS on the description patterns. Every quantifier is possessive, which FindSecBugs does not model.
     -->
     <Match>
         <Bug pattern="REDOS"/>
-        <Class name="com.betterreads.catalog.service.source.quality.DescriptionCleaner"/>
-    </Match>
-    <Match>
-        <Bug pattern="REDOS"/>
-        <Class name="com.betterreads.catalog.service.source.quality.DescriptionQuality"/>
+        <Or>
+            <Class name="com.betterreads.bookdescription.DescriptionCleaner"/>
+            <Class name="com.betterreads.bookdescription.DescriptionQuality"/>
+        </Or>
     </Match>
 </FindBugsFilter>

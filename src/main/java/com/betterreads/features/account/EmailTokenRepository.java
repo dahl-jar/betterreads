@@ -1,0 +1,32 @@
+package com.betterreads.features.account;
+
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+@Repository
+interface EmailTokenRepository extends JpaRepository<EmailToken, Long> {
+
+    /** Purpose is part of the lookup so a token issued for one feature cannot be used on another. */
+    @Query("""
+        SELECT t FROM EmailToken t
+        WHERE t.tokenHash = :hash AND t.purpose = :purpose
+        """)
+    Optional<EmailToken> findByHashAndPurpose(
+        @Param("hash") String hash,
+        @Param("purpose") EmailToken.Purpose purpose
+    );
+
+    @Query("""
+        SELECT t FROM EmailToken t
+        WHERE t.userId = :userId AND t.purpose = :purpose AND t.consumedAt IS NULL
+        """)
+    List<EmailToken> findActive(
+        @Param("userId") long userId,
+        @Param("purpose") EmailToken.Purpose purpose
+    );
+}

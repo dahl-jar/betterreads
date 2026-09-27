@@ -6,14 +6,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import tools.jackson.databind.DeserializationFeature;
 
-/**
- * Jackson defaults.
- *
- * <p>Unknown JSON fields are ignored on read. Dates are written as ISO-8601 strings. Null
- * fields are dropped from output.
- */
+/** App-wide Jackson defaults. */
 @Configuration
-public class JacksonConfig {
+class JacksonConfig {
 
     @Bean
     JsonMapperBuilderCustomizer jacksonCustomizer() {

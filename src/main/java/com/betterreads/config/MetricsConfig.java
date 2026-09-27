@@ -6,13 +6,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Micrometer filters for the HTTP request metric.
- *
- * <p>Health probes call {@code /healthz} every few seconds, which would dominate
- * {@code http_server_requests} and hide real traffic, so that URI is dropped from the meter.
+ * Health probes call {@code /healthz} every few seconds and would outnumber real traffic in
+ * {@code http_server_requests}, so that URI is dropped from the meter.
  */
 @Configuration
-public class MetricsConfig {
+class MetricsConfig {
 
     private static final String HTTP_SERVER_REQUESTS = "http.server.requests";
 

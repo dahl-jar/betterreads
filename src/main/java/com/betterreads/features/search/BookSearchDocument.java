@@ -1,0 +1,127 @@
+package com.betterreads.features.search;
+
+import java.util.List;
+import org.jspecify.annotations.Nullable;
+
+/**
+ * One book in the Meilisearch books index.
+ *
+ * @param bookId the catalog dedup key
+ * @param subjects BISAC subjects
+ * @param language ISO 639-1 code
+ * @param publicationYear year of first publication
+ * @param popularityScore sort tie-breaker, 0 if unknown
+ */
+public record BookSearchDocument(
+    String bookId,
+    String title,
+    @Nullable String subtitle,
+    @Nullable String seriesName,
+    @Nullable Integer seriesPosition,
+    List<String> authors,
+    List<String> subjects,
+    @Nullable String language,
+    @Nullable String coverUrl,
+    @Nullable Integer publicationYear,
+    double popularityScore
+) {
+
+    static final String PRIMARY_KEY = "bookId";
+
+    public BookSearchDocument {
+        authors = List.copyOf(authors);
+        subjects = List.copyOf(subjects);
+    }
+
+    @Override
+    public List<String> authors() {
+        return List.copyOf(authors);
+    }
+
+    @Override
+    public List<String> subjects() {
+        return List.copyOf(subjects);
+    }
+
+    static Builder builder(final String bookId) {
+        return new Builder(bookId);
+    }
+
+    /** several String and Integer fields sit side by side, so named setters keep two from being swapped. */
+    // PMD.AvoidFieldNameMatchingMethodName: a builder field and its setter share a name by design.
+    @SuppressWarnings("PMD.AvoidFieldNameMatchingMethodName")
+    public static final class Builder {
+
+        private final String bookId;
+        private String title = "";
+        private @Nullable String subtitle;
+        private @Nullable String seriesName;
+        private @Nullable Integer seriesPosition;
+        private List<String> authors = List.of();
+        private List<String> subjects = List.of();
+        private @Nullable String language;
+        private @Nullable String coverUrl;
+        private @Nullable Integer publicationYear;
+        private double popularityScore;
+
+        private Builder(final String bookId) {
+            this.bookId = bookId;
+        }
+
+        public Builder title(final String value) {
+            this.title = value;
+            return this;
+        }
+
+        public Builder subtitle(final @Nullable String value) {
+            this.subtitle = value;
+            return this;
+        }
+
+        public Builder seriesName(final @Nullable String value) {
+            this.seriesName = value;
+            return this;
+        }
+
+        public Builder seriesPosition(final @Nullable Integer value) {
+            this.seriesPosition = value;
+            return this;
+        }
+
+        public Builder authors(final List<String> value) {
+            this.authors = List.copyOf(value);
+            return this;
+        }
+
+        public Builder subjects(final List<String> value) {
+            this.subjects = List.copyOf(value);
+            return this;
+        }
+
+        public Builder language(final @Nullable String value) {
+            this.language = value;
+            return this;
+        }
+
+        public Builder coverUrl(final @Nullable String value) {
+            this.coverUrl = value;
+            return this;
+        }
+
+        public Builder publicationYear(final @Nullable Integer value) {
+            this.publicationYear = value;
+            return this;
+        }
+
+        public Builder popularityScore(final double value) {
+            this.popularityScore = value;
+            return this;
+        }
+
+        public BookSearchDocument build() {
+            return new BookSearchDocument(
+                bookId, title, subtitle, seriesName, seriesPosition, authors, subjects, language,
+                coverUrl, publicationYear, popularityScore);
+        }
+    }
+}

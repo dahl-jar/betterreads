@@ -20,7 +20,7 @@ Java 25 · Spring Boot 4.0 · Postgres 17 · Meilisearch · Redis · MinIO · Fl
 # copy the environment template and set JWT_SECRET to at least 32 random bytes
 cp .env.example .env
 
-# start Postgres
+# start Postgres and Redis
 docker compose -f docker/docker-compose.yml --env-file .env up -d
 
 # run the API
@@ -44,31 +44,24 @@ The API listens on `http://localhost:8080`. Swagger UI is at `http://localhost:8
 # build the executable jar
 ./gradlew bootJar
 
-# start Postgres
+# start Postgres and Redis
 docker compose -f docker/docker-compose.yml --env-file .env up -d
 
-# stop Postgres and delete its volume
+# stop Postgres and Redis and delete the Postgres volume
 docker compose -f docker/docker-compose.yml --env-file .env down -v
 ```
 
 ## Architecture
 
-Code is organised by feature. Controllers expose record DTOs, services contain application logic, and repositories access Postgres. External API types remain under `integration/<vendor>/`; catalog code consumes internal source models and ports. ArchUnit checks package placement, layer dependencies, and feature ownership. See [Backend architecture](docs/explanation/architecture.md).
+Each feature is one flat package under `features/`, holding its controller, service, repository, entities, and DTOs. Each external system gets its own package under `clients/`. Code that more than one slice uses lives in named shared modules such as `book`, `users`, and `web`. Slices reach each other only through interfaces in those modules, and ArchUnit checks the boundaries.
 
 ## Deployment
 
-Production runs on a single-node k3s cluster. CI publishes the application image to GHCR, updates the Kubernetes manifests, and Argo CD applies the change. Cloudflare Tunnel routes `api.betterreadsapp.com` to the cluster. See [Deployment](docs/explanation/deployment.md).
+Production runs on a single-node k3s cluster. CI publishes the application image to GHCR, updates the Kubernetes manifests, and Argo CD applies the change. Cloudflare Tunnel routes `api.betterreadsapp.com` to the cluster.
 
-## Docs
+## API
 
-- [API reference](docs/reference/api.md)
-- [Database schema](docs/reference/database-schema.md)
-- [Project structure](docs/reference/project-structure.md)
-- [Backend architecture](docs/explanation/architecture.md)
-- [Catalog pipeline](docs/explanation/catalog-pipeline.md)
-- [Deployment](docs/explanation/deployment.md)
-- [Deploy the app](docs/how-to/deploy.md)
-- [Back up and restore Postgres](docs/how-to/backup-postgres.md)
+The API is documented in Swagger UI at `/swagger-ui.html`, with the committed spec in [openapi.yaml](openapi.yaml).
 
 ## License
 

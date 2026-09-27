@@ -1,0 +1,257 @@
+package com.betterreads.book;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.math.BigDecimal;
+import java.util.List;
+
+import com.betterreads.booksource.BookFieldSource;
+import com.betterreads.booksource.SourceBook;
+import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+
+class BookTest {
+
+    private static final String FANTASY = "fantasy";
+
+    private static final String FICTION = "fiction";
+
+    private static final String CLASSICS = "classics";
+
+    private static final String DUNE_LCCN = "2019287107";
+
+    private static final String A_TITLE = "A Title";
+
+    @Nested
+    @DisplayName("applyFrom subject replacement")
+    class Subjects {
+
+        @Test
+        @DisplayName("a re-apply with null subjects keeps the existing ones")
+        void nullSubjectsPreserveExisting() {
+            final Book book = new Book();
+            book.applyFrom(sourceWithSubjects(List.of(FANTASY, FICTION)));
+
+            book.applyFrom(sourceWithSubjects(null));
+
+            assertThat(book.getSubjects())
+                .as("null subjects mean the source did not return the field, so a refresh keeps the stored genres")
+                .extracting(BookSubject::getSubject)
+                .containsExactly(FANTASY, FICTION);
+        }
+
+        @Test
+        @DisplayName("a re-apply with an empty list clears subjects")
+        void emptySubjectsClearExisting() {
+            final Book book = new Book();
+            book.applyFrom(sourceWithSubjects(List.of(FANTASY)));
+
+            book.applyFrom(sourceWithSubjects(List.of()));
+
+            assertThat(book.getSubjects())
+                .as("an empty list clears the stored genres")
+                .isEmpty();
+        }
+
+        @Test
+        @DisplayName("a re-apply with new subjects replaces the old ones")
+        void newSubjectsReplace() {
+            final Book book = new Book();
+            book.applyFrom(sourceWithSubjects(List.of(FANTASY, FICTION)));
+
+            book.applyFrom(sourceWithSubjects(List.of(CLASSICS)));
+
+            assertThat(book.getSubjects())
+                .extracting(BookSubject::getSubject)
+                .containsExactly(CLASSICS);
+        }
+    }
+
+    @Nested
+    @DisplayName("applyFrom LCCN accrual")
+    class LocLccn {
+
+        @Test
+        @DisplayName("a later source without an LCCN keeps the stored one")
+        void laterSourceWithoutLccnPreservesIt() {
+            final Book book = new Book();
+            book.applyFrom(locSource(DUNE_LCCN));
+
+            book.applyFrom(sourceWithSubjects(null));
+
+            assertThat(book.getLocLccn())
+                .as("a Google or OL refresh without an LCCN keeps the LoC one")
+                .isEqualTo(DUNE_LCCN);
+        }
+    }
+
+    @Nested
+    @DisplayName("applySeries")
+    class ApplySeries {
+
+        private static final String SERIES = "The Sun Eater";
+
+        @Test
+        @DisplayName("a resolved authority with a numbered volume sets the name and position")
+        void resolvedVolumeIsSet() {
+            final Book book = new Book();
+
+            book.applySeries(SERIES, 1, true);
+
+            assertThat(book).satisfies(applied -> {
+                assertThat(applied.getSeriesName()).isEqualTo(SERIES);
+                assertThat(applied.getSeriesPosition()).isEqualTo(1);
+            });
+        }
+
+        @Test
+        @DisplayName("a resolved authority with no series clears an existing label")
+        void resolvedNullClearsExisting() {
+            final Book book = new Book();
+            book.applySeries(SERIES, 1, true);
+
+            book.applySeries(null, null, true);
+
+            assertThat(book).satisfies(applied -> {
+                assertThat(applied.getSeriesName())
+                    .as("the authority resolved and reported no volume, so the stale label is cleared")
+                    .isNull();
+                assertThat(applied.getSeriesPosition()).isNull();
+            });
+        }
+
+        @Test
+        @DisplayName("an unresolved authority keeps the existing label, so a transient miss does not wipe it")
+        void unresolvedNullKeepsExisting() {
+            final Book book = new Book();
+            book.applySeries(SERIES, 2, true);
+
+            book.applySeries(null, null, false);
+
+            assertThat(book).satisfies(applied -> {
+                assertThat(applied.getSeriesName())
+                    .as("no series authority resolved this run, so the existing series is kept")
+                    .isEqualTo(SERIES);
+                assertThat(applied.getSeriesPosition()).isEqualTo(2);
+            });
+        }
+    }
+
+    @Nested
+    class ApplyFrom {
+
+        private static final String TITLE = "Red Rising";
+        private static final String SUBTITLE = "Book One";
+        private static final String DESCRIPTION = "Darrow is a Helldiver in the mines of Mars.";
+        private static final String COVER_URL = "https://covers.example.test/red-rising.jpg";
+        private static final int YEAR = 2014;
+        private static final String ISBN = "9780345539786";
+        private static final int PAGES = 382;
+        private static final String LANGUAGE = "en";
+        private static final String AWARD = "Hugo Award";
+        private static final String GOOGLE_ID = "gb-1";
+        private static final String WORK_KEY = "OL2W";
+        private static final String HARDCOVER_ID = "hc-1";
+        private static final String QID = "Q1";
+        private static final double RATING = 4.316;
+        private static final String ROUNDED_RATING = "4.32";
+        private static final int RATING_COUNT = 9000;
+
+        @Test
+        void shouldCopyEverySourceFieldOntoBook() {
+            final SourceBook redRising = SourceBook.builder(BookFieldSource.HARDCOVER)
+                .title(TITLE)
+                .subtitle(SUBTITLE)
+                .description(DESCRIPTION)
+                .coverUrl(COVER_URL)
+                .publicationYear(YEAR)
+                .isbn13(ISBN)
+                .pageCount(PAGES)
+                .language(LANGUAGE)
+                .awards(List.of(AWARD))
+                .googleBooksVolumeId(GOOGLE_ID)
+                .openLibraryWorkKey(WORK_KEY)
+                .hardcoverId(HARDCOVER_ID)
+                .locLccn(DUNE_LCCN)
+                .wikidataQid(QID)
+                .averageRating(RATING)
+                .ratingCount(RATING_COUNT)
+                .build();
+            final Book book = new Book();
+
+            book.applyFrom(redRising);
+
+            assertThat(book)
+                .extracting(
+                    Book::getTitle, Book::getSubtitle, Book::getDescription, Book::getCoverUrl,
+                    Book::getFirstPublishYear, Book::getIsbn, Book::getPageCount, Book::getLanguage,
+                    Book::getGoogleBooksVolumeId, Book::getOpenLibraryWorkKey, Book::getHardcoverId,
+                    Book::getLocLccn, Book::getWikidataQid, Book::getAverageRating, Book::getRatingCount,
+                    Book::getDedupKey)
+                .containsExactly(
+                    TITLE, SUBTITLE, DESCRIPTION, COVER_URL, YEAR, ISBN, PAGES, LANGUAGE,
+                    GOOGLE_ID, WORK_KEY, HARDCOVER_ID, DUNE_LCCN, QID, new BigDecimal(ROUNDED_RATING),
+                    RATING_COUNT, ISBN);
+            assertThat(book.getAwards()).extracting(BookAward::getAward).containsExactly(AWARD);
+        }
+
+        @Test
+        void shouldKeepDedupKeyWhenLaterSourceAddsIsbn() {
+            final SourceBook workOnly = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+                .openLibraryWorkKey(WORK_KEY)
+                .title(TITLE)
+                .build();
+            final SourceBook withIsbn = workOnly.toBuilder()
+                .isbn13(ISBN)
+                .build();
+            final Book book = new Book();
+            book.applyFrom(workOnly);
+
+            book.applyFrom(withIsbn);
+
+            assertThat(book.getDedupKey()).isEqualTo(WORK_KEY);
+        }
+
+        @Test
+        void shouldRejectSourceWithoutIdentifier() {
+            final SourceBook noIds = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+                .title(TITLE)
+                .build();
+            final Book book = new Book();
+
+            assertThatThrownBy(() -> book.applyFrom(noIds))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("source identifier");
+        }
+
+        @Test
+        void shouldRejectSourceWithoutTitle() {
+            final SourceBook noTitle = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+                .openLibraryWorkKey(WORK_KEY)
+                .build();
+            final Book book = new Book();
+
+            assertThatThrownBy(() -> book.applyFrom(noTitle))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("no title");
+        }
+    }
+
+    private static SourceBook sourceWithSubjects(final @Nullable List<String> subjects) {
+        return SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+            .openLibraryWorkKey("OL1W")
+            .title(A_TITLE)
+            .rawSubjects(subjects)
+            .build();
+    }
+
+    private static SourceBook locSource(final String lccn) {
+        return SourceBook.builder(BookFieldSource.LOC)
+            .locLccn(lccn)
+            .title(A_TITLE)
+            .build();
+    }
+}

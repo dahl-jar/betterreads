@@ -3,7 +3,9 @@ package com.betterreads.config;
 import java.time.Duration;
 import java.util.Set;
 
-import com.betterreads.catalog.dto.BookDetailResponse;
+import com.betterreads.book.BookDetailCache;
+import com.betterreads.features.bookdetail.BookDetailResponse;
+import com.betterreads.features.search.SearchResultsCache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.cache.CacheManager;
@@ -20,33 +22,22 @@ import org.springframework.data.redis.serializer.RedisSerializationContext;
 
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Two cache managers: promoted book detail in Redis, search results in Caffeine.
- *
- * <p>Book detail is shared across replicas, written once at promotion and evicted on
- * re-enrichment, with a TTL backstop. Search results stay in process with a short TTL and a
- * bounded entry count.
- */
+/** Caches book detail in Redis so replicas share it, and search results in process. */
 @Configuration
 @EnableCaching
 @ConfigurationProperties(prefix = "betterreads.cache")
-public class CacheConfig {
+class CacheConfig {
 
-    private static final long DEFAULT_TTL_HOURS = 24L;
+    private static final long DEFAULT_BOOK_DETAIL_TTL_HOURS = 24L;
 
     private static final long SEARCH_MAX_ENTRIES = 1_000L;
 
     private static final long DEFAULT_SEARCH_TTL_SECONDS = 10L;
 
-    static final String BOOK_DETAILS = "bookDetails";
-
-    static final String SEARCH_RESULTS = "searchResults";
-
-    private Duration bookDetailTtl = Duration.ofHours(DEFAULT_TTL_HOURS);
+    private Duration bookDetailTtl = Duration.ofHours(DEFAULT_BOOK_DETAIL_TTL_HOURS);
 
     private Duration searchResultTtl = Duration.ofSeconds(DEFAULT_SEARCH_TTL_SECONDS);
 
-    /** Builds the {@code bookDetails} cache, storing each detail response as JSON under the TTL. */
     @Bean
     @Primary
     RedisCacheManager bookDetailCacheManager(
@@ -60,14 +51,13 @@ public class CacheConfig {
                 new JacksonJsonRedisSerializer<>(objectMapper, BookDetailResponse.class)));
         return RedisCacheManager.builder(connectionFactory)
             .cacheDefaults(config)
-            .initialCacheNames(Set.of(BOOK_DETAILS))
+            .initialCacheNames(Set.of(BookDetailCache.NAME))
             .build();
     }
 
-    /** Builds the in-process {@code searchResults} cache that collapses rapid identical queries. */
     @Bean
     CacheManager searchCacheManager() {
-        final CaffeineCacheManager manager = new CaffeineCacheManager(SEARCH_RESULTS);
+        final CaffeineCacheManager manager = new CaffeineCacheManager(SearchResultsCache.NAME);
         manager.setCaffeine(Caffeine.newBuilder()
             .expireAfterWrite(searchResultTtl)
             .maximumSize(SEARCH_MAX_ENTRIES));

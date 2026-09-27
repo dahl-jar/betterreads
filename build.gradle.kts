@@ -16,6 +16,7 @@ plugins {
 	id("net.ltgt.errorprone") version "5.1.0"
 	id("org.owasp.dependencycheck") version "12.2.2"
 	id("de.aaschmid.cpd") version "3.5"
+	id("info.solidsoft.pitest") version "1.19.0"
 }
 
 group = "com.betterreads"
@@ -90,7 +91,7 @@ dependencies {
 	implementation("io.micrometer:micrometer-registry-prometheus")
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3")
 
-	// Boot 4 ships Flyway auto-configuration in the starter, not in flyway-core; the postgresql dialect is a separate module.
+	// Boot 4 ships Flyway auto-configuration in the starter, and the postgresql dialect is a separate module
 	implementation("org.springframework.boot:spring-boot-starter-flyway")
 	implementation("org.flywaydb:flyway-database-postgresql")
 	runtimeOnly("org.postgresql:postgresql")
@@ -153,8 +154,6 @@ pmd {
 	incrementalAnalysis.set(true)
 }
 
-// Copy-paste detection. JPA entity accessors are identical by ORM necessity, not copied
-// logic, so the entity packages are excluded rather than tripping CPD on getter/setter runs.
 cpd {
 	toolVersion = "7.16.0"
 	language = "java"
@@ -162,9 +161,13 @@ cpd {
 	isIgnoreFailures = false
 }
 
+// entity getter/setter runs trip CPD, so the entity files are excluded
 tasks.named<de.aaschmid.gradle.plugins.cpd.Cpd>("cpdCheck") {
 	source = files("src/main/java").asFileTree.matching {
-		exclude("**/entity/**", "**/token/*Token.java", "**/refresh/*Token.java")
+		exclude(
+			"**/Book.java", "**/Author.java", "**/BookSubject.java", "**/BookAward.java", "**/PendingBook.java",
+			"**/User.java", "**/Comment.java", "**/ShelfEntry.java", "**/Review.java", "**/*Token.java"
+		)
 	}
 }
 
@@ -251,6 +254,26 @@ tasks.jacocoTestCoverageVerification {
 }
 
 // ---------------------------------------------------------------------------
+// PIT mutation testing, opt-in: ./gradlew pitest -PpitClasses='com.betterreads.text.*'
+// ---------------------------------------------------------------------------
+pitest {
+	pitestVersion = "1.30.0"
+	junit5PluginVersion = "1.2.3"
+	addJUnitPlatformLauncher = false
+	targetClasses.set(providers.gradleProperty("pitClasses").orElse("com.betterreads.*").map { it.split(",") })
+	targetTests.set(providers.gradleProperty("pitTests").orElse("com.betterreads.*").map { it.split(",") })
+	excludedTestClasses.set(
+		providers.gradleProperty("pitExcludedTests").orElse("*IntegrationTest,com.betterreads.ArchitectureTest")
+			.map { it.split(",") }
+	)
+	threads = providers.gradleProperty("pitThreads").orElse("6").get().toInt()
+	timeoutConstInMillis = providers.gradleProperty("pitTimeoutMillis").orElse("4000").get().toInt()
+	outputFormats.set(listOf("XML", "HTML"))
+	timestampedReports = false
+	jvmArgs.set(listOf("-Xmx1g", "-Dmail.outbox.worker-enabled=false"))
+}
+
+// ---------------------------------------------------------------------------
 // OWASP Dependency-Check (vulnerable dependency scanning)
 // ---------------------------------------------------------------------------
 dependencyCheck {
@@ -331,7 +354,7 @@ tasks.register<Test>("openApiSpec") {
 	group = "documentation"
 	testClassesDirs = testSourceSet.output.classesDirs
 	classpath = testSourceSet.runtimeClasspath
-	filter { includeTestsMatching("com.betterreads.config.OpenApiEnvelopeTest.shouldMatchCommittedSpec") }
+	filter { includeTestsMatching("com.betterreads.web.OpenApiEnvelopeTest.shouldMatchCommittedSpec") }
 	systemProperty("openapi.write", "true")
 	outputs.upToDateWhen { false }
 }
@@ -339,14 +362,10 @@ tasks.register<Test>("openApiSpec") {
 tasks.withType<Test> {
 	useJUnitPlatform()
 
-	// ArchUnit builds an in-memory class graph over the whole application, which overflows the
-	// default fork heap as the suite grows. Give the test JVM room so the architecture rules run.
+	// ArchUnit's class graph of the whole app overflows the default fork heap
 	maxHeapSize = "2g"
 
-	// Disable @Scheduled jobs during tests. Without these, the mail-outbox worker and the
-	// account-deletion sweep tick on a shared scheduler thread and can race the Testcontainers
-	// Postgres shutdown at the end of an integration test, producing a noisy 30s Hikari timeout
-	// long after the test has already passed.
+	// the outbox worker and deletion sweep race the Testcontainers Postgres shutdown and log a 30s Hikari timeout after the test passed
 	systemProperty("mail.outbox.worker-enabled", "false")
 	systemProperty("betterreads.auth.deletion.scheduler-enabled", "false")
 }
@@ -355,8 +374,7 @@ tasks.test {
 	finalizedBy(tasks.jacocoTestReport)
 }
 
-// Wire coverage verification and the opt-in suites' compile + static analysis into check.
-// The opt-in suites run only via their own tasks.
+// the opt-in suites compile and get static analysis here, and run only via their own tasks
 tasks.named("check") {
 	dependsOn(
 		tasks.jacocoTestCoverageVerification,
