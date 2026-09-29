@@ -1,4 +1,4 @@
-package com.betterreads.bookmerge;
+package com.betterreads.isbn;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

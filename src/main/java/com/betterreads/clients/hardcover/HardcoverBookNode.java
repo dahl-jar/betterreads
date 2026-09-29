@@ -88,7 +88,8 @@ public record HardcoverBookNode(
         @Nullable Integer position, @Nullable Boolean featured, @Nullable Series series) { }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Series(@Nullable String name) { }
+    @JsonNaming(SnakeCaseStrategy.class)
+    public record Series(@Nullable String name, @Nullable Integer primaryBooksCount) { }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Author(@Nullable String name) { }

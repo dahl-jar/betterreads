@@ -5,6 +5,8 @@ import com.betterreads.booksource.MergedBook;
 import com.betterreads.booksource.SourceAuthor;
 import com.betterreads.booksource.SourceBook;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -14,7 +16,10 @@ import java.util.stream.Collectors;
 
 import jakarta.persistence.EntityManager;
 
+import com.betterreads.logging.LogSanitizer;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -23,6 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
 /** Matches an existing book on its source id columns and evicts its cached detail on write. */
 @Service
 class BookUpsertServiceImpl implements BookUpsertService {
+
+    private static final Logger LOG = LoggerFactory.getLogger(BookUpsertServiceImpl.class);
 
     private final BookRepository bookRepository;
 
@@ -60,7 +67,27 @@ class BookUpsertServiceImpl implements BookUpsertService {
             .orElseGet(Book::new);
         book.applyFrom(source);
         book.applySeries(source.seriesName(), source.seriesPosition(), seriesAuthorityResolved);
-        replaceAuthors(book, source.authors());
+        if (!book.isVerified(VerifiedField.AUTHORS)) {
+            replaceAuthors(book, source.authors());
+        }
+        return bookRepository.save(book);
+    }
+
+    @Override
+    @Transactional
+    @CacheEvict(cacheNames = BookDetailCache.NAME, key = "#result.dedupKey")
+    public Book applyVerified(final long bookId, final VerifiedMetadata metadata) {
+        final Book book = bookRepository.findForUpdate(bookId)
+            .orElseThrow(() -> new IllegalArgumentException("no book with id " + bookId));
+        LOG.info("catalog.metadata-check bookId={} before title={} isbn={} series={} #{}", bookId,
+            LogSanitizer.forLog(book.getTitle()), LogSanitizer.forLog(book.getIsbn()),
+            LogSanitizer.forLog(book.getSeriesName()), book.getSeriesPosition());
+        book.applyVerified(metadata, OffsetDateTime.now(ZoneOffset.UTC));
+        replaceAuthors(book, SourceAuthor.ofNames(metadata.authors()));
+        LOG.info("catalog.metadata-check bookId={} verified={} after title={} isbn={} series={} #{}", bookId,
+            LogSanitizer.forLog(book.getVerifiedFields().toString()), LogSanitizer.forLog(book.getTitle()),
+            LogSanitizer.forLog(book.getIsbn()),
+            LogSanitizer.forLog(book.getSeriesName()), book.getSeriesPosition());
         return bookRepository.save(book);
     }
 

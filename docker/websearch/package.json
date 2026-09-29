@@ -1,0 +1,12 @@
+{
+  "private": true,
+  "dependencies": {
+    "@anthropic-ai/claude-code-linux-x64": "2.1.284"
+  },
+  "pnpm": {
+    "supportedArchitectures": {
+      "os": ["linux"],
+      "cpu": ["x64"]
+    }
+  }
+}

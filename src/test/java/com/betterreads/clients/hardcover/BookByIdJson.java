@@ -52,8 +52,17 @@ public final class BookByIdJson {
     }
 
     public BookByIdJson withSeries(final String name, final @Nullable Integer position, final boolean featured) {
+        return withSeries(name, position, featured, null);
+    }
+
+    public BookByIdJson withSeries(
+        final String name,
+        final @Nullable Integer position,
+        final boolean featured,
+        final @Nullable Integer primaryBooksCount
+    ) {
         series().addObject().put("position", position).put("featured", featured)
-            .putObject("series").put("name", name);
+            .putObject("series").put("name", name).put("primary_books_count", primaryBooksCount);
         return this;
     }
 

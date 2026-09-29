@@ -1,0 +1,25 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@anthropic-ai/claude-code-linux-x64':
+        specifier: 2.1.284
+        version: 2.1.284
+
+packages:
+
+  '@anthropic-ai/claude-code-linux-x64@2.1.284':
+    resolution: {integrity: sha512-hjjPgN4u8DvnzZqWDYnU5xxQkykuUrkUoVeeutVLXjrhx4qeRPmwgZ69BFAHmV42FBRdiRwbLbiDE9nkQdAE8g==}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+snapshots:
+
+  '@anthropic-ai/claude-code-linux-x64@2.1.284': {}

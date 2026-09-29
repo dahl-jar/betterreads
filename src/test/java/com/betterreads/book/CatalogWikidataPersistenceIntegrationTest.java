@@ -163,6 +163,29 @@ class CatalogWikidataPersistenceIntegrationTest extends ContainerizedTest {
         }
 
         @Test
+        void shouldApplyVerifiedAuthors() {
+            final long bookId = bookUpsertService.upsertFromSource(redRising(List.of())).getBookId();
+
+            bookUpsertService.applyVerified(bookId, verifiedAuthor(REAPER_NAME));
+
+            assertThat(storedAuthorNames()).containsExactly(REAPER_NAME);
+        }
+
+        @Test
+        void shouldKeepVerifiedAuthorsOnRefresh() {
+            final long bookId = bookUpsertService.upsertFromSource(redRising(List.of())).getBookId();
+            bookUpsertService.applyVerified(bookId, verifiedAuthor(REAPER_NAME));
+
+            bookUpsertService.upsertFromSource(redRising(List.of()));
+
+            assertThat(storedAuthorNames()).containsExactly(REAPER_NAME);
+        }
+
+        private static VerifiedMetadata verifiedAuthor(final String name) {
+            return new VerifiedMetadata(null, List.of(name), null, null, null, null, null);
+        }
+
+        @Test
         void shouldKeepStoredAuthorsWhenSourceHasNone() {
             bookUpsertService.upsertFromSource(redRising(List.of()));
 

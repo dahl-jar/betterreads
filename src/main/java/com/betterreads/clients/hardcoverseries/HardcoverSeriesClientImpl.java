@@ -51,6 +51,8 @@ class HardcoverSeriesClientImpl implements HardcoverSeriesClient {
     private static final ParameterizedTypeReference<SeriesEnumerationResponse> ENUMERATION =
         new ParameterizedTypeReference<>() { };
 
+    private static final int MIN_PRIMARY_BOOKS = 2;
+
     private static final Comparator<SeriesSearchDocument> BY_READERS =
         Comparator.comparingInt(document -> Objects.requireNonNullElse(document.readersCount(), 0));
 
@@ -83,6 +85,8 @@ class HardcoverSeriesClientImpl implements HardcoverSeriesClient {
     private Optional<SeriesSearchDocument> bestCandidate(final String query) {
         return HardcoverGraphQl.search(hardcoverWebClient, LOG, SEARCH_QUERY, query, SERIES_HITS).stream()
             .filter(document -> document.name() != null)
+            .filter(document -> document.primaryBooksCount() == null
+                || document.primaryBooksCount() >= MIN_PRIMARY_BOOKS)
             .max(BY_READERS);
     }
 

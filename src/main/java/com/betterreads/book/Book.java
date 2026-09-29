@@ -2,6 +2,7 @@ package com.betterreads.book;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -19,6 +20,7 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -38,6 +40,8 @@ import org.jspecify.annotations.Nullable;
     "PMD.CyclomaticComplexity"
 })
 public class Book {
+
+    private static final String ENGLISH = "en";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -139,6 +143,14 @@ public class Book {
     @Column(name = "description_checked_at")
     private OffsetDateTime descriptionCheckedAt;
 
+    @Nullable
+    @Column(name = "metadata_checked_at")
+    private OffsetDateTime metadataCheckedAt;
+
+    @Convert(converter = VerifiedFieldsConverter.class)
+    @Column(name = "verified_fields", nullable = false)
+    private final Set<VerifiedField> verifiedFields = EnumSet.noneOf(VerifiedField.class);
+
     @ManyToMany
     @JoinTable(
         name = "book_author",
@@ -181,15 +193,15 @@ public class Book {
         if (sourceTitle == null) {
             throw new IllegalArgumentException("source book has no title");
         }
-        this.title = sourceTitle;
+        this.title = isVerified(VerifiedField.TITLE) ? this.title : sourceTitle;
         this.subtitle = source.subtitle();
-        this.description = source.description();
+        this.description = isVerified(VerifiedField.DESCRIPTION) ? this.description : source.description();
         invalidateMirrorIfCoverChanged(source.coverUrl());
         this.coverUrl = source.coverUrl();
-        this.firstPublishYear = source.publicationYear();
-        this.isbn = source.isbn13();
+        this.firstPublishYear = isVerified(VerifiedField.YEAR) ? this.firstPublishYear : source.publicationYear();
+        this.isbn = isVerified(VerifiedField.ISBN) ? this.isbn : source.isbn13();
         this.pageCount = source.pageCount();
-        this.language = source.language();
+        this.language = isVerified(VerifiedField.ISBN) ? this.language : source.language();
         replaceSubjects(source.rawSubjects());
         replaceAwards(source.awards());
         accrueFrom(source);
@@ -235,15 +247,53 @@ public class Book {
 
     /**
      * A clear is trusted only when the series authority resolved, so a failed or timed-out collect
-     * does not wipe a real series.
+     * does not wipe a real series. A verified series is kept.
      */
     public void applySeries(
         final @Nullable String name, final @Nullable Integer position, final boolean authorityResolved) {
-        if (!authorityResolved) {
+        if (!authorityResolved || isVerified(VerifiedField.SERIES)) {
             return;
         }
         this.seriesName = name;
         this.seriesPosition = position;
+    }
+
+    public void applyVerified(final VerifiedMetadata metadata, final OffsetDateTime checkedAt) {
+        if (metadata.authors() != null) {
+            verifiedFields.add(VerifiedField.AUTHORS);
+        }
+        final String verifiedTitle = metadata.title();
+        if (verifiedTitle != null) {
+            this.title = verifiedTitle;
+            verifiedFields.add(VerifiedField.TITLE);
+        }
+        if (metadata.year() != null) {
+            this.firstPublishYear = metadata.year();
+            verifiedFields.add(VerifiedField.YEAR);
+        }
+        if (metadata.seriesName() != null && metadata.seriesPosition() != null) {
+            this.seriesName = metadata.seriesName();
+            this.seriesPosition = metadata.seriesPosition();
+            verifiedFields.add(VerifiedField.SERIES);
+        }
+        if (metadata.description() != null) {
+            this.description = metadata.description();
+            verifiedFields.add(VerifiedField.DESCRIPTION);
+        }
+        if (metadata.isbn13() != null) {
+            this.isbn = metadata.isbn13();
+            this.language = ENGLISH;
+            verifiedFields.add(VerifiedField.ISBN);
+        }
+        this.metadataCheckedAt = checkedAt;
+    }
+
+    public Set<VerifiedField> getVerifiedFields() {
+        return Set.copyOf(verifiedFields);
+    }
+
+    boolean isVerified(final VerifiedField field) {
+        return verifiedFields.contains(field);
     }
 
     private static <T> @Nullable T coalesce(final @Nullable T value, final @Nullable T fallback) {

@@ -36,7 +36,7 @@ class HardcoverAuthorClientImpl implements HardcoverAuthorClient {
             contributions(order_by: {book: {users_count: desc_nulls_last}}, limit: $limit) {
               book {
         """ + HardcoverBookNode.FIELDS + """
-                book_series { position featured series { name } }
+                book_series { position featured series { name primary_books_count } }
               }
             }
           }

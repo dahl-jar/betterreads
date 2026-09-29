@@ -11,6 +11,7 @@ on:
       - "gradle/**"
       - "config/**"
       - "docker/Dockerfile"
+      - "docker/websearch/**"
       - ".github/workflows/docker-image.yml"
       - ".github/scripts/**"
   workflow_dispatch: {}

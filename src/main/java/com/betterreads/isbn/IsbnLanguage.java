@@ -1,11 +1,10 @@
-package com.betterreads.bookmerge;
+package com.betterreads.isbn;
 
 import java.util.Map;
 
-import com.betterreads.isbn.Isbn13;
 import org.jspecify.annotations.Nullable;
 
-final class IsbnLanguage {
+public final class IsbnLanguage {
 
     private static final Map<String, String> GROUP_LANGUAGES = Map.ofEntries(
         Map.entry("9780", "en"),
@@ -28,7 +27,11 @@ final class IsbnLanguage {
     private IsbnLanguage() {
     }
 
-    static @Nullable String languageOf(final @Nullable String isbn13) {
+    public static boolean isEnglish(final @Nullable String isbn13) {
+        return "en".equals(languageOf(isbn13));
+    }
+
+    public static @Nullable String languageOf(final @Nullable String isbn13) {
         if (isbn13 == null || !Isbn13.matches(isbn13)) {
             return null;
         }

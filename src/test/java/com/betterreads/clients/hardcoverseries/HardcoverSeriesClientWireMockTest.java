@@ -52,6 +52,8 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
 
     private static final String SERIES_NAME = "The Wheel of Time";
 
+    private static final String PARODY_NAME = "Wheel of Time Parody";
+
     private static final String GRAPHIC_NOVEL_QUERY = "the sandman";
 
     @Autowired
@@ -101,7 +103,25 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
 
             final Optional<SourceSeries> series = client.fetchSeries(QUERY);
 
-            assertThat(series).get().extracting(SourceSeries::name).isEqualTo("Wheel of Time Parody");
+            assertThat(series).get().extracting(SourceSeries::name).isEqualTo(PARODY_NAME);
+        }
+
+        @Test
+        void shouldSkipOneBookHit() {
+            stub(seriesSearch().withPrimaryBooksCount(1), seriesBooks());
+
+            final Optional<SourceSeries> series = client.fetchSeries(QUERY);
+
+            assertThat(series).get().extracting(SourceSeries::name).isEqualTo(PARODY_NAME);
+        }
+
+        @Test
+        void shouldKeepHitWithUnknownBookCount() {
+            stub(seriesSearch().withoutPrimaryBooksCount(), seriesBooks());
+
+            final Optional<SourceSeries> series = client.fetchSeries(QUERY);
+
+            assertThat(series).get().extracting(SourceSeries::name).isEqualTo(SERIES_NAME);
         }
 
         @Test

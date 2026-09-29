@@ -16,4 +16,6 @@ public interface BookUpsertService {
 
     /** The series replaces the stored one, including a clear, only when Hardcover resolved on the collect. */
     Book upsertFromSource(MergedBook merged);
+
+    Book applyVerified(long bookId, VerifiedMetadata metadata);
 }

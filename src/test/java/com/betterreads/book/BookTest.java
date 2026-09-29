@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import com.betterreads.booksource.BookFieldSource;
@@ -237,6 +239,93 @@ class BookTest {
             assertThatThrownBy(() -> book.applyFrom(noTitle))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("no title");
+        }
+    }
+
+    @Nested
+    class Verified {
+
+        private static final String GOLDEN_SON = "Golden Son";
+
+        private static final String RED_RISING_SAGA = "Red Rising Saga";
+
+        private static final int YEAR = 2015;
+
+        private static final int WRONG_YEAR = 1999;
+
+        private static final String ENGLISH_ISBN = "9780345539816";
+
+        private static final String BLURB = "Darrow infiltrates the Golds.";
+
+        private static final OffsetDateTime NOW = OffsetDateTime.now(ZoneOffset.UTC);
+
+        private static VerifiedMetadata verifiedTitle(final String title) {
+            return new VerifiedMetadata(title, null, null, null, null, null, null);
+        }
+
+        private static SourceBook refresh(final int year) {
+            return SourceBook.builder(BookFieldSource.LOC).locLccn(DUNE_LCCN).title(A_TITLE).publicationYear(year)
+                .build();
+        }
+
+        @Test
+        void shouldKeepVerifiedTitle() {
+            final Book book = new Book();
+            book.applyFrom(refresh(YEAR));
+            book.applyVerified(verifiedTitle(GOLDEN_SON), NOW);
+
+            book.applyFrom(refresh(YEAR));
+
+            assertThat(book.getTitle()).isEqualTo(GOLDEN_SON);
+        }
+
+        @Test
+        void shouldKeepVerifiedYearDescriptionAndIsbn() {
+            final Book book = new Book();
+            book.applyFrom(refresh(YEAR));
+            book.applyVerified(new VerifiedMetadata(null, null, YEAR, null, null, BLURB, ENGLISH_ISBN), NOW);
+
+            book.applyFrom(SourceBook.builder(BookFieldSource.LOC).locLccn(DUNE_LCCN).title(A_TITLE)
+                .publicationYear(WRONG_YEAR).description("Another blurb.").isbn13("9783453315617").language("de")
+                .build());
+
+            assertThat(book.getFirstPublishYear()).isEqualTo(YEAR);
+            assertThat(book.getDescription()).isEqualTo(BLURB);
+            assertThat(book.getIsbn()).isEqualTo(ENGLISH_ISBN);
+            assertThat(book.getLanguage()).isEqualTo("en");
+        }
+
+        @Test
+        void shouldUpdateUnverifiedYear() {
+            final Book book = new Book();
+            book.applyFrom(refresh(YEAR));
+            book.applyVerified(verifiedTitle(GOLDEN_SON), NOW);
+
+            book.applyFrom(refresh(WRONG_YEAR));
+
+            assertThat(book.getFirstPublishYear()).isEqualTo(WRONG_YEAR);
+        }
+
+        @Test
+        void shouldKeepVerifiedSeries() {
+            final Book book = new Book();
+            book.applyFrom(refresh(YEAR));
+            book.applyVerified(new VerifiedMetadata(null, null, null, RED_RISING_SAGA, 2, null, null), NOW);
+
+            book.applySeries("Red Rising (German)", 1, true);
+
+            assertThat(book.getSeriesName()).isEqualTo(RED_RISING_SAGA);
+        }
+
+        @Test
+        void shouldSetEnglishOnIsbnSwap() {
+            final Book book = new Book();
+            book.applyFrom(refresh(YEAR));
+
+            book.applyVerified(new VerifiedMetadata(null, null, null, null, null, null, ENGLISH_ISBN), NOW);
+
+            assertThat(book.getIsbn()).isEqualTo(ENGLISH_ISBN);
+            assertThat(book.getLanguage()).isEqualTo("en");
         }
     }
 

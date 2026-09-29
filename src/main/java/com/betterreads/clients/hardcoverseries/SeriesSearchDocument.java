@@ -12,5 +12,6 @@ record SeriesSearchDocument(
     @Nullable String id,
     @Nullable String name,
     @Nullable String authorName,
-    @Nullable Integer readersCount
+    @Nullable Integer readersCount,
+    @Nullable Integer primaryBooksCount
 ) { }

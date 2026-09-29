@@ -33,6 +33,16 @@ class HardcoverMapperTest {
 
     private static final int BEGINNINGS_VOLUME = 3;
 
+    private static final String LAST_KING = "The Last King of Osten Ard";
+
+    private static final String LETZTE_KOENIG = "Der letzte König von Osten Ard";
+
+    private static final int LAST_KING_BOOKS = 4;
+
+    private static final int SAGA_VOLUME = 4;
+
+    private static final int SAGA_BOOKS = 7;
+
     private final HardcoverMapper mapper = new HardcoverMapper();
 
     private SourceBook map(final HardcoverDocument document) {
@@ -215,6 +225,55 @@ class HardcoverMapperTest {
 
             assertThat(book.seriesName()).isEqualTo(beginnings);
             assertThat(book.seriesPosition()).isEqualTo(BEGINNINGS_VOLUME);
+        }
+
+        @Test
+        void shouldSkipOneBookSeries() {
+            final HardcoverBookNode node = bookById().withoutSeries()
+                .withSeries(LAST_KING, 1, false, LAST_KING_BOOKS)
+                .withSeries("Osten Ard Saga", SAGA_VOLUME, false, SAGA_BOOKS)
+                .withSeries(LETZTE_KOENIG, 1, true, 1)
+                .node();
+
+            final SourceBook book = map(node);
+
+            assertThat(book.seriesName()).isEqualTo(LAST_KING);
+            assertThat(book.seriesPosition()).isEqualTo(1);
+        }
+
+        @Test
+        void shouldKeepLoneOneBookSeries() {
+            final HardcoverBookNode node = bookById().withoutSeries()
+                .withSeries(LETZTE_KOENIG, 1, true, 1)
+                .node();
+
+            final SourceBook book = map(node);
+
+            assertThat(book.seriesName()).isEqualTo(LETZTE_KOENIG);
+        }
+
+        @Test
+        void shouldKeepOneBookSeriesBesideUnnumbered() {
+            final HardcoverBookNode node = bookById().withoutSeries()
+                .withSeries(COMPANIONS, null, false, LAST_KING_BOOKS)
+                .withSeries(LETZTE_KOENIG, 1, true, 1)
+                .node();
+
+            final SourceBook book = map(node);
+
+            assertThat(book.seriesName()).isEqualTo(LETZTE_KOENIG);
+        }
+
+        @Test
+        void shouldTrustUnknownBookCount() {
+            final HardcoverBookNode node = bookById().withoutSeries()
+                .withSeries(LAST_KING, 1, false, LAST_KING_BOOKS)
+                .withSeries(LETZTE_KOENIG, 1, true)
+                .node();
+
+            final SourceBook book = map(node);
+
+            assertThat(book.seriesName()).isEqualTo(LETZTE_KOENIG);
         }
 
         @Test

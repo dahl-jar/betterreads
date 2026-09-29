@@ -7,6 +7,8 @@ public final class SeriesSearchJson {
 
     private static final String NAME = "name";
 
+    private static final String PRIMARY_BOOKS_COUNT = "primary_books_count";
+
     private final ObjectNode json = Fixtures.parse("""
         {"data": {"search": {"results": {"hits": [
           {"document": {"id": "404", "name": "Wheel of Time Parody",
@@ -30,6 +32,16 @@ public final class SeriesSearchJson {
 
     public SeriesSearchJson withId(final String id) {
         pickedHit().put("id", id);
+        return this;
+    }
+
+    public SeriesSearchJson withPrimaryBooksCount(final int count) {
+        pickedHit().put(PRIMARY_BOOKS_COUNT, count);
+        return this;
+    }
+
+    public SeriesSearchJson withoutPrimaryBooksCount() {
+        pickedHit().remove(PRIMARY_BOOKS_COUNT);
         return this;
     }
 

@@ -7,6 +7,7 @@ import com.betterreads.book.AuthorRepository;
 import com.betterreads.book.BookDetailCache;
 import com.betterreads.book.BookRepository;
 import com.betterreads.book.BookUpsertService;
+import com.betterreads.book.VerifiedMetadata;
 import com.betterreads.booksource.BookFieldSource;
 import com.betterreads.booksource.SourceAuthor;
 import com.betterreads.booksource.SourceBook;
@@ -77,6 +78,20 @@ class BookDetailEvictionIntegrationTest extends ContainerizedTest {
         bookDetailService.findByKey(ISBN);
 
         bookUpsertService.upsertFromSource(book(REVISED_TITLE));
+
+        await().atMost(EVICTION_TIMEOUT).pollInterval(EVICTION_POLL_INTERVAL).untilAsserted(() -> {
+            final BookDetailResponse fresh = bookDetailService.findByKey(ISBN).orElseThrow();
+            assertThat(fresh.title()).isEqualTo(REVISED_TITLE);
+        });
+    }
+
+    @Test
+    void shouldServeVerifiedTitle() {
+        final long bookId = bookUpsertService.upsertFromSource(book(ORIGINAL_TITLE)).getBookId();
+        bookDetailService.findByKey(ISBN);
+
+        final VerifiedMetadata verified = new VerifiedMetadata(REVISED_TITLE, null, null, null, null, null, null);
+        bookUpsertService.applyVerified(bookId, verified);
 
         await().atMost(EVICTION_TIMEOUT).pollInterval(EVICTION_POLL_INTERVAL).untilAsserted(() -> {
             final BookDetailResponse fresh = bookDetailService.findByKey(ISBN).orElseThrow();

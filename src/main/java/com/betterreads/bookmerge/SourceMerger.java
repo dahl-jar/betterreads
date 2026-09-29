@@ -14,6 +14,7 @@ import com.betterreads.booksource.BookFieldSource;
 import com.betterreads.booksource.IssueRunSeries;
 import com.betterreads.booksource.MergedBook;
 import com.betterreads.booksource.SourceBook;
+import com.betterreads.isbn.IsbnLanguage;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 

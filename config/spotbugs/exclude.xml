@@ -170,4 +170,14 @@
             <Class name="com.betterreads.bookdescription.DescriptionQuality"/>
         </Or>
     </Match>
+
+    <!--
+      COMMAND_INJECTION and CRLF_INJECTION_LOGS on WebSearchRunner. The argv comes from the web-search
+      config and a fixed schema, the prompt goes over stdin, and the log lines carry exception class
+      names, numbers, and a sanitized subtype.
+    -->
+    <Match>
+        <Bug pattern="COMMAND_INJECTION,CRLF_INJECTION_LOGS"/>
+        <Class name="com.betterreads.clients.websearch.WebSearchRunner"/>
+    </Match>
 </FindBugsFilter>

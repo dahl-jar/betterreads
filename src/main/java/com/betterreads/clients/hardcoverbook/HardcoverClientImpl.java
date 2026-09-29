@@ -37,7 +37,7 @@ class HardcoverClientImpl implements HardcoverClient {
         query BookById($id: Int!) {
           books(where: {id: {_eq: $id}}) {
         """ + HardcoverBookNode.FIELDS + """
-            book_series { position featured series { name } }
+            book_series { position featured series { name primary_books_count } }
           }
         }
         """;

@@ -147,6 +147,11 @@ betterreads:
     cover-backfill:
       enabled: ${CATALOG_COVER_BACKFILL_ENABLED:true}
       full-sweep: ${CATALOG_COVER_FULL_SWEEP:false}
+    metadata-check:
+      enabled: ${CATALOG_METADATA_CHECK_ENABLED:false}
+      batch-size: ${CATALOG_METADATA_CHECK_BATCH_SIZE:10}
+      max-books-per-run: ${CATALOG_METADATA_CHECK_MAX_BOOKS:100}
+      lookback-days: ${CATALOG_METADATA_CHECK_LOOKBACK_DAYS:7}
   cache:
     book-detail-ttl: ${BOOK_DETAIL_CACHE_TTL:PT24H}
 
@@ -177,6 +182,23 @@ wikidata:
   base-url: ${WIKIDATA_BASE_URL:https://www.wikidata.org}
   connect-timeout: ${WIKIDATA_CONNECT_TIMEOUT:5000}
   read-timeout: ${WIKIDATA_READ_TIMEOUT:10000}
+
+web-search:
+  bin: ${WEB_SEARCH_BIN:claude}
+  model: ${WEB_SEARCH_MODEL:claude-sonnet-5-5}
+  effort: ${WEB_SEARCH_EFFORT:low}
+  max-turns: ${WEB_SEARCH_MAX_TURNS:40}
+  timeout: ${WEB_SEARCH_TIMEOUT:PT5M}
+  hook-script: ${WEB_SEARCH_HOOK_SCRIPT:/opt/websearch/restrict-search.mjs}
+  allowed-domains:
+    - isfdb.org
+    - en.wikipedia.org
+    - fantasticfiction.com
+    - bookseriesinorder.com
+    - penguinrandomhouse.com
+    - macmillan.com
+    - hachettebookgroup.com
+    - simonandschuster.com
 
 wikipedia:
   base-url: ${WIKIPEDIA_BASE_URL:https://en.wikipedia.org}

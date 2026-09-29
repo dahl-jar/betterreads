@@ -312,7 +312,9 @@ val liveTestEnvironmentVariables = listOf(
 	"GOOGLE_BOOKS_API_KEY",
 	"HARDCOVER_BEARER_TOKEN",
 	"RUN_LOC_LIVE",
-	"RUN_OPENLIBRARY_LIVE"
+	"RUN_OPENLIBRARY_LIVE",
+	"RUN_WEB_SEARCH_LIVE",
+	"CLAUDE_CODE_OAUTH_TOKEN"
 )
 
 val localDbVerificationEnvironmentVariables = listOf(

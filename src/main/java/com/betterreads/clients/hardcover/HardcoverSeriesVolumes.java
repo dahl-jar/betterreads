@@ -21,7 +21,8 @@ public final class HardcoverSeriesVolumes {
     }
 
     private static Optional<HardcoverBookNode.SeriesMembership> volumeMembership(
-        final List<HardcoverBookNode.SeriesMembership> memberships, final @Nullable String title) {
+        final List<HardcoverBookNode.SeriesMembership> all, final @Nullable String title) {
+        final List<HardcoverBookNode.SeriesMembership> memberships = withoutOneBookSeries(all);
         if (memberships.isEmpty()) {
             return Optional.empty();
         }
@@ -37,6 +38,15 @@ public final class HardcoverSeriesVolumes {
             .findFirst();
     }
 
+    private static List<HardcoverBookNode.SeriesMembership> withoutOneBookSeries(
+        final List<HardcoverBookNode.SeriesMembership> memberships) {
+        final boolean hasLongerSeries = memberships.stream()
+            .anyMatch(entry -> isVolume(entry) && !isOneBookSeries(entry));
+        return hasLongerSeries
+            ? memberships.stream().filter(entry -> !isOneBookSeries(entry)).toList()
+            : memberships;
+    }
+
     public static boolean isIssueRun(final @Nullable String seriesName, final @Nullable String title) {
         return seriesName != null && title != null && IssueRunSeries.matches(seriesName, title);
     }
@@ -44,6 +54,11 @@ public final class HardcoverSeriesVolumes {
     private static boolean isIssueRun(
         final HardcoverBookNode.SeriesMembership membership, final @Nullable String title) {
         return membership.series() != null && isIssueRun(membership.series().name(), title);
+    }
+
+    private static boolean isOneBookSeries(final HardcoverBookNode.SeriesMembership membership) {
+        return membership.series() != null
+            && Integer.valueOf(1).equals(membership.series().primaryBooksCount());
     }
 
     private static boolean isVolume(final HardcoverBookNode.SeriesMembership membership) {

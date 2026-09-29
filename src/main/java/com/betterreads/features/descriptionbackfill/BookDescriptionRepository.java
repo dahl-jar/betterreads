@@ -25,6 +25,7 @@ interface BookDescriptionRepository extends JpaRepository<Book, Long> {
         SELECT b FROM Book b
         WHERE (b.description IS NULL OR LENGTH(b.description) < :minLength)
           AND (b.wikidataQid IS NOT NULL OR b.isbn IS NOT NULL)
+          AND CAST(b.verifiedFields AS String) NOT LIKE '%DESCRIPTION%'
         ORDER BY b.descriptionCheckedAt ASC NULLS FIRST, b.updatedAt ASC
         """)
     List<Book> findThinDescriptions(int minLength, Pageable pageable);
@@ -32,7 +33,8 @@ interface BookDescriptionRepository extends JpaRepository<Book, Long> {
     @EntityGraph(attributePaths = "authors")
     @Query("""
         SELECT b FROM Book b
-        WHERE b.wikidataQid IS NOT NULL OR b.isbn IS NOT NULL
+        WHERE (b.wikidataQid IS NOT NULL OR b.isbn IS NOT NULL)
+          AND CAST(b.verifiedFields AS String) NOT LIKE '%DESCRIPTION%'
         ORDER BY b.bookId ASC
         """)
     List<Book> findAllKeyedBooks(Pageable pageable);
@@ -46,7 +48,7 @@ interface BookDescriptionRepository extends JpaRepository<Book, Long> {
     @Query("""
         UPDATE Book b
         SET b.description = :description, b.updatedAt = :checkedAt, b.descriptionCheckedAt = :checkedAt
-        WHERE b.bookId = :bookId
+        WHERE b.bookId = :bookId AND CAST(b.verifiedFields AS String) NOT LIKE '%DESCRIPTION%'
         """)
     void updateDescription(
         @Param("bookId") long bookId,
