@@ -144,6 +144,15 @@
     </Match>
 
     <!--
+      IMPROPER_UNICODE on StoredNames. Case folding and NFC normalization are the point: a confirmed
+      name only reuses a stored spelling, and a key two stored names share is dropped.
+    -->
+    <Match>
+        <Bug pattern="IMPROPER_UNICODE"/>
+        <Class name="com.betterreads.features.metadatacheck.StoredNames"/>
+    </Match>
+
+    <!--
       IMPROPER_UNICODE on the language-code lookup. The input is a source's ISO 639 code, lower-cased
       to look up a fixed ASCII table.
     -->

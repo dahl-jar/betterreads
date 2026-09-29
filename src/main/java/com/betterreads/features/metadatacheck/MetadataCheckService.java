@@ -3,12 +3,8 @@ package com.betterreads.features.metadatacheck;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import com.betterreads.book.Author;
 import com.betterreads.book.Book;
@@ -26,8 +22,6 @@ import org.springframework.stereotype.Service;
 class MetadataCheckService {
 
     private static final Logger LOG = LoggerFactory.getLogger(MetadataCheckService.class);
-
-    private static final Pattern LEADING_ARTICLE = Pattern.compile("^the\\s+");
 
     private final MetadataCheckRepository books;
 
@@ -56,8 +50,7 @@ class MetadataCheckService {
         if (unchecked.isEmpty()) {
             return;
         }
-        final Map<String, String> storedSeries = books.findSeriesNames().stream()
-            .collect(Collectors.toMap(MetadataCheckService::seriesKey, Function.identity(), (first, second) -> first));
+        final StoredNames names = new StoredNames(books.findSeriesNames(), books.findAuthorNames());
         for (int start = 0; start < unchecked.size(); start += properties.batchSize()) {
             final List<Book> batch =
                 unchecked.subList(start, Math.min(start + properties.batchSize(), unchecked.size()));
@@ -67,8 +60,8 @@ class MetadataCheckService {
                 LOG.warn("catalog.metadata-check stopped, the search failed");
                 return;
             }
-            batch.forEach(book -> apply(book.getBookId(),
-                withStoredSeries(checks.get().getOrDefault(book.getBookId(), VerifiedMetadata.NONE), storedSeries)));
+            batch.forEach(book -> apply(book.getBookId(), names.withStoredSpelling(
+                checks.get().getOrDefault(book.getBookId(), VerifiedMetadata.NONE), book.getTitle())));
         }
     }
 
@@ -78,22 +71,6 @@ class MetadataCheckService {
         } catch (IllegalArgumentException | DataAccessException ex) {
             LOG.warn("catalog.metadata-check could not apply bookId={} ({})", bookId, ex.getClass().getSimpleName());
         }
-    }
-
-    private static VerifiedMetadata withStoredSeries(
-        final VerifiedMetadata metadata, final Map<String, String> storedSeries) {
-        final String series = metadata.seriesName();
-        if (series == null) {
-            return metadata;
-        }
-        return new VerifiedMetadata(metadata.title(), metadata.authors(), metadata.year(),
-            storedSeries.getOrDefault(seriesKey(series), series), metadata.seriesPosition(),
-            metadata.description(), metadata.isbn13());
-    }
-
-    private static String seriesKey(final String name) {
-        return LEADING_ARTICLE.matcher(name.toLowerCase(Locale.ROOT).strip()).replaceFirst("")
-            .replaceAll("[^\\p{L}\\p{N}]", "");
     }
 
     private static MetadataCheckRequest request(final Book book) {

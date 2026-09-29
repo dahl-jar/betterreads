@@ -22,4 +22,7 @@ interface MetadataCheckRepository extends JpaRepository<Book, Long> {
 
     @Query("SELECT DISTINCT b.seriesName FROM Book b WHERE b.seriesName IS NOT NULL")
     List<String> findSeriesNames();
+
+    @Query("SELECT a.name FROM Author a")
+    List<String> findAuthorNames();
 }

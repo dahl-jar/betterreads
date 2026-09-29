@@ -176,6 +176,32 @@ class MetadataCheckServiceTest {
         }
 
         @Test
+        void shouldUseStoredAuthorSpelling() {
+            givenBooks(List.of(book(BOOK_ID)));
+            when(books.findAuthorNames()).thenReturn(List.of(AUTHOR));
+            final VerifiedMetadata found =
+                new VerifiedMetadata(null, List.of("BROWN, Pierce"), null, null, null, null, null);
+            when(client.check(any())).thenReturn(Optional.of(Map.of(BOOK_ID, found)));
+
+            service.checkNewBooks();
+
+            verify(upsert).applyVerified(BOOK_ID,
+                new VerifiedMetadata(null, List.of(AUTHOR), null, null, null, null, null));
+        }
+
+        @Test
+        void shouldKeepStoredTitleForSubtitle() {
+            givenBooks(List.of(book(BOOK_ID)));
+            final VerifiedMetadata found =
+                new VerifiedMetadata("Red Rising: Book One of the Red Rising Saga", null, null, null, null, null, null);
+            when(client.check(any())).thenReturn(Optional.of(Map.of(BOOK_ID, found)));
+
+            service.checkNewBooks();
+
+            verify(upsert).applyVerified(BOOK_ID, new VerifiedMetadata(TITLE, null, null, null, null, null, null));
+        }
+
+        @Test
         void shouldMarkUnansweredBookChecked() {
             givenBooks(List.of(book(BOOK_ID)));
             when(client.check(any())).thenReturn(Optional.of(Map.of()));
