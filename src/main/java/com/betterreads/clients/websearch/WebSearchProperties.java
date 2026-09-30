@@ -21,10 +21,16 @@ public record WebSearchProperties(
     @Positive int maxTurns,
     @NotNull Duration timeout,
     @Pattern(regexp = "[A-Za-z0-9_./-]+") String hookScript,
-    @NotEmpty List<@Pattern(regexp = "[a-z0-9-]+(\\.[a-z0-9-]+)+") String> allowedDomains
+    @NotEmpty List<@Pattern(regexp = "[a-z0-9-]+(\\.[a-z0-9-]+)+") String> allowedDomains,
+    @NotNull List<String> searchOnlyDomains
 ) {
 
     public WebSearchProperties {
         allowedDomains = List.copyOf(allowedDomains);
+        searchOnlyDomains = List.copyOf(searchOnlyDomains);
+    }
+
+    public List<String> fetchDomains() {
+        return allowedDomains.stream().filter(domain -> !searchOnlyDomains.contains(domain)).toList();
     }
 }

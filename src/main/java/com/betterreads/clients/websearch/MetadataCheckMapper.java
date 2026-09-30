@@ -7,8 +7,8 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.betterreads.book.VerifiedMetadata;
@@ -35,33 +35,62 @@ final class MetadataCheckMapper {
 
     private static final String VALUE = "value";
 
+    private static final String SOURCE = "source";
+
     private MetadataCheckMapper() {
     }
 
     static Map<Long, VerifiedMetadata> toMetadata(
-        final JsonNode output, final Set<Long> askedIds, final List<String> allowedDomains) {
+        final JsonNode output, final List<MetadataCheckRequest> asked, final List<String> allowedDomains) {
         final Map<Long, JsonNode> byId = output.path("books").valueStream()
             .filter(book -> book.path("id").canConvertToLong())
             .collect(Collectors.toMap(book -> book.path("id").asLong(), Function.identity(), (first, second) -> first));
-        return askedIds.stream().collect(Collectors.toMap(Function.identity(),
-            id -> byId.containsKey(id) ? toMetadata(byId.get(id), allowedDomains) : VerifiedMetadata.NONE));
+        return asked.stream().collect(Collectors.toMap(MetadataCheckRequest::bookId,
+            request -> byId.containsKey(request.bookId())
+                ? toMetadata(byId.get(request.bookId()), request.isbn13(), allowedDomains)
+                : VerifiedMetadata.NONE));
     }
 
-    private static VerifiedMetadata toMetadata(final JsonNode book, final List<String> allowedDomains) {
+    private static VerifiedMetadata toMetadata(
+        final JsonNode book, final @Nullable String storedIsbn, final List<String> allowedDomains) {
         final AllowedFields fields = new AllowedFields(book, allowedDomains);
         final JsonNode series = fields.field("series");
         final String seriesName = series.path("name").asString("").strip();
         final int seriesNumber = series.path("number").asInt(0);
         final boolean seriesValid =
             isText(seriesName, MAX_SERIES_LENGTH) && inRange(seriesNumber, 1, MAX_SERIES_POSITION);
+        final String englishIsbn = IsbnLanguage.isEnglish(storedIsbn) ? storedIsbn : null;
         return new VerifiedMetadata(
-            text(fields.field("title").path(VALUE), MAX_TITLE_LENGTH),
+            title(fields.field("title"), englishIsbn),
             authors(fields.field("authors").path(VALUE)),
             year(fields.field("year").path(VALUE)),
             seriesValid ? seriesName : null,
             seriesValid ? seriesNumber : null,
             description(fields.field("description").path(VALUE)),
-            isbn(fields.field("isbn13").path(VALUE)));
+            englishIsbn == null ? isbn(fields.field("isbn13").path(VALUE)) : null);
+    }
+
+    private static @Nullable String title(final JsonNode field, final @Nullable String englishIsbn) {
+        final String title = text(field.path(VALUE), MAX_TITLE_LENGTH);
+        if (title == null || englishIsbn == null) {
+            return title;
+        }
+        final String path = pathOf(field.path(SOURCE).asString("")).replace("-", "").toUpperCase(Locale.ROOT);
+        final String isbn10 = Isbn13.toIsbn10(englishIsbn);
+        return holdsIsbn(path, englishIsbn) || isbn10 != null && holdsIsbn(path, isbn10) ? title : null;
+    }
+
+    private static boolean holdsIsbn(final String path, final String isbn) {
+        return Pattern.compile("(?<![0-9X])" + Pattern.quote(isbn) + "(?![0-9X])").matcher(path).find();
+    }
+
+    private static String pathOf(final String source) {
+        try {
+            final String path = new URI(source).getRawPath();
+            return path == null ? "" : path;
+        } catch (URISyntaxException ex) {
+            return "";
+        }
     }
 
     private static @Nullable String text(final JsonNode value, final int maxLength) {
@@ -103,7 +132,7 @@ final class MetadataCheckMapper {
 
         JsonNode field(final String name) {
             final JsonNode field = book.path(name);
-            return isAllowed(field.path("source").asString("")) ? field : MissingNode.getInstance();
+            return isAllowed(field.path(SOURCE).asString("")) ? field : MissingNode.getInstance();
         }
 
         private boolean isAllowed(final String source) {

@@ -259,10 +259,10 @@ public class Book {
     }
 
     public void applyVerified(final VerifiedMetadata metadata, final OffsetDateTime checkedAt) {
+        final String verifiedTitle = metadata.title();
         if (metadata.authors() != null) {
             verifiedFields.add(VerifiedField.AUTHORS);
         }
-        final String verifiedTitle = metadata.title();
         if (verifiedTitle != null) {
             this.title = verifiedTitle;
             verifiedFields.add(VerifiedField.TITLE);
@@ -271,7 +271,7 @@ public class Book {
             this.firstPublishYear = metadata.year();
             verifiedFields.add(VerifiedField.YEAR);
         }
-        if (metadata.seriesName() != null && metadata.seriesPosition() != null) {
+        if (metadata.seriesName() != null) {
             this.seriesName = metadata.seriesName();
             this.seriesPosition = metadata.seriesPosition();
             verifiedFields.add(VerifiedField.SERIES);
@@ -485,6 +485,10 @@ public class Book {
 
     public OffsetDateTime getUpdatedAt() {
         return updatedAt;
+    }
+
+    void setUpdatedAt(final OffsetDateTime updatedAt) {
+        this.updatedAt = updatedAt;
     }
 
     public Set<Author> getAuthors() {

@@ -11,6 +11,8 @@ import org.testcontainers.utility.DockerImageName;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import org.jspecify.annotations.Nullable;
@@ -19,6 +21,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /** Wikidata awards and author identity round-tripped through a real Postgres. */
@@ -48,6 +51,9 @@ class CatalogWikidataPersistenceIntegrationTest extends ContainerizedTest {
 
     @Autowired
     private AuthorRepository authorRepository;
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     @BeforeEach
     void clearCatalog() {
@@ -183,6 +189,17 @@ class CatalogWikidataPersistenceIntegrationTest extends ContainerizedTest {
 
         private static VerifiedMetadata verifiedAuthor(final String name) {
             return new VerifiedMetadata(null, List.of(name), null, null, null, null, null);
+        }
+
+        @Test
+        void shouldMarkBookChangedWhenOnlyAuthorsChange() {
+            final long bookId = bookUpsertService.upsertFromSource(redRising(List.of())).getBookId();
+            jdbc.update("UPDATE book SET updated_at = now() - interval '10 days' WHERE book_id = ?", bookId);
+
+            bookUpsertService.upsertFromSource(redRisingBy(List.of(SourceAuthor.ofName(REAPER_NAME))));
+
+            final OffsetDateTime updatedAt = bookRepository.findById(bookId).orElseThrow().getUpdatedAt();
+            assertThat(updatedAt).isAfter(OffsetDateTime.now(ZoneOffset.UTC).minusHours(1));
         }
 
         @Test

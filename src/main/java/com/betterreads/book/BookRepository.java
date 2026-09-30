@@ -1,10 +1,12 @@
 package com.betterreads.book;
 
+import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -23,8 +25,16 @@ public interface BookRepository extends JpaRepository<Book, Long> {
     @EntityGraph(attributePaths = {"authors", "subjects"})
     Optional<Book> findByDedupKey(String dedupKey);
 
+    @Query("""
+        SELECT b.bookId FROM Book b
+        WHERE b.updatedAt >= :since AND b.bookId > :afterId
+        ORDER BY b.bookId
+        """)
+    List<Long> findIdsChangedSince(
+        @Param("since") OffsetDateTime since, @Param("afterId") long afterId, Pageable pageable);
+
     @EntityGraph(attributePaths = {"authors", "subjects"})
-    List<Book> findAllBy();
+    List<Book> findWithSubjectsByBookIdIn(Collection<Long> bookIds);
 
     @EntityGraph(attributePaths = "authors")
     List<Book> findByBookIdIn(Collection<Long> bookIds);

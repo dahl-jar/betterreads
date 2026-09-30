@@ -5,7 +5,13 @@ import java.util.List;
 
 final class WebSearchSamples {
 
-    static final List<String> DOMAINS = List.of("isfdb.org", "en.wikipedia.org");
+    private static final String WIKIPEDIA = "en.wikipedia.org";
+
+    private static final String ISFDB = "isfdb.org";
+
+    static final List<String> DOMAINS = List.of(ISFDB, WIKIPEDIA);
+
+    static final List<String> SEARCH_ONLY_DOMAINS = List.of(ISFDB);
 
     private static final int MAX_TURNS = 30;
 
@@ -19,6 +25,7 @@ final class WebSearchSamples {
     }
 
     static WebSearchProperties properties(final String bin, final Duration timeout, final String hookScript) {
-        return new WebSearchProperties(bin, "claude-sonnet-5-5", "low", MAX_TURNS, timeout, hookScript, DOMAINS);
+        return new WebSearchProperties(
+            bin, "claude-sonnet-5-5", "low", MAX_TURNS, timeout, hookScript, DOMAINS, SEARCH_ONLY_DOMAINS);
     }
 }

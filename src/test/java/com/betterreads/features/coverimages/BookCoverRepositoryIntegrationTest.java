@@ -51,9 +51,7 @@ class BookCoverRepositoryIntegrationTest extends ContainerizedTest {
 
     @Test
     void shouldQueueMirroredCoverAgainWhenUrlChanges() {
-        final Book book = new Book();
-        book.applyFrom(redRising(OLD_COVER));
-        final long bookId = covers.save(book).getBookId();
+        final long bookId = save(redRising(OLD_COVER));
         covers.markCoverMirrored(bookId, OBJECT_KEY, OffsetDateTime.now(ZoneOffset.UTC));
         final Book mirrored = covers.findById(bookId).orElseThrow();
         mirrored.applyFrom(redRising(NEW_COVER));
@@ -63,6 +61,16 @@ class BookCoverRepositoryIntegrationTest extends ContainerizedTest {
             covers.findCoverSweepCandidates(OffsetDateTime.now(ZoneOffset.UTC), PageRequest.of(0, PAGE_SIZE));
 
         assertThat(candidates).extracting(Book::getBookId).containsExactly(bookId);
+    }
+
+    @Test
+    void shouldMarkMirroredBookChanged() {
+        final long bookId = save(redRising(OLD_COVER));
+        final OffsetDateTime mirroredAt = OffsetDateTime.now(ZoneOffset.UTC).plusDays(1);
+
+        covers.markCoverMirrored(bookId, OBJECT_KEY, mirroredAt);
+
+        assertThat(covers.findById(bookId).orElseThrow().getUpdatedAt()).isAfter(mirroredAt.minusMinutes(1));
     }
 
     @Test

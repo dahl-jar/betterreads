@@ -148,8 +148,10 @@ class BookUpsertServiceImpl implements BookUpsertService {
         if (named.isEmpty()) {
             return;
         }
-        book.getAuthors().retainAll(named);
-        book.getAuthors().addAll(named);
+        final boolean changed = book.getAuthors().retainAll(named) | book.getAuthors().addAll(named);
+        if (changed) {
+            book.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
+        }
     }
 
     private Author findOrCreateAuthor(final SourceAuthor source) {

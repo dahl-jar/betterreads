@@ -255,6 +255,8 @@ class BookTest {
 
         private static final String ENGLISH_ISBN = "9780345539816";
 
+        private static final String GERMAN_ISBN = "9783608949650";
+
         private static final String BLURB = "Darrow infiltrates the Golds.";
 
         private static final OffsetDateTime NOW = OffsetDateTime.now(ZoneOffset.UTC);
@@ -280,13 +282,13 @@ class BookTest {
         }
 
         @Test
-        void shouldKeepVerifiedYearDescriptionAndIsbn() {
+        void shouldKeepVerifiedFieldsOnRefresh() {
             final Book book = new Book();
             book.applyFrom(refresh(YEAR));
             book.applyVerified(new VerifiedMetadata(null, null, YEAR, null, null, BLURB, ENGLISH_ISBN), NOW);
 
             book.applyFrom(SourceBook.builder(BookFieldSource.LOC).locLccn(DUNE_LCCN).title(A_TITLE)
-                .publicationYear(WRONG_YEAR).description("Another blurb.").isbn13("9783453315617").language("de")
+                .publicationYear(WRONG_YEAR).description("Another blurb.").isbn13(GERMAN_ISBN).language("de")
                 .build());
 
             assertThat(book.getFirstPublishYear()).isEqualTo(YEAR);
@@ -321,6 +323,7 @@ class BookTest {
         void shouldSetEnglishOnIsbnSwap() {
             final Book book = new Book();
             book.applyFrom(refresh(YEAR));
+            book.setIsbn(GERMAN_ISBN);
 
             book.applyVerified(new VerifiedMetadata(null, null, null, null, null, null, ENGLISH_ISBN), NOW);
 

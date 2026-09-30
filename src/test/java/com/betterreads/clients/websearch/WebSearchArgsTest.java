@@ -26,11 +26,12 @@ class WebSearchArgsTest {
     }
 
     @Test
-    void shouldFetchOnlyAllowedDomains() {
+    void shouldNotFetchSearchOnlyDomain() {
         final List<String> argv = WebSearchArgs.argv(PROPERTIES, SCHEMA);
 
-        assertThat(argv).containsSequence(
-            "--allowedTools", SEARCH, "WebFetch(domain:isfdb.org)", "WebFetch(domain:en.wikipedia.org)");
+        assertThat(argv)
+            .containsSequence("--allowedTools", SEARCH, "WebFetch(domain:en.wikipedia.org)")
+            .doesNotContain("WebFetch(domain:isfdb.org)");
     }
 
     @Test

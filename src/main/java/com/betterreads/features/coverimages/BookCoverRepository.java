@@ -30,12 +30,12 @@ interface BookCoverRepository extends JpaRepository<Book, Long> {
         """)
     List<Book> findCoverSweepCandidates(OffsetDateTime runStart, Pageable pageable);
 
-    /** Writes only the cover columns, so a slow mirror cannot write back a stale rating or community aggregate. */
+    /** Skips the rating columns, so a slow mirror cannot write back a stale rating or community aggregate. */
     @Transactional
     @Modifying
     @Query("""
         UPDATE Book b
-        SET b.coverObjectKey = :objectKey, b.coverCheckedAt = :checkedAt
+        SET b.coverObjectKey = :objectKey, b.coverCheckedAt = :checkedAt, b.updatedAt = :checkedAt
         WHERE b.bookId = :bookId
         """)
     void markCoverMirrored(

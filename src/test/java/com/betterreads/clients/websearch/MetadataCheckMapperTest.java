@@ -8,15 +8,16 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import com.betterreads.book.VerifiedMetadata;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.JsonNode;
@@ -24,6 +25,8 @@ import tools.jackson.databind.JsonNode;
 class MetadataCheckMapperTest {
 
     private static final long OTHER_ID = 2L;
+
+    private static final String GERMAN_ISBN = "9783453315617";
 
     private static final String OTHER_SITE = "https://www.goodreads.com/book/1";
 
@@ -42,12 +45,21 @@ class MetadataCheckMapperTest {
     private static final int NEXT_YEAR = Year.now(ZoneOffset.UTC).getValue() + 1;
 
     private static VerifiedMetadata map(final MetadataJson json) {
-        final Map<Long, VerifiedMetadata> metadata = map(json.node(), Set.of(MetadataJson.BOOK_ID));
+        return map(json, GERMAN_ISBN);
+    }
+
+    private static VerifiedMetadata map(final MetadataJson json, final @Nullable String storedIsbn) {
+        final Map<Long, VerifiedMetadata> metadata =
+            map(json.node(), List.of(request(MetadataJson.BOOK_ID, storedIsbn)));
         return Objects.requireNonNull(metadata.get(MetadataJson.BOOK_ID));
     }
 
-    private static Map<Long, VerifiedMetadata> map(final JsonNode output, final Set<Long> asked) {
+    private static Map<Long, VerifiedMetadata> map(final JsonNode output, final List<MetadataCheckRequest> asked) {
         return MetadataCheckMapper.toMetadata(output, asked, WebSearchSamples.DOMAINS);
+    }
+
+    private static MetadataCheckRequest request(final long bookId, final @Nullable String isbn) {
+        return new MetadataCheckRequest(bookId, MetadataJson.TITLE, List.of(), null, null, null, isbn);
     }
 
     private static List<String> authors(final int count) {
@@ -79,6 +91,36 @@ class MetadataCheckMapperTest {
         @ValueSource(strings = {OTHER_SITE, "https://notisfdb.org/1", "not a url", "isfdb.org/title/1"})
         void shouldRejectSource(final String source) {
             final VerifiedMetadata metadata = map(metadata().withSource(MetadataJson.TITLE_FIELD, source));
+
+            assertThat(metadata.title()).isNull();
+        }
+
+        @Test
+        void shouldRequireIsbnPageForTitle() {
+            final VerifiedMetadata metadata = map(metadata(), MetadataJson.ISBN);
+
+            assertThat(metadata.title()).isNull();
+        }
+
+        @ParameterizedTest
+        @CsvSource({
+            "9780345539786, https://en.wikipedia.org/wiki/Special:BookSources/9780345539786",
+            "9780345539786, https://www.isfdb.org/cgi-bin/title.cgi/0-345-53978-8",
+            "9780804429573, https://www.isfdb.org/cgi-bin/pl.cgi/080442957x"})
+        void shouldAcceptTitleFromIsbnPage(final String storedIsbn, final String source) {
+            final VerifiedMetadata metadata = map(metadata().withSource(MetadataJson.TITLE_FIELD, source), storedIsbn);
+
+            assertThat(metadata.title()).isEqualTo(MetadataJson.TITLE);
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {
+            "https://en.wikipedia.org/w/index.php?search=9780345539786",
+            "https://en.wikipedia.org/wiki/Red_Rising#9780345539786",
+            "https://en.wikipedia.org/wiki/978/0345539786"})
+        void shouldRejectIsbnOutsideThePath(final String source) {
+            final VerifiedMetadata metadata =
+                map(metadata().withSource(MetadataJson.TITLE_FIELD, source), MetadataJson.ISBN);
 
             assertThat(metadata.title()).isNull();
         }
@@ -143,6 +185,13 @@ class MetadataCheckMapperTest {
             final VerifiedMetadata metadata = map(metadata().with(MetadataJson.ISBN_FIELD, "978-0-345-53978-6"));
 
             assertThat(metadata.isbn13()).isEqualTo(MetadataJson.ISBN);
+        }
+
+        @Test
+        void shouldKeepStoredEnglishIsbn() {
+            final VerifiedMetadata metadata = map(metadata(), "9780553103540");
+
+            assertThat(metadata.isbn13()).isNull();
         }
 
         @ParameterizedTest
@@ -212,14 +261,14 @@ class MetadataCheckMapperTest {
         @Test
         void shouldLeaveMissingBookUnconfirmed() {
             final Map<Long, VerifiedMetadata> metadata =
-                map(metadata().node(), Set.of(MetadataJson.BOOK_ID, OTHER_ID));
+                map(metadata().node(), List.of(request(MetadataJson.BOOK_ID, null), request(OTHER_ID, null)));
 
             assertThat(metadata).containsEntry(OTHER_ID, VerifiedMetadata.NONE);
         }
 
         @Test
         void shouldDropUnaskedId() {
-            final Map<Long, VerifiedMetadata> metadata = map(metadata().node(), Set.of(OTHER_ID));
+            final Map<Long, VerifiedMetadata> metadata = map(metadata().node(), List.of(request(OTHER_ID, null)));
 
             assertThat(metadata).containsOnlyKeys(OTHER_ID);
         }

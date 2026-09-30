@@ -30,7 +30,7 @@ final class WebSearchArgs {
                     "--settings", settings(properties.hookScript()),
                     "--tools", SEARCH + ",WebFetch",
                     "--allowedTools", SEARCH),
-                properties.allowedDomains().stream().map(domain -> "WebFetch(domain:" + domain + ")"),
+                properties.fetchDomains().stream().map(domain -> "WebFetch(domain:" + domain + ")"),
                 Stream.of(
                     "--permission-mode", "dontAsk",
                     "--max-turns", String.valueOf(properties.maxTurns()),

@@ -15,4 +15,13 @@ class Isbn13Test {
 
         assertThat(result).isEqualTo(valid);
     }
+
+    @ParameterizedTest
+    @CsvSource({"9780345539786, 0345539788", "9780804429573, 080442957X", "9780000000002, 0000000000",
+        "9798000000000,"})
+    void shouldConvertToIsbn10(final String isbn13, final String isbn10) {
+        final String result = Isbn13.toIsbn10(isbn13);
+
+        assertThat(result).isEqualTo(isbn10);
+    }
 }

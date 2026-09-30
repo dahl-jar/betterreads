@@ -199,6 +199,8 @@ web-search:
     - macmillan.com
     - hachettebookgroup.com
     - simonandschuster.com
+  search-only-domains:
+    - isfdb.org
 
 wikipedia:
   base-url: ${WIKIPEDIA_BASE_URL:https://en.wikipedia.org}

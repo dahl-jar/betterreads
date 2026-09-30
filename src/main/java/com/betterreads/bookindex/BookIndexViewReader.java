@@ -1,5 +1,6 @@
 package com.betterreads.bookindex;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -8,6 +9,7 @@ import com.betterreads.book.Book;
 import com.betterreads.book.BookRepository;
 import com.betterreads.book.BookSubject;
 import com.betterreads.images.CoverImages;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,10 +30,14 @@ public class BookIndexViewReader {
         return books.findByDedupKey(dedupKey).map(this::toIndexView);
     }
 
-    /** Loads authors and subjects in the same query, so a full reindex skips a lazy load per book. */
     @Transactional(readOnly = true)
-    public List<BookIndexView> allForIndex() {
-        return books.findAllBy().stream().map(this::toIndexView).toList();
+    public List<Long> idsChangedSince(final OffsetDateTime since, final long afterId, final int limit) {
+        return books.findIdsChangedSince(since, afterId, PageRequest.ofSize(limit));
+    }
+
+    @Transactional(readOnly = true)
+    public List<BookIndexView> indexViewsByIds(final List<Long> bookIds) {
+        return books.findWithSubjectsByBookIdIn(bookIds).stream().map(this::toIndexView).toList();
     }
 
     private BookIndexView toIndexView(final Book book) {

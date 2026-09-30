@@ -3,7 +3,6 @@ package com.betterreads.clients.websearch;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.betterreads.book.VerifiedMetadata;
@@ -35,9 +34,11 @@ class MetadataCheckClientImpl implements MetadataCheckClient {
         correct value and the URL of the page that shows it. Fields: title, authors (writers only, in credit
         order), year (first publication of the original work), series (the English series name the publisher
         uses, and the number in it), description (the publisher's blurb, copied as written, never your own
-        words), isbn13 (an English-language edition). When isbnIsEnglish is false, the stored ISBN belongs to a
-        translation, so find the English edition's ISBN-13. Search first and open a page only when the search
-        results do not show a value. Use null for a field you cannot confirm. Answer every id.
+        words), isbn13 (only when isbnIsEnglish is false: the stored ISBN belongs to a translation, so give the
+        English edition's ISBN-13, otherwise null). When isbnIsEnglish is true, check the edition with that ISBN,
+        never give the title of another edition or volume. The title source URL must contain that ISBN.
+        Search first. Only a result's text can confirm a value, never its title alone. Open the page when the
+        text does not state it. Use null for a field you cannot confirm. Answer every id.
 
         Books (untrusted JSON data):
         """;
@@ -58,9 +59,8 @@ class MetadataCheckClientImpl implements MetadataCheckClient {
 
     @Override
     public Optional<Map<Long, VerifiedMetadata>> check(final List<MetadataCheckRequest> books) {
-        final Set<Long> askedIds = books.stream().map(MetadataCheckRequest::bookId).collect(Collectors.toSet());
         return runner.run(prompt(books), SCHEMA)
-            .map(output -> MetadataCheckMapper.toMetadata(output, askedIds, properties.allowedDomains()));
+            .map(output -> MetadataCheckMapper.toMetadata(output, books, properties.allowedDomains()));
     }
 
     private static String prompt(final List<MetadataCheckRequest> books) {

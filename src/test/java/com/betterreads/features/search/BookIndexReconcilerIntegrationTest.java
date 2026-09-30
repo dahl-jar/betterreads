@@ -12,17 +12,17 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
-@SpringBootTest
+@SpringBootTest(properties = "betterreads.search.reconcile-page-size=1")
 @Testcontainers
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class BookIndexReconcilerIntegrationTest extends ContainerizedTest {
@@ -47,6 +47,9 @@ class BookIndexReconcilerIntegrationTest extends ContainerizedTest {
     @Autowired
     private AuthorRepository authors;
 
+    @Autowired
+    private JdbcTemplate jdbc;
+
     @DynamicPropertySource
     static void meilisearchProps(final DynamicPropertyRegistry registry) {
         MeilisearchServer.register(registry, "books-reconcile-test");
@@ -59,8 +62,7 @@ class BookIndexReconcilerIntegrationTest extends ContainerizedTest {
     }
 
     @Test
-    @DisplayName("indexes every catalog book so it is searchable")
-    void indexesAllBooks() {
+    void shouldIndexEveryPage() {
         saveBook("rc-1", "Dune", "Frank Herbert");
         saveBook("rc-2", "Hyperion", "Dan Simmons");
 
@@ -72,10 +74,25 @@ class BookIndexReconcilerIntegrationTest extends ContainerizedTest {
         assertThat(hyperion.hits()).hasSize(ONE_HIT);
     }
 
-    private void saveBook(final String key, final String title, final String authorName) {
+    @Test
+    void shouldSkipBooksNotChangedRecently() {
+        final long old = saveBook("rc-3", "Foundation", "Isaac Asimov");
+        final long recent = saveBook("rc-4", "Neuromancer", "William Gibson");
+        jdbc.update("UPDATE book SET updated_at = now() - interval '2 days 1 hour' WHERE book_id = ?", old);
+        jdbc.update("UPDATE book SET updated_at = now() - interval '1 day 23 hours' WHERE book_id = ?", recent);
+
+        reconciler.reconcile();
+
+        final BookSearchResult foundation = searchService.search("foundation", 0, FULL_PAGE).result();
+        final BookSearchResult neuromancer = searchService.search("neuromancer", 0, FULL_PAGE).result();
+        assertThat(foundation.hits()).isEmpty();
+        assertThat(neuromancer.hits()).hasSize(ONE_HIT);
+    }
+
+    private long saveBook(final String key, final String title, final String authorName) {
         final Author author = authors.save(Books.author(authorName));
         final Book book = Books.promoted(key, title, author);
         book.setHardcoverId(key);
-        books.save(book);
+        return books.save(book).getBookId();
     }
 }
