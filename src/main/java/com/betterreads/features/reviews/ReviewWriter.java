@@ -22,15 +22,15 @@ class ReviewWriter {
 
     private final BookCommunityRatingWriter communityRating;
 
-    private final ReviewMapper mapper;
+    private final ReviewResponseAssembler assembler;
 
     public ReviewWriter(
         final ReviewRepository reviews,
         final BookCommunityRatingWriter communityRating,
-        final ReviewMapper mapper) {
+        final ReviewResponseAssembler assembler) {
         this.reviews = reviews;
         this.communityRating = communityRating;
-        this.mapper = mapper;
+        this.assembler = assembler;
     }
 
     /** saveAndFlush raises the duplicate-key conflict before commit, so the caller can retry it. */
@@ -45,7 +45,7 @@ class ReviewWriter {
         review.setBody(blankToNull(request.body()));
         final Review saved = reviews.saveAndFlush(review);
         recomputeRating(bookId);
-        return mapper.toResponse(saved, bookKey);
+        return assembler.assembleOne(saved, bookKey);
     }
 
     @Transactional

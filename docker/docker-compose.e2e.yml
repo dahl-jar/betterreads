@@ -74,6 +74,7 @@ services:
       DB_SSL_MODE: disable
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
+      MEILI_MASTER_KEY: e2e-meili-master-key-not-for-real-use
       MINIO_ENDPOINT: http://minio:9000
       MINIO_BUCKET: betterreads-images
       MINIO_ACCESS_KEY: betterreads-app

@@ -9,8 +9,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Per-IP token-bucket limits for the public auth and catalog-read endpoints, bound from
- * {@code auth.rate-limit.*}.
+ * Per-IP token-bucket limits for the public endpoints, bound from {@code auth.rate-limit.*}.
  *
  * <p>{@code X-Forwarded-For} is only read when the immediate client matches a CIDR in
  * {@code trustedProxies}. Otherwise the bucket key is {@code remoteAddr} so a direct attacker
@@ -43,6 +42,9 @@ record RateLimitProperties(
     @Positive long eventStreamCapacity,
     @Positive long eventStreamRefillTokens,
     @Positive long eventStreamRefillSeconds,
+    @Positive long imageCapacity,
+    @Positive long imageRefillTokens,
+    @Positive long imageRefillSeconds,
     @Positive long bucketTtlSeconds,
     @NotNull List<String> trustedProxies
 ) {

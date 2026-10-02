@@ -59,4 +59,12 @@ interface ReviewRepository extends JpaRepository<Review, Long> {
         GROUP BY r.rating
         """)
     List<StarCount> countByStarForBook(@Param("bookId") Long bookId);
+
+    @Query("""
+        SELECT r FROM Review r
+        JOIN User u ON u.userId = r.userId
+        WHERE r.body IS NOT NULL
+        ORDER BY r.createdAt DESC, r.reviewId DESC
+        """)
+    List<Review> findRecentWithBody(Pageable pageable);
 }

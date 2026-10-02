@@ -1,8 +1,10 @@
 package com.betterreads.bookaccess;
 
 import java.util.Collection;
-import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import com.betterreads.book.Author;
 import com.betterreads.book.Book;
@@ -31,8 +33,10 @@ public class BookSummaryReader {
 
     /** Authors load in the same query as the books. */
     @Transactional(readOnly = true)
-    public List<BookSummary> summariesByIds(final Collection<Long> bookIds) {
-        return books.findByBookIdIn(bookIds).stream().map(this::toSummary).toList();
+    public Map<Long, BookSummary> summariesKeyedById(final Collection<Long> bookIds) {
+        return books.findByBookIdIn(bookIds).stream()
+            .map(this::toSummary)
+            .collect(Collectors.toMap(BookSummary::bookId, Function.identity()));
     }
 
     private BookSummary toSummary(final Book book) {

@@ -4,17 +4,13 @@ import java.time.LocalDate;
 
 import org.jspecify.annotations.Nullable;
 
-/**
- * @param createdAt the day the review was first posted, edits leave it unchanged
- */
-public record ReviewResponse(
+public record RecentReviewResponse(
     long id,
-    String bookKey,
+    String author,
     @Nullable Integer rating,
     @Nullable String title,
-    @Nullable String body,
+    String body,
     LocalDate createdAt,
-    String author,
-    long commentCount
+    ReviewedBook book
 ) {
 }

@@ -14,8 +14,6 @@ import org.springframework.stereotype.Component;
 @Component
 class CommentResponseAssembler {
 
-    private static final String UNKNOWN_AUTHOR = "unknown";
-
     private final UsernameLookup usernames;
 
     private final CommentRepository comments;
@@ -46,7 +44,7 @@ class CommentResponseAssembler {
         final Map<Long, String> authors = authorsFor(found.getContent());
         final List<CommentResponse> responses = found.getContent().stream()
             .map(comment -> toResponse(comment,
-                authors.getOrDefault(comment.getUserId(), UNKNOWN_AUTHOR),
+                UsernameLookup.usernameIn(authors, comment.getUserId()),
                 replyCounts.getOrDefault(comment.getCommentId(), 0L)))
             .toList();
         return new CommentPage(responses, found.getTotalElements(), page.getOffset(), page.getLimit());

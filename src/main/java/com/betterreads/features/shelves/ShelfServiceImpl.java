@@ -4,7 +4,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.betterreads.bookaccess.BookIdLookup;
@@ -109,12 +108,24 @@ class ShelfServiceImpl implements ShelfService {
             ? entries.findByUserIdOrderByCreatedAtDesc(userId)
             : entries.findByUserIdAndStatusOrderByCreatedAtDesc(userId, status);
         final List<Long> shelfBookIds = shelf.stream().map(ShelfEntry::getBookId).toList();
-        final Map<Long, BookSummary> booksById = bookSummaries.summariesByIds(shelfBookIds).stream()
-            .collect(Collectors.toMap(BookSummary::bookId, Function.identity()));
+        final Map<Long, BookSummary> booksById = bookSummaries.summariesKeyedById(shelfBookIds);
         final Map<Long, Integer> ratingsByBookId = ratings.ratingsOf(userId, shelfBookIds);
         return shelf.stream()
             .map(entry -> toResponse(entry, booksById, ratingsByBookId))
             .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ShelfCountsResponse countsForBook(final String bookKey) {
+        final Map<ReadingStatus, Long> countByStatus =
+            entries.countByStatusForBook(bookIds.requireBookId(bookKey)).stream()
+                .collect(Collectors.toMap(StatusCount::status, StatusCount::count));
+        return new ShelfCountsResponse(
+            countByStatus.getOrDefault(ReadingStatus.WANT_TO_READ, 0L),
+            countByStatus.getOrDefault(ReadingStatus.CURRENTLY_READING, 0L),
+            countByStatus.getOrDefault(ReadingStatus.FINISHED, 0L),
+            countByStatus.getOrDefault(ReadingStatus.DROPPED, 0L));
     }
 
     private ShelfEntryResponse toResponse(

@@ -2,7 +2,6 @@ package com.betterreads.features.shelves;
 
 import com.betterreads.book.Book;
 import com.betterreads.book.BookRepository;
-import com.betterreads.ratelimit.RateLimitFilter;
 import com.betterreads.testsupport.Books;
 import com.betterreads.testsupport.RegisteredUserTest;
 
@@ -35,6 +34,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static com.betterreads.testsupport.Books.DUNE_KEY;
 import static com.betterreads.testsupport.Books.DUNE_TITLE;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -122,6 +123,22 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
     private static final String OVERSIZED_NOTE = "x".repeat(2001);
 
+    private static final String DROPPED = "DROPPED";
+
+    private static final String BOOKS_PATH = "/api/v1/books/";
+
+    private static final int THREE_READERS = 3;
+
+    private static final int FOUR_READERS = 4;
+
+    private static final String JSON_WANT_TO_READ_COUNT = "$.data.wantToRead";
+
+    private static final String JSON_CURRENTLY_READING_COUNT = "$.data.currentlyReading";
+
+    private static final String JSON_FINISHED_COUNT = "$.data.finished";
+
+    private static final String JSON_DROPPED_COUNT = "$.data.dropped";
+
     @Autowired
     private BookRepository bookRepository;
 
@@ -131,21 +148,13 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    @Autowired
-    private RateLimitFilter rateLimitFilter;
-
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         mockMvc = securedMockMvc();
         jdbcTemplate.update("DELETE FROM user_book_collection");
-        jdbcTemplate.update("DELETE FROM review");
-        jdbcTemplate.update("DELETE FROM book_author");
-        jdbcTemplate.update("DELETE FROM book");
-        jdbcTemplate.update("DELETE FROM app_user");
-        rateLimitFilter.reset();
-        Books.seedBook(bookRepository, DUNE_KEY, DUNE_TITLE);
+        resetToDune();
         Books.seedBook(bookRepository, HOBBIT_KEY, HOBBIT_TITLE);
         final Book rated = Books.book(RATED_KEY, RATED_TITLE);
         rated.setAverageRating(RATED_AVERAGE);
@@ -556,8 +565,93 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
             goblinShelf
                 .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_FIRST_KEY).value(RATED_KEY))
                 .andExpect(jsonPath(JSON_FIRST_MY_RATING).doesNotExist());
         }
+    }
+
+    @Nested
+    @DisplayName("GET /books/{key}/shelf-counts")
+    class ShelfCounts {
+
+        @Test
+        void shouldCountReadersPerStatus() throws Exception {
+            shelveForEach(DUNE_KEY, WANT_TO_READ, DARROW);
+            shelveForEach(DUNE_KEY, CURRENTLY_READING, GOBLIN, "mustang");
+            shelveForEach(DUNE_KEY, FINISHED, "sevro", "cassius", "victra");
+            shelveForEach(DUNE_KEY, DROPPED, "ragnar", "roque", "dancer", "holiday");
+
+            final ResultActions response = getShelfCounts(DUNE_KEY);
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_WANT_TO_READ_COUNT).value(1))
+                .andExpect(jsonPath(JSON_CURRENTLY_READING_COUNT).value(2))
+                .andExpect(jsonPath(JSON_FINISHED_COUNT).value(THREE_READERS))
+                .andExpect(jsonPath(JSON_DROPPED_COUNT).value(FOUR_READERS));
+        }
+
+        @Test
+        void shouldReturnZeroForEveryStatusWhenNobodyShelvedTheBook() throws Exception {
+            final ResultActions response = getShelfCounts(DUNE_KEY);
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_WANT_TO_READ_COUNT).value(0))
+                .andExpect(jsonPath(JSON_CURRENTLY_READING_COUNT).value(0))
+                .andExpect(jsonPath(JSON_FINISHED_COUNT).value(0))
+                .andExpect(jsonPath(JSON_DROPPED_COUNT).value(0));
+        }
+
+        @Test
+        void shouldNotCountReadersOfAnotherBook() throws Exception {
+            shelveForEach(HOBBIT_KEY, FINISHED, DARROW);
+            shelveForEach(DUNE_KEY, FINISHED, GOBLIN);
+
+            final ResultActions response = getShelfCounts(DUNE_KEY);
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_FINISHED_COUNT).value(1));
+        }
+
+        @Test
+        void shouldNotCountReadersWithDeletedAccounts() throws Exception {
+            shelveForEach(DUNE_KEY, FINISHED, DARROW, GOBLIN);
+            final int deleted = jdbcTemplate.update(
+                "UPDATE app_user SET deleted_at = now() WHERE username = ?", GOBLIN);
+            assertThat(deleted).isOne();
+
+            final ResultActions response = getShelfCounts(DUNE_KEY);
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_FINISHED_COUNT).value(1));
+        }
+
+        @Test
+        void shouldReturn404ForShelfCountsOfAnUnknownBook() throws Exception {
+            final ResultActions response = getShelfCounts(UNKNOWN_KEY);
+
+            response
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value(containsString(UNKNOWN_KEY)));
+        }
+    }
+
+    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
+    private void shelveForEach(final String key, final String readingStatus, final String... readers)
+        throws Exception {
+        for (final String reader : readers) {
+            final String token = registerAndLogin(reader, reader + "@example.com");
+            final ResultActions shelved = putStatus(token, key, readingStatus);
+            shelved.andExpect(status().isOk());
+        }
+    }
+
+    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
+    private ResultActions getShelfCounts(final String key) throws Exception {
+        return mockMvc.perform(get(BOOKS_PATH + key + "/shelf-counts"));
     }
 
     // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
@@ -612,7 +706,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
     // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     private void rateBook(final String token, final String key, final int rating) throws Exception {
-        mockMvc.perform(put("/api/v1/books/" + key + "/reviews/me")
+        mockMvc.perform(put(BOOKS_PATH + key + "/reviews/me")
                 .header(AUTH_HEADER, BEARER_PREFIX + token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(jsonBody("rating", rating)))

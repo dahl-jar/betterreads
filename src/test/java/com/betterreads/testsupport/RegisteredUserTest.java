@@ -3,12 +3,15 @@ package com.betterreads.testsupport;
 import com.betterreads.book.BookRepository;
 import com.betterreads.ratelimit.RateLimitFilter;
 
+import java.io.UnsupportedEncodingException;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
 
 import tools.jackson.databind.ObjectMapper;
 
@@ -66,5 +69,10 @@ public abstract class RegisteredUserTest extends ContainerizedTest {
             .andReturn();
         final String body = login.getResponse().getContentAsString();
         return objectMapper.readTree(body).at("/data/accessToken").asString();
+    }
+
+    protected long idOf(final ResultActions created) throws UnsupportedEncodingException {
+        final String body = created.andReturn().getResponse().getContentAsString();
+        return objectMapper.readTree(body).at("/data/id").asLong();
     }
 }

@@ -111,6 +111,9 @@ class OpenApiEnvelopeTest extends ContainerizedTest {
             .andExpect(jsonPath("$.paths.['/api/v1/books/{key}/community-rating'].get.security.length()").value(0))
             .andExpect(jsonPath("$.paths.['/api/v1/books/{key}/comments'].get.security.length()").value(0))
             .andExpect(jsonPath("$.paths.['/api/v1/comments/{commentId}/replies'].get.security.length()").value(0))
+            .andExpect(jsonPath("$.paths.['/api/v1/books/{key}/shelf-counts'].get.security.length()").value(0))
+            .andExpect(jsonPath("$.paths.['/api/v1/books/{key}/series'].get.security.length()").value(0))
+            .andExpect(jsonPath("$.paths.['/api/v1/reviews/recent'].get.security.length()").value(0))
             .andExpect(jsonPath("$.paths.['/healthz'].get.security.length()").value(0));
     }
 

@@ -9,7 +9,7 @@ services:
     environment:
       POSTGRES_DB: ${DB_NAME:-betterreads}
       POSTGRES_USER: ${DB_USERNAME:-betterreads}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-betterreads}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
     volumes:
       - betterreads-data:/var/lib/postgresql/data
     healthcheck:

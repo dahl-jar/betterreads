@@ -299,8 +299,7 @@ dependencyCheck {
 // ---------------------------------------------------------------------------
 // Test config
 // ---------------------------------------------------------------------------
-// the test JVM does not inherit the parent environment, so credentials and opt-in flags
-// would fall back to application.yml defaults without this
+// the test JVM does not inherit the parent environment, so the opt-in suites get their keys and flags passed in by name
 fun Test.forwardEnvironmentVariables(names: Iterable<String>) {
 	names.forEach { name ->
 		project.providers.environmentVariable(name).orNull?.let { environment(name, it) }
@@ -322,9 +321,7 @@ val localDbVerificationEnvironmentVariables = listOf(
 	"DB_PORT",
 	"DB_NAME",
 	"DB_USERNAME",
-	"DB_PASSWORD",
 	"DB_APP_USERNAME",
-	"DB_APP_PASSWORD",
 	"GOOGLE_BOOKS_API_KEY",
 	"HARDCOVER_BEARER_TOKEN",
 	"RUN_LOCAL_DB_VERIFICATION",
@@ -361,8 +358,21 @@ tasks.register<Test>("openApiSpec") {
 	outputs.upToDateWhen { false }
 }
 
+val testCredentials = mapOf(
+	"DB_PASSWORD" to "test-owner-password",
+	"DB_APP_PASSWORD" to "test-app-password",
+	"MEILI_MASTER_KEY" to "test-meili-master-key",
+	"MINIO_ACCESS_KEY" to "test-minio-access-key",
+	"MINIO_SECRET_KEY" to "test-minio-secret-key"
+)
+
 tasks.withType<Test> {
 	useJUnitPlatform()
+
+	// application.yml has no fallback for these, so a test context needs a value to start
+	testCredentials.forEach { (name, value) ->
+		environment(name, providers.environmentVariable(name).getOrElse(value))
+	}
 
 	// ArchUnit's class graph of the whole app overflows the default fork heap
 	maxHeapSize = "2g"

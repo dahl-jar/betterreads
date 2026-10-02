@@ -5,7 +5,7 @@ spring:
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:betterreads}?sslmode=${DB_SSL_MODE:disable}
     username: ${DB_APP_USERNAME:betterreads_app}
-    password: ${DB_APP_PASSWORD:betterreads_app}
+    password: ${DB_APP_PASSWORD}
     hikari:
       maximum-pool-size: 10
 
@@ -28,10 +28,10 @@ spring:
     enabled: true
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:betterreads}?sslmode=${DB_SSL_MODE:disable}
     user: ${DB_USERNAME:betterreads}
-    password: ${DB_PASSWORD:betterreads}
+    password: ${DB_PASSWORD}
     target: ${SPRING_FLYWAY_TARGET:latest}
     placeholders:
-      appPassword: ${DB_APP_PASSWORD:betterreads_app}
+      appPassword: ${DB_APP_PASSWORD}
 
 server:
   port: 8080
@@ -128,6 +128,9 @@ auth:
     event-stream-capacity: 10
     event-stream-refill-tokens: 1
     event-stream-refill-seconds: 30
+    image-capacity: 60
+    image-refill-tokens: 20
+    image-refill-seconds: 10
     bucket-ttl-seconds: 900
     trusted-proxies: ${AUTH_TRUSTED_PROXIES:}
 
@@ -215,14 +218,14 @@ itunes:
 
 meilisearch:
   host: ${MEILISEARCH_HOST:http://localhost:7700}
-  master-key: ${MEILI_MASTER_KEY:dev-placeholder-set-MEILI_MASTER_KEY-for-real-use}
+  master-key: ${MEILI_MASTER_KEY}
   index-name: ${MEILISEARCH_INDEX_NAME:books}
 
 minio:
   endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
   bucket: ${MINIO_BUCKET:betterreads-images}
-  access-key: ${MINIO_ACCESS_KEY:minioadmin}
-  secret-key: ${MINIO_SECRET_KEY:minioadmin}
+  access-key: ${MINIO_ACCESS_KEY}
+  secret-key: ${MINIO_SECRET_KEY}
 
 cover-fetch:
   connect-timeout: ${COVER_FETCH_CONNECT_TIMEOUT:5000}

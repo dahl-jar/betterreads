@@ -29,11 +29,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Per-IP token-bucket rate limiter for the public auth, search, and catalog endpoints, shared
- * across replicas through Redis.
+ * Per-IP token-bucket rate limiter for the public endpoints, shared across replicas through Redis.
  *
- * <p>Each path has its own per-IP bucket so a burst against one endpoint does not eat
- * another's budget. An empty bucket returns 429 with {@code Retry-After}.
+ * <p>Auth paths, search, event streams, comment posts, cover images and the other public reads
+ * each draw from their own per-IP bucket, so a burst against one does not eat another's budget.
+ * An empty bucket returns 429 with {@code Retry-After}.
  */
 @Component
 public final class RateLimitFilter extends OncePerRequestFilter {
@@ -57,7 +57,9 @@ public final class RateLimitFilter extends OncePerRequestFilter {
     private static final String BOOK_DETAIL_PREFIX = "/api/v1/books/";
 
     private static final List<String> PUBLIC_READ_PREFIXES = List.of(
-        BOOK_DETAIL_PREFIX, "/api/v1/reviews/", "/api/v1/comments/", "/api/v1/images/");
+        BOOK_DETAIL_PREFIX, "/api/v1/reviews/", "/api/v1/comments/");
+
+    private static final String IMAGE_PREFIX = "/api/v1/images/";
 
     private static final String EVENT_STREAM_SUFFIX = "/events";
 
@@ -72,6 +74,8 @@ public final class RateLimitFilter extends OncePerRequestFilter {
     private final Endpoint eventStreamEndpoint;
 
     private final Endpoint commentWriteEndpoint;
+
+    private final Endpoint imageEndpoint;
 
     private final ClientIpResolver clientIpResolver;
 
@@ -94,6 +98,8 @@ public final class RateLimitFilter extends OncePerRequestFilter {
         this.commentWriteEndpoint = endpoint(HttpMethod.POST, "comment-write",
             properties.searchCapacity(),
             properties.searchRefillTokens(), properties.searchRefillSeconds());
+        this.imageEndpoint = endpoint(HttpMethod.GET, "image", properties.imageCapacity(),
+            properties.imageRefillTokens(), properties.imageRefillSeconds());
         this.clientIpResolver = new ClientIpResolver(properties.trustedProxies());
         this.proxyManager = proxyManager;
         this.redis = redis;
@@ -138,7 +144,7 @@ public final class RateLimitFilter extends OncePerRequestFilter {
     public void reset() {
         Stream.concat(
                 endpoints.values().stream(),
-                Stream.of(publicReadEndpoint, eventStreamEndpoint, commentWriteEndpoint))
+                Stream.of(publicReadEndpoint, eventStreamEndpoint, commentWriteEndpoint, imageEndpoint))
             .map(Endpoint::keyPrefix)
             .forEach(prefix -> {
                 final List<String> keys = redis.sync().keys(prefix + ":*");
@@ -193,6 +199,9 @@ public final class RateLimitFilter extends OncePerRequestFilter {
     private Endpoint readEndpointFor(final String uri) {
         if (uri.endsWith(EVENT_STREAM_SUFFIX)) {
             return eventStreamEndpoint;
+        }
+        if (uri.startsWith(IMAGE_PREFIX)) {
+            return imageEndpoint;
         }
         final boolean publicRead = PUBLIC_READ_PREFIXES.stream().anyMatch(uri::startsWith);
         return publicRead ? publicReadEndpoint : null;

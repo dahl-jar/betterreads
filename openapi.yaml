@@ -814,6 +814,43 @@ paths:
               schema:
                 $ref: "#/components/schemas/BookSearchDocument"
       security: []
+  /api/v1/reviews/recent:
+    get:
+      tags:
+      - Reviews
+      summary: List the newest reviews with text
+      operationId: recent
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 6
+          maximum: 20
+          minimum: 1
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: "Reviews with text, newest first"
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RecentReviewResponse"
+        "400":
+          description: Limit out of range
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
   /api/v1/me/reviews:
     get:
       tags:
@@ -1035,6 +1072,70 @@ paths:
                 properties:
                   data:
                     $ref: "#/components/schemas/BookDetailResponse"
+        "404":
+          description: No book with that key
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/books/{key}/shelf-counts:
+    get:
+      tags:
+      - Catalog
+      summary: Count a book's readers per shelf status
+      operationId: shelfCounts
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: The reader count for each shelf status
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ShelfCountsResponse"
+        "404":
+          description: No book with that key
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/books/{key}/series:
+    get:
+      tags:
+      - Catalog
+      summary: List the other books in each of a book's series
+      operationId: series
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: One entry per series the book belongs to
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BookSeriesResponse"
         "404":
           description: No book with that key
           content:
@@ -1354,6 +1455,11 @@ components:
         createdAt:
           type: string
           format: date
+        author:
+          type: string
+        commentCount:
+          type: integer
+          format: int64
     CreateCommentRequest:
       type: object
       properties:
@@ -1607,6 +1713,39 @@ components:
         limit:
           type: integer
           format: int32
+    RecentReviewResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        author:
+          type: string
+        rating:
+          type: integer
+          format: int32
+        title:
+          type: string
+        body:
+          type: string
+        createdAt:
+          type: string
+          format: date
+        book:
+          $ref: "#/components/schemas/ReviewedBook"
+    ReviewedBook:
+      type: object
+      properties:
+        key:
+          type: string
+        title:
+          type: string
+        authors:
+          type: array
+          items:
+            type: string
+        coverUrl:
+          type: string
     ReviewPage:
       type: object
       properties:
@@ -1695,6 +1834,49 @@ components:
           type: array
           items:
             type: string
+    ShelfCountsResponse:
+      type: object
+      properties:
+        wantToRead:
+          type: integer
+          format: int64
+        currentlyReading:
+          type: integer
+          format: int64
+        finished:
+          type: integer
+          format: int64
+        dropped:
+          type: integer
+          format: int64
+    BookSeriesResponse:
+      type: object
+      properties:
+        name:
+          type: string
+        position:
+          type: integer
+          format: int32
+        books:
+          type: array
+          items:
+            $ref: "#/components/schemas/SeriesBookResponse"
+    SeriesBookResponse:
+      type: object
+      properties:
+        key:
+          type: string
+        title:
+          type: string
+        authors:
+          type: array
+          items:
+            type: string
+        coverUrl:
+          type: string
+        position:
+          type: integer
+          format: int32
     CommunityRatingResponse:
       type: object
       properties:

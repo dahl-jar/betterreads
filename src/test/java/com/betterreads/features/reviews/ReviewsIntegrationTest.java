@@ -1,7 +1,11 @@
 package com.betterreads.features.reviews;
 
+import com.betterreads.book.Author;
+import com.betterreads.book.AuthorRepository;
 import com.betterreads.book.Book;
 import com.betterreads.book.BookRepository;
+import com.betterreads.testsupport.Books;
+import com.betterreads.testsupport.Comments;
 import com.betterreads.testsupport.RegisteredUserTest;
 
 import java.math.BigDecimal;
@@ -29,6 +33,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static com.betterreads.testsupport.Books.DUNE_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -106,8 +111,53 @@ class ReviewsIntegrationTest extends RegisteredUserTest {
 
     private static final String BOOKS_PATH = "/api/v1/books/";
 
+    private static final String MUSTANG = "mustang";
+
+    private static final String MUSTANG_EMAIL = "mustang@example.com";
+
+    private static final String DELETED_AUTHOR = "[deleted]";
+
+    private static final String FIRST_COMMENT = "The ecology chapters are the best part.";
+
+    private static final String SECOND_COMMENT = "The banquet scene carries it for me.";
+
+    private static final String A_REPLY = "The appendix is worth reading too.";
+
+    private static final String JSON_AUTHOR = "$.data.author";
+
+    private static final String JSON_COMMENT_COUNT = "$.data.commentCount";
+
+    private static final String JSON_FIRST_AUTHOR = "$.data[0].author";
+
+    private static final String JSON_SECOND_AUTHOR = "$.data[1].author";
+
+    private static final String JSON_FIRST_COMMENT_COUNT = "$.data[0].commentCount";
+
+    private static final String JSON_SECOND_COMMENT_COUNT = "$.data[1].commentCount";
+
+    private static final String JSON_FIRST_TITLE = "$.data[0].title";
+
+    private static final String OWN_REVIEWS_URL = "/api/v1/me/reviews";
+
+    private static final String RECENT_REVIEWS_URL = "/api/v1/reviews/recent";
+
+    private static final String LIMIT_PARAM = "limit";
+
+    private static final String RED_RISING_KEY = "red-rising";
+
+    private static final String RED_RISING_TITLE = "Red Rising";
+
+    private static final String RED_RISING_AUTHOR = "Pierce Brown";
+
+    private static final String FIRST_POSTED_AT = "2026-03-14T12:00:00Z";
+
+    private static final String FIRST_POSTED_DATE = "2026-03-14";
+
     @Autowired
     private BookRepository bookRepository;
+
+    @Autowired
+    private AuthorRepository authorRepository;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -265,7 +315,7 @@ class ReviewsIntegrationTest extends RegisteredUserTest {
             response
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(JSON_LENGTH).value(1))
-                .andExpect(jsonPath("$.data[0].title").value(REVIEW_TITLE));
+                .andExpect(jsonPath(JSON_FIRST_TITLE).value(REVIEW_TITLE));
         }
 
         @Test
@@ -276,13 +326,14 @@ class ReviewsIntegrationTest extends RegisteredUserTest {
             putReview(goblinToken, DUNE_KEY, THREE_STARS, null, null);
 
             final ResultActions response = mockMvc.perform(
-                get("/api/v1/me/reviews").header(AUTH_HEADER, BEARER_PREFIX + goblinToken));
+                get(OWN_REVIEWS_URL).header(AUTH_HEADER, BEARER_PREFIX + goblinToken));
 
             response
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(JSON_LENGTH).value(1))
                 .andExpect(jsonPath(JSON_FIRST_RATING).value(THREE_STARS))
-                .andExpect(jsonPath(JSON_FIRST_BOOK_KEY).value(DUNE_KEY));
+                .andExpect(jsonPath(JSON_FIRST_BOOK_KEY).value(DUNE_KEY))
+                .andExpect(jsonPath(JSON_FIRST_AUTHOR).value(GOBLIN));
         }
     }
 
@@ -384,10 +435,260 @@ class ReviewsIntegrationTest extends RegisteredUserTest {
         }
     }
 
+    @Nested
+    @DisplayName("Reviewer name and comment count on a review")
+    class ReviewerAndComments {
+
+        @Test
+        void shouldNameEachReviewerOnABooksReviews() throws Exception {
+            final String darrowToken = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String goblinToken = registerAndLogin(GOBLIN, GOBLIN_EMAIL);
+            putReview(darrowToken, DUNE_KEY, FIVE_STARS, REVIEW_TITLE, REVIEW_BODY);
+            putReview(goblinToken, DUNE_KEY, THREE_STARS, null, null);
+
+            final ResultActions response = getBookReviews(DUNE_KEY);
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_FIRST_AUTHOR).value(GOBLIN))
+                .andExpect(jsonPath(JSON_SECOND_AUTHOR).value(DARROW));
+        }
+
+        @Test
+        void shouldShowDeletedForAReviewerWhoseAccountIsDeleted() throws Exception {
+            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            putReview(token, DUNE_KEY, FIVE_STARS, REVIEW_TITLE, REVIEW_BODY);
+            softDelete(DARROW);
+
+            final ResultActions response = getBookReviews(DUNE_KEY);
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_FIRST_AUTHOR).value(DELETED_AUTHOR));
+        }
+
+        @Test
+        void shouldCountOnlyTopLevelCommentsOnAReview() throws Exception {
+            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final long reviewId = postReview(token, DUNE_KEY, FIVE_STARS, REVIEW_TITLE, REVIEW_BODY);
+            final long parentId = commentOnReview(token, reviewId, FIRST_COMMENT, null);
+            commentOnReview(token, reviewId, SECOND_COMMENT, null);
+            commentOnReview(token, reviewId, A_REPLY, parentId);
+
+            final ResultActions response = getBookReviews(DUNE_KEY);
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_FIRST_COMMENT_COUNT).value(2));
+        }
+
+        @Test
+        void shouldReportZeroCommentsOnAnUncommentedReview() throws Exception {
+            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            putReview(token, DUNE_KEY, FIVE_STARS, REVIEW_TITLE, REVIEW_BODY);
+
+            final ResultActions response = getBookReviews(DUNE_KEY);
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_FIRST_COMMENT_COUNT).value(0));
+        }
+
+        @Test
+        void shouldNotCountCommentsOnABookWithTheSameId() throws Exception {
+            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final long reviewId = postReview(token, DUNE_KEY, FIVE_STARS, REVIEW_TITLE, REVIEW_BODY);
+            commentOnReview(token, reviewId, FIRST_COMMENT, null);
+            final int bookComments = jdbcTemplate.update(
+                "INSERT INTO comment (user_id, target_type, target_id, body) "
+                    + "SELECT user_id, 'BOOK', ?, ? FROM app_user WHERE username = ?",
+                reviewId, SECOND_COMMENT, DARROW);
+            assertThat(bookComments).isOne();
+
+            final ResultActions response = getBookReviews(DUNE_KEY);
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_FIRST_COMMENT_COUNT).value(1));
+        }
+
+        @Test
+        void shouldKeepCommentCountsApartPerReview() throws Exception {
+            final String darrowToken = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String goblinToken = registerAndLogin(GOBLIN, GOBLIN_EMAIL);
+            final long darrowReviewId = postReview(darrowToken, DUNE_KEY, FIVE_STARS, REVIEW_TITLE, REVIEW_BODY);
+            final long goblinReviewId = postReview(goblinToken, DUNE_KEY, THREE_STARS, null, null);
+            commentOnReview(goblinToken, darrowReviewId, FIRST_COMMENT, null);
+            commentOnReview(goblinToken, darrowReviewId, SECOND_COMMENT, null);
+            commentOnReview(darrowToken, goblinReviewId, FIRST_COMMENT, null);
+
+            final ResultActions response = getBookReviews(DUNE_KEY);
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_FIRST_AUTHOR).value(GOBLIN))
+                .andExpect(jsonPath(JSON_FIRST_COMMENT_COUNT).value(1))
+                .andExpect(jsonPath(JSON_SECOND_COMMENT_COUNT).value(2));
+        }
+
+        @Test
+        void shouldReturnTheListedFieldsWhenEditingAReview() throws Exception {
+            final String darrowToken = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String goblinToken = registerAndLogin(GOBLIN, GOBLIN_EMAIL);
+            final long reviewId = postReview(darrowToken, DUNE_KEY, FIVE_STARS, REVIEW_TITLE, REVIEW_BODY);
+            commentOnReview(goblinToken, reviewId, FIRST_COMMENT, null);
+
+            final ResultActions response = putReview(darrowToken, DUNE_KEY, THREE_STARS, null, null);
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_AUTHOR).value(DARROW))
+                .andExpect(jsonPath(JSON_COMMENT_COUNT).value(1));
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /reviews/recent")
+    class RecentReviews {
+
+        @Test
+        void shouldListARecentReviewWithItsBook() throws Exception {
+            final Author unsavedAuthor = Books.author(RED_RISING_AUTHOR);
+            final Author pierceBrown = authorRepository.save(unsavedAuthor);
+            final Book redRising = Books.promoted(RED_RISING_KEY, RED_RISING_TITLE, pierceBrown);
+            bookRepository.save(redRising);
+            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final long reviewId = postReview(token, RED_RISING_KEY, FIVE_STARS, REVIEW_TITLE, REVIEW_BODY);
+            jdbcTemplate.update("UPDATE review SET created_at = ?::timestamptz", FIRST_POSTED_AT);
+
+            final ResultActions response = getRecentReviews();
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_LENGTH).value(1))
+                .andExpect(jsonPath("$.data[0].id").value(reviewId))
+                .andExpect(jsonPath(JSON_FIRST_AUTHOR).value(DARROW))
+                .andExpect(jsonPath(JSON_FIRST_RATING).value(FIVE_STARS))
+                .andExpect(jsonPath(JSON_FIRST_TITLE).value(REVIEW_TITLE))
+                .andExpect(jsonPath("$.data[0].body").value(REVIEW_BODY))
+                .andExpect(jsonPath("$.data[0].createdAt").value(FIRST_POSTED_DATE))
+                .andExpect(jsonPath("$.data[0].book.key").value(RED_RISING_KEY))
+                .andExpect(jsonPath("$.data[0].book.title").value(RED_RISING_TITLE))
+                .andExpect(jsonPath("$.data[0].book.authors[0]").value(RED_RISING_AUTHOR))
+                .andExpect(jsonPath("$.data[0].book.coverUrl")
+                    .value(containsString("/api/v1/images/covers/" + RED_RISING_KEY)));
+        }
+
+        @Test
+        void shouldOrderRecentReviewsByFirstPostedDate() throws Exception {
+            final String darrowToken = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String goblinToken = registerAndLogin(GOBLIN, GOBLIN_EMAIL);
+            putReview(darrowToken, DUNE_KEY, FIVE_STARS, REVIEW_TITLE, REVIEW_BODY);
+            putReview(goblinToken, DUNE_KEY, THREE_STARS, REVIEW_TITLE, REVIEW_BODY);
+            putReview(darrowToken, DUNE_KEY, ONE_STAR, REVIEW_TITLE, REVIEW_BODY);
+
+            final ResultActions response = getRecentReviews();
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_FIRST_AUTHOR).value(GOBLIN))
+                .andExpect(jsonPath(JSON_SECOND_AUTHOR).value(DARROW));
+        }
+
+        @Test
+        void shouldLeaveOutRatingOnlyReviews() throws Exception {
+            final String darrowToken = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String goblinToken = registerAndLogin(GOBLIN, GOBLIN_EMAIL);
+            putReview(darrowToken, DUNE_KEY, FIVE_STARS, REVIEW_TITLE, REVIEW_BODY);
+            putReview(goblinToken, DUNE_KEY, THREE_STARS, null, null);
+
+            final ResultActions response = getRecentReviews();
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_LENGTH).value(1))
+                .andExpect(jsonPath(JSON_FIRST_AUTHOR).value(DARROW));
+        }
+
+        @Test
+        void shouldLeaveOutReviewsByDeletedAccounts() throws Exception {
+            final String darrowToken = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String goblinToken = registerAndLogin(GOBLIN, GOBLIN_EMAIL);
+            putReview(darrowToken, DUNE_KEY, FIVE_STARS, REVIEW_TITLE, REVIEW_BODY);
+            putReview(goblinToken, DUNE_KEY, THREE_STARS, REVIEW_TITLE, REVIEW_BODY);
+            softDelete(GOBLIN);
+
+            final ResultActions response = getRecentReviews();
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_LENGTH).value(1))
+                .andExpect(jsonPath(JSON_FIRST_AUTHOR).value(DARROW));
+        }
+
+        @Test
+        void shouldReturnNoMoreReviewsThanTheLimit() throws Exception {
+            final String darrowToken = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String goblinToken = registerAndLogin(GOBLIN, GOBLIN_EMAIL);
+            final String mustangToken = registerAndLogin(MUSTANG, MUSTANG_EMAIL);
+            putReview(darrowToken, DUNE_KEY, FIVE_STARS, REVIEW_TITLE, REVIEW_BODY);
+            putReview(goblinToken, DUNE_KEY, THREE_STARS, REVIEW_TITLE, REVIEW_BODY);
+            putReview(mustangToken, DUNE_KEY, ONE_STAR, REVIEW_TITLE, REVIEW_BODY);
+
+            final ResultActions response = mockMvc.perform(get(RECENT_REVIEWS_URL).param(LIMIT_PARAM, "2"));
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_LENGTH).value(2));
+        }
+
+        @Test
+        void shouldRejectARecentLimitOverTheCap() throws Exception {
+            final ResultActions response = mockMvc.perform(get(RECENT_REVIEWS_URL).param(LIMIT_PARAM, "21"));
+
+            response.andExpect(status().isBadRequest());
+        }
+
+        @Test
+        void shouldRejectAZeroRecentLimit() throws Exception {
+            final ResultActions response = mockMvc.perform(get(RECENT_REVIEWS_URL).param(LIMIT_PARAM, "0"));
+
+            response.andExpect(status().isBadRequest());
+        }
+    }
+
+    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
+    private long commentOnReview(final String token, final long reviewId, final String body,
+        final @Nullable Long parentId) throws Exception {
+        final ResultActions created = mockMvc.perform(
+            Comments.request(objectMapper, token, Comments.reviewCommentsUrl(reviewId), body, parentId));
+        created.andExpect(status().isCreated());
+        return idOf(created);
+    }
+
+    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
+    private long postReview(final String token, final String key, final int rating,
+        final @Nullable String title, final @Nullable String body) throws Exception {
+        final ResultActions created = putReview(token, key, rating, title, body);
+        created.andExpect(status().isOk());
+        return idOf(created);
+    }
+
+    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
+    private ResultActions getRecentReviews() throws Exception {
+        return mockMvc.perform(get(RECENT_REVIEWS_URL));
+    }
+
+    private void softDelete(final String username) {
+        jdbcTemplate.update("UPDATE app_user SET deleted_at = now() WHERE username = ?", username);
+    }
+
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     private void rateDuneFiveAndThree() throws Exception {
-        putReview(registerAndLogin(DARROW, DARROW_EMAIL), DUNE_KEY, FIVE_STARS, null, null);
-        putReview(registerAndLogin(GOBLIN, GOBLIN_EMAIL), DUNE_KEY, THREE_STARS, null, null);
+        final String darrowToken = registerAndLogin(DARROW, DARROW_EMAIL);
+        final String goblinToken = registerAndLogin(GOBLIN, GOBLIN_EMAIL);
+        postReview(darrowToken, DUNE_KEY, FIVE_STARS, null, null);
+        postReview(goblinToken, DUNE_KEY, THREE_STARS, null, null);
     }
 
     // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.

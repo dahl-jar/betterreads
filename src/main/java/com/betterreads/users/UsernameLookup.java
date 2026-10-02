@@ -12,6 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class UsernameLookup {
 
+    private static final String DELETED_ACCOUNT = "[deleted]";
+
     private final UserRepository users;
 
     public UsernameLookup(final UserRepository users) {
@@ -28,5 +30,9 @@ public class UsernameLookup {
     public Map<Long, String> usernamesByIds(final Collection<Long> userIds) {
         return users.findAllById(userIds).stream()
             .collect(Collectors.toMap(User::getUserId, User::getUsername));
+    }
+
+    public static String usernameIn(final Map<Long, String> usernames, final Long userId) {
+        return usernames.getOrDefault(userId, DELETED_ACCOUNT);
     }
 }

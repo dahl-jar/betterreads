@@ -35,4 +35,6 @@ interface ShelfService {
 
     /** Newest first, every status when status is null. */
     List<ShelfEntryResponse> list(Long userId, @Nullable ReadingStatus status);
+
+    ShelfCountsResponse countsForBook(String bookKey);
 }

@@ -2,8 +2,6 @@ package com.betterreads.features.reviews;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -41,7 +39,7 @@ class ReviewServiceImpl implements ReviewService {
 
     private final BookCommunityRatingReader communityRatings;
 
-    private final ReviewMapper mapper;
+    private final ReviewResponseAssembler assembler;
 
     private final ReviewWriter writer;
 
@@ -52,13 +50,13 @@ class ReviewServiceImpl implements ReviewService {
         final BookIdLookup bookIds,
         final BookSummaryReader bookSummaries,
         final BookCommunityRatingReader communityRatings,
-        final ReviewMapper mapper,
+        final ReviewResponseAssembler assembler,
         final ReviewWriter writer) {
         this.reviews = reviews;
         this.bookIds = bookIds;
         this.bookSummaries = bookSummaries;
         this.communityRatings = communityRatings;
-        this.mapper = mapper;
+        this.assembler = assembler;
         this.writer = writer;
     }
 
@@ -85,9 +83,7 @@ class ReviewServiceImpl implements ReviewService {
     public ReviewPage listForBook(final String bookKey, final PageQuery page) {
         final Page<Review> found = reviews.findForBook(
             bookIds.requireBookId(bookKey), page.toPageable());
-        final List<ReviewResponse> responses = found.getContent().stream()
-            .map(review -> mapper.toResponse(review, bookKey))
-            .toList();
+        final List<ReviewResponse> responses = assembler.assemble(found.getContent(), review -> bookKey);
         return new ReviewPage(responses, found.getTotalElements(), page.getOffset(), page.getLimit());
     }
 
@@ -95,13 +91,10 @@ class ReviewServiceImpl implements ReviewService {
     @Transactional(readOnly = true)
     public ReviewPage listOwn(final Long userId, final PageQuery page) {
         final Page<Review> found = reviews.findForUser(userId, page.toPageable());
-        final Map<Long, BookSummary> booksById = bookSummaries.summariesByIds(
-                found.getContent().stream().map(Review::getBookId).toList())
-            .stream()
-            .collect(Collectors.toMap(BookSummary::bookId, Function.identity()));
-        final List<ReviewResponse> responses = found.getContent().stream()
-            .map(review -> mapper.toResponse(review, keyOf(review, booksById)))
-            .toList();
+        final Map<Long, BookSummary> booksById = bookSummaries.summariesKeyedById(
+            found.getContent().stream().map(Review::getBookId).toList());
+        final List<ReviewResponse> responses = assembler.assemble(
+            found.getContent(), review -> ReviewResponseAssembler.bookOf(review, booksById).dedupKey());
         return new ReviewPage(responses, found.getTotalElements(), page.getOffset(), page.getLimit());
     }
 
@@ -118,12 +111,5 @@ class ReviewServiceImpl implements ReviewService {
             .toList();
         return new CommunityRatingResponse(
             book.average(), book.count(), distribution);
-    }
-
-    private static String keyOf(final Review review, final Map<Long, BookSummary> booksById) {
-        return Optional.ofNullable(booksById.get(review.getBookId()))
-            .map(BookSummary::dedupKey)
-            .orElseThrow(() -> new IllegalStateException(
-                "review references a missing book bookId=" + review.getBookId()));
     }
 }

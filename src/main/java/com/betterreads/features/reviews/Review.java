@@ -54,6 +54,10 @@ public class Review extends Timestamped {
         return reviewId;
     }
 
+    public Long getUserId() {
+        return userId;
+    }
+
     public Long getBookId() {
         return bookId;
     }

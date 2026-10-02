@@ -45,4 +45,13 @@ interface CommentRepository extends JpaRepository<Comment, Long> {
         GROUP BY c.parentCommentId
         """)
     List<ReplyCount> countRepliesForParents(@Param("parentIds") Collection<Long> parentIds);
+
+    @Query("""
+        SELECT new com.betterreads.features.comments.TargetCount(c.targetId, COUNT(c))
+        FROM Comment c
+        WHERE c.targetType = :targetType AND c.targetId IN :targetIds AND c.parentCommentId IS NULL
+        GROUP BY c.targetId
+        """)
+    List<TargetCount> countTopLevelForTargets(
+        @Param("targetType") CommentTarget targetType, @Param("targetIds") Collection<Long> targetIds);
 }
