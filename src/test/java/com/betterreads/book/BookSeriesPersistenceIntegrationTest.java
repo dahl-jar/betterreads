@@ -13,6 +13,7 @@ import java.util.List;
 
 import com.betterreads.bookindex.BookIndexView;
 import com.betterreads.bookindex.BookIndexViewReader;
+import com.betterreads.booksource.SeriesEntry;
 import com.betterreads.testsupport.ContainerizedTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,14 @@ class BookSeriesPersistenceIntegrationTest extends ContainerizedTest {
 
     private static final String SERIES_ROWS_SQL =
         "SELECT series_name FROM book_series WHERE book_id = ? ORDER BY ordinal";
+
+    private static final String POSITIONS_SQL = """
+        SELECT series_position FROM book WHERE book_id = ?
+        UNION ALL
+        SELECT position FROM book_series WHERE book_id = ?
+        """;
+
+    private static final double NOVELLA_POSITION = 2.5;
 
     private static final String UPDATED_AT_SQL = "SELECT updated_at FROM book WHERE book_id = ?";
 
@@ -62,6 +71,16 @@ class BookSeriesPersistenceIntegrationTest extends ContainerizedTest {
         final List<String> rows = jdbc.queryForList(SERIES_ROWS_SQL, String.class, book.getBookId());
 
         assertThat(rows).containsExactly(STORMLIGHT.name(), COSMERE.name());
+    }
+
+    @Test
+    void shouldStoreADecimalPosition() {
+        final SeriesEntry novella = new SeriesEntry(STORMLIGHT.name(), NOVELLA_POSITION);
+        final Book book = bookUpsertService.upsertFromSource(wordsOfRadiance(List.of(novella)));
+
+        final List<Double> stored = jdbc.queryForList(POSITIONS_SQL, Double.class, book.getBookId(), book.getBookId());
+
+        assertThat(stored).containsExactly(NOVELLA_POSITION, NOVELLA_POSITION);
     }
 
     @Test

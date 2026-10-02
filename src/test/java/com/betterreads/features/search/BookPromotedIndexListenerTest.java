@@ -62,7 +62,7 @@ class BookPromotedIndexListenerTest {
     }
 
     private static BookIndexView indexView() {
-        return new BookIndexView(BOOK_ID, "The Eye of the World", null, "The Wheel of Time", 1, List.of(),
+        return new BookIndexView(BOOK_ID, "The Eye of the World", null, "The Wheel of Time", 1.0, List.of(),
             List.of("Robert Jordan"), List.of(), "en", null, null, null, null);
     }
 }

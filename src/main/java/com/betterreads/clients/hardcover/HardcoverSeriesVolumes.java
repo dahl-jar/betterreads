@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.betterreads.booksource.IssueRunSeries;
+import com.betterreads.booksource.SeriesNumber;
 import com.betterreads.booksource.SourceBook;
 import org.jspecify.annotations.Nullable;
 
@@ -19,7 +20,7 @@ public final class HardcoverSeriesVolumes {
         return primaryMembership(memberships, node.featuredBookSeries(), node.title())
             .map(primary -> builder
                 .seriesName(Objects.requireNonNull(primary.series()).name())
-                .seriesPosition(HardcoverVolumeNumber.fromPosition(primary.position()).orElseThrow()))
+                .seriesPosition(SeriesNumber.of(primary.position()).orElseThrow()))
             .orElse(builder);
     }
 
@@ -38,17 +39,17 @@ public final class HardcoverSeriesVolumes {
                 .findFirst()
                 .orElse(memberships.getFirst());
         if (!isIssueRun(primary, title)) {
-            return Optional.of(primary).filter(HardcoverSeriesVolumes::isVolume);
+            return Optional.of(primary).filter(HardcoverSeriesVolumes::isNumbered);
         }
         return memberships.stream()
-            .filter(membership -> isVolume(membership) && !isIssueRun(membership, title))
+            .filter(membership -> isNumbered(membership) && !isIssueRun(membership, title))
             .findFirst();
     }
 
     private static List<HardcoverBookNode.SeriesMembership> withoutOneBookSeries(
         final List<HardcoverBookNode.SeriesMembership> memberships) {
         final boolean hasLongerSeries = memberships.stream()
-            .anyMatch(entry -> isVolume(entry) && !isOneBookSeries(entry));
+            .anyMatch(entry -> isNumbered(entry) && !isOneBookSeries(entry));
         return hasLongerSeries
             ? memberships.stream().filter(entry -> !isOneBookSeries(entry)).toList()
             : memberships;
@@ -68,8 +69,8 @@ public final class HardcoverSeriesVolumes {
             && Integer.valueOf(1).equals(membership.series().primaryBooksCount());
     }
 
-    private static boolean isVolume(final HardcoverBookNode.SeriesMembership membership) {
+    private static boolean isNumbered(final HardcoverBookNode.SeriesMembership membership) {
         return membership.series() != null && membership.series().name() != null
-            && HardcoverVolumeNumber.fromPosition(membership.position()).isPresent();
+            && SeriesNumber.of(membership.position()).isPresent();
     }
 }

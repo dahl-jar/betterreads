@@ -116,7 +116,7 @@ class HardcoverClientLiveTest {
             .get()
             .satisfies(book -> {
                 assertThat(book.seriesName()).isEqualTo(DUNE);
-                assertThat(book.seriesPosition()).isEqualTo(1);
+                assertThat(book.seriesPosition()).isEqualTo(1.0);
             });
     }
 

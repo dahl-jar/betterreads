@@ -9,7 +9,7 @@ record SeriesBookResponse(
     String title,
     List<String> authors,
     @Nullable String coverUrl,
-    int position
+    double position
 ) {
 
     public SeriesBookResponse {

@@ -27,6 +27,10 @@ class MetadataCheckClientImplTest {
 
     private static final String UNIVERSE_KEY = "universe";
 
+    private static final String NUMBER = "number";
+
+    private static final double NOVELLA_NUMBER = 0.5;
+
     private static final int GOLDEN_SON_YEAR = 2015;
 
     private final WebSearchRunner runner = mock(WebSearchRunner.class);
@@ -40,7 +44,7 @@ class MetadataCheckClientImplTest {
 
     private static MetadataCheckRequest redRising(final String isbn, final @Nullable SeriesEntry universe) {
         return new MetadataCheckRequest(MetadataJson.BOOK_ID, MetadataJson.TITLE,
-            List.of(MetadataJson.AUTHOR), MetadataJson.YEAR, MetadataJson.SERIES, 1, isbn, universe);
+            List.of(MetadataJson.AUTHOR), MetadataJson.YEAR, MetadataJson.SERIES, 1.0, isbn, universe);
     }
 
     @Test
@@ -48,7 +52,7 @@ class MetadataCheckClientImplTest {
         when(runner.run(anyString(), anyString())).thenReturn(Optional.empty());
         final ArgumentCaptor<String> prompt = ArgumentCaptor.captor();
         final MetadataCheckRequest other = new MetadataCheckRequest(OTHER_ID, "Golden Son",
-            List.of(MetadataJson.AUTHOR), GOLDEN_SON_YEAR, MetadataJson.SERIES, 2, null, null);
+            List.of(MetadataJson.AUTHOR), GOLDEN_SON_YEAR, MetadataJson.SERIES, 2.0, null, null);
 
         client.check(List.of(redRising(MetadataJson.ISBN), other));
 
@@ -73,6 +77,19 @@ class MetadataCheckClientImplTest {
     }
 
     @Test
+    void shouldSendADecimalNumber() {
+        when(runner.run(anyString(), anyString())).thenReturn(Optional.empty());
+        final ArgumentCaptor<String> prompt = ArgumentCaptor.captor();
+        final MetadataCheckRequest novella = new MetadataCheckRequest(OTHER_ID, "Sons of Ares",
+            List.of(MetadataJson.AUTHOR), GOLDEN_SON_YEAR, MetadataJson.SERIES, NOVELLA_NUMBER, null, null);
+
+        client.check(List.of(novella));
+
+        verify(runner).run(prompt.capture(), anyString());
+        assertThat(prompt.getValue()).contains("\"number\":0.5,");
+    }
+
+    @Test
     void shouldAskForTheUniverse() {
         when(runner.run(anyString(), anyString())).thenReturn(Optional.empty());
         final ArgumentCaptor<String> schema = ArgumentCaptor.captor();
@@ -83,7 +100,20 @@ class MetadataCheckClientImplTest {
         final JsonNode book = new JsonMapper().readTree(schema.getValue()).at("/properties/books/items");
         assertThat(book.at("/required").valueStream().map(JsonNode::asString)).contains(UNIVERSE_KEY);
         assertThat(book.at("/properties/universe/required").valueStream().map(JsonNode::asString))
-            .containsExactly("name", "number", "source");
+            .containsExactly("name", NUMBER, "source");
+    }
+
+    @Test
+    void shouldAskForADecimalNumber() {
+        when(runner.run(anyString(), anyString())).thenReturn(Optional.empty());
+        final ArgumentCaptor<String> schema = ArgumentCaptor.captor();
+
+        client.check(List.of(redRising(MetadataJson.ISBN)));
+
+        verify(runner).run(anyString(), schema.capture());
+        final JsonNode number = new JsonMapper().readTree(schema.getValue())
+            .at("/properties/books/items/properties/series/properties/number/type");
+        assertThat(number.valueStream().map(JsonNode::asString)).containsExactly(NUMBER, "null");
     }
 
     @Test

@@ -85,6 +85,8 @@ class BookDetailIntegrationTest extends ContainerizedTest {
 
     private static final String PRIMARY_SERIES_PATH = "$.data.series[0].name";
 
+    private static final String PRIMARY_POSITION_PATH = "$.data.series[0].position";
+
     private static final String ADD_SERIES_SQL = """
         INSERT INTO book_series (book_id, ordinal, series_name, position)
         SELECT book_id, ?, ?, ? FROM book WHERE hardcover_id = ?
@@ -97,6 +99,8 @@ class BookDetailIntegrationTest extends ContainerizedTest {
     private static final int STORMLIGHT_VOLUME = 1;
 
     private static final int COSMERE_VOLUME = 11;
+
+    private static final double NOVELLA_POSITION = 2.5;
 
     @Autowired
     private TransactionTemplate transactionTemplate;
@@ -170,20 +174,34 @@ class BookDetailIntegrationTest extends ContainerizedTest {
             mockMvc.perform(get(BOOK_PATH, HARDCOVER_KEY))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(PRIMARY_SERIES_PATH).value(STORMLIGHT))
-                .andExpect(jsonPath("$.data.series[0].position").value(STORMLIGHT_VOLUME))
+                .andExpect(jsonPath(PRIMARY_POSITION_PATH).value(STORMLIGHT_VOLUME))
                 .andExpect(jsonPath("$.data.series[1].name").value(COSMERE));
+        }
+
+        @Test
+        void shouldReturnADecimalSeriesPosition() throws Exception {
+            saveCompleteBook(HARDCOVER_KEY);
+            jdbcTemplate.update(ADD_SERIES_SQL, 0, STORMLIGHT, NOVELLA_POSITION, HARDCOVER_KEY);
+            jdbcTemplate.update("UPDATE book SET series_name = ?, series_position = ? WHERE hardcover_id = ?",
+                STORMLIGHT, NOVELLA_POSITION, HARDCOVER_KEY);
+
+            mockMvc.perform(get(BOOK_PATH, HARDCOVER_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.seriesPosition").value(NOVELLA_POSITION))
+                .andExpect(jsonPath(PRIMARY_POSITION_PATH).value(NOVELLA_POSITION));
         }
 
         @Test
         void shouldListTheStagedSeries() throws Exception {
             final PendingBook seed = newPendingSeed();
             seed.setSeriesName(STORMLIGHT);
-            seed.setSeriesPosition(STORMLIGHT_VOLUME);
+            seed.setSeriesPosition(NOVELLA_POSITION);
             pendingBooks.save(seed);
 
             mockMvc.perform(get(BOOK_PATH, PENDING_KEY))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath(PRIMARY_SERIES_PATH).value(STORMLIGHT));
+                .andExpect(jsonPath(PRIMARY_SERIES_PATH).value(STORMLIGHT))
+                .andExpect(jsonPath(PRIMARY_POSITION_PATH).value(NOVELLA_POSITION));
         }
 
         @Test

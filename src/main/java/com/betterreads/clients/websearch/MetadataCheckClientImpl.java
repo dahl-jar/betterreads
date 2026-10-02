@@ -8,8 +8,12 @@ import java.util.stream.Collectors;
 import com.betterreads.book.VerifiedMetadata;
 import com.betterreads.booksource.SeriesEntry;
 import com.betterreads.isbn.IsbnLanguage;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.DoubleNode;
+import tools.jackson.databind.node.LongNode;
 import tools.jackson.databind.node.ObjectNode;
 
 @Component
@@ -22,7 +26,7 @@ class MetadataCheckClientImpl implements MetadataCheckClient {
     private static final String NUMBERED_SERIES =
         "{\"type\":[\"object\",\"null\"],\"required\":[\"name\",\"number\",\"source\"],"
             + "\"additionalProperties\":false,\"properties\":{\"name\":" + TEXT
-            + ",\"number\":{\"type\":[\"integer\",\"null\"]},\"source\":" + TEXT + "}}";
+            + ",\"number\":{\"type\":[\"number\",\"null\"]},\"source\":" + TEXT + "}}";
 
     private static final String SCHEMA = """
         {"type":"object","required":["books"],"additionalProperties":false,\
@@ -39,9 +43,10 @@ class MetadataCheckClientImpl implements MetadataCheckClient {
         Check the metadata of each book below against the English-language edition. For each field give the
         correct value and the URL of the page that shows it. Fields: title, authors (writers only, in credit
         order), year (first publication of the original work), series (the English series name the publisher
-        uses, and the number in it), universe (a larger series or shared world the publisher places this series
-        in, and the book's number in it, null when there is none or the number is unknown), description (the
-        publisher's blurb, copied as written, never your own words), isbn13 (only when isbnIsEnglish is false:
+        uses, and the number in it, with a decimal such as 2.5 for a novella between two volumes), universe (a
+        larger series or shared world the publisher places this series in, and the book's number in it, null
+        when there is none or the number is unknown), description (the publisher's blurb, copied as written,
+        never your own words), isbn13 (only when isbnIsEnglish is false:
         the stored ISBN belongs to a translation, so give the English edition's ISBN-13, otherwise null).
         When isbnIsEnglish is true, check the edition with that ISBN,
         never give the title of another edition or volume. The title source URL must contain that ISBN.
@@ -86,11 +91,19 @@ class MetadataCheckClientImpl implements MetadataCheckClient {
         return node
             .put("year", book.year())
             .put("series", book.seriesName())
-            .put("number", book.seriesPosition())
+            .set("number", number(book.seriesPosition()))
             .put("universe", universe.map(SeriesEntry::name).orElse(null))
-            .put("universeNumber", universe.map(SeriesEntry::position).orElse(null))
+            .set("universeNumber", number(universe.map(SeriesEntry::position).orElse(null)))
             .put("isbn13", book.isbn13())
             .put("isbnIsEnglish", IsbnLanguage.isEnglish(book.isbn13()))
             .toString();
+    }
+
+    private static JsonNode number(final @Nullable Double position) {
+        if (position == null) {
+            return JSON.nullNode();
+        }
+        final boolean whole = Double.compare(position, Math.rint(position)) == 0;
+        return whole ? LongNode.valueOf(position.longValue()) : DoubleNode.valueOf(position);
     }
 }

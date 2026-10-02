@@ -106,6 +106,8 @@ class BookListIntegrationTest extends ContainerizedTest {
 
     private static final int FOURTH_VOLUME = 4;
 
+    private static final double NOVELLA_POSITION = 2.5;
+
     @Autowired
     private BookRepository books;
 
@@ -269,6 +271,22 @@ class BookListIntegrationTest extends ContainerizedTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(FIRST_SERIES_FIRST_BOOK + ".key").value(RED_RISING))
                 .andExpect(jsonPath("$.data[0].books[1].key").value(GOLDEN_SON));
+        }
+
+        @Test
+        void shouldOrderADecimalPositionBetweenWholeOnes() throws Exception {
+            final String novella = "sons-of-ares";
+            saveInSeries(RED_RISING, new SeriesEntry(SAGA, 1));
+            saveInSeries(MORNING_STAR, new SeriesEntry(SAGA, THIRD_VOLUME));
+            saveInSeries(novella, new SeriesEntry(SAGA, NOVELLA_POSITION));
+            saveInSeries(GOLDEN_SON, new SeriesEntry(SAGA, 2));
+
+            final ResultActions response = mockMvc.perform(get(SERIES_PATH, RED_RISING));
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(FIRST_SERIES_BOOK_KEYS, contains(GOLDEN_SON, novella, MORNING_STAR)))
+                .andExpect(jsonPath("$.data[0].books[1].position").value(NOVELLA_POSITION));
         }
 
         @Test

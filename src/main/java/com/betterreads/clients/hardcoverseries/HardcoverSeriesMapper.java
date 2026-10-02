@@ -15,7 +15,6 @@ import com.betterreads.booksource.SourceSeries;
 import com.betterreads.booksource.SourceSeriesVolume;
 import com.betterreads.clients.hardcover.HardcoverBookNode;
 import com.betterreads.clients.hardcover.HardcoverBookNodeMapper;
-import com.betterreads.clients.hardcover.HardcoverVolumeNumber;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
@@ -28,6 +27,8 @@ import org.springframework.stereotype.Component;
  */
 @Component
 class HardcoverSeriesMapper {
+
+    private static final int FIRST_VOLUME = 1;
 
     /**
      * Returns the series, or null when the search hit or the enumeration cannot supply a name,
@@ -65,10 +66,17 @@ class HardcoverSeriesMapper {
         if (node == null) {
             return Optional.empty();
         }
-        return HardcoverVolumeNumber.fromPosition(row.position())
+        return wholeVolume(row.position())
             .filter(volume -> volume <= cap)
             .flatMap(volume -> HardcoverBookNodeMapper.toSourceBookWithSeries(node)
                 .map(book -> new Candidate(volume, book, HardcoverBookNodeMapper.readers(node))));
+    }
+
+    private static Optional<Integer> wholeVolume(final @Nullable Double position) {
+        if (position == null || Double.compare(position, Math.floor(position)) != 0) {
+            return Optional.empty();
+        }
+        return Optional.of(position.intValue()).filter(volume -> volume >= FIRST_VOLUME);
     }
 
     private record Candidate(int position, SourceBook book, int readers) {

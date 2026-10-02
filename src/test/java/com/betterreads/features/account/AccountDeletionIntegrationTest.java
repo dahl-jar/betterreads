@@ -221,6 +221,7 @@ class AccountDeletionIntegrationTest extends ContainerizedTest {
                 .as("mustang's outstanding password-reset token is untouched")
                 .isPositive();
             mockMvc.perform(post(Accounts.REFRESH_URL)
+                    .contentType(MediaType.APPLICATION_JSON)
                     .cookie(new Cookie(RefreshCookies.COOKIE_NAME, mustangTokens.refreshCookieValue())))
                 .andExpect(status().isOk());
         }

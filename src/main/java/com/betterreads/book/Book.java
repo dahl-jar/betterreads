@@ -33,6 +33,8 @@ import java.util.stream.Stream;
 import com.betterreads.booksource.SeriesEntry;
 import com.betterreads.booksource.SourceBook;
 import com.betterreads.db.Timestamped;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 
 /** A catalog book. Each source id column is unique and nullable, and any one of them identifies the row. */
@@ -133,9 +135,10 @@ public class Book extends Timestamped {
     @Nullable
     private String seriesName;
 
-    @Column(name = "series_position")
+    @Column(name = "series_position", precision = 6, scale = 2)
+    @JdbcTypeCode(SqlTypes.NUMERIC)
     @Nullable
-    private Integer seriesPosition;
+    private Double seriesPosition;
 
     @Nullable
     @Column(name = "description_checked_at")
@@ -498,7 +501,7 @@ public class Book extends Timestamped {
     }
 
     @Nullable
-    public Integer getSeriesPosition() {
+    public Double getSeriesPosition() {
         return seriesPosition;
     }
 

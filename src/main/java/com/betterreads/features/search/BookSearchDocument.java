@@ -21,7 +21,7 @@ public record BookSearchDocument(
     String title,
     @Nullable String subtitle,
     @Nullable String seriesName,
-    @Nullable Integer seriesPosition,
+    @Nullable Double seriesPosition,
     @JsonSetter(nulls = Nulls.AS_EMPTY) List<SeriesEntry> series,
     List<String> authors,
     List<String> subjects,
@@ -62,7 +62,7 @@ public record BookSearchDocument(
         private String title = "";
         private @Nullable String subtitle;
         private @Nullable String seriesName;
-        private @Nullable Integer seriesPosition;
+        private @Nullable Double seriesPosition;
         private List<SeriesEntry> series = List.of();
         private List<String> authors = List.of();
         private List<String> subjects = List.of();
@@ -90,7 +90,7 @@ public record BookSearchDocument(
             return this;
         }
 
-        public Builder seriesPosition(final @Nullable Integer value) {
+        public Builder seriesPosition(final @Nullable Double value) {
             this.seriesPosition = value;
             return this;
         }

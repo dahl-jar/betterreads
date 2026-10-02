@@ -331,7 +331,7 @@ class BookTest {
             book.applyFrom(refresh(YEAR));
             book.applySeries(
                 List.of(new SeriesEntry("Red Rising Trilogy", 1), new SeriesEntry(RED_RISING_SAGA, 1)), true);
-            book.applyVerified(new VerifiedMetadata(null, null, null, RED_RISING_SAGA, 2, null, null, null), NOW);
+            book.applyVerified(new VerifiedMetadata(null, null, null, RED_RISING_SAGA, 2.0, null, null, null), NOW);
 
             book.applySeries(List.of(new SeriesEntry("Red Rising (German)", 1)), true);
 
@@ -345,7 +345,7 @@ class BookTest {
             final Book book = new Book();
             final SeriesEntry universe = new SeriesEntry("Red Rising Universe", UNIVERSE_VOLUME);
 
-            book.applyVerified(new VerifiedMetadata(null, null, null, RED_RISING_SAGA, 2, null, null, universe), NOW);
+            book.applyVerified(new VerifiedMetadata(null, null, null, RED_RISING_SAGA, 2.0, null, null, universe), NOW);
 
             assertThat(book.getSeries()).containsExactly(new SeriesEntry(RED_RISING_SAGA, 2), universe);
         }

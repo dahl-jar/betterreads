@@ -68,7 +68,7 @@ class HardcoverSeriesVolumesTest {
     }
 
     @Test
-    void shouldGiveNoSeriesForAFractionalPosition() {
+    void shouldKeepAFractionalPosition() {
         final HardcoverBookNode node = bookById().withTitle("Edgedancer").withoutSeries()
             .withSeries(COSMERE, NOVELLA_UMBRELLA_VOLUME, false, COSMERE_BOOKS)
             .withSeries(STORMLIGHT, NOVELLA_POSITION, true, STORMLIGHT_BOOKS)
@@ -77,7 +77,7 @@ class HardcoverSeriesVolumesTest {
 
         final List<SeriesEntry> series = seriesOf(node);
 
-        assertThat(series).isEmpty();
+        assertThat(series).containsExactly(new SeriesEntry(STORMLIGHT, NOVELLA_POSITION));
     }
 
     @Test

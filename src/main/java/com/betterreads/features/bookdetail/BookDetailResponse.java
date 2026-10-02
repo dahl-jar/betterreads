@@ -29,7 +29,7 @@ public record BookDetailResponse(
     @Nullable BigDecimal averageRating,
     @Nullable Integer ratingCount,
     @Nullable String seriesName,
-    @Nullable Integer seriesPosition,
+    @Nullable Double seriesPosition,
     @JsonSetter(nulls = Nulls.AS_EMPTY) List<SeriesEntry> series,
     List<String> subjects,
     List<String> awards
@@ -83,7 +83,7 @@ public record BookDetailResponse(
         private @Nullable BigDecimal averageRating;
         private @Nullable Integer ratingCount;
         private @Nullable String seriesName;
-        private @Nullable Integer seriesPosition;
+        private @Nullable Double seriesPosition;
         private List<SeriesEntry> series = List.of();
         private List<String> subjects = List.of();
         private List<String> awards = List.of();
@@ -153,7 +153,7 @@ public record BookDetailResponse(
             return this;
         }
 
-        public Builder seriesPosition(final @Nullable Integer value) {
+        public Builder seriesPosition(final @Nullable Double value) {
             this.seriesPosition = value;
             return this;
         }

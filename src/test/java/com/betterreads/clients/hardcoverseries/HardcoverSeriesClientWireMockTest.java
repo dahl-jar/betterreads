@@ -58,6 +58,12 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
 
     private static final int SECOND_POSITION = 2;
 
+    private static final int THIRD_POSITION = 3;
+
+    private static final double NOVELLA_POSITION = 1.5;
+
+    private static final String GREAT_HUNT = "The Great Hunt";
+
     private static final String SERIES_NAME = "The Wheel of Time";
 
     private static final String PARODY_NAME = "Wheel of Time Parody";
@@ -168,6 +174,21 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
             assertVolumeDropped("A Crown of Swords");
         }
 
+        @Test
+        void shouldLeaveOutAFractionalVolume() {
+            final String novella = "The Strike at Shayol Ghul";
+            stub(seriesSearch(), seriesBooks().withoutVolumes()
+                .withVolume(THIRD_POSITION, GREAT_HUNT, "Rand rides after the Horn of Valere.")
+                .withVolume(NOVELLA_POSITION, novella, "A short history of the war."));
+
+            final Optional<SourceSeries> series = client.fetchSeries(QUERY);
+
+            assertThat(series).get()
+                .extracting(SourceSeries::volumes, list(SourceSeriesVolume.class))
+                .extracting(volume -> volume.book().title())
+                .containsExactly(GREAT_HUNT);
+        }
+
         private void assertVolumeDropped(final String title) {
             stubSearchAndBooks();
 
@@ -190,7 +211,7 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
                 .extracting(SourceSeriesVolume::position, volume -> volume.book().title())
                 .contains(
                     tuple(FIRST_POSITION, "The Eye of the World"),
-                    tuple(SECOND_POSITION, "The Great Hunt"));
+                    tuple(SECOND_POSITION, GREAT_HUNT));
         }
 
         @Test

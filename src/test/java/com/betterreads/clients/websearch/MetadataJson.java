@@ -73,7 +73,7 @@ public final class MetadataJson {
         return this;
     }
 
-    MetadataJson withSeries(final String name, final int number) {
+    MetadataJson withSeries(final String name, final Number number) {
         putSeries((ObjectNode) book.get(SERIES_FIELD), name, number);
         return this;
     }
@@ -96,7 +96,7 @@ public final class MetadataJson {
         return book.putObject(name).put(SOURCE_KEY, SOURCE);
     }
 
-    private static void putSeries(final ObjectNode series, final String name, final int number) {
-        series.put("name", name).put("number", number);
+    private static void putSeries(final ObjectNode series, final String name, final Number number) {
+        series.put("name", name).set("number", JSON.valueToTree(number));
     }
 }

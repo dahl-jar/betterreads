@@ -14,6 +14,7 @@ import jakarta.validation.Valid;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -79,11 +80,13 @@ class SessionController {
         return sessionService.currentUser(userId);
     }
 
-    @PostMapping("/refresh")
+    @PostMapping(path = "/refresh", consumes = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Rotate access and refresh tokens")
     @SecurityRequirements
     @ApiResponse(responseCode = "200", description = "New access token, refresh cookie rotated")
     @ApiResponse(responseCode = "401", description = "Missing, expired, or already-rotated refresh token",
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "415", description = "Content type is not application/json",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     public ResponseEntity<AuthResponse> refresh(
         @CookieValue(name = RefreshCookies.COOKIE_NAME, required = false) final String refreshToken
@@ -95,10 +98,12 @@ class SessionController {
         return withRefreshCookie(ResponseEntity.ok(), tokens);
     }
 
-    @PostMapping("/logout")
+    @PostMapping(path = "/logout", consumes = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Revoke a refresh token")
     @SecurityRequirements
     @ApiResponse(responseCode = "204", description = "Refresh cookie cleared")
+    @ApiResponse(responseCode = "415", description = "Content type is not application/json",
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     public ResponseEntity<Void> logout(
         @CookieValue(name = RefreshCookies.COOKIE_NAME, required = false) final String refreshToken
     ) {

@@ -25,7 +25,7 @@ class PendingBookMapperTest {
 
     private static final int PAGES = 382;
 
-    private static final int FIRST_VOLUME = 1;
+    private static final double FIRST_VOLUME = 1;
 
     private static final SourceBook ORIGINAL = SourceBook.builder(BookFieldSource.GOOGLE_BOOKS)
         .isbn13(ISBN)

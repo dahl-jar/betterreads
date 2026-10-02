@@ -52,8 +52,6 @@ class BookSeriesChange {
     }
 
     private static String text(final List<SeriesEntry> series) {
-        return series.stream()
-            .map(entry -> entry.name() + " #" + entry.position())
-            .collect(Collectors.joining(", "));
+        return series.stream().map(SeriesEntry::label).collect(Collectors.joining(", "));
     }
 }

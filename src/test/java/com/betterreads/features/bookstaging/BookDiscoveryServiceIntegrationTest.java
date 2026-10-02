@@ -178,7 +178,7 @@ class BookDiscoveryServiceIntegrationTest extends ContainerizedTest {
             authorBook(MISTBORN), authorBook(WAY_OF_KINGS)));
     }
 
-    private static SourceBook volume(final String title, final int position) {
+    private static SourceBook volume(final String title, final double position) {
         return SourceBook.builder(BookFieldSource.HARDCOVER)
             .title(title)
             .authors(SourceAuthor.ofNames(List.of(AUTHOR)))
@@ -236,7 +236,7 @@ class BookDiscoveryServiceIntegrationTest extends ContainerizedTest {
             .as("a middle volume stages under its own key, carrying its series position")
             .get()
             .extracting(PendingBook::getSeriesPosition)
-            .isEqualTo(SECOND_POSITION);
+            .isEqualTo((double) SECOND_POSITION);
     }
 
     @Test

@@ -39,9 +39,9 @@ class SourceMergerTest {
 
     private static final String SERIES = "Dune Saga";
 
-    private static final int HARDCOVER_VOLUME = 1;
+    private static final double HARDCOVER_VOLUME = 1;
 
-    private static final int WIKIDATA_VOLUME = 3;
+    private static final double WIKIDATA_VOLUME = 3;
 
     private static final String UMBRELLA_SERIES = "Dune Universe";
 

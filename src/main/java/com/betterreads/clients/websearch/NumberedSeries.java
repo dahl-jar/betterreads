@@ -1,6 +1,7 @@
 package com.betterreads.clients.websearch;
 
 import com.betterreads.booksource.SeriesEntry;
+import com.betterreads.booksource.SeriesNumber;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
@@ -15,9 +16,9 @@ final class NumberedSeries {
 
     static @Nullable SeriesEntry from(final JsonNode field) {
         final String name = field.path("name").asString("").strip();
-        final int number = field.path("number").asInt(0);
-        final boolean valid = MetadataCheckMapper.isText(name, MAX_NAME_LENGTH)
-            && MetadataCheckMapper.inRange(number, 1, MAX_POSITION);
-        return valid ? new SeriesEntry(name, number) : null;
+        return SeriesNumber.of(field.path("number").asDouble(0))
+            .filter(number -> number <= MAX_POSITION && MetadataCheckMapper.isText(name, MAX_NAME_LENGTH))
+            .map(number -> new SeriesEntry(name, number))
+            .orElse(null);
     }
 }

@@ -142,6 +142,21 @@ class WikidataMapperTest {
         }
 
         @Test
+        void shouldReadADecimalOrdinal() {
+            final double novella = 2.5;
+            final SourceBook book = map(entity().withSeriesOrdinal("2.5"));
+
+            assertThat(book.seriesPosition()).isEqualTo(novella);
+        }
+
+        @Test
+        void shouldLeaveThePositionNullForAnOrdinalOfTenThousand() {
+            final SourceBook book = map(entity().withSeriesOrdinal("10000"));
+
+            assertThat(book.seriesPosition()).isNull();
+        }
+
+        @Test
         void shouldLeaveThePositionNullForANonNumericOrdinal() {
             final SourceBook book = map(entity().withSeriesOrdinal("1a"));
 

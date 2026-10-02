@@ -78,14 +78,16 @@ class HardcoverMapperTest {
     @DisplayName("series position")
     class SeriesPosition {
 
-        @ParameterizedTest(name = "position {0} maps to volume {1}")
-        @CsvSource({"2.0, 2", "0.5, ", "0.0, "})
-        void shouldKeepOnlyWholePositionsFromOneUp(final double position, final Integer volume) {
+        @ParameterizedTest(name = "position {0} is kept as {1}")
+        @CsvSource({
+            "2.0, 2.0", "2.5, 2.5", "0.5, 0.5", "1.756, 1.76", "9999.99, 9999.99", "0.0, ", "0.004, ", "10000, "
+        })
+        void shouldKeepAPositionBetweenZeroAndTenThousand(final double position, final Double kept) {
             final HardcoverDocument document = bookSearch().withFeaturedSeries(COMPANIONS, position).document();
 
             final SourceBook book = map(document);
 
-            assertThat(book.seriesPosition()).isEqualTo(volume);
+            assertThat(book.seriesPosition()).isEqualTo(kept);
         }
     }
 

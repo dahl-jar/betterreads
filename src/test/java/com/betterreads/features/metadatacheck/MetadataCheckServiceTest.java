@@ -49,7 +49,7 @@ class MetadataCheckServiceTest {
     private static final SeriesEntry UNIVERSE = MetadataJson.UNIVERSE_ENTRY;
 
     private static final VerifiedMetadata CORRECTED =
-        new VerifiedMetadata(TITLE, List.of(AUTHOR), YEAR, SERIES, 1, null, ISBN, null);
+        new VerifiedMetadata(TITLE, List.of(AUTHOR), YEAR, SERIES, 1.0, null, ISBN, null);
 
     private final MetadataCheckRepository books = mock(MetadataCheckRepository.class);
 
@@ -136,7 +136,7 @@ class MetadataCheckServiceTest {
 
             verify(client).check(batch.capture());
             assertThat(batch.getValue()).containsExactly(
-                new MetadataCheckRequest(BOOK_ID, TITLE, List.of(AUTHOR), YEAR, SERIES, 1, ISBN, UNIVERSE));
+                new MetadataCheckRequest(BOOK_ID, TITLE, List.of(AUTHOR), YEAR, SERIES, 1.0, ISBN, UNIVERSE));
         }
 
         @Test
@@ -154,12 +154,12 @@ class MetadataCheckServiceTest {
             givenBooks(List.of(book(BOOK_ID)));
             when(books.findSeriesNames()).thenReturn(List.of(LAST_KING));
             final VerifiedMetadata found =
-                new VerifiedMetadata(null, null, null, "last king of osten ard", 1, null, null, null);
+                new VerifiedMetadata(null, null, null, "last king of osten ard", 1.0, null, null, null);
 
             checkWithAnswer(found);
 
             verify(upsert).applyVerified(BOOK_ID,
-                new VerifiedMetadata(null, null, null, LAST_KING, 1, null, null, null));
+                new VerifiedMetadata(null, null, null, LAST_KING, 1.0, null, null, null));
         }
 
         @Test

@@ -28,7 +28,7 @@ class StoredNamesTest {
     }
 
     private static VerifiedMetadata series(final String name) {
-        return new VerifiedMetadata(null, null, null, name, 1, null, null, null);
+        return new VerifiedMetadata(null, null, null, name, 1.0, null, null, null);
     }
 
     private static @Nullable String title(final String stored, final String confirmed) {
@@ -106,7 +106,7 @@ class StoredNamesTest {
     void shouldDropAUniverseNamedLikeTheSeries() {
         final StoredNames names = new StoredNames(List.of(), List.of());
         final VerifiedMetadata found =
-            new VerifiedMetadata(null, null, null, SAGA, 1, null, null, new SeriesEntry(LOWERCASE_SAGA, 2));
+            new VerifiedMetadata(null, null, null, SAGA, 1.0, null, null, new SeriesEntry(LOWERCASE_SAGA, 2));
 
         final VerifiedMetadata result = names.withStoredSpelling(found, RED_RISING);
 

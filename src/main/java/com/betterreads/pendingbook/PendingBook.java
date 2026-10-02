@@ -12,6 +12,8 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -102,9 +104,10 @@ public class PendingBook {
     @Nullable
     private String seriesName;
 
-    @Column(name = "series_position")
+    @Column(name = "series_position", precision = 6, scale = 2)
+    @JdbcTypeCode(SqlTypes.NUMERIC)
     @Nullable
-    private Integer seriesPosition;
+    private Double seriesPosition;
 
     @Column(name = "subjects")
     @Nullable
@@ -328,11 +331,11 @@ public class PendingBook {
     }
 
     @Nullable
-    public Integer getSeriesPosition() {
+    public Double getSeriesPosition() {
         return seriesPosition;
     }
 
-    public void setSeriesPosition(@Nullable final Integer seriesPosition) {
+    public void setSeriesPosition(@Nullable final Double seriesPosition) {
         this.seriesPosition = seriesPosition;
     }
 

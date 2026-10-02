@@ -38,7 +38,7 @@ public record SourceBook(
         @Nullable Double averageRating,
         @Nullable Integer ratingCount,
         @Nullable String seriesName,
-        @Nullable Integer seriesPosition,
+        @Nullable Double seriesPosition,
         List<SeriesEntry> series) {
 
     public SourceBook {
@@ -143,7 +143,7 @@ public record SourceBook(
         private @Nullable Double averageRating;
         private @Nullable Integer ratingCount;
         private @Nullable String seriesName;
-        private @Nullable Integer seriesPosition;
+        private @Nullable Double seriesPosition;
         private @Nullable List<SeriesEntry> series;
 
         private Builder(final BookFieldSource source) {
@@ -250,7 +250,7 @@ public record SourceBook(
             return this;
         }
 
-        public Builder seriesPosition(final @Nullable Integer value) {
+        public Builder seriesPosition(final @Nullable Double value) {
             this.seriesPosition = value;
             return this;
         }

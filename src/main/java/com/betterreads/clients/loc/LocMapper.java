@@ -38,7 +38,7 @@ class LocMapper {
             .authors(SourceAuthor.ofNames(authors.isEmpty() ? null : authors))
             .rawSubjects(genres.isEmpty() ? null : genres)
             .seriesName(ModsSeries.name(mods))
-            .seriesPosition(ModsSeries.position(mods).orElse(null))
+            .seriesPosition(ModsSeries.position(mods).map(Integer::doubleValue).orElse(null))
             .build();
     }
 

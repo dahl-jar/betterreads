@@ -25,7 +25,7 @@ class BookSearchDocumentMapperTest {
 
     private static final String SERIES = "Mistborn Era One";
 
-    private static final int SERIES_POSITION = 1;
+    private static final double SERIES_POSITION = 1;
 
     private static final SeriesEntry PRIMARY = new SeriesEntry(SERIES, SERIES_POSITION);
 

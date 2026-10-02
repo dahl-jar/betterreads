@@ -4,12 +4,12 @@ import java.util.List;
 
 import com.betterreads.booksource.BookFieldSource;
 import com.betterreads.booksource.CatalogGenres;
+import com.betterreads.booksource.SeriesNumber;
 import com.betterreads.booksource.SourceAuthor;
 import com.betterreads.booksource.SourceBook;
 import com.betterreads.clients.hardcover.HardcoverBookNode;
 import com.betterreads.clients.hardcover.HardcoverContributors;
 import com.betterreads.clients.hardcover.HardcoverSeriesVolumes;
-import com.betterreads.clients.hardcover.HardcoverVolumeNumber;
 import com.betterreads.clients.hardcoverbook.HardcoverDocument.FeaturedSeries;
 import com.betterreads.isbn.Isbn13;
 import org.jspecify.annotations.Nullable;
@@ -23,7 +23,7 @@ class HardcoverMapper {
             return null;
         }
         final FeaturedSeries series = document.featuredSeries();
-        final Integer position = series == null ? null : seriesPosition(series.position());
+        final Double position = series == null ? null : SeriesNumber.of(series.position()).orElse(null);
         return SourceBook.builder(BookFieldSource.HARDCOVER)
             .isbn13(firstIsbn13(document.isbns()))
             .hardcoverId(document.id())
@@ -58,10 +58,6 @@ class HardcoverMapper {
             return null;
         }
         return isbns.stream().filter(Isbn13::matches).findFirst().orElse(null);
-    }
-
-    private static @Nullable Integer seriesPosition(final @Nullable Double position) {
-        return HardcoverVolumeNumber.fromPosition(position).orElse(null);
     }
 
     private static @Nullable List<SourceAuthor> authors(final HardcoverDocument document) {

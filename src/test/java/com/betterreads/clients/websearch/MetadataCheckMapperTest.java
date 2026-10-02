@@ -72,7 +72,7 @@ class MetadataCheckMapperTest {
 
         assertThat(metadata).isEqualTo(new VerifiedMetadata(
             MetadataJson.TITLE, List.of(MetadataJson.AUTHOR), MetadataJson.YEAR,
-            MetadataJson.SERIES, 1, MetadataJson.DESCRIPTION, MetadataJson.ISBN, null));
+            MetadataJson.SERIES, 1.0, MetadataJson.DESCRIPTION, MetadataJson.ISBN, null));
     }
 
     @Nested
@@ -276,6 +276,14 @@ class MetadataCheckMapperTest {
             assertThat(metadata.seriesPosition()).isNull();
         }
 
+        @ParameterizedTest(name = "number {0} is stored as {1}")
+        @CsvSource({"2.5, 2.5", "0.5, 0.5", "1.756, 1.76"})
+        void shouldAcceptADecimalSeriesNumber(final double number, final double stored) {
+            final VerifiedMetadata metadata = map(metadata().withSeries(MetadataJson.SERIES, number));
+
+            assertThat(metadata.seriesPosition()).isEqualTo(stored);
+        }
+
         @Test
         void shouldAcceptUpperLimits() {
             final String longest = "x".repeat(NAME_LIMIT);
@@ -284,7 +292,7 @@ class MetadataCheckMapperTest {
                 .with(MetadataJson.YEAR_FIELD, NEXT_YEAR).with(MetadataJson.AUTHORS_FIELD, authors(MAX_AUTHORS)));
 
             assertThat(metadata.seriesName()).isEqualTo(longest);
-            assertThat(metadata.seriesPosition()).isEqualTo(MAX_POSITION);
+            assertThat(metadata.seriesPosition()).isEqualTo((double) MAX_POSITION);
             assertThat(metadata.year()).isEqualTo(NEXT_YEAR);
             assertThat(metadata.authors()).hasSize(MAX_AUTHORS);
         }

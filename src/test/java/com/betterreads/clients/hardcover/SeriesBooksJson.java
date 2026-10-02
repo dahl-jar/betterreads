@@ -99,7 +99,7 @@ public final class SeriesBooksJson {
         return this;
     }
 
-    public SeriesBooksJson withVolume(final int position, final String title, final String description) {
+    public SeriesBooksJson withVolume(final double position, final String title, final String description) {
         final ObjectNode volume = template.deepCopy().put(POSITION, position);
         volume.withObject(BOOK).put(TITLE, title).put("description", description);
         volumes().add(volume);

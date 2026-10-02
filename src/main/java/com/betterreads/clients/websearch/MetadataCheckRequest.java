@@ -11,7 +11,7 @@ public record MetadataCheckRequest(
     List<String> authors,
     @Nullable Integer year,
     @Nullable String seriesName,
-    @Nullable Integer seriesPosition,
+    @Nullable Double seriesPosition,
     @Nullable String isbn13,
     @Nullable SeriesEntry universe
 ) {

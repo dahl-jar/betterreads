@@ -118,7 +118,7 @@ final class MetadataCheckMapper {
         return Isbn13.isValid(isbn) && IsbnLanguage.isEnglish(isbn) ? isbn : null;
     }
 
-    static boolean inRange(final int value, final int min, final int max) {
+    private static boolean inRange(final int value, final int min, final int max) {
         return value >= min && value <= max;
     }
 

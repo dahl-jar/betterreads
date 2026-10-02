@@ -1,8 +1,10 @@
 package com.betterreads.clients.wikidata;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.function.Function;
 
+import com.betterreads.booksource.SeriesNumber;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
@@ -41,11 +43,20 @@ final class WikidataClaims {
             .orElse(null);
     }
 
-    static @Nullable Integer seriesPosition(final JsonNode entity) {
+    static @Nullable Double seriesPosition(final JsonNode entity) {
         return WikidataTree.claims(entity, WikidataTree.SERIES_PROPERTY)
             .findFirst()
-            .map(claim -> parseInt(WikidataTree.firstQualifierValue(claim, SERIES_ORDINAL_QUALIFIER)))
+            .map(claim -> WikidataTree.firstQualifierValue(claim, SERIES_ORDINAL_QUALIFIER))
+            .flatMap(ordinal -> SeriesNumber.of(parseDecimal(ordinal)))
             .orElse(null);
+    }
+
+    private static @Nullable Double parseDecimal(final String value) {
+        try {
+            return new BigDecimal(value).doubleValue();
+        } catch (NumberFormatException exception) {
+            return null;
+        }
     }
 
     private static @Nullable Integer year(final JsonNode claim) {
@@ -56,10 +67,7 @@ final class WikidataClaims {
         return parseInt(time.substring(YEAR_START, YEAR_END));
     }
 
-    private static @Nullable Integer parseInt(final @Nullable String value) {
-        if (value == null) {
-            return null;
-        }
+    private static @Nullable Integer parseInt(final String value) {
         try {
             return Integer.valueOf(value);
         } catch (NumberFormatException exception) {

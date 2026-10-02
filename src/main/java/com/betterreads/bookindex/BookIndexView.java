@@ -22,7 +22,7 @@ public record BookIndexView(
     String title,
     @Nullable String subtitle,
     @Nullable String seriesName,
-    @Nullable Integer seriesPosition,
+    @Nullable Double seriesPosition,
     List<SeriesEntry> series,
     List<String> authors,
     List<String> subjects,

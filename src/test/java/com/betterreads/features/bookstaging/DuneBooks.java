@@ -21,7 +21,7 @@ final class DuneBooks {
 
     static final String GENRE = "science fiction";
 
-    static final int SERIES_POSITION = 1;
+    static final double SERIES_POSITION = 1;
 
     static final String SECOND_EDITION_ISBN = "9780345298591";
 

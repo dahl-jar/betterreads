@@ -42,7 +42,7 @@ class MetadataCheckLiveTest {
     @Test
     void shouldCorrectForeignEdition() {
         final MetadataCheckRequest witchwood = new MetadataCheckRequest(WITCHWOOD, "Die Hexenholzkrone",
-            List.of("Tad Williams"), YEAR, "Der letzte König von Osten Ard", 1, GERMAN_ISBN, null);
+            List.of("Tad Williams"), YEAR, "Der letzte König von Osten Ard", 1.0, GERMAN_ISBN, null);
 
         final Optional<Map<Long, VerifiedMetadata>> checks = client.check(List.of(witchwood));
 
@@ -50,7 +50,7 @@ class MetadataCheckLiveTest {
             final VerifiedMetadata metadata = map.get(WITCHWOOD);
             assertThat(metadata.title()).isEqualTo("The Witchwood Crown");
             assertThat(metadata.seriesName()).endsWith("Last King of Osten Ard");
-            assertThat(metadata.seriesPosition()).isEqualTo(1);
+            assertThat(metadata.seriesPosition()).isEqualTo(1.0);
             assertThat(IsbnLanguage.languageOf(metadata.isbn13())).isEqualTo("en");
         });
     }

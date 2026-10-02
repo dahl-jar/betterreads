@@ -198,7 +198,7 @@ class RefreshTokenIntegrationTest extends ContainerizedTest {
             final long userId = seedUser();
             final String loggedOut = loginAndExtractCookieValue();
             loginAndExtractCookieValue();
-            mockMvc.perform(post(LOGOUT_URL).cookie(new Cookie(COOKIE_NAME, loggedOut)))
+            logout(loggedOut)
                 .andExpect(status().isNoContent());
 
             refresh(loggedOut)
@@ -209,8 +209,22 @@ class RefreshTokenIntegrationTest extends ContainerizedTest {
 
         @Test
         void rejectsRequestWithoutCookie() throws Exception {
-            mockMvc.perform(post(REFRESH_URL))
+            mockMvc.perform(post(REFRESH_URL).contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        void shouldRejectAFormPostWithoutRotatingTheToken() throws Exception {
+            seedUser();
+            final String original = loginAndExtractCookieValue();
+
+            final ResultActions formPost = mockMvc.perform(post(REFRESH_URL)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .cookie(new Cookie(COOKIE_NAME, original)));
+
+            formPost.andExpect(status().isUnsupportedMediaType());
+            refresh(original)
+                .andExpect(status().isOk());
         }
     }
 
@@ -223,7 +237,7 @@ class RefreshTokenIntegrationTest extends ContainerizedTest {
             final long userId = seedUser();
             final String original = loginAndExtractCookieValue();
 
-            mockMvc.perform(post(LOGOUT_URL).cookie(new Cookie(COOKIE_NAME, original)))
+            logout(original)
                 .andExpect(status().isNoContent())
                 .andExpect(cookie().exists(COOKIE_NAME))
                 .andExpect(cookie().maxAge(COOKIE_NAME, 0))
@@ -234,8 +248,21 @@ class RefreshTokenIntegrationTest extends ContainerizedTest {
 
         @Test
         void isIdempotentWithoutCookie() throws Exception {
-            mockMvc.perform(post(LOGOUT_URL))
+            mockMvc.perform(post(LOGOUT_URL).contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNoContent());
+        }
+
+        @Test
+        void shouldRejectAFormPostWithoutRevokingTheToken() throws Exception {
+            final long userId = seedUser();
+            final String original = loginAndExtractCookieValue();
+
+            final ResultActions formPost = mockMvc.perform(post(LOGOUT_URL)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .cookie(new Cookie(COOKIE_NAME, original)));
+
+            formPost.andExpect(status().isUnsupportedMediaType());
+            assertThat(Accounts.activeRefreshTokenCount(refreshTokenRepository, userId)).isEqualTo(1L);
         }
     }
 
@@ -246,7 +273,21 @@ class RefreshTokenIntegrationTest extends ContainerizedTest {
     // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     private ResultActions refresh(final String cookieValue) throws Exception {
-        return mockMvc.perform(post(REFRESH_URL).cookie(new Cookie(COOKIE_NAME, cookieValue)));
+        return jsonPost(REFRESH_URL, cookieValue);
+    }
+
+    // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
+    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
+    private ResultActions logout(final String cookieValue) throws Exception {
+        return jsonPost(LOGOUT_URL, cookieValue);
+    }
+
+    // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
+    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
+    private ResultActions jsonPost(final String url, final String cookieValue) throws Exception {
+        return mockMvc.perform(post(url)
+            .contentType(MediaType.APPLICATION_JSON)
+            .cookie(new Cookie(COOKIE_NAME, cookieValue)));
     }
 
     // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
