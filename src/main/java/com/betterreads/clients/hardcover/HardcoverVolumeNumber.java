@@ -20,10 +20,6 @@ public final class HardcoverVolumeNumber {
         if (position == null || Double.compare(position, Math.floor(position)) != 0) {
             return Optional.empty();
         }
-        return Optional.of(position.intValue()).filter(HardcoverVolumeNumber::isVolume);
-    }
-
-    public static boolean isVolume(final @Nullable Integer position) {
-        return position != null && position >= FIRST_VOLUME;
+        return Optional.of(position.intValue()).filter(volume -> volume >= FIRST_VOLUME);
     }
 }

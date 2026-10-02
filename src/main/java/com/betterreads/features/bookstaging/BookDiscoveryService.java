@@ -1,7 +1,6 @@
 package com.betterreads.features.bookstaging;
 
 import com.betterreads.bookdiscovery.BookDiscovery;
-import com.betterreads.booksource.MergedBook;
 import com.betterreads.booksource.SingleBookFilter;
 import com.betterreads.booksource.SourceBook;
 import com.betterreads.clients.hardcoverauthor.HardcoverAuthorClient;
@@ -11,16 +10,11 @@ import com.betterreads.text.TextMatch;
 
 import java.util.Comparator;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 
 /** Turns a user search into staged candidates. */
 @Service
 class BookDiscoveryService implements BookDiscovery {
-
-    private static final Logger LOG = LoggerFactory.getLogger(BookDiscoveryService.class);
 
     private static final int FALLBACK_SEARCH_LIMIT = 5;
 
@@ -30,29 +24,25 @@ class BookDiscoveryService implements BookDiscovery {
 
     private final OpenLibraryClient openLibraryClient;
 
-    private final SourceCollector sourceCollector;
-
-    private final PendingBookService pendingBookService;
+    private final BookStager stager;
 
     public BookDiscoveryService(
         final HardcoverSeriesClient seriesClient,
         final HardcoverAuthorClient authorClient,
         final OpenLibraryClient openLibraryClient,
-        final SourceCollector sourceCollector,
-        final PendingBookService pendingBookService
+        final BookStager stager
     ) {
         this.seriesClient = seriesClient;
         this.authorClient = authorClient;
         this.openLibraryClient = openLibraryClient;
-        this.sourceCollector = sourceCollector;
-        this.pendingBookService = pendingBookService;
+        this.stager = stager;
     }
 
     /** Tries series, then author, then one OpenLibrary title hit, so a standalone book still stages. */
     @Override
     public void searchAndStage(final String query) {
         seriesClient.fetchSeries(query).ifPresentOrElse(
-            series -> series.volumes().forEach(volume -> stage(volume.book())),
+            series -> series.volumes().forEach(volume -> stager.stage(volume.book())),
             () -> {
                 if (!stageAuthor(query)) {
                     stageStandalone(query);
@@ -68,7 +58,7 @@ class BookDiscoveryService implements BookDiscovery {
     private boolean stageAuthor(final String query) {
         return authorClient.fetchAuthorWorks(query)
             .map(works -> {
-                works.books().forEach(this::stage);
+                works.books().forEach(stager::stage);
                 return true;
             })
             .orElse(false);
@@ -80,20 +70,6 @@ class BookDiscoveryService implements BookDiscovery {
                 && TextMatch.titleWithinQuery(hit.title(), query)
                 && SingleBookFilter.isSingleBook(hit.title()))
             .min(Comparator.comparing(SourceBook::publicationYear, Comparator.nullsLast(Comparator.naturalOrder())))
-            .ifPresent(this::stage);
-    }
-
-    private void stage(final SourceBook seed) {
-        try {
-            final MergedBook merged = sourceCollector.collectFor(seed);
-            final String dedupKey = merged.book().dedupKey();
-            if (dedupKey != null) {
-                pendingBookService.stage(merged);
-                pendingBookService.promoteNow(dedupKey, merged);
-            }
-        } catch (DataAccessException ex) {
-            LOG.warn("catalog.search staging failed for source {} ({}), skipping it",
-                seed.source(), ex.getClass().getSimpleName());
-        }
+            .ifPresent(stager::stage);
     }
 }

@@ -22,13 +22,13 @@ class MetadataCheckSchedulerTest {
     void shouldRunWhenEnabled() {
         scheduler(true).scheduledCheck();
 
-        verify(service).checkNewBooks();
+        verify(service).checkDueBooks();
     }
 
     @Test
     void shouldSkipWhenDisabled() {
         scheduler(false).scheduledCheck();
 
-        verify(service, never()).checkNewBooks();
+        verify(service, never()).checkDueBooks();
     }
 }

@@ -219,8 +219,7 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
 
             final Optional<SourceSeries> series = client.fetchSeries(COSMERE_QUERY);
 
-            assertThatSeriesOfTheOnlyVolume(series).containsExactly(
-                new SeriesEntry(STORMLIGHT, STORMLIGHT_VOLUME), new SeriesEntry(COSMERE, COSMERE_VOLUME));
+            assertThatSeriesOfTheOnlyVolume(series).containsExactly(new SeriesEntry(STORMLIGHT, STORMLIGHT_VOLUME));
         }
 
         @Test

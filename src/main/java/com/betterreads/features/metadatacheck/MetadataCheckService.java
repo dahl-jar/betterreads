@@ -1,7 +1,5 @@
 package com.betterreads.features.metadatacheck;
 
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -10,6 +8,7 @@ import com.betterreads.book.Author;
 import com.betterreads.book.Book;
 import com.betterreads.book.BookUpsertService;
 import com.betterreads.book.VerifiedMetadata;
+import com.betterreads.booksource.SeriesEntry;
 import com.betterreads.clients.websearch.MetadataCheckClient;
 import com.betterreads.clients.websearch.MetadataCheckRequest;
 import org.slf4j.Logger;
@@ -43,17 +42,15 @@ class MetadataCheckService {
         this.properties = properties;
     }
 
-    public void checkNewBooks() {
-        final OffsetDateTime since = OffsetDateTime.now(ZoneOffset.UTC).minusDays(properties.lookbackDays());
-        final List<Book> unchecked = books.findUncheckedSince(since, PageRequest.ofSize(properties.maxBooksPerRun()));
-        LOG.info("catalog.metadata-check checking books={}", unchecked.size());
-        if (unchecked.isEmpty()) {
+    public void checkDueBooks() {
+        final List<Book> due = books.findDueForCheck(PageRequest.ofSize(properties.maxBooksPerRun()));
+        LOG.info("catalog.metadata-check checking books={}", due.size());
+        if (due.isEmpty()) {
             return;
         }
         final StoredNames names = new StoredNames(books.findSeriesNames(), books.findAuthorNames());
-        for (int start = 0; start < unchecked.size(); start += properties.batchSize()) {
-            final List<Book> batch =
-                unchecked.subList(start, Math.min(start + properties.batchSize(), unchecked.size()));
+        for (int start = 0; start < due.size(); start += properties.batchSize()) {
+            final List<Book> batch = due.subList(start, Math.min(start + properties.batchSize(), due.size()));
             final Optional<Map<Long, VerifiedMetadata>> checks =
                 client.check(batch.stream().map(MetadataCheckService::request).toList());
             if (checks.isEmpty()) {
@@ -74,6 +71,7 @@ class MetadataCheckService {
     }
 
     private static MetadataCheckRequest request(final Book book) {
+        final SeriesEntry universe = book.getSeries().stream().skip(1).findFirst().orElse(null);
         return new MetadataCheckRequest(
             book.getBookId(),
             book.getTitle(),
@@ -81,6 +79,7 @@ class MetadataCheckService {
             book.getFirstPublishYear(),
             book.getSeriesName(),
             book.getSeriesPosition(),
-            book.getIsbn());
+            book.getIsbn(),
+            universe);
     }
 }

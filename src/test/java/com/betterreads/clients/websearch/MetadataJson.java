@@ -1,5 +1,6 @@
 package com.betterreads.clients.websearch;
 
+import com.betterreads.booksource.SeriesEntry;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -14,6 +15,12 @@ public final class MetadataJson {
     public static final int YEAR = 2014;
 
     public static final String SERIES = "Red Rising Saga";
+
+    public static final String UNIVERSE = "Red Rising Universe";
+
+    public static final int UNIVERSE_NUMBER = 4;
+
+    public static final SeriesEntry UNIVERSE_ENTRY = new SeriesEntry(UNIVERSE, UNIVERSE_NUMBER);
 
     public static final String DESCRIPTION = "Darrow is a Red, a miner who toils beneath the surface of Mars so "
         + "that one day the planet can be made livable for future generations. When he learns the surface was "
@@ -30,6 +37,8 @@ public final class MetadataJson {
     static final String YEAR_FIELD = "year";
 
     static final String SERIES_FIELD = "series";
+
+    static final String UNIVERSE_FIELD = "universe";
 
     static final String DESCRIPTION_FIELD = "description";
 
@@ -66,6 +75,11 @@ public final class MetadataJson {
 
     MetadataJson withSeries(final String name, final int number) {
         putSeries((ObjectNode) book.get(SERIES_FIELD), name, number);
+        return this;
+    }
+
+    MetadataJson withUniverse(final String name, final int number) {
+        putSeries(field(UNIVERSE_FIELD), name, number);
         return this;
     }
 

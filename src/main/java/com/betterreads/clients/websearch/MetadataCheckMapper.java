@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
 
 import com.betterreads.book.VerifiedMetadata;
 import com.betterreads.bookdescription.DescriptionQuality;
+import com.betterreads.booksource.SeriesEntry;
 import com.betterreads.isbn.Isbn13;
 import com.betterreads.isbn.IsbnLanguage;
 import org.jspecify.annotations.Nullable;
@@ -23,13 +24,9 @@ final class MetadataCheckMapper {
 
     private static final int MAX_TITLE_LENGTH = 300;
 
-    private static final int MAX_SERIES_LENGTH = 200;
-
     private static final int MAX_AUTHOR_LENGTH = 150;
 
     private static final int MAX_AUTHORS = 10;
-
-    private static final int MAX_SERIES_POSITION = 999;
 
     private static final int EARLIEST_YEAR = 1450;
 
@@ -54,20 +51,17 @@ final class MetadataCheckMapper {
     private static VerifiedMetadata toMetadata(
         final JsonNode book, final @Nullable String storedIsbn, final List<String> allowedDomains) {
         final AllowedFields fields = new AllowedFields(book, allowedDomains);
-        final JsonNode series = fields.field("series");
-        final String seriesName = series.path("name").asString("").strip();
-        final int seriesNumber = series.path("number").asInt(0);
-        final boolean seriesValid =
-            isText(seriesName, MAX_SERIES_LENGTH) && inRange(seriesNumber, 1, MAX_SERIES_POSITION);
+        final SeriesEntry series = NumberedSeries.from(fields.field("series"));
         final String englishIsbn = IsbnLanguage.isEnglish(storedIsbn) ? storedIsbn : null;
         return new VerifiedMetadata(
             title(fields.field("title"), englishIsbn),
             authors(fields.field("authors").path(VALUE)),
             year(fields.field("year").path(VALUE)),
-            seriesValid ? seriesName : null,
-            seriesValid ? seriesNumber : null,
+            series == null ? null : series.name(),
+            series == null ? null : series.position(),
             description(fields.field("description").path(VALUE)),
-            englishIsbn == null ? isbn(fields.field("isbn13").path(VALUE)) : null);
+            englishIsbn == null ? isbn(fields.field("isbn13").path(VALUE)) : null,
+            series == null ? null : NumberedSeries.from(fields.field("universe")));
     }
 
     private static @Nullable String title(final JsonNode field, final @Nullable String englishIsbn) {
@@ -98,7 +92,7 @@ final class MetadataCheckMapper {
         return isText(text, maxLength) ? text : null;
     }
 
-    private static boolean isText(final String text, final int maxLength) {
+    static boolean isText(final String text, final int maxLength) {
         return !text.isEmpty() && text.length() <= maxLength && text.chars().noneMatch(Character::isISOControl);
     }
 
@@ -124,7 +118,7 @@ final class MetadataCheckMapper {
         return Isbn13.isValid(isbn) && IsbnLanguage.isEnglish(isbn) ? isbn : null;
     }
 
-    private static boolean inRange(final int value, final int min, final int max) {
+    static boolean inRange(final int value, final int min, final int max) {
         return value >= min && value <= max;
     }
 

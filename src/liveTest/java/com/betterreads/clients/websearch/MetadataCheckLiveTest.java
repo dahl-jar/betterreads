@@ -42,7 +42,7 @@ class MetadataCheckLiveTest {
     @Test
     void shouldCorrectForeignEdition() {
         final MetadataCheckRequest witchwood = new MetadataCheckRequest(WITCHWOOD, "Die Hexenholzkrone",
-            List.of("Tad Williams"), YEAR, "Der letzte König von Osten Ard", 1, GERMAN_ISBN);
+            List.of("Tad Williams"), YEAR, "Der letzte König von Osten Ard", 1, GERMAN_ISBN, null);
 
         final Optional<Map<Long, VerifiedMetadata>> checks = client.check(List.of(witchwood));
 

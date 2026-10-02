@@ -188,7 +188,7 @@ class CatalogWikidataPersistenceIntegrationTest extends ContainerizedTest {
         }
 
         private static VerifiedMetadata verifiedAuthor(final String name) {
-            return new VerifiedMetadata(null, List.of(name), null, null, null, null, null);
+            return new VerifiedMetadata(null, List.of(name), null, null, null, null, null, null);
         }
 
         @Test

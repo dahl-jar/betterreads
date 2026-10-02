@@ -109,9 +109,8 @@ public final class SeriesBooksJson {
     public SeriesBooksJson withMembership(
         final String name, final int position, final boolean featured, final int books) {
         final ObjectNode lastVolume = (ObjectNode) volumes().get(volumes().size() - 1);
-        lastVolume.withObject(BOOK).withArray(BOOK_SERIES).addObject()
-            .put(POSITION, position).put("featured", featured)
-            .putObject("series").put(NAME, name).put(PRIMARY_BOOKS_COUNT, books);
+        BookByIdJson.membership(
+            lastVolume.withObject(BOOK).withArray(BOOK_SERIES).addObject(), name, position, featured, books);
         return this;
     }
 

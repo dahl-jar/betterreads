@@ -35,7 +35,7 @@ class MetadataCheckScheduler {
         if (!properties.enabled()) {
             return;
         }
-        if (!executor.tryRun(service::checkNewBooks)) {
+        if (!executor.tryRun(service::checkDueBooks)) {
             LOG.info("catalog.metadata-check previous run still in progress, skipping this trigger");
         }
     }

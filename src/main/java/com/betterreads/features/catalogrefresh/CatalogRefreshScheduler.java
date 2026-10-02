@@ -17,25 +17,18 @@ class CatalogRefreshScheduler {
 
     private final CatalogRefreshService refreshService;
 
-    private final CatalogRefreshProperties properties;
-
     private final SkipIfRunningExecutor executor;
 
     CatalogRefreshScheduler(
         final CatalogRefreshService refreshService,
-        final CatalogRefreshProperties properties,
         @Qualifier("catalogRefreshExecutor") final Executor catalogRefreshExecutor
     ) {
         this.refreshService = refreshService;
-        this.properties = properties;
         this.executor = new SkipIfRunningExecutor(catalogRefreshExecutor);
     }
 
     @Scheduled(cron = "0 0 2 * * *")
     public void scheduledRefresh() {
-        if (!properties.enabled()) {
-            return;
-        }
         if (!executor.tryRun(refreshService::refresh)) {
             LOG.info("catalog.refresh previous run still in progress, skipping this trigger");
         }

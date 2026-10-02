@@ -3,6 +3,9 @@ package com.betterreads.clients.hardcoverbook;
 import com.betterreads.booksource.SourceBook;
 import com.betterreads.clients.hardcover.HardcoverBookNode;
 import com.betterreads.clients.hardcover.HardcoverBookNodeMapper;
+import static com.betterreads.clients.hardcover.BookByIdJson.LAST_KING;
+import static com.betterreads.clients.hardcover.BookByIdJson.LAST_KING_BOOKS;
+import static com.betterreads.clients.hardcover.BookByIdJson.LETZTE_KOENIG;
 import static com.betterreads.clients.hardcover.BookByIdJson.bookById;
 import static com.betterreads.clients.hardcover.BookSearchJson.bookSearch;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,12 +35,6 @@ class HardcoverMapperTest {
     private static final int PAGES = 310;
 
     private static final int BEGINNINGS_VOLUME = 3;
-
-    private static final String LAST_KING = "The Last King of Osten Ard";
-
-    private static final String LETZTE_KOENIG = "Der letzte König von Osten Ard";
-
-    private static final int LAST_KING_BOOKS = 4;
 
     private static final int SAGA_VOLUME = 4;
 

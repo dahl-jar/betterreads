@@ -103,7 +103,7 @@ class BookDescriptionRepositoryIntegrationTest extends ContainerizedTest {
 
     private long saveVerified() {
         final Book book = book(RED_RISING_KEY, RED_RISING_ISBN, THIN);
-        final VerifiedMetadata verified = new VerifiedMetadata(null, null, null, null, null, THIN, null);
+        final VerifiedMetadata verified = new VerifiedMetadata(null, null, null, null, null, THIN, null, null);
         book.applyVerified(verified, OffsetDateTime.now(ZoneOffset.UTC));
         return books.save(book).getBookId();
     }

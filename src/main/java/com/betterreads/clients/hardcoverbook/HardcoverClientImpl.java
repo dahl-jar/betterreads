@@ -98,7 +98,7 @@ class HardcoverClientImpl implements HardcoverClient {
 
     private @Nullable SourceBook toSourceBook(final HardcoverDocument document) {
         final SourceBook book = mapper.toSourceBook(document);
-        if (book == null || !(mapper.hasIssueRunSeries(document) || mapper.hasSeveralSeries(document))) {
+        if (book == null || !mapper.hasIssueRunSeries(document)) {
             return book;
         }
         return HardcoverGraphQl.parseId(document.id())

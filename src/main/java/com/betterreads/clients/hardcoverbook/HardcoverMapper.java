@@ -48,11 +48,6 @@ class HardcoverMapper {
             && HardcoverSeriesVolumes.isIssueRun(series.series().name(), document.title());
     }
 
-    public boolean hasSeveralSeries(final HardcoverDocument document) {
-        final List<String> names = document.seriesNames();
-        return names != null && names.size() > 1;
-    }
-
     public SourceBook withSeriesOf(final SourceBook book, final HardcoverBookNode node) {
         final SourceBook.Builder withoutSeries = book.toBuilder().seriesName(null).seriesPosition(null).series(null);
         return HardcoverSeriesVolumes.withSeriesOf(withoutSeries, node).build();

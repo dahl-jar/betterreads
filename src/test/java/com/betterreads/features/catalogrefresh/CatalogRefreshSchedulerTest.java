@@ -1,7 +1,6 @@
 package com.betterreads.features.catalogrefresh;
 
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -18,23 +17,13 @@ class CatalogRefreshSchedulerTest {
     private final Executor sameThread = Runnable::run;
 
     @Test
-    @DisplayName("runs the refresh when enabled")
+    @DisplayName("runs the refresh")
     void runsRefresh() {
-        final CatalogRefreshScheduler scheduler = scheduler(true, sameThread);
+        final CatalogRefreshScheduler scheduler = new CatalogRefreshScheduler(service, sameThread);
 
         scheduler.scheduledRefresh();
 
         verify(service).refresh();
-    }
-
-    @Test
-    @DisplayName("does nothing when disabled")
-    void skipsWhenDisabled() {
-        final CatalogRefreshScheduler scheduler = scheduler(false, sameThread);
-
-        scheduler.scheduledRefresh();
-
-        verify(service, never()).refresh();
     }
 
     @Test
@@ -45,15 +34,11 @@ class CatalogRefreshSchedulerTest {
             ref.get().scheduledRefresh();
             task.run();
         };
-        final CatalogRefreshScheduler reentrantScheduler = scheduler(true, reentrant);
+        final CatalogRefreshScheduler reentrantScheduler = new CatalogRefreshScheduler(service, reentrant);
         ref.set(reentrantScheduler);
 
         reentrantScheduler.scheduledRefresh();
 
         verify(service, times(1)).refresh();
-    }
-
-    private CatalogRefreshScheduler scheduler(final boolean enabled, final Executor executor) {
-        return new CatalogRefreshScheduler(service, new CatalogRefreshProperties(enabled), executor);
     }
 }

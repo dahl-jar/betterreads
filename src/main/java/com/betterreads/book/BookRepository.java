@@ -15,8 +15,11 @@ import org.springframework.data.repository.query.Param;
 
 public interface BookRepository extends JpaRepository<Book, Long> {
 
-    @Query("SELECT DISTINCT b.seriesName FROM Book b WHERE b.seriesName IS NOT NULL")
-    List<String> findDistinctSeriesNames();
+    @Query(value = """
+        SELECT EXISTS (
+            SELECT 1 FROM book WHERE hardcover_id = :hardcoverId AND verified_fields LIKE '%SERIES%')
+        """, nativeQuery = true)
+    boolean existsSeriesVerifiedByHardcoverId(@Param("hardcoverId") String hardcoverId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT b FROM Book b WHERE b.bookId = :bookId")

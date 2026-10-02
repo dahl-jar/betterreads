@@ -10,7 +10,6 @@ import org.springframework.validation.annotation.Validated;
 record MetadataCheckProperties(
     boolean enabled,
     @Positive int batchSize,
-    @Positive int maxBooksPerRun,
-    @Positive int lookbackDays
+    @Positive int maxBooksPerRun
 ) {
 }

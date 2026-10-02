@@ -30,7 +30,8 @@ public record HardcoverBookNode(
     @Nullable Image image,
     @Nullable Edition defaultPhysicalEdition,
     @Nullable List<Contribution> contributions,
-    @Nullable List<SeriesMembership> bookSeries
+    @Nullable List<SeriesMembership> bookSeries,
+    @Nullable SeriesMembership featuredBookSeries
 ) {
 
     public static final String FIELDS = """
@@ -49,6 +50,7 @@ public record HardcoverBookNode(
         default_physical_edition { language { language } reading_format { format } }
         contributions { contribution author { name } }
         book_series { position featured series { name primary_books_count } }
+        featured_book_series { position featured series { name primary_books_count } }
         """;
 
     public HardcoverBookNode {
@@ -86,7 +88,7 @@ public record HardcoverBookNode(
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record SeriesMembership(
-        @Nullable Integer position, @Nullable Boolean featured, @Nullable Series series) { }
+        @Nullable Double position, @Nullable Boolean featured, @Nullable Series series) { }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     @JsonNaming(SnakeCaseStrategy.class)

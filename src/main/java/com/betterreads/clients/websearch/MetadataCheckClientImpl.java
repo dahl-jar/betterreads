@@ -6,6 +6,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import com.betterreads.book.VerifiedMetadata;
+import com.betterreads.booksource.SeriesEntry;
 import com.betterreads.isbn.IsbnLanguage;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.json.JsonMapper;
@@ -18,24 +19,31 @@ class MetadataCheckClientImpl implements MetadataCheckClient {
 
     private static final String TEXT = "{\"type\":[\"string\",\"null\"]}";
 
+    private static final String NUMBERED_SERIES =
+        "{\"type\":[\"object\",\"null\"],\"required\":[\"name\",\"number\",\"source\"],"
+            + "\"additionalProperties\":false,\"properties\":{\"name\":" + TEXT
+            + ",\"number\":{\"type\":[\"integer\",\"null\"]},\"source\":" + TEXT + "}}";
+
     private static final String SCHEMA = """
         {"type":"object","required":["books"],"additionalProperties":false,\
          "properties":{"books":{"type":"array","items":{"type":"object",\
-          "required":["id","title","authors","year","series","description","isbn13"],"additionalProperties":false,\
+          "required":["id","title","authors","year","series","universe","description","isbn13"],\
+          "additionalProperties":false,\
           "properties":{"id":{"type":"integer"},"title":%s,"authors":%s,"year":%s,\
-           "series":{"type":["object","null"],"required":["name","number","source"],"additionalProperties":false,\
-            "properties":{"name":%s,"number":{"type":["integer","null"]},"source":%s}},\
-           "description":%s,"isbn13":%s}}}}}""".formatted(
+           "series":%s,"universe":%s,"description":%s,"isbn13":%s}}}}}""".formatted(
         sourced(TEXT), sourced("{\"type\":[\"array\",\"null\"],\"items\":{\"type\":\"string\"}}"),
-        sourced("{\"type\":[\"integer\",\"null\"]}"), TEXT, TEXT, sourced(TEXT), sourced(TEXT));
+        sourced("{\"type\":[\"integer\",\"null\"]}"), NUMBERED_SERIES, NUMBERED_SERIES, sourced(TEXT),
+        sourced(TEXT));
 
     private static final String INSTRUCTIONS = """
         Check the metadata of each book below against the English-language edition. For each field give the
         correct value and the URL of the page that shows it. Fields: title, authors (writers only, in credit
         order), year (first publication of the original work), series (the English series name the publisher
-        uses, and the number in it), description (the publisher's blurb, copied as written, never your own
-        words), isbn13 (only when isbnIsEnglish is false: the stored ISBN belongs to a translation, so give the
-        English edition's ISBN-13, otherwise null). When isbnIsEnglish is true, check the edition with that ISBN,
+        uses, and the number in it), universe (a larger series or shared world the publisher places this series
+        in, and the book's number in it, null when there is none or the number is unknown), description (the
+        publisher's blurb, copied as written, never your own words), isbn13 (only when isbnIsEnglish is false:
+        the stored ISBN belongs to a translation, so give the English edition's ISBN-13, otherwise null).
+        When isbnIsEnglish is true, check the edition with that ISBN,
         never give the title of another edition or volume. The title source URL must contain that ISBN.
         Search first. Only a result's text can confirm a value, never its title alone. Open the page when the
         text does not state it. Use null for a field you cannot confirm. Answer every id.
@@ -74,10 +82,13 @@ class MetadataCheckClientImpl implements MetadataCheckClient {
             .put("id", book.bookId())
             .put("title", book.title());
         book.authors().forEach(node.putArray("authors")::add);
+        final Optional<SeriesEntry> universe = Optional.ofNullable(book.universe());
         return node
             .put("year", book.year())
             .put("series", book.seriesName())
             .put("number", book.seriesPosition())
+            .put("universe", universe.map(SeriesEntry::name).orElse(null))
+            .put("universeNumber", universe.map(SeriesEntry::position).orElse(null))
             .put("isbn13", book.isbn13())
             .put("isbnIsEnglish", IsbnLanguage.isEnglish(book.isbn13()))
             .toString();

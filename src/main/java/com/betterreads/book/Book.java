@@ -145,6 +145,10 @@ public class Book extends Timestamped {
     @Column(name = "metadata_checked_at")
     private OffsetDateTime metadataCheckedAt;
 
+    @Nullable
+    @Column(name = "metadata_check_requested_at")
+    private OffsetDateTime metadataCheckRequestedAt = OffsetDateTime.now(ZoneOffset.UTC);
+
     @Convert(converter = VerifiedFieldsConverter.class)
     @Column(name = "verified_fields", nullable = false)
     private final Set<VerifiedField> verifiedFields = EnumSet.noneOf(VerifiedField.class);
@@ -276,7 +280,10 @@ public class Book extends Timestamped {
         if (metadata.seriesName() != null) {
             this.seriesName = metadata.seriesName();
             this.seriesPosition = metadata.seriesPosition();
-            replaceSeries(SeriesEntry.listOf(metadata.seriesName(), metadata.seriesPosition()));
+            replaceSeries(Stream.concat(
+                    SeriesEntry.listOf(metadata.seriesName(), metadata.seriesPosition()).stream(),
+                    Stream.ofNullable(metadata.universe()))
+                .toList());
             verifiedFields.add(VerifiedField.SERIES);
         }
         if (metadata.description() != null) {
@@ -289,6 +296,15 @@ public class Book extends Timestamped {
             verifiedFields.add(VerifiedField.ISBN);
         }
         this.metadataCheckedAt = checkedAt;
+        setMetadataCheckRequestedAt(null);
+    }
+
+    @Nullable OffsetDateTime getMetadataCheckRequestedAt() {
+        return metadataCheckRequestedAt;
+    }
+
+    void setMetadataCheckRequestedAt(final @Nullable OffsetDateTime metadataCheckRequestedAt) {
+        this.metadataCheckRequestedAt = metadataCheckRequestedAt;
     }
 
     public Set<VerifiedField> getVerifiedFields() {

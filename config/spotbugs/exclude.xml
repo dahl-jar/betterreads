@@ -21,7 +21,7 @@
 
     <!--
       THROWS_METHOD_THROWS_CLAUSE_BASIC_EXCEPTION on test classes only. MockMvc.perform()
-      itself declares 'throws Exception'; rewrapping in the test isn't useful when the
+      itself declares 'throws Exception', so rewrapping in the test adds nothing when the
       test fails fast on any throw anyway.
     -->
     <Match>
@@ -74,7 +74,7 @@
 
     <!--
       EI_EXPOSE_REP / EI_EXPOSE_REP2 on JPA entities. Hibernate tracks the live collection
-      instance for dirty-checking and cascade; returning or accepting a defensive copy would
+      instance for dirty-checking and cascade. Returning or accepting a defensive copy would
       break orphan removal and managed-collection semantics. Entities are not value objects.
     -->
     <Match>
@@ -120,7 +120,7 @@
         <Bug pattern="CRLF_INJECTION_LOGS"/>
         <Or>
             <Class name="com.betterreads.features.bookstaging.SourceCollector"/>
-            <Class name="com.betterreads.features.bookstaging.BookDiscoveryService"/>
+            <Class name="com.betterreads.features.bookstaging.BookStager"/>
             <Class name="com.betterreads.bookdescription.DescriptionSelector"/>
         </Or>
     </Match>

@@ -3,6 +3,7 @@ package com.betterreads.book;
 import java.util.List;
 
 import com.betterreads.booksource.NullableLists;
+import com.betterreads.booksource.SeriesEntry;
 import org.jspecify.annotations.Nullable;
 
 public record VerifiedMetadata(
@@ -12,10 +13,12 @@ public record VerifiedMetadata(
     @Nullable String seriesName,
     @Nullable Integer seriesPosition,
     @Nullable String description,
-    @Nullable String isbn13
+    @Nullable String isbn13,
+    @Nullable SeriesEntry universe
 ) {
 
-    public static final VerifiedMetadata NONE = new VerifiedMetadata(null, null, null, null, null, null, null);
+    public static final VerifiedMetadata NONE =
+        new VerifiedMetadata(null, null, null, null, null, null, null, null);
 
     public VerifiedMetadata {
         authors = NullableLists.copyOf(authors);

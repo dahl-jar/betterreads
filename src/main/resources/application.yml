@@ -143,7 +143,9 @@ betterreads:
     staging:
       poll-enabled: ${CATALOG_STAGING_POLL_ENABLED:true}
     refresh:
-      enabled: ${CATALOG_REFRESH_ENABLED:true}
+      authors-enabled: ${CATALOG_REFRESH_AUTHORS_ENABLED:false}
+      series-enabled: ${CATALOG_REFRESH_SERIES_ENABLED:false}
+      max-books-per-run: ${CATALOG_REFRESH_MAX_BOOKS:50}
     description-backfill:
       enabled: ${CATALOG_DESCRIPTION_BACKFILL_ENABLED:true}
       full-sweep: ${CATALOG_DESCRIPTION_FULL_SWEEP:false}
@@ -154,7 +156,6 @@ betterreads:
       enabled: ${CATALOG_METADATA_CHECK_ENABLED:false}
       batch-size: ${CATALOG_METADATA_CHECK_BATCH_SIZE:10}
       max-books-per-run: ${CATALOG_METADATA_CHECK_MAX_BOOKS:100}
-      lookback-days: ${CATALOG_METADATA_CHECK_LOOKBACK_DAYS:7}
   cache:
     book-detail-ttl: ${BOOK_DETAIL_CACHE_TTL:PT24H}
 

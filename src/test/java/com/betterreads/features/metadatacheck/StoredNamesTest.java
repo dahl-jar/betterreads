@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 
 import com.betterreads.book.VerifiedMetadata;
+import com.betterreads.booksource.SeriesEntry;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -20,16 +21,18 @@ class StoredNamesTest {
 
     private static final String SAGA = "The Red Rising Saga";
 
+    private static final String LOWERCASE_SAGA = "red rising saga";
+
     private static VerifiedMetadata authors(final String... names) {
-        return new VerifiedMetadata(null, List.of(names), null, null, null, null, null);
+        return new VerifiedMetadata(null, List.of(names), null, null, null, null, null, null);
     }
 
     private static VerifiedMetadata series(final String name) {
-        return new VerifiedMetadata(null, null, null, name, 1, null, null);
+        return new VerifiedMetadata(null, null, null, name, 1, null, null, null);
     }
 
     private static @Nullable String title(final String stored, final String confirmed) {
-        final VerifiedMetadata metadata = new VerifiedMetadata(confirmed, null, null, null, null, null, null);
+        final VerifiedMetadata metadata = new VerifiedMetadata(confirmed, null, null, null, null, null, null, null);
         return new StoredNames(List.of(), List.of()).withStoredSpelling(metadata, stored).title();
     }
 
@@ -83,8 +86,30 @@ class StoredNamesTest {
     void shouldUseStoredSeries() {
         final StoredNames names = new StoredNames(List.of(SAGA), List.of());
 
-        final VerifiedMetadata result = names.withStoredSpelling(series("red rising saga"), RED_RISING);
+        final VerifiedMetadata result = names.withStoredSpelling(series(LOWERCASE_SAGA), RED_RISING);
 
         assertThat(result.seriesName()).isEqualTo(SAGA);
+    }
+
+    @Test
+    void shouldUseStoredUniverse() {
+        final StoredNames names = new StoredNames(List.of(SAGA), List.of());
+        final VerifiedMetadata found =
+            new VerifiedMetadata(null, null, null, null, null, null, null, new SeriesEntry(LOWERCASE_SAGA, 2));
+
+        final VerifiedMetadata result = names.withStoredSpelling(found, RED_RISING);
+
+        assertThat(result.universe()).isEqualTo(new SeriesEntry(SAGA, 2));
+    }
+
+    @Test
+    void shouldDropAUniverseNamedLikeTheSeries() {
+        final StoredNames names = new StoredNames(List.of(), List.of());
+        final VerifiedMetadata found =
+            new VerifiedMetadata(null, null, null, SAGA, 1, null, null, new SeriesEntry(LOWERCASE_SAGA, 2));
+
+        final VerifiedMetadata result = names.withStoredSpelling(found, RED_RISING);
+
+        assertThat(result.universe()).isNull();
     }
 }

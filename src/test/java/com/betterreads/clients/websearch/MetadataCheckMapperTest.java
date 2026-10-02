@@ -59,7 +59,7 @@ class MetadataCheckMapperTest {
     }
 
     private static MetadataCheckRequest request(final long bookId, final @Nullable String isbn) {
-        return new MetadataCheckRequest(bookId, MetadataJson.TITLE, List.of(), null, null, null, isbn);
+        return new MetadataCheckRequest(bookId, MetadataJson.TITLE, List.of(), null, null, null, isbn, null);
     }
 
     private static List<String> authors(final int count) {
@@ -72,7 +72,49 @@ class MetadataCheckMapperTest {
 
         assertThat(metadata).isEqualTo(new VerifiedMetadata(
             MetadataJson.TITLE, List.of(MetadataJson.AUTHOR), MetadataJson.YEAR,
-            MetadataJson.SERIES, 1, MetadataJson.DESCRIPTION, MetadataJson.ISBN));
+            MetadataJson.SERIES, 1, MetadataJson.DESCRIPTION, MetadataJson.ISBN, null));
+    }
+
+    @Nested
+    class Universe {
+
+        @Test
+        void shouldReadTheUniverse() {
+            final MetadataJson json = metadata().withUniverse(MetadataJson.UNIVERSE, MetadataJson.UNIVERSE_NUMBER);
+
+            final VerifiedMetadata metadata = map(json);
+
+            assertThat(metadata.universe()).isEqualTo(MetadataJson.UNIVERSE_ENTRY);
+        }
+
+        @Test
+        void shouldDropAUniverseWithoutAnAllowedSource() {
+            final MetadataJson json = metadata().withUniverse(MetadataJson.UNIVERSE, MetadataJson.UNIVERSE_NUMBER)
+                .withSource(MetadataJson.UNIVERSE_FIELD, OTHER_SITE);
+
+            final VerifiedMetadata metadata = map(json);
+
+            assertThat(metadata.universe()).isNull();
+        }
+
+        @Test
+        void shouldDropAUniverseWithoutANumber() {
+            final MetadataJson json = metadata().withUniverse(MetadataJson.UNIVERSE, 0);
+
+            final VerifiedMetadata metadata = map(json);
+
+            assertThat(metadata.universe()).isNull();
+        }
+
+        @Test
+        void shouldDropAUniverseWithoutASeries() {
+            final MetadataJson json = metadata().withSeries(MetadataJson.SERIES, 0)
+                .withUniverse(MetadataJson.UNIVERSE, MetadataJson.UNIVERSE_NUMBER);
+
+            final VerifiedMetadata metadata = map(json);
+
+            assertThat(metadata.universe()).isNull();
+        }
     }
 
     @Nested

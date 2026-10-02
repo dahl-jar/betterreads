@@ -2,6 +2,7 @@ package com.betterreads.clients.websearch;
 
 import java.util.List;
 
+import com.betterreads.booksource.SeriesEntry;
 import org.jspecify.annotations.Nullable;
 
 public record MetadataCheckRequest(
@@ -11,7 +12,8 @@ public record MetadataCheckRequest(
     @Nullable Integer year,
     @Nullable String seriesName,
     @Nullable Integer seriesPosition,
-    @Nullable String isbn13
+    @Nullable String isbn13,
+    @Nullable SeriesEntry universe
 ) {
 
     public MetadataCheckRequest {

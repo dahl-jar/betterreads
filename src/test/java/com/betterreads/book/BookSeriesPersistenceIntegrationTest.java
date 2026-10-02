@@ -1,5 +1,11 @@
 package com.betterreads.book;
 
+import static com.betterreads.book.BookSeriesSamples.COSMERE;
+import static com.betterreads.book.BookSeriesSamples.DARROW;
+import static com.betterreads.book.BookSeriesSamples.HARDCOVER_ID;
+import static com.betterreads.book.BookSeriesSamples.MUSTANG;
+import static com.betterreads.book.BookSeriesSamples.STORMLIGHT;
+import static com.betterreads.book.BookSeriesSamples.wordsOfRadiance;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.OffsetDateTime;
@@ -7,10 +13,6 @@ import java.util.List;
 
 import com.betterreads.bookindex.BookIndexView;
 import com.betterreads.bookindex.BookIndexViewReader;
-import com.betterreads.booksource.BookFieldSource;
-import com.betterreads.booksource.SeriesEntry;
-import com.betterreads.booksource.SourceAuthor;
-import com.betterreads.booksource.SourceBook;
 import com.betterreads.testsupport.ContainerizedTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,16 +32,6 @@ class BookSeriesPersistenceIntegrationTest extends ContainerizedTest {
     @Container
     @ServiceConnection
     static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
-
-    private static final String HARDCOVER_ID = "hc-1";
-
-    private static final SeriesEntry STORMLIGHT = new SeriesEntry("The Stormlight Archive", 2);
-
-    private static final SeriesEntry COSMERE = new SeriesEntry("The Cosmere", 12);
-
-    private static final String DARROW = "Darrow";
-
-    private static final String MUSTANG = "Mustang";
 
     private static final String SERIES_ROWS_SQL =
         "SELECT series_name FROM book_series WHERE book_id = ? ORDER BY ordinal";
@@ -61,15 +53,6 @@ class BookSeriesPersistenceIntegrationTest extends ContainerizedTest {
     @BeforeEach
     void clearCatalog() {
         bookRepository.deleteAll();
-    }
-
-    private static SourceBook wordsOfRadiance(final List<SeriesEntry> series) {
-        return SourceBook.builder(BookFieldSource.HARDCOVER)
-            .hardcoverId(HARDCOVER_ID)
-            .title("Words of Radiance")
-            .authors(SourceAuthor.ofNames(List.of(DARROW, MUSTANG)))
-            .series(series)
-            .build();
     }
 
     @Test
@@ -99,6 +82,26 @@ class BookSeriesPersistenceIntegrationTest extends ContainerizedTest {
         bookUpsertService.upsertFromSource(wordsOfRadiance(List.of(STORMLIGHT, COSMERE)));
 
         assertThat(updatedAt(book)).isEqualTo(before);
+    }
+
+    @Test
+    void shouldFindAVerifiedSeriesByHardcoverId() {
+        final Book book = bookUpsertService.upsertFromSource(wordsOfRadiance(List.of(STORMLIGHT)));
+        bookUpsertService.applyVerified(book.getBookId(),
+            new VerifiedMetadata(null, null, null, STORMLIGHT.name(), STORMLIGHT.position(), null, null, null));
+
+        final boolean verified = bookRepository.existsSeriesVerifiedByHardcoverId(HARDCOVER_ID);
+
+        assertThat(verified).isTrue();
+    }
+
+    @Test
+    void shouldNotFindAnUnverifiedSeriesByHardcoverId() {
+        bookUpsertService.upsertFromSource(wordsOfRadiance(List.of(STORMLIGHT)));
+
+        final boolean verified = bookRepository.existsSeriesVerifiedByHardcoverId(HARDCOVER_ID);
+
+        assertThat(verified).isFalse();
     }
 
     @Test

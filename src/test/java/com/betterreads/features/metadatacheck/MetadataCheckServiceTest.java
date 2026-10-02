@@ -9,8 +9,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -48,8 +46,10 @@ class MetadataCheckServiceTest {
 
     private static final String LAST_KING = "The Last King of Osten Ard";
 
+    private static final SeriesEntry UNIVERSE = MetadataJson.UNIVERSE_ENTRY;
+
     private static final VerifiedMetadata CORRECTED =
-        new VerifiedMetadata(TITLE, List.of(AUTHOR), YEAR, SERIES, 1, null, ISBN);
+        new VerifiedMetadata(TITLE, List.of(AUTHOR), YEAR, SERIES, 1, null, ISBN, null);
 
     private final MetadataCheckRepository books = mock(MetadataCheckRepository.class);
 
@@ -61,7 +61,7 @@ class MetadataCheckServiceTest {
         new MetadataCheckService(books, client, upsert, MetadataCheckSamples.properties(true));
 
     private void givenBooks(final List<Book> found) {
-        when(books.findUncheckedSince(any(OffsetDateTime.class), any(Pageable.class))).thenReturn(found);
+        when(books.findDueForCheck(any(Pageable.class))).thenReturn(found);
     }
 
     private static List<Book> booksNumbered(final int count) {
@@ -77,7 +77,7 @@ class MetadataCheckServiceTest {
             when(client.check(any())).thenReturn(Optional.of(Map.of()));
             final ArgumentCaptor<List<MetadataCheckRequest>> batches = ArgumentCaptor.captor();
 
-            service.checkNewBooks();
+            service.checkDueBooks();
 
             verify(client, times(2)).check(batches.capture());
             assertThat(batches.getAllValues()).extracting(List::size)
@@ -85,12 +85,12 @@ class MetadataCheckServiceTest {
         }
 
         @Test
-        void shouldSkipSearchWithoutBooks() {
+        void shouldSkipTheNameQueriesWithoutBooks() {
             givenBooks(List.of());
 
-            service.checkNewBooks();
+            service.checkDueBooks();
 
-            verify(client, never()).check(any());
+            verify(books, never()).findSeriesNames();
         }
 
         @Test
@@ -98,23 +98,10 @@ class MetadataCheckServiceTest {
             givenBooks(booksNumbered(2 * MetadataCheckSamples.BATCH_SIZE));
             when(client.check(any())).thenReturn(Optional.empty());
 
-            service.checkNewBooks();
+            service.checkDueBooks();
 
             verify(client, times(1)).check(any());
             verify(upsert, never()).applyVerified(anyLong(), any());
-        }
-
-        @Test
-        void shouldQueryLastWeek() {
-            givenBooks(List.of());
-            final ArgumentCaptor<OffsetDateTime> since = ArgumentCaptor.captor();
-            final OffsetDateTime expected =
-                OffsetDateTime.now(ZoneOffset.UTC).minusDays(MetadataCheckSamples.LOOKBACK_DAYS);
-
-            service.checkNewBooks();
-
-            verify(books).findUncheckedSince(since.capture(), any(Pageable.class));
-            assertThat(since.getValue()).isBetween(expected.minusMinutes(1), expected.plusMinutes(1));
         }
 
         @Test
@@ -122,9 +109,9 @@ class MetadataCheckServiceTest {
             givenBooks(List.of());
             final ArgumentCaptor<Pageable> page = ArgumentCaptor.captor();
 
-            service.checkNewBooks();
+            service.checkDueBooks();
 
-            verify(books).findUncheckedSince(any(OffsetDateTime.class), page.capture());
+            verify(books).findDueForCheck(page.capture());
             assertThat(page.getValue().getPageSize()).isEqualTo(MetadataCheckSamples.MAX_BOOKS);
         }
     }
@@ -140,16 +127,16 @@ class MetadataCheckServiceTest {
             book.setAuthors(Set.of(author));
             book.setFirstPublishYear(YEAR);
             book.setIsbn(ISBN);
-            book.applySeries(List.of(new SeriesEntry(SERIES, 1)), true);
+            book.applySeries(List.of(new SeriesEntry(SERIES, 1), UNIVERSE), true);
             givenBooks(List.of(book));
             when(client.check(any())).thenReturn(Optional.of(Map.of()));
             final ArgumentCaptor<List<MetadataCheckRequest>> batch = ArgumentCaptor.captor();
 
-            service.checkNewBooks();
+            service.checkDueBooks();
 
             verify(client).check(batch.capture());
-            assertThat(batch.getValue())
-                .containsExactly(new MetadataCheckRequest(BOOK_ID, TITLE, List.of(AUTHOR), YEAR, SERIES, 1, ISBN));
+            assertThat(batch.getValue()).containsExactly(
+                new MetadataCheckRequest(BOOK_ID, TITLE, List.of(AUTHOR), YEAR, SERIES, 1, ISBN, UNIVERSE));
         }
 
         @Test
@@ -157,7 +144,7 @@ class MetadataCheckServiceTest {
             givenBooks(List.of(book(BOOK_ID)));
             when(client.check(any())).thenReturn(Optional.of(Map.of(BOOK_ID, CORRECTED)));
 
-            service.checkNewBooks();
+            service.checkDueBooks();
 
             verify(upsert).applyVerified(BOOK_ID, CORRECTED);
         }
@@ -167,12 +154,12 @@ class MetadataCheckServiceTest {
             givenBooks(List.of(book(BOOK_ID)));
             when(books.findSeriesNames()).thenReturn(List.of(LAST_KING));
             final VerifiedMetadata found =
-                new VerifiedMetadata(null, null, null, "last king of osten ard", 1, null, null);
+                new VerifiedMetadata(null, null, null, "last king of osten ard", 1, null, null, null);
 
             checkWithAnswer(found);
 
             verify(upsert).applyVerified(BOOK_ID,
-                new VerifiedMetadata(null, null, null, LAST_KING, 1, null, null));
+                new VerifiedMetadata(null, null, null, LAST_KING, 1, null, null, null));
         }
 
         @Test
@@ -180,23 +167,26 @@ class MetadataCheckServiceTest {
             givenBooks(List.of(book(BOOK_ID)));
             when(books.findAuthorNames()).thenReturn(List.of(AUTHOR));
             final VerifiedMetadata found =
-                new VerifiedMetadata(null, List.of("BROWN, Pierce"), null, null, null, null, null);
+                new VerifiedMetadata(null, List.of("BROWN, Pierce"), null, null, null, null, null, null);
 
             checkWithAnswer(found);
 
             verify(upsert).applyVerified(BOOK_ID,
-                new VerifiedMetadata(null, List.of(AUTHOR), null, null, null, null, null));
+                new VerifiedMetadata(null, List.of(AUTHOR), null, null, null, null, null, null));
         }
 
         @Test
         void shouldKeepStoredTitleForSubtitle() {
             givenBooks(List.of(book(BOOK_ID)));
-            final VerifiedMetadata found =
-                new VerifiedMetadata("Red Rising: Book One of the Red Rising Saga", null, null, null, null, null, null);
+            final VerifiedMetadata found = titled("Red Rising: Book One of the Red Rising Saga");
 
             checkWithAnswer(found);
 
-            verify(upsert).applyVerified(BOOK_ID, new VerifiedMetadata(TITLE, null, null, null, null, null, null));
+            verify(upsert).applyVerified(BOOK_ID, titled(TITLE));
+        }
+
+        private static VerifiedMetadata titled(final String title) {
+            return new VerifiedMetadata(title, null, null, null, null, null, null, null);
         }
 
         @Test
@@ -204,7 +194,7 @@ class MetadataCheckServiceTest {
             givenBooks(List.of(book(BOOK_ID)));
             when(client.check(any())).thenReturn(Optional.of(Map.of()));
 
-            service.checkNewBooks();
+            service.checkDueBooks();
 
             verify(upsert).applyVerified(BOOK_ID, VerifiedMetadata.NONE);
         }
@@ -215,14 +205,14 @@ class MetadataCheckServiceTest {
             when(client.check(any())).thenReturn(Optional.of(Map.of()));
             when(upsert.applyVerified(BOOK_ID, VerifiedMetadata.NONE)).thenThrow(new IllegalArgumentException("gone"));
 
-            service.checkNewBooks();
+            service.checkDueBooks();
 
             verify(upsert).applyVerified(OTHER_ID, VerifiedMetadata.NONE);
         }
 
         private void checkWithAnswer(final VerifiedMetadata found) {
             when(client.check(any())).thenReturn(Optional.of(Map.of(BOOK_ID, found)));
-            service.checkNewBooks();
+            service.checkDueBooks();
         }
     }
 

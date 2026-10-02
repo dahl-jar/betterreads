@@ -11,6 +11,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.betterreads.book.VerifiedMetadata;
+import com.betterreads.booksource.SeriesEntry;
 import org.jspecify.annotations.Nullable;
 
 final class StoredNames {
@@ -41,10 +42,24 @@ final class StoredNames {
             title(metadata.title(), storedTitle),
             names == null ? null : names.stream().map(name -> stored(authors, authorKey(name), name)).toList(),
             metadata.year(),
-            seriesName == null ? null : stored(series, seriesKey(seriesName), seriesName),
+            seriesName == null ? null : storedSeries(seriesName),
             metadata.seriesPosition(),
             metadata.description(),
-            metadata.isbn13());
+            metadata.isbn13(),
+            storedUniverse(seriesName, metadata.universe()));
+    }
+
+    private @Nullable SeriesEntry storedUniverse(
+        final @Nullable String seriesName, final @Nullable SeriesEntry universe) {
+        final boolean repeatsSeries = universe != null && seriesName != null
+            && seriesKey(universe.name()).equals(seriesKey(seriesName));
+        return universe == null || repeatsSeries
+            ? null
+            : new SeriesEntry(storedSeries(universe.name()), universe.position());
+    }
+
+    private String storedSeries(final String name) {
+        return stored(series, seriesKey(name), name);
     }
 
     private static String stored(final Map<String, Optional<String>> byKey, final String key, final String name) {

@@ -2,6 +2,7 @@ package com.betterreads.book;
 
 import com.betterreads.booksource.BookFieldSource;
 import com.betterreads.booksource.MergedBook;
+import com.betterreads.booksource.SeriesEntry;
 import com.betterreads.booksource.SourceAuthor;
 import com.betterreads.booksource.SourceBook;
 
@@ -35,15 +36,19 @@ class BookUpsertServiceImpl implements BookUpsertService {
 
     private final AuthorRepository authorRepository;
 
+    private final SeriesChangeRecorder seriesChanges;
+
     private final EntityManager entityManager;
 
     BookUpsertServiceImpl(
         final BookRepository bookRepository,
         final AuthorRepository authorRepository,
+        final SeriesChangeRecorder seriesChanges,
         final EntityManager entityManager
     ) {
         this.bookRepository = bookRepository;
         this.authorRepository = authorRepository;
+        this.seriesChanges = seriesChanges;
         this.entityManager = entityManager;
     }
 
@@ -66,7 +71,9 @@ class BookUpsertServiceImpl implements BookUpsertService {
             .map(this::lockAndRefresh)
             .orElseGet(Book::new);
         book.applyFrom(source);
+        final List<SeriesEntry> seriesBefore = book.getSeries();
         book.applySeries(source.series(), seriesAuthorityResolved);
+        seriesChanges.recordAndRequestCheck(book, seriesBefore);
         if (!book.isVerified(VerifiedField.AUTHORS)) {
             replaceAuthors(book, source.authors());
         }

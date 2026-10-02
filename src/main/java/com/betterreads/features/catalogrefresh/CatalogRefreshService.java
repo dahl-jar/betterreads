@@ -2,11 +2,8 @@ package com.betterreads.features.catalogrefresh;
 
 import com.betterreads.book.Author;
 import com.betterreads.book.AuthorRepository;
-import com.betterreads.book.BookRepository;
 import com.betterreads.bookdiscovery.BookDiscovery;
 import com.betterreads.logging.LogSanitizer;
-import java.util.List;
-import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
@@ -24,18 +21,22 @@ class CatalogRefreshService {
 
     private final AuthorRepository authors;
 
-    private final BookRepository books;
-
     private final BookDiscovery discovery;
+
+    private final DueSeriesRefresher dueSeries;
+
+    private final CatalogRefreshProperties properties;
 
     public CatalogRefreshService(
         final AuthorRepository authors,
-        final BookRepository books,
-        final BookDiscovery discovery
+        final BookDiscovery discovery,
+        final DueSeriesRefresher dueSeries,
+        final CatalogRefreshProperties properties
     ) {
         this.authors = authors;
-        this.books = books;
         this.discovery = discovery;
+        this.dueSeries = dueSeries;
+        this.properties = properties;
     }
 
     /**
@@ -43,18 +44,19 @@ class CatalogRefreshService {
      * the run makes Postgres reject those inserts with {@code 25006}
      */
     public void refresh() {
-        final List<String> authorNames = authors.findAll().stream().map(Author::getName).toList();
-        final List<String> seriesNames = books.findDistinctSeriesNames();
-        LOG.info("catalog.refresh re-resolving authors={} series={}", authorNames.size(), seriesNames.size());
-        authorNames.forEach(name -> resolve(name, discovery::searchAuthorAndStage));
-        seriesNames.forEach(name -> resolve(name, discovery::searchAndStage));
+        if (properties.authorsEnabled()) {
+            authors.findAll().stream().map(Author::getName).forEach(this::refreshAuthor);
+        }
+        if (properties.seriesEnabled()) {
+            dueSeries.refresh();
+        }
     }
 
-    private void resolve(final String name, final Consumer<String> resolver) {
+    private void refreshAuthor(final String name) {
         try {
-            resolver.accept(name);
+            discovery.searchAuthorAndStage(name);
         } catch (WebClientException | DataAccessException ex) {
-            LOG.warn("catalog.refresh failed name={} ({}), skipping it",
+            LOG.warn("catalog.refresh failed author={} ({}), skipping it",
                 LogSanitizer.forLog(name), ex.getClass().getSimpleName());
         }
     }

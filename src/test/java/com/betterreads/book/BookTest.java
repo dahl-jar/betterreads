@@ -268,6 +268,8 @@ class BookTest {
 
         private static final int WRONG_YEAR = 1999;
 
+        private static final int UNIVERSE_VOLUME = 5;
+
         private static final String ENGLISH_ISBN = "9780345539816";
 
         private static final String GERMAN_ISBN = "9783608949650";
@@ -277,7 +279,7 @@ class BookTest {
         private static final OffsetDateTime NOW = OffsetDateTime.now(ZoneOffset.UTC);
 
         private static VerifiedMetadata verifiedTitle(final String title) {
-            return new VerifiedMetadata(title, null, null, null, null, null, null);
+            return new VerifiedMetadata(title, null, null, null, null, null, null, null);
         }
 
         private static SourceBook refresh(final int year) {
@@ -300,7 +302,7 @@ class BookTest {
         void shouldKeepVerifiedFieldsOnRefresh() {
             final Book book = new Book();
             book.applyFrom(refresh(YEAR));
-            book.applyVerified(new VerifiedMetadata(null, null, YEAR, null, null, BLURB, ENGLISH_ISBN), NOW);
+            book.applyVerified(new VerifiedMetadata(null, null, YEAR, null, null, BLURB, ENGLISH_ISBN, null), NOW);
 
             book.applyFrom(SourceBook.builder(BookFieldSource.LOC).locLccn(DUNE_LCCN).title(A_TITLE)
                 .publicationYear(WRONG_YEAR).description("Another blurb.").isbn13(GERMAN_ISBN).language("de")
@@ -329,7 +331,7 @@ class BookTest {
             book.applyFrom(refresh(YEAR));
             book.applySeries(
                 List.of(new SeriesEntry("Red Rising Trilogy", 1), new SeriesEntry(RED_RISING_SAGA, 1)), true);
-            book.applyVerified(new VerifiedMetadata(null, null, null, RED_RISING_SAGA, 2, null, null), NOW);
+            book.applyVerified(new VerifiedMetadata(null, null, null, RED_RISING_SAGA, 2, null, null, null), NOW);
 
             book.applySeries(List.of(new SeriesEntry("Red Rising (German)", 1)), true);
 
@@ -339,10 +341,20 @@ class BookTest {
         }
 
         @Test
+        void shouldStoreTheVerifiedUniverseAfterTheSeries() {
+            final Book book = new Book();
+            final SeriesEntry universe = new SeriesEntry("Red Rising Universe", UNIVERSE_VOLUME);
+
+            book.applyVerified(new VerifiedMetadata(null, null, null, RED_RISING_SAGA, 2, null, null, universe), NOW);
+
+            assertThat(book.getSeries()).containsExactly(new SeriesEntry(RED_RISING_SAGA, 2), universe);
+        }
+
+        @Test
         void shouldMarkAuthorsVerified() {
             final Book book = new Book();
 
-            book.applyVerified(new VerifiedMetadata(null, List.of("Darrow"), null, null, null, null, null), NOW);
+            book.applyVerified(new VerifiedMetadata(null, List.of("Darrow"), null, null, null, null, null, null), NOW);
 
             assertThat(book.getVerifiedFields()).containsExactly(VerifiedField.AUTHORS);
         }
@@ -353,7 +365,7 @@ class BookTest {
             book.applyFrom(refresh(YEAR));
             book.setIsbn(GERMAN_ISBN);
 
-            book.applyVerified(new VerifiedMetadata(null, null, null, null, null, null, ENGLISH_ISBN), NOW);
+            book.applyVerified(new VerifiedMetadata(null, null, null, null, null, null, ENGLISH_ISBN, null), NOW);
 
             assertThat(book.getIsbn()).isEqualTo(ENGLISH_ISBN);
             assertThat(book.getLanguage()).isEqualTo("en");

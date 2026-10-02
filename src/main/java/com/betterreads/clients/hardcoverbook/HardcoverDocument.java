@@ -27,7 +27,6 @@ public record HardcoverDocument(
     @Nullable List<String> genres,
     @Nullable Image image,
     @Nullable FeaturedSeries featuredSeries,
-    @Nullable List<String> seriesNames,
     @Nullable List<HardcoverBookNode.Contribution> contributions
 ) {
 
@@ -35,7 +34,6 @@ public record HardcoverDocument(
         authorNames = NullableLists.copyOf(authorNames);
         isbns = NullableLists.copyOf(isbns);
         genres = NullableLists.copyOf(genres);
-        seriesNames = NullableLists.copyOf(seriesNames);
         contributions = NullableLists.copyOf(contributions);
     }
 
@@ -61,12 +59,6 @@ public record HardcoverDocument(
     @Nullable
     public List<String> genres() {
         return NullableLists.copyOf(genres);
-    }
-
-    @Override
-    @Nullable
-    public List<String> seriesNames() {
-        return NullableLists.copyOf(seriesNames);
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
