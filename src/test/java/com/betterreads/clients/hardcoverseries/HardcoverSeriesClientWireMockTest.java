@@ -1,5 +1,6 @@
 package com.betterreads.clients.hardcoverseries;
 
+import com.betterreads.booksource.SeriesEntry;
 import com.betterreads.booksource.SourceSeries;
 import com.betterreads.booksource.SourceSeriesVolume;
 import com.betterreads.clients.hardcover.HardcoverProperties;
@@ -7,6 +8,10 @@ import com.betterreads.clients.hardcover.HardcoverWebClientConfig;
 import com.betterreads.clients.hardcover.HardcoverWireMock;
 import com.betterreads.clients.hardcover.SeriesBooksJson;
 import com.betterreads.clients.hardcover.SeriesSearchJson;
+import static com.betterreads.clients.hardcover.BookByIdJson.COSMERE;
+import static com.betterreads.clients.hardcover.BookByIdJson.COSMERE_VOLUME;
+import static com.betterreads.clients.hardcover.BookByIdJson.STORMLIGHT;
+import static com.betterreads.clients.hardcover.BookByIdJson.STORMLIGHT_VOLUME;
 import static com.betterreads.clients.hardcover.SeriesBooksJson.seriesBooks;
 import static com.betterreads.clients.hardcover.SeriesSearchJson.seriesSearch;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -16,6 +21,7 @@ import static org.assertj.core.api.InstanceOfAssertFactories.list;
 import java.util.Optional;
 import java.util.stream.IntStream;
 
+import org.assertj.core.api.ListAssert;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -55,6 +61,8 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
     private static final String PARODY_NAME = "Wheel of Time Parody";
 
     private static final String GRAPHIC_NOVEL_QUERY = "the sandman";
+
+    private static final String COSMERE_QUERY = "cosmere";
 
     @Autowired
     private HardcoverSeriesClientImpl client;
@@ -202,19 +210,40 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
         }
 
         @Test
-        @DisplayName("each volume's book carries the series name and its position")
-        void volumeBookCarriesSeriesNameAndPosition() {
-            stubSearchAndBooks();
+        void shouldKeepEachVolumesOwnPrimarySeries() {
+            stub(cosmereSearch(), cosmereVolume()
+                .withMembership(COSMERE, COSMERE_VOLUME, false)
+                .withMembership(STORMLIGHT, STORMLIGHT_VOLUME, true));
 
-            final Optional<SourceSeries> series = client.fetchSeries(QUERY);
+            final Optional<SourceSeries> series = client.fetchSeries(COSMERE_QUERY);
 
-            assertThat(series).get()
+            assertThatSeriesOfTheOnlyVolume(series).containsExactly(
+                new SeriesEntry(STORMLIGHT, STORMLIGHT_VOLUME), new SeriesEntry(COSMERE, COSMERE_VOLUME));
+        }
+
+        @Test
+        void shouldLeaveTheSeriesEmptyWhenTheVolumeHasNoNumberedMembership() {
+            stub(cosmereSearch(), cosmereVolume().withMembership(COSMERE, 0, true));
+
+            final Optional<SourceSeries> series = client.fetchSeries(COSMERE_QUERY);
+
+            assertThatSeriesOfTheOnlyVolume(series).isEmpty();
+        }
+
+        private static ListAssert<SeriesEntry> assertThatSeriesOfTheOnlyVolume(final Optional<SourceSeries> series) {
+            return assertThat(series).get()
                 .extracting(SourceSeries::volumes, list(SourceSeriesVolume.class))
-                .first()
-                .satisfies(volume -> {
-                    assertThat(volume.book().seriesName()).isEqualTo(SERIES_NAME);
-                    assertThat(volume.book().seriesPosition()).isEqualTo(FIRST_POSITION);
-                });
+                .singleElement()
+                .extracting(volume -> volume.book().series(), list(SeriesEntry.class));
+        }
+
+        private static SeriesSearchJson cosmereSearch() {
+            return seriesSearch().withSeries(COSMERE, "Brandon Sanderson");
+        }
+
+        private static SeriesBooksJson cosmereVolume() {
+            return seriesBooks().withName(COSMERE).withBookCount(COSMERE_VOLUME).withoutVolumes()
+                .withVolume(COSMERE_VOLUME, "Words of Radiance", "Shallan joins Kaladin on the Shattered Plains.");
         }
     }
 

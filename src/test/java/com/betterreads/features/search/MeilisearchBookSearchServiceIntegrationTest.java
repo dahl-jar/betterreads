@@ -2,6 +2,7 @@ package com.betterreads.features.search;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.betterreads.booksource.SeriesEntry;
 import com.betterreads.testsupport.ContainerizedTest;
 import com.meilisearch.sdk.Client;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -66,6 +67,14 @@ class MeilisearchBookSearchServiceIntegrationTest extends ContainerizedTest {
 
     private static final String INDEX_NAME = "books-test";
 
+    private static final String STORMLIGHT = "The Stormlight Archive";
+
+    private static final String ELANTRIS = "elantris";
+
+    private static final String SANDERSON = "Brandon Sanderson";
+
+    private static final int COSMERE_VOLUME = 11;
+
     @Autowired
     private BookSearchService searchService;
 
@@ -126,6 +135,39 @@ class MeilisearchBookSearchServiceIntegrationTest extends ContainerizedTest {
         }
 
         @Test
+        void shouldFindABookByItsUmbrellaSeries() {
+            final String wayOfKingsId = "kings";
+            final BookSearchDocument wayOfKings = BookSearchDocument.builder(wayOfKingsId)
+                .title("The Way of Kings")
+                .seriesName(STORMLIGHT)
+                .series(List.of(new SeriesEntry(STORMLIGHT, 1), new SeriesEntry("The Cosmere", COSMERE_VOLUME)))
+                .authors(List.of(SANDERSON))
+                .build();
+            searchService.index(List.of(wayOfKings));
+            try {
+                final BookSearchResult result = searchService.search("cosmere", 0, FULL_PAGE).result();
+
+                assertThat(result.hits()).extracting(BookSearchDocument::bookId).containsExactly(wayOfKingsId);
+            } finally {
+                removeFromIndex(wayOfKingsId);
+            }
+        }
+
+        @Test
+        void shouldReadADocumentIndexedWithoutSeries() {
+            MeilisearchServer.addToIndex(client, INDEX_NAME, """
+                [{"bookId": "elantris", "title": "Elantris", "authors": [], "subjects": [], "popularityScore": 0}]
+                """);
+            try {
+                final BookSearchResult result = searchService.search(ELANTRIS, 0, FULL_PAGE).result();
+
+                assertThat(result.hits()).extracting(BookSearchDocument::series).containsExactly(List.of());
+            } finally {
+                removeFromIndex(ELANTRIS);
+            }
+        }
+
+        @Test
         @DisplayName("a multi-word query needs every word, so a book sharing only a common word is not returned")
         void requiresEveryQueryWord() {
             final BookSearchResult result = searchService.search("the hobbit dragons", 0, FULL_PAGE).result();
@@ -141,7 +183,7 @@ class MeilisearchBookSearchServiceIntegrationTest extends ContainerizedTest {
         void dropsTypoCrossMatchToAnotherAuthor() {
             final String sandersonId = "sand";
             searchService.index(List.of(
-                doc(sandersonId, "Mistborn", "Brandon Sanderson", null),
+                doc(sandersonId, "Mistborn", SANDERSON, null),
                 doc(ANDERSON_ID, ANDERSON_TITLE, ANDERSON, null)));
             try {
                 final BookSearchResult result = searchService.search(SANDERSON_QUERY, 0, FULL_PAGE).result();

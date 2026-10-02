@@ -83,6 +83,21 @@ class BookDetailIntegrationTest extends ContainerizedTest {
 
     private static final String EVENTS_PATH = "/api/v1/books/{key}/events";
 
+    private static final String PRIMARY_SERIES_PATH = "$.data.series[0].name";
+
+    private static final String ADD_SERIES_SQL = """
+        INSERT INTO book_series (book_id, ordinal, series_name, position)
+        SELECT book_id, ?, ?, ? FROM book WHERE hardcover_id = ?
+        """;
+
+    private static final String STORMLIGHT = "The Stormlight Archive";
+
+    private static final String COSMERE = "The Cosmere";
+
+    private static final int STORMLIGHT_VOLUME = 1;
+
+    private static final int COSMERE_VOLUME = 11;
+
     @Autowired
     private TransactionTemplate transactionTemplate;
 
@@ -144,6 +159,31 @@ class BookDetailIntegrationTest extends ContainerizedTest {
                 .andExpect(jsonPath(TITLE_PATH).value(TITLE))
                 .andExpect(jsonPath(AUTHORS_PATH).value(AUTHOR))
                 .andExpect(jsonPath(COMPLETE_PATH).value(false));
+        }
+
+        @Test
+        void shouldListEverySeriesPrimaryFirst() throws Exception {
+            saveCompleteBook(HARDCOVER_KEY);
+            jdbcTemplate.update(ADD_SERIES_SQL, 1, COSMERE, COSMERE_VOLUME, HARDCOVER_KEY);
+            jdbcTemplate.update(ADD_SERIES_SQL, 0, STORMLIGHT, STORMLIGHT_VOLUME, HARDCOVER_KEY);
+
+            mockMvc.perform(get(BOOK_PATH, HARDCOVER_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(PRIMARY_SERIES_PATH).value(STORMLIGHT))
+                .andExpect(jsonPath("$.data.series[0].position").value(STORMLIGHT_VOLUME))
+                .andExpect(jsonPath("$.data.series[1].name").value(COSMERE));
+        }
+
+        @Test
+        void shouldListTheStagedSeries() throws Exception {
+            final PendingBook seed = newPendingSeed();
+            seed.setSeriesName(STORMLIGHT);
+            seed.setSeriesPosition(STORMLIGHT_VOLUME);
+            pendingBooks.save(seed);
+
+            mockMvc.perform(get(BOOK_PATH, PENDING_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(PRIMARY_SERIES_PATH).value(STORMLIGHT));
         }
 
         @Test
@@ -212,6 +252,10 @@ class BookDetailIntegrationTest extends ContainerizedTest {
     }
 
     private void savePendingSeed() {
+        pendingBooks.save(newPendingSeed());
+    }
+
+    private static PendingBook newPendingSeed() {
         final PendingBook seed = new PendingBook();
         seed.setDedupKey(PENDING_KEY);
         seed.setIsbn13(PENDING_KEY);
@@ -219,6 +263,6 @@ class BookDetailIntegrationTest extends ContainerizedTest {
         seed.setAuthors(AUTHOR);
         seed.setCoverUrl(COVER_URL);
         seed.setFirstPublishYear(YEAR);
-        pendingBooks.save(seed);
+        return seed;
     }
 }

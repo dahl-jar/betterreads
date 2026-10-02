@@ -133,6 +133,7 @@ public class SourceMerger {
             .ratingCount(valueOf(pick(bySource, RATING_CHAIN, SourceBook::ratingCount)))
             .seriesName(series.map(SourceBook::seriesName).orElse(null))
             .seriesPosition(series.map(SourceBook::seriesPosition).orElse(null))
+            .series(series.map(SourceBook::series).orElse(null))
             .isbn13(isbn13)
             .googleBooksVolumeId(firstId(sources, SourceBook::googleBooksVolumeId))
             .openLibraryWorkKey(firstId(sources, SourceBook::openLibraryWorkKey))

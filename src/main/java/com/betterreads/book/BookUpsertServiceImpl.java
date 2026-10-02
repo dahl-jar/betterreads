@@ -66,7 +66,7 @@ class BookUpsertServiceImpl implements BookUpsertService {
             .map(this::lockAndRefresh)
             .orElseGet(Book::new);
         book.applyFrom(source);
-        book.applySeries(source.seriesName(), source.seriesPosition(), seriesAuthorityResolved);
+        book.applySeries(source.series(), seriesAuthorityResolved);
         if (!book.isVerified(VerifiedField.AUTHORS)) {
             replaceAuthors(book, source.authors());
         }

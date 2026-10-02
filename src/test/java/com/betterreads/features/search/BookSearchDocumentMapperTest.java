@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
 import com.betterreads.bookindex.BookIndexView;
+import com.betterreads.booksource.SeriesEntry;
 import java.math.BigDecimal;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
@@ -26,6 +27,10 @@ class BookSearchDocumentMapperTest {
 
     private static final int SERIES_POSITION = 1;
 
+    private static final SeriesEntry PRIMARY = new SeriesEntry(SERIES, SERIES_POSITION);
+
+    private static final SeriesEntry UMBRELLA = new SeriesEntry("The Cosmere", 3);
+
     private static final String LANGUAGE = "en";
 
     private static final String SERVED_COVER_URL =
@@ -47,7 +52,7 @@ class BookSearchDocumentMapperTest {
     @DisplayName("copies the book's fields onto the search document")
     void mapsFields() {
         final BookIndexView book = new BookIndexView(
-            MISTBORN_KEY, MISTBORN_TITLE, SUBTITLE, SERIES, SERIES_POSITION,
+            MISTBORN_KEY, MISTBORN_TITLE, SUBTITLE, SERIES, SERIES_POSITION, List.of(PRIMARY, UMBRELLA),
             List.of(AUTHOR), List.of(SUBJECT), LANGUAGE, SERVED_COVER_URL, YEAR, null, null);
 
         final BookSearchDocument document = mapper.toDocument(book);
@@ -67,6 +72,7 @@ class BookSearchDocumentMapperTest {
                 YEAR);
         assertThat(document.authors()).containsExactly(AUTHOR);
         assertThat(document.subjects()).containsExactly(SUBJECT);
+        assertThat(document.series()).containsExactly(PRIMARY, UMBRELLA);
     }
 
     @Test
@@ -103,7 +109,7 @@ class BookSearchDocumentMapperTest {
         final String dedupKey, final String title,
         final @Nullable Integer ratingCount, final @Nullable BigDecimal averageRating) {
         return new BookIndexView(
-            dedupKey, title, null, null, null, List.of(), List.of(), null, null, null,
+            dedupKey, title, null, null, null, List.of(), List.of(), List.of(), null, null, null,
             averageRating, ratingCount);
     }
 }

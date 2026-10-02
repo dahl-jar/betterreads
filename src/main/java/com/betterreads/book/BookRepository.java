@@ -33,7 +33,7 @@ public interface BookRepository extends JpaRepository<Book, Long> {
     List<Long> findIdsChangedSince(
         @Param("since") OffsetDateTime since, @Param("afterId") long afterId, Pageable pageable);
 
-    @EntityGraph(attributePaths = {"authors", "subjects"})
+    @EntityGraph(attributePaths = {"authors", "subjects", "series"})
     List<Book> findWithSubjectsByBookIdIn(Collection<Long> bookIds);
 
     @EntityGraph(attributePaths = "authors")

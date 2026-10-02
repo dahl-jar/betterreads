@@ -21,6 +21,7 @@ class BookSearchDocumentMapper {
             .subtitle(book.subtitle())
             .seriesName(book.seriesName())
             .seriesPosition(book.seriesPosition())
+            .series(book.series())
             .authors(book.authors())
             .subjects(book.subjects())
             .language(book.language())

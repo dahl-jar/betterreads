@@ -14,6 +14,7 @@ import com.betterreads.booksource.SourceBook;
 import com.betterreads.testsupport.ContainerizedTest;
 import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.cache.CacheManager;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
@@ -40,6 +42,9 @@ class BookDetailEvictionIntegrationTest extends ContainerizedTest {
     private static final String REVISED_TITLE = "A Game of Thrones (Revised)";
 
     private static final int PUBLISH_YEAR = 1996;
+
+    private static final String CACHED_WITHOUT_SERIES = "{\"key\": \"%s\", \"complete\": true, \"title\": \"%s\", "
+        + "\"authors\": [], \"subjects\": [], \"awards\": []}";
 
     private static final Duration EVICTION_TIMEOUT = Duration.ofSeconds(5);
 
@@ -63,6 +68,9 @@ class BookDetailEvictionIntegrationTest extends ContainerizedTest {
 
     @Autowired
     private CacheManager cacheManager;
+
+    @Autowired
+    private StringRedisTemplate redis;
 
     @BeforeEach
     void clearCatalog() {
@@ -91,6 +99,16 @@ class BookDetailEvictionIntegrationTest extends ContainerizedTest {
         bookUpsertService.applyVerified(bookId, verified);
 
         assertServesRevisedTitle();
+    }
+
+    @Test
+    void shouldReadAnEntryCachedWithoutSeries() {
+        final String cached = CACHED_WITHOUT_SERIES.formatted(ISBN, ORIGINAL_TITLE);
+        redis.opsForValue().set(BookDetailCache.NAME + "::" + ISBN, cached);
+
+        final Optional<BookDetailResponse> detail = bookDetailService.findByKey(ISBN);
+
+        assertThat(detail).get().satisfies(response -> assertThat(response.series()).isEmpty());
     }
 
     private void assertServesRevisedTitle() {

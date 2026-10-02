@@ -33,6 +33,11 @@ final class MeilisearchServer {
         registry.add("meilisearch.index-name", () -> indexName);
     }
 
+    static void addToIndex(final Client client, final String indexName, final String json) {
+        final Index index = client.index(indexName);
+        index.waitForTask(index.addDocuments(json, BookSearchDocument.PRIMARY_KEY).getTaskUid());
+    }
+
     static void removeFromIndex(final Client client, final String indexName, final String bookId) {
         final Index index = client.index(indexName);
         index.waitForTask(index.deleteDocument(bookId).getTaskUid());

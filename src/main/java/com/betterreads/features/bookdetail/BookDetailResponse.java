@@ -2,6 +2,10 @@ package com.betterreads.features.bookdetail;
 
 import java.math.BigDecimal;
 import java.util.List;
+
+import com.betterreads.booksource.SeriesEntry;
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.annotation.Nulls;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -26,12 +30,14 @@ public record BookDetailResponse(
     @Nullable Integer ratingCount,
     @Nullable String seriesName,
     @Nullable Integer seriesPosition,
+    @JsonSetter(nulls = Nulls.AS_EMPTY) List<SeriesEntry> series,
     List<String> subjects,
     List<String> awards
 ) {
 
     public BookDetailResponse {
         authors = List.copyOf(authors);
+        series = List.copyOf(series);
         subjects = List.copyOf(subjects);
         awards = List.copyOf(awards);
     }
@@ -56,11 +62,11 @@ public record BookDetailResponse(
     }
 
     /**
-     * Builds the response by field name. The record has seventeen components and
+     * Builds the response by field name. The record has eighteen components and
      * several share a type, so positional construction swaps two of them unnoticed.
      */
-    // PMD.TooManyMethods, PMD.AvoidFieldNameMatchingMethodName: one setter per record field, named after it.
-    @SuppressWarnings({"PMD.TooManyMethods", "PMD.AvoidFieldNameMatchingMethodName"})
+    // PMD.TooManyMethods, PMD.TooManyFields, PMD.AvoidFieldNameMatchingMethodName: one setter per record field.
+    @SuppressWarnings({"PMD.TooManyMethods", "PMD.TooManyFields", "PMD.AvoidFieldNameMatchingMethodName"})
     public static final class Builder {
 
         private final String key;
@@ -78,6 +84,7 @@ public record BookDetailResponse(
         private @Nullable Integer ratingCount;
         private @Nullable String seriesName;
         private @Nullable Integer seriesPosition;
+        private List<SeriesEntry> series = List.of();
         private List<String> subjects = List.of();
         private List<String> awards = List.of();
 
@@ -151,6 +158,11 @@ public record BookDetailResponse(
             return this;
         }
 
+        public Builder series(final List<SeriesEntry> value) {
+            this.series = List.copyOf(value);
+            return this;
+        }
+
         public Builder subjects(final List<String> value) {
             this.subjects = List.copyOf(value);
             return this;
@@ -165,7 +177,7 @@ public record BookDetailResponse(
             return new BookDetailResponse(
                 key, complete, title, subtitle, authors, description, coverUrl, firstPublishYear,
                 isbn, pageCount, language, averageRating, ratingCount, seriesName, seriesPosition,
-                subjects, awards);
+                series, subjects, awards);
         }
     }
 }

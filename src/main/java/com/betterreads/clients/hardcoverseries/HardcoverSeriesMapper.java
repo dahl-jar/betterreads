@@ -42,20 +42,17 @@ class HardcoverSeriesMapper {
         if (name == null || author == null) {
             return null;
         }
-        final List<SourceSeriesVolume> volumes = collapse(enumerated, name);
+        final List<SourceSeriesVolume> volumes = collapse(enumerated);
         return volumes.isEmpty() ? null : new SourceSeries(name, author, volumes);
     }
 
-    private static List<SourceSeriesVolume> collapse(
-        final SeriesEnumerationResponse.Series series,
-        final String name
-    ) {
+    private static List<SourceSeriesVolume> collapse(final SeriesEnumerationResponse.Series series) {
         final int cap = Objects.requireNonNullElse(series.primaryBooksCount(), Integer.MAX_VALUE);
         final List<SeriesEnumerationResponse.BookSeries> rows =
             Objects.requireNonNullElse(series.bookSeries(), List.of());
 
         final Map<Integer, Candidate> best = rows.stream()
-            .flatMap(row -> candidate(row, cap, name).stream())
+            .flatMap(row -> candidate(row, cap).stream())
             .collect(Collectors.toMap(Candidate::position, Function.identity(),
                 BinaryOperator.maxBy(Comparator.comparingInt(Candidate::readers)), TreeMap::new));
         return best.values().stream()
@@ -63,21 +60,15 @@ class HardcoverSeriesMapper {
             .toList();
     }
 
-    private static Optional<Candidate> candidate(
-        final SeriesEnumerationResponse.BookSeries row,
-        final int cap,
-        final String name
-    ) {
+    private static Optional<Candidate> candidate(final SeriesEnumerationResponse.BookSeries row, final int cap) {
         final HardcoverBookNode node = row.book();
         if (node == null) {
             return Optional.empty();
         }
         return HardcoverVolumeNumber.fromPosition(row.position())
             .filter(volume -> volume <= cap)
-            .flatMap(volume -> HardcoverBookNodeMapper.toBuilder(node)
-                .map(builder -> new Candidate(volume,
-                    builder.seriesName(name).seriesPosition(volume).build(),
-                    HardcoverBookNodeMapper.readers(node))));
+            .flatMap(volume -> HardcoverBookNodeMapper.toSourceBookWithSeries(node)
+                .map(book -> new Candidate(volume, book, HardcoverBookNodeMapper.readers(node))));
     }
 
     private record Candidate(int position, SourceBook book, int readers) {

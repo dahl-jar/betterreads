@@ -112,6 +112,12 @@ public final class BookSearchJson {
         return this;
     }
 
+    public BookSearchJson withSeriesNames(final String... names) {
+        final ArrayNode values = pickedHit().putArray("series_names");
+        Arrays.stream(names).forEach(values::add);
+        return this;
+    }
+
     public BookSearchJson withUnnamedFeaturedSeries() {
         pickedHit().putObject(FEATURED_SERIES).put(POSITION, 1.0);
         return this;

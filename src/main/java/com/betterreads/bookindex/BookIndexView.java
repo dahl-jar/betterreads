@@ -3,6 +3,7 @@ package com.betterreads.bookindex;
 import java.math.BigDecimal;
 import java.util.List;
 
+import com.betterreads.booksource.SeriesEntry;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -22,6 +23,7 @@ public record BookIndexView(
     @Nullable String subtitle,
     @Nullable String seriesName,
     @Nullable Integer seriesPosition,
+    List<SeriesEntry> series,
     List<String> authors,
     List<String> subjects,
     @Nullable String language,
@@ -32,6 +34,7 @@ public record BookIndexView(
 ) {
 
     public BookIndexView {
+        series = List.copyOf(series);
         authors = List.copyOf(authors);
         subjects = List.copyOf(subjects);
     }

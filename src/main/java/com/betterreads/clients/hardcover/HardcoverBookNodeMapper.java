@@ -31,7 +31,7 @@ public final class HardcoverBookNodeMapper {
         return node.usersCount() == null ? 0 : node.usersCount();
     }
 
-    public static Optional<SourceBook.Builder> toBuilder(final HardcoverBookNode node) {
+    private static Optional<SourceBook.Builder> toBuilder(final HardcoverBookNode node) {
         if (!qualifies(node)) {
             return Optional.empty();
         }

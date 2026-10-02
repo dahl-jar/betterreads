@@ -5,7 +5,21 @@ import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
+// PMD.TooManyMethods: one builder method per book variation the tests need.
+@SuppressWarnings("PMD.TooManyMethods")
 public final class BookByIdJson {
+
+    public static final String STORMLIGHT = "The Stormlight Archive";
+
+    public static final String COSMERE = "The Cosmere";
+
+    public static final int STORMLIGHT_VOLUME = 2;
+
+    public static final int COSMERE_VOLUME = 12;
+
+    private static final int STORMLIGHT_BOOKS = 5;
+
+    private static final int COSMERE_BOOKS = 35;
 
     private static final String BOOK_SERIES = "book_series";
 
@@ -29,6 +43,12 @@ public final class BookByIdJson {
 
     public static BookByIdJson bookById() {
         return new BookByIdJson();
+    }
+
+    public static BookByIdJson wordsOfRadiance() {
+        return bookById().withTitle("Words of Radiance").withoutSeries()
+            .withSeries(COSMERE, COSMERE_VOLUME, false, COSMERE_BOOKS)
+            .withSeries(STORMLIGHT, STORMLIGHT_VOLUME, true, STORMLIGHT_BOOKS);
     }
 
     public BookByIdJson withTitle(final String title) {

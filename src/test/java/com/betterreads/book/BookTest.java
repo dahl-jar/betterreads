@@ -9,6 +9,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 
 import com.betterreads.booksource.BookFieldSource;
+import com.betterreads.booksource.SeriesEntry;
 import com.betterreads.booksource.SourceBook;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
@@ -96,12 +97,15 @@ class BookTest {
 
         private static final String SERIES = "The Sun Eater";
 
+        private static final String UMBRELLA = "The Sollan Empire";
+
+        private static final int UMBRELLA_VOLUME = 4;
+
         @Test
-        @DisplayName("a resolved authority with a numbered volume sets the name and position")
-        void resolvedVolumeIsSet() {
+        void shouldMakeTheFirstSeriesThePrimary() {
             final Book book = new Book();
 
-            book.applySeries(SERIES, 1, true);
+            book.applySeries(List.of(new SeriesEntry(SERIES, 1), new SeriesEntry(UMBRELLA, UMBRELLA_VOLUME)), true);
 
             assertThat(book).satisfies(applied -> {
                 assertThat(applied.getSeriesName()).isEqualTo(SERIES);
@@ -110,28 +114,39 @@ class BookTest {
         }
 
         @Test
-        @DisplayName("a resolved authority with no series clears an existing label")
-        void resolvedNullClearsExisting() {
+        void shouldKeepEverySeriesInOrder() {
             final Book book = new Book();
-            book.applySeries(SERIES, 1, true);
 
-            book.applySeries(null, null, true);
+            book.applySeries(List.of(new SeriesEntry(SERIES, 1), new SeriesEntry(UMBRELLA, UMBRELLA_VOLUME)), true);
+
+            assertThat(book.getSeries())
+                .containsExactly(new SeriesEntry(SERIES, 1), new SeriesEntry(UMBRELLA, UMBRELLA_VOLUME));
+        }
+
+        @Test
+        @DisplayName("a resolved authority with no series clears an existing label")
+        void resolvedEmptyClearsExisting() {
+            final Book book = new Book();
+            book.applySeries(List.of(new SeriesEntry(SERIES, 1)), true);
+
+            book.applySeries(List.of(), true);
 
             assertThat(book).satisfies(applied -> {
                 assertThat(applied.getSeriesName())
                     .as("the authority resolved and reported no volume, so the stale label is cleared")
                     .isNull();
                 assertThat(applied.getSeriesPosition()).isNull();
+                assertThat(applied.getSeries()).isEmpty();
             });
         }
 
         @Test
         @DisplayName("an unresolved authority keeps the existing label, so a transient miss does not wipe it")
-        void unresolvedNullKeepsExisting() {
+        void unresolvedEmptyKeepsExisting() {
             final Book book = new Book();
-            book.applySeries(SERIES, 2, true);
+            book.applySeries(List.of(new SeriesEntry(SERIES, 2)), true);
 
-            book.applySeries(null, null, false);
+            book.applySeries(List.of(), false);
 
             assertThat(book).satisfies(applied -> {
                 assertThat(applied.getSeriesName())
@@ -312,11 +327,24 @@ class BookTest {
         void shouldKeepVerifiedSeries() {
             final Book book = new Book();
             book.applyFrom(refresh(YEAR));
+            book.applySeries(
+                List.of(new SeriesEntry("Red Rising Trilogy", 1), new SeriesEntry(RED_RISING_SAGA, 1)), true);
             book.applyVerified(new VerifiedMetadata(null, null, null, RED_RISING_SAGA, 2, null, null), NOW);
 
-            book.applySeries("Red Rising (German)", 1, true);
+            book.applySeries(List.of(new SeriesEntry("Red Rising (German)", 1)), true);
 
+            assertThat(book.getSeries()).containsExactly(new SeriesEntry(RED_RISING_SAGA, 2));
             assertThat(book.getSeriesName()).isEqualTo(RED_RISING_SAGA);
+            assertThat(book.getSeriesPosition()).isEqualTo(2);
+        }
+
+        @Test
+        void shouldMarkAuthorsVerified() {
+            final Book book = new Book();
+
+            book.applyVerified(new VerifiedMetadata(null, List.of("Darrow"), null, null, null, null, null), NOW);
+
+            assertThat(book.getVerifiedFields()).containsExactly(VerifiedField.AUTHORS);
         }
 
         @Test

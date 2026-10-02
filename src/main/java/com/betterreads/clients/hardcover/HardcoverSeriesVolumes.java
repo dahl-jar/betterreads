@@ -1,41 +1,69 @@
 package com.betterreads.clients.hardcover;
 
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import com.betterreads.booksource.IssueRunSeries;
+import com.betterreads.booksource.SeriesEntry;
 import com.betterreads.booksource.SourceBook;
 import org.jspecify.annotations.Nullable;
 
 public final class HardcoverSeriesVolumes {
 
+    private static final Comparator<HardcoverBookNode.SeriesMembership> BY_BOOK_COUNT =
+        Comparator.comparingInt(membership -> Optional.ofNullable(membership.series())
+            .map(HardcoverBookNode.Series::primaryBooksCount)
+            .orElse(0));
+
     private HardcoverSeriesVolumes() {
     }
 
     public static SourceBook.Builder withSeriesOf(final SourceBook.Builder builder, final HardcoverBookNode node) {
-        return Optional.ofNullable(node.bookSeries())
-            .flatMap(memberships -> volumeMembership(memberships, node.title()))
-            .flatMap(membership -> Optional.ofNullable(membership.series())
-                .map(series -> builder.seriesName(series.name()).seriesPosition(membership.position())))
-            .orElse(builder);
+        final List<SeriesEntry> series =
+            entries(Objects.requireNonNullElse(node.bookSeries(), List.of()), node.title());
+        if (series.isEmpty()) {
+            return builder;
+        }
+        final SeriesEntry primary = series.getFirst();
+        return builder.seriesName(primary.name()).seriesPosition(primary.position()).series(series);
     }
 
-    private static Optional<HardcoverBookNode.SeriesMembership> volumeMembership(
+    private static List<SeriesEntry> entries(
         final List<HardcoverBookNode.SeriesMembership> all, final @Nullable String title) {
         final List<HardcoverBookNode.SeriesMembership> memberships = withoutOneBookSeries(all);
+        return primaryMembership(memberships, title)
+            .map(primary -> Stream.concat(Stream.of(primary), memberships.stream()
+                    .filter(membership -> !membership.equals(primary)
+                        && isVolume(membership) && !isIssueRun(membership, title)))
+                .map(HardcoverSeriesVolumes::toEntry)
+                .toList())
+            .orElse(List.of());
+    }
+
+    private static Optional<HardcoverBookNode.SeriesMembership> primaryMembership(
+        final List<HardcoverBookNode.SeriesMembership> memberships, final @Nullable String title) {
         if (memberships.isEmpty()) {
             return Optional.empty();
         }
         final HardcoverBookNode.SeriesMembership primary = memberships.stream()
             .filter(entry -> Boolean.TRUE.equals(entry.featured()))
-            .findFirst()
-            .orElse(memberships.get(0));
+            .max(BY_BOOK_COUNT)
+            .orElse(memberships.getFirst());
         if (!isIssueRun(primary, title)) {
             return Optional.of(primary).filter(HardcoverSeriesVolumes::isVolume);
         }
         return memberships.stream()
             .filter(entry -> isVolume(entry) && !isIssueRun(entry, title))
             .findFirst();
+    }
+
+    private static SeriesEntry toEntry(final HardcoverBookNode.SeriesMembership membership) {
+        final HardcoverBookNode.Series series = Objects.requireNonNull(membership.series());
+        return new SeriesEntry(
+            Objects.requireNonNull(series.name()), Objects.requireNonNull(membership.position()));
     }
 
     private static List<HardcoverBookNode.SeriesMembership> withoutOneBookSeries(

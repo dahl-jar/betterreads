@@ -14,6 +14,8 @@ public final class SeriesBooksJson {
 
     private static final String TITLE = "title";
 
+    private static final String NAME = "name";
+
     private static final int GRAPHIC_NOVEL_CATEGORY = 4;
 
     private final ObjectNode json = Fixtures.parse("""
@@ -81,7 +83,7 @@ public final class SeriesBooksJson {
     }
 
     public SeriesBooksJson withName(final String name) {
-        series().put("name", name);
+        series().put(NAME, name);
         return this;
     }
 
@@ -99,6 +101,14 @@ public final class SeriesBooksJson {
         final ObjectNode volume = template.deepCopy().put(POSITION, position);
         volume.withObject(BOOK).put(TITLE, title).put("description", description);
         volumes().add(volume);
+        return this;
+    }
+
+    public SeriesBooksJson withMembership(final String name, final int position, final boolean featured) {
+        final ObjectNode lastVolume = (ObjectNode) volumes().get(volumes().size() - 1);
+        lastVolume.withObject(BOOK).withArray(BOOK_SERIES).addObject()
+            .put(POSITION, position).put("featured", featured)
+            .putObject("series").put(NAME, name);
         return this;
     }
 

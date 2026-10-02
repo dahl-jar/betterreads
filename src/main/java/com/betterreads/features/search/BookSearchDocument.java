@@ -1,6 +1,10 @@
 package com.betterreads.features.search;
 
 import java.util.List;
+
+import com.betterreads.booksource.SeriesEntry;
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.annotation.Nulls;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -18,6 +22,7 @@ public record BookSearchDocument(
     @Nullable String subtitle,
     @Nullable String seriesName,
     @Nullable Integer seriesPosition,
+    @JsonSetter(nulls = Nulls.AS_EMPTY) List<SeriesEntry> series,
     List<String> authors,
     List<String> subjects,
     @Nullable String language,
@@ -29,6 +34,7 @@ public record BookSearchDocument(
     static final String PRIMARY_KEY = "bookId";
 
     public BookSearchDocument {
+        series = List.copyOf(series);
         authors = List.copyOf(authors);
         subjects = List.copyOf(subjects);
     }
@@ -57,6 +63,7 @@ public record BookSearchDocument(
         private @Nullable String subtitle;
         private @Nullable String seriesName;
         private @Nullable Integer seriesPosition;
+        private List<SeriesEntry> series = List.of();
         private List<String> authors = List.of();
         private List<String> subjects = List.of();
         private @Nullable String language;
@@ -85,6 +92,11 @@ public record BookSearchDocument(
 
         public Builder seriesPosition(final @Nullable Integer value) {
             this.seriesPosition = value;
+            return this;
+        }
+
+        public Builder series(final List<SeriesEntry> value) {
+            this.series = List.copyOf(value);
             return this;
         }
 
@@ -120,7 +132,7 @@ public record BookSearchDocument(
 
         public BookSearchDocument build() {
             return new BookSearchDocument(
-                bookId, title, subtitle, seriesName, seriesPosition, authors, subjects, language,
+                bookId, title, subtitle, seriesName, seriesPosition, series, authors, subjects, language,
                 coverUrl, publicationYear, popularityScore);
         }
     }

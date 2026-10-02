@@ -1,18 +1,25 @@
 package com.betterreads.clients.hardcoverbook;
 
 import com.betterreads.booksource.BookFieldSource;
+import com.betterreads.booksource.SeriesEntry;
 import com.betterreads.booksource.SourceBook;
 import com.betterreads.clients.hardcover.BookByIdJson;
 import com.betterreads.clients.hardcover.BookSearchJson;
 import com.betterreads.clients.hardcover.HardcoverProperties;
 import com.betterreads.clients.hardcover.HardcoverWebClientConfig;
 import com.betterreads.clients.hardcover.HardcoverWireMock;
+import static com.betterreads.clients.hardcover.BookByIdJson.COSMERE;
+import static com.betterreads.clients.hardcover.BookByIdJson.COSMERE_VOLUME;
+import static com.betterreads.clients.hardcover.BookByIdJson.STORMLIGHT;
+import static com.betterreads.clients.hardcover.BookByIdJson.STORMLIGHT_VOLUME;
 import static com.betterreads.clients.hardcover.BookByIdJson.bookById;
+import static com.betterreads.clients.hardcover.BookByIdJson.wordsOfRadiance;
 import static com.betterreads.clients.hardcover.BookSearchJson.bookSearch;
 import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.InstanceOfAssertFactories.list;
 
 import java.util.Optional;
 
@@ -46,6 +53,16 @@ class HardcoverClientWireMockTest extends HardcoverWireMock {
     private static final String ABSOLUTE_BATMAN_ISBN = "9781799507505";
 
     private static final String NON_NUMERIC_ID = "not-a-number";
+
+    private static final String WORDS_OF_RADIANCE_ISBN = "9780765326362";
+
+    private static final String WORDS_OF_RADIANCE_ID = "1234";
+
+    private static final String COLLECTED_SERIES = "Absolute Batman (2024)";
+
+    private static final String SEARCH_OPERATION = "Search";
+
+    private static final String BY_ID_OPERATION = "BookById";
 
     @Autowired
     private HardcoverClientImpl client;
@@ -142,8 +159,9 @@ class HardcoverClientWireMockTest extends HardcoverWireMock {
             final Optional<SourceBook> book = client.fetchByIsbn(ABSOLUTE_BATMAN_ISBN);
 
             assertThat(book).get().satisfies(value -> {
-                assertThat(value.seriesName()).isEqualTo("Absolute Batman (2024)");
+                assertThat(value.seriesName()).isEqualTo(COLLECTED_SERIES);
                 assertThat(value.seriesPosition()).isEqualTo(2);
+                assertThat(value.series()).containsExactly(new SeriesEntry(COLLECTED_SERIES, 2));
             });
         }
 
@@ -153,7 +171,10 @@ class HardcoverClientWireMockTest extends HardcoverWireMock {
 
             final Optional<SourceBook> book = client.fetchByIsbn(ABSOLUTE_BATMAN_ISBN);
 
-            assertThat(book).get().extracting(SourceBook::seriesName).isNull();
+            assertThat(book).get().satisfies(value -> {
+                assertThat(value.seriesName()).isNull();
+                assertThat(value.series()).isEmpty();
+            });
         }
 
         @Test
@@ -183,9 +204,34 @@ class HardcoverClientWireMockTest extends HardcoverWireMock {
             WIREMOCK.verify(1, postRequestedFor(urlPathEqualTo(GRAPHQL_PATH)));
         }
 
+        @Test
+        void shouldFetchMembershipsWhenTheBookIsInSeveralSeries() {
+            stubGraphQl(SEARCH_OPERATION, wordsOfRadianceSearch().withSeriesNames(STORMLIGHT, COSMERE));
+            stubGraphQl(BY_ID_OPERATION, wordsOfRadiance());
+
+            final Optional<SourceBook> book = client.fetchByIsbn(WORDS_OF_RADIANCE_ISBN);
+
+            assertThat(book).get().extracting(SourceBook::series, list(SeriesEntry.class)).containsExactly(
+                new SeriesEntry(STORMLIGHT, STORMLIGHT_VOLUME), new SeriesEntry(COSMERE, COSMERE_VOLUME));
+        }
+
+        @Test
+        void shouldSkipTheLookupWhenTheBookIsInOneSeries() {
+            stubGraphQl(wordsOfRadianceSearch().withSeriesNames(STORMLIGHT));
+
+            client.fetchByIsbn(WORDS_OF_RADIANCE_ISBN);
+
+            WIREMOCK.verify(1, postRequestedFor(urlPathEqualTo(GRAPHQL_PATH)));
+        }
+
+        private static BookSearchJson wordsOfRadianceSearch() {
+            return bookSearch().withId(WORDS_OF_RADIANCE_ID).withTitle("Words of Radiance")
+                .withFeaturedSeries(STORMLIGHT, (double) STORMLIGHT_VOLUME);
+        }
+
         private void stubIssueRunSearchAndById(final BookByIdJson byId) {
-            stubGraphQl("Search", issueRunSearch().withId(ABSOLUTE_BATMAN_ID));
-            stubGraphQl("BookById", byId);
+            stubGraphQl(SEARCH_OPERATION, issueRunSearch().withId(ABSOLUTE_BATMAN_ID));
+            stubGraphQl(BY_ID_OPERATION, byId);
         }
 
         private static BookSearchJson issueRunSearch() {

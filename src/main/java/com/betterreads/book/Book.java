@@ -1,8 +1,10 @@
 package com.betterreads.book;
 
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -12,19 +14,23 @@ import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
+import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import com.betterreads.booksource.SeriesEntry;
 import com.betterreads.booksource.SourceBook;
 import com.betterreads.db.Timestamped;
 import org.jspecify.annotations.Nullable;
@@ -162,6 +168,11 @@ public class Book extends Timestamped {
     @OneToMany(mappedBy = "book", cascade = CascadeType.ALL, orphanRemoval = true)
     private final List<BookAward> awards = new ArrayList<>();
 
+    @ElementCollection
+    @CollectionTable(name = "book_series", joinColumns = @JoinColumn(name = "book_id"))
+    @OrderColumn(name = "ordinal")
+    private final List<BookSeries> series = new ArrayList<>();
+
     /**
      * Overwrites the descriptive fields, null included. Source ids, ratings, subjects and awards
      * change only when the source has them.
@@ -229,13 +240,24 @@ public class Book extends Timestamped {
      * A clear is trusted only when the series authority resolved, so a failed or timed-out collect
      * does not wipe a real series. A verified series is kept.
      */
-    public void applySeries(
-        final @Nullable String name, final @Nullable Integer position, final boolean authorityResolved) {
+    public void applySeries(final List<SeriesEntry> entries, final boolean authorityResolved) {
         if (!authorityResolved || isVerified(VerifiedField.SERIES)) {
             return;
         }
-        this.seriesName = name;
-        this.seriesPosition = position;
+        final Optional<SeriesEntry> primary = entries.stream().findFirst();
+        this.seriesName = primary.map(SeriesEntry::name).orElse(null);
+        this.seriesPosition = primary.map(SeriesEntry::position).orElse(null);
+        replaceSeries(entries);
+    }
+
+    private void replaceSeries(final List<SeriesEntry> entries) {
+        final List<BookSeries> rows = entries.stream().map(BookSeries::from).toList();
+        if (rows.equals(this.series)) {
+            return;
+        }
+        this.series.clear();
+        this.series.addAll(rows);
+        stampUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
     }
 
     public void applyVerified(final VerifiedMetadata metadata, final OffsetDateTime checkedAt) {
@@ -254,6 +276,7 @@ public class Book extends Timestamped {
         if (metadata.seriesName() != null) {
             this.seriesName = metadata.seriesName();
             this.seriesPosition = metadata.seriesPosition();
+            replaceSeries(SeriesEntry.listOf(metadata.seriesName(), metadata.seriesPosition()));
             verifiedFields.add(VerifiedField.SERIES);
         }
         if (metadata.description() != null) {
@@ -461,6 +484,10 @@ public class Book extends Timestamped {
     @Nullable
     public Integer getSeriesPosition() {
         return seriesPosition;
+    }
+
+    public List<SeriesEntry> getSeries() {
+        return series.stream().map(BookSeries::toEntry).toList();
     }
 
     void setUpdatedAt(final OffsetDateTime updatedAt) {

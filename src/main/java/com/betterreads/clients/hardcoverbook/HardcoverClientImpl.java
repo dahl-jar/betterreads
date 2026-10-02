@@ -37,7 +37,6 @@ class HardcoverClientImpl implements HardcoverClient {
         query BookById($id: Int!) {
           books(where: {id: {_eq: $id}}) {
         """ + HardcoverBookNode.FIELDS + """
-            book_series { position featured series { name primary_books_count } }
           }
         }
         """;
@@ -99,7 +98,7 @@ class HardcoverClientImpl implements HardcoverClient {
 
     private @Nullable SourceBook toSourceBook(final HardcoverDocument document) {
         final SourceBook book = mapper.toSourceBook(document);
-        if (book == null || !mapper.hasIssueRunSeries(document)) {
+        if (book == null || !(mapper.hasIssueRunSeries(document) || mapper.hasSeveralSeries(document))) {
             return book;
         }
         return HardcoverGraphQl.parseId(document.id())

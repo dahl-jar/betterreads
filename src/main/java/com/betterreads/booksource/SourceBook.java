@@ -9,8 +9,8 @@ import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Book metadata from one source. A null list means the source did not send that field, an empty
- * list means it sent the field with no values.
+ * Book metadata from one source. A nullable list is null when the source did not send that field
+ * and empty when it sent no values.
  */
 public record SourceBook(
         BookFieldSource source,
@@ -38,12 +38,14 @@ public record SourceBook(
         @Nullable Double averageRating,
         @Nullable Integer ratingCount,
         @Nullable String seriesName,
-        @Nullable Integer seriesPosition) {
+        @Nullable Integer seriesPosition,
+        List<SeriesEntry> series) {
 
     public SourceBook {
         authors = NullableLists.copyOf(authors);
         rawSubjects = NullableLists.copyOf(rawSubjects);
         awards = NullableLists.copyOf(awards);
+        series = List.copyOf(series);
     }
 
     @Override
@@ -107,10 +109,11 @@ public record SourceBook(
             .averageRating(averageRating)
             .ratingCount(ratingCount)
             .seriesName(seriesName)
-            .seriesPosition(seriesPosition);
+            .seriesPosition(seriesPosition)
+            .series(series);
     }
 
-    /** the record has 22 components, so mappers set only the fields their source supplies */
+    /** the record has 23 components, so mappers set only the fields their source supplies */
     // PMD.TooManyFields, PMD.TooManyMethods, PMD.ExcessivePublicCount,
     // PMD.AvoidFieldNameMatchingMethodName: one nullable field and setter per record component.
     @SuppressWarnings({
@@ -141,6 +144,7 @@ public record SourceBook(
         private @Nullable Integer ratingCount;
         private @Nullable String seriesName;
         private @Nullable Integer seriesPosition;
+        private @Nullable List<SeriesEntry> series;
 
         private Builder(final BookFieldSource source) {
             this.source = source;
@@ -251,12 +255,18 @@ public record SourceBook(
             return this;
         }
 
+        public Builder series(final @Nullable List<SeriesEntry> value) {
+            this.series = NullableLists.copyOf(value);
+            return this;
+        }
+
         public SourceBook build() {
             return new SourceBook(
                 source, isbn13, openLibraryWorkKey, googleBooksVolumeId, wikidataQid, locLccn,
                 hardcoverId, title, subtitle, description, publicationYear, publisher, pageCount,
                 language, coverUrl, authors, rawSubjects, awards, averageRating,
-                ratingCount, seriesName, seriesPosition);
+                ratingCount, seriesName, seriesPosition,
+                series == null ? SeriesEntry.listOf(seriesName, seriesPosition) : series);
         }
     }
 }

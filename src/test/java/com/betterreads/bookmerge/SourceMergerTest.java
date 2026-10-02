@@ -8,6 +8,7 @@ import java.util.List;
 import com.betterreads.booksource.BookField;
 import com.betterreads.booksource.BookFieldSource;
 import com.betterreads.booksource.MergedBook;
+import com.betterreads.booksource.SeriesEntry;
 import com.betterreads.booksource.SourceAuthor;
 import com.betterreads.booksource.SourceBook;
 import com.betterreads.testsupport.Books;
@@ -42,13 +43,17 @@ class SourceMergerTest {
 
     private static final int WIKIDATA_VOLUME = 3;
 
+    private static final String UMBRELLA_SERIES = "Dune Universe";
+
+    private static final int UMBRELLA_VOLUME = 7;
+
     private static final String SCIENCE_FICTION = "science fiction";
 
     private static final String FANTASY = "fantasy";
 
     private static final String FICTION = "fiction";
 
-    private static final String COVER_URL = "https://covers.openlibrary.org/b/id/1-L.jpg";
+    private static final String COVER_URL = "https://covers.example.test/1-L.jpg";
 
     private static final String HUGO = "Hugo Award";
 
@@ -265,7 +270,7 @@ class SourceMergerTest {
                 .coverUrl(COVER_URL)
                 .build();
             final SourceBook openLibrary = titled(BookFieldSource.OPEN_LIBRARY)
-                .coverUrl("https://covers.openlibrary.org/b/id/2-L.jpg")
+                .coverUrl("https://covers.example.test/2-L.jpg")
                 .build();
 
             final MergedBook merged = merger.merge(null, List.of(openLibrary, google));
@@ -363,6 +368,21 @@ class SourceMergerTest {
             });
         }
 
+        @Test
+        void shouldTakeEverySeriesFromHardcover() {
+            final List<SeriesEntry> memberships = List.of(
+                new SeriesEntry(SERIES, HARDCOVER_VOLUME), new SeriesEntry(UMBRELLA_SERIES, UMBRELLA_VOLUME));
+            final SourceBook hardcover = titled(BookFieldSource.HARDCOVER)
+                .seriesName(SERIES)
+                .seriesPosition(HARDCOVER_VOLUME)
+                .series(memberships)
+                .build();
+
+            final MergedBook merged = merger.merge(null, List.of(wikidataVolume(), hardcover));
+
+            assertThat(merged.book().series()).isEqualTo(memberships);
+        }
+
         @ParameterizedTest
         @NullSource
         @ValueSource(strings = TITLE)
@@ -388,6 +408,7 @@ class SourceMergerTest {
             final MergedBook merged = merger.merge(null, List.of(hardcover));
 
             assertThat(merged.book().seriesName()).isNull();
+            assertThat(merged.book().series()).isEmpty();
         }
 
         @Test
@@ -408,6 +429,7 @@ class SourceMergerTest {
             final MergedBook merged = merger.merge(null, List.of(hardcover, wikidata));
 
             assertThat(merged.book().seriesName()).isEqualTo(beginnings);
+            assertThat(merged.book().series()).containsExactly(new SeriesEntry(beginnings, WIKIDATA_VOLUME));
         }
 
         @Test

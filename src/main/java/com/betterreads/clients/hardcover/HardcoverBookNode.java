@@ -48,6 +48,7 @@ public record HardcoverBookNode(
         image { url }
         default_physical_edition { language { language } reading_format { format } }
         contributions { contribution author { name } }
+        book_series { position featured series { name primary_books_count } }
         """;
 
     public HardcoverBookNode {

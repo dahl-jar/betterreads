@@ -42,6 +42,7 @@ class BookDetailMapper {
             .ratingCount(book.getRatingCount())
             .seriesName(book.getSeriesName())
             .seriesPosition(book.getSeriesPosition())
+            .series(book.getSeries())
             .subjects(book.getSubjects().stream().map(BookSubject::getSubject).toList())
             .awards(book.getAwards().stream().map(BookAward::getAward).toList())
             .build();
@@ -64,6 +65,7 @@ class BookDetailMapper {
             .ratingCount(seed.ratingCount())
             .seriesName(seed.seriesName())
             .seriesPosition(seed.seriesPosition())
+            .series(seed.series())
             .subjects(Objects.requireNonNullElse(seed.rawSubjects(), List.of()))
             .awards(Objects.requireNonNullElse(seed.awards(), List.of()))
             .build();
