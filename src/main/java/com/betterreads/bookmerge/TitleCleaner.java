@@ -24,7 +24,17 @@ final class TitleCleaner {
             + "|\\s+(?:official\\s+)?(?:movie|film)\\s+|\\s+official\\s+)"
             + "novelization(?:\\s+of\\s+the\\s+(?:film|movie))?\\s*$", Pattern.CASE_INSENSITIVE);
 
+    private static final Pattern ALTERNATIVE_TITLE =
+        Pattern.compile(";(?=\\s+or\\b)", Pattern.CASE_INSENSITIVE);
+
+    private static final Pattern SPACE_BEFORE_PUNCTUATION = Pattern.compile("\\s+(?=[:;])");
+
     private TitleCleaner() {
+    }
+
+    static String closePunctuation(final String title) {
+        final String withColon = ALTERNATIVE_TITLE.matcher(title).replaceAll(":");
+        return SPACE_BEFORE_PUNCTUATION.matcher(withColon).replaceAll("");
     }
 
     static String clean(final String title) {

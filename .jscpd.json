@@ -1,0 +1,6 @@
+{
+  "minTokens": 50,
+  "reporters": ["console"],
+  "ignore": ["**/node_modules/**", "**/dist/**", "**/build/**", "**/db/migration/**"],
+  "ignorePattern": ["import\\s+(static\\s+)?[\\w.*]+;"]
+}

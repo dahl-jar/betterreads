@@ -23,13 +23,13 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultMatcher;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.Duration;
@@ -39,7 +39,6 @@ import java.util.Objects;
 import static com.betterreads.testsupport.Accounts.PASSWORD;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -126,7 +125,7 @@ class AuthIntegrationTest extends ContainerizedTest {
             final String body =
                 Accounts.registerPayload(objectMapper, Accounts.USERNAME, Accounts.EMAIL, PASSWORD);
 
-            mockMvc.perform(post(Accounts.REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content(body))
+            AuthRequests.register(mockMvc, body)
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath(JSON_TOKEN).isNotEmpty())
                 .andExpect(jsonPath(JSON_USER_USERNAME).value(Accounts.USERNAME))
@@ -146,9 +145,8 @@ class AuthIntegrationTest extends ContainerizedTest {
             Accounts.seedUser(userRepository, passwordEncoder, Accounts.USERNAME, Accounts.EMAIL, PASSWORD);
             final String body = Accounts.registerPayload(objectMapper, Accounts.USERNAME, OTHER_EMAIL, PASSWORD);
 
-            mockMvc.perform(post(Accounts.REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath(JSON_DETAIL).value(USERNAME_TAKEN));
+            AuthRequests.register(mockMvc, body)
+                .andExpect(conflictWithDetail(USERNAME_TAKEN));
         }
 
         @Test
@@ -156,9 +154,8 @@ class AuthIntegrationTest extends ContainerizedTest {
             Accounts.seedUser(userRepository, passwordEncoder, Accounts.USERNAME, Accounts.EMAIL, PASSWORD);
             final String body = Accounts.registerPayload(objectMapper, OTHER_USERNAME, Accounts.EMAIL, PASSWORD);
 
-            mockMvc.perform(post(Accounts.REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath(JSON_DETAIL).value("Email already registered"));
+            AuthRequests.register(mockMvc, body)
+                .andExpect(conflictWithDetail("Email already registered"));
         }
 
         @Test
@@ -171,9 +168,8 @@ class AuthIntegrationTest extends ContainerizedTest {
             userRepository.save(deleted);
             final String body = Accounts.registerPayload(objectMapper, Accounts.USERNAME, OTHER_EMAIL, PASSWORD);
 
-            mockMvc.perform(post(Accounts.REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath(JSON_DETAIL).value("Username or email already registered"));
+            AuthRequests.register(mockMvc, body)
+                .andExpect(conflictWithDetail("Username or email already registered"));
         }
 
         @ParameterizedTest(name = "rejects invalid {0} with 400")
@@ -191,7 +187,7 @@ class AuthIntegrationTest extends ContainerizedTest {
         ) throws Exception {
             final String body = Accounts.registerPayload(objectMapper, username, email, password);
 
-            mockMvc.perform(post(Accounts.REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content(body))
+            AuthRequests.register(mockMvc, body)
                 .andExpect(status().isBadRequest());
         }
 
@@ -200,7 +196,7 @@ class AuthIntegrationTest extends ContainerizedTest {
             final String body =
                 Accounts.registerPayload(objectMapper, Accounts.USERNAME, Accounts.MIXED_CASE_EMAIL, PASSWORD);
 
-            mockMvc.perform(post(Accounts.REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content(body))
+            AuthRequests.register(mockMvc, body)
                 .andExpect(status().isCreated());
 
             assertThat(userRepository.findByUsername(Accounts.USERNAME))
@@ -215,9 +211,8 @@ class AuthIntegrationTest extends ContainerizedTest {
             final String body =
                 Accounts.registerPayload(objectMapper, MIXED_CASE_USERNAME, OTHER_EMAIL, PASSWORD);
 
-            mockMvc.perform(post(Accounts.REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath(JSON_DETAIL).value(USERNAME_TAKEN));
+            AuthRequests.register(mockMvc, body)
+                .andExpect(conflictWithDetail(USERNAME_TAKEN));
         }
 
         @Test
@@ -225,16 +220,14 @@ class AuthIntegrationTest extends ContainerizedTest {
             final String body =
                 Accounts.registerPayload(objectMapper, MIXED_CASE_USERNAME, Accounts.EMAIL, PASSWORD);
 
-            mockMvc.perform(post(Accounts.REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content(body))
+            AuthRequests.register(mockMvc, body)
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath(JSON_USER_USERNAME).value(MIXED_CASE_USERNAME));
         }
 
         @Test
         void rejectsBadJsonBodyWithBadRequest() throws Exception {
-            mockMvc.perform(post(Accounts.REGISTER_URL)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"username\": \"darrow\""))
+            AuthRequests.register(mockMvc, "{\"username\": \"darrow\"")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath(JSON_DETAIL).value("Malformed request body"));
         }
@@ -253,7 +246,7 @@ class AuthIntegrationTest extends ContainerizedTest {
         void succeedsWithUsername() throws Exception {
             final String body = Accounts.loginPayload(objectMapper, Accounts.USERNAME, PASSWORD);
 
-            mockMvc.perform(post(Accounts.LOGIN_URL).contentType(MediaType.APPLICATION_JSON).content(body))
+            AuthRequests.login(mockMvc, body)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(JSON_TOKEN).isNotEmpty())
                 .andExpect(jsonPath(JSON_USER_USERNAME).value(Accounts.USERNAME));
@@ -264,7 +257,7 @@ class AuthIntegrationTest extends ContainerizedTest {
             Accounts.seedUser(userRepository, passwordEncoder, LOWERCASE_USERNAME, OTHER_EMAIL, PASSWORD);
             final String body = Accounts.loginPayload(objectMapper, MIXED_CASE_USERNAME, PASSWORD);
 
-            mockMvc.perform(post(Accounts.LOGIN_URL).contentType(MediaType.APPLICATION_JSON).content(body))
+            AuthRequests.login(mockMvc, body)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(JSON_TOKEN).isNotEmpty())
                 .andExpect(jsonPath(JSON_USER_USERNAME).value(LOWERCASE_USERNAME));
@@ -274,7 +267,7 @@ class AuthIntegrationTest extends ContainerizedTest {
         void succeedsWithEmail() throws Exception {
             final String body = Accounts.loginPayload(objectMapper, Accounts.EMAIL, PASSWORD);
 
-            mockMvc.perform(post(Accounts.LOGIN_URL).contentType(MediaType.APPLICATION_JSON).content(body))
+            AuthRequests.login(mockMvc, body)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(JSON_TOKEN).isNotEmpty());
         }
@@ -283,7 +276,7 @@ class AuthIntegrationTest extends ContainerizedTest {
         void succeedsWithMixedCaseEmail() throws Exception {
             final String body = Accounts.loginPayload(objectMapper, Accounts.MIXED_CASE_EMAIL, PASSWORD);
 
-            mockMvc.perform(post(Accounts.LOGIN_URL).contentType(MediaType.APPLICATION_JSON).content(body))
+            AuthRequests.login(mockMvc, body)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(JSON_TOKEN).isNotEmpty());
         }
@@ -292,7 +285,7 @@ class AuthIntegrationTest extends ContainerizedTest {
         void shouldLogInWithIdentifierSurroundedByWhitespace() throws Exception {
             final String body = Accounts.loginPayload(objectMapper, " " + Accounts.USERNAME + " ", PASSWORD);
 
-            mockMvc.perform(post(Accounts.LOGIN_URL).contentType(MediaType.APPLICATION_JSON).content(body))
+            AuthRequests.login(mockMvc, body)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(JSON_USER_USERNAME).value(Accounts.USERNAME));
         }
@@ -301,7 +294,7 @@ class AuthIntegrationTest extends ContainerizedTest {
         void rejectsWrongPasswordWithUnauthorized() throws Exception {
             final String body = Accounts.loginPayload(objectMapper, Accounts.USERNAME, "WrongPassword1!");
 
-            mockMvc.perform(post(Accounts.LOGIN_URL).contentType(MediaType.APPLICATION_JSON).content(body))
+            AuthRequests.login(mockMvc, body)
                 .andExpect(status().isUnauthorized());
         }
 
@@ -309,7 +302,7 @@ class AuthIntegrationTest extends ContainerizedTest {
         void rejectsUnknownUserWithUnauthorized() throws Exception {
             final String body = Accounts.loginPayload(objectMapper, UNKNOWN_USERNAME, PASSWORD);
 
-            mockMvc.perform(post(Accounts.LOGIN_URL).contentType(MediaType.APPLICATION_JSON).content(body))
+            AuthRequests.login(mockMvc, body)
                 .andExpect(status().isUnauthorized());
         }
     }
@@ -323,8 +316,7 @@ class AuthIntegrationTest extends ContainerizedTest {
             final String registerBody =
                 Accounts.registerPayload(objectMapper, Accounts.USERNAME, Accounts.EMAIL, PASSWORD);
 
-            final MvcResult registerResult = mockMvc.perform(
-                    post(Accounts.REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content(registerBody))
+            final MvcResult registerResult = AuthRequests.register(mockMvc, registerBody)
                 .andExpect(status().isCreated())
                 .andReturn();
             final MockHttpServletResponse registerResponse = registerResult.getResponse();
@@ -363,5 +355,12 @@ class AuthIntegrationTest extends ContainerizedTest {
             mockMvc.perform(get(Accounts.ME_URL).header(AUTH_HEADER, BEARER_PREFIX + expiredToken))
                 .andExpect(status().isUnauthorized());
         }
+    }
+
+    private static ResultMatcher conflictWithDetail(final String detail) {
+        return result -> {
+            status().isConflict().match(result);
+            jsonPath(JSON_DETAIL).value(detail).match(result);
+        };
     }
 }

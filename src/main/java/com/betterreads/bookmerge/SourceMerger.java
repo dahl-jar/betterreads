@@ -112,7 +112,8 @@ public class SourceMerger {
             valueOf(pick(bySource, ISBN_CHAIN, SourceMerger::usableText, SourceBook::isbn13));
         final @Nullable String language = resolveLanguage(bySource, isbn13);
         final String displayTitle =
-            TitleCleaner.clean(TitleCasing.capitalize(title.value(), titles(sources), language));
+            TitleCleaner.clean(TitleCasing.capitalize(
+                TitleCleaner.closePunctuation(title.value()), titles(sources), language));
         final Optional<SourceBook> series = pickSeries(bySource, displayTitle);
         return SourceBook.builder(title.source())
             .title(displayTitle)
@@ -149,7 +150,11 @@ public class SourceMerger {
     }
 
     private static List<String> titles(final List<SourceBook> sources) {
-        return sources.stream().map(SourceBook::title).filter(title -> title != null).toList();
+        return sources.stream()
+            .map(SourceBook::title)
+            .filter(title -> title != null)
+            .map(TitleCleaner::closePunctuation)
+            .toList();
     }
 
     private static <T> @Nullable Winner<T> pick(

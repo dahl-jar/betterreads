@@ -28,12 +28,15 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+// PMD.TooManyMethods: one test per collect route plus the shared collector builders.
+@SuppressWarnings("PMD.TooManyMethods")
 class SourceCollectorTest {
 
     private static final double HARDCOVER_RATING = 4.32;
@@ -91,16 +94,10 @@ class SourceCollectorTest {
             .title(TITLE)
             .authors(SourceAuthor.ofNames(List.of(AUTHOR)))
             .build();
-        final SourceBook wikidataHit = SourceBook.builder(BookFieldSource.WIKIDATA)
-            .title(TITLE)
-            .awards(List.of(HUGO))
-            .build();
-        final SourceCollector collector =
-            collectorWith(SAME_THREAD, stubByTitleAuthor(BookFieldSource.WIKIDATA, TITLE, AUTHOR, wikidataHit));
 
-        final MergedBook merged = collector.collectFor(seed);
+        final List<String> awards = awardsFromWikidataTitleAuthorHit(seed);
 
-        assertThat(merged.book().awards())
+        assertThat(awards)
             .as("with no ISBN, the collector fetches by title and author")
             .containsExactly(HUGO);
     }
@@ -114,16 +111,10 @@ class SourceCollectorTest {
             .title(TITLE)
             .authors(SourceAuthor.ofNames(List.of(AUTHOR)))
             .build();
-        final SourceBook wikidataHit = SourceBook.builder(BookFieldSource.WIKIDATA)
-            .title(TITLE)
-            .awards(List.of(HUGO))
-            .build();
-        final SourceCollector collector =
-            collectorWith(SAME_THREAD, stubByTitleAuthor(BookFieldSource.WIKIDATA, TITLE, AUTHOR, wikidataHit));
 
-        final MergedBook merged = collector.collectFor(seed);
+        final List<String> awards = awardsFromWikidataTitleAuthorHit(seed);
 
-        assertThat(merged.book().awards())
+        assertThat(awards)
             .as("Wikidata has no ISBN match, so its title and author match supplies the awards")
             .containsExactly(HUGO);
     }
@@ -263,6 +254,17 @@ class SourceCollectorTest {
             .as("the seed, a source with a hit, and a source with a clean empty all resolved")
             .contains(BookFieldSource.OPEN_LIBRARY, BookFieldSource.HARDCOVER,
                 BookFieldSource.GOOGLE_BOOKS);
+    }
+
+    private static @Nullable List<String> awardsFromWikidataTitleAuthorHit(final SourceBook seed) {
+        final SourceBook wikidataHit = SourceBook.builder(BookFieldSource.WIKIDATA)
+            .title(TITLE)
+            .awards(List.of(HUGO))
+            .build();
+        final SourceCollector collector =
+            collectorWith(SAME_THREAD, stubByTitleAuthor(BookFieldSource.WIKIDATA, TITLE, AUTHOR, wikidataHit));
+        final MergedBook merged = collector.collectFor(seed);
+        return merged.book().awards();
     }
 
     private static SourceCollector collectorWith(final Executor executor, final BookSourceClient... clients) {

@@ -1,9 +1,7 @@
 package com.betterreads.book;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-import java.util.Objects;
-import java.util.Optional;
+import static com.betterreads.book.CatalogUpserts.assertIsEyeOfTheWorld;
+import static com.betterreads.book.CatalogUpserts.fetchEyeOfTheWorld;
 
 import com.betterreads.booksource.SourceBook;
 import com.betterreads.clients.googlebooks.GoogleBooksClient;
@@ -13,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 
 /** Persists live Google Books data in local Postgres for operator inspection. */
 @SpringBootTest(properties = {
@@ -22,48 +21,29 @@ import org.springframework.boot.test.context.SpringBootTest;
 })
 @EnabledIfEnvironmentVariable(named = "RUN_LOCAL_DB_VERIFICATION", matches = "1")
 @EnabledIfEnvironmentVariable(named = "GOOGLE_BOOKS_API_KEY", matches = ".+")
+@Import(CatalogUpserts.class)
 // PMD.ClassNamingConventions: operator-run database verification without a Test suffix
 @SuppressWarnings("PMD.ClassNamingConventions")
 class CatalogGoogleBooksLocalDbVerification {
 
-    private static final String EYE_OF_THE_WORLD_AUTHOR = "Robert Jordan";
+    @Autowired
+    private CatalogUpserts catalogUpserts;
 
     @Autowired
     private GoogleBooksClient googleBooksClient;
 
-    @Autowired
-    private BookUpsertService bookUpsertService;
-
-    @Autowired
-    private BookRepository bookRepository;
-
-    @Autowired
-    private AuthorRepository authorRepository;
-
     @BeforeEach
     void clearCatalog() {
-        bookRepository.deleteAll();
-        authorRepository.deleteAll();
+        catalogUpserts.clear();
     }
 
     @Test
     @DisplayName("Eye of the World persists with its Google Books metadata")
     void eyeOfTheWorldPersistsToLocalDatabase() {
-        final Optional<SourceBook> source = googleBooksClient.fetchByTitleAuthor(
-            "The Eye of the World", EYE_OF_THE_WORLD_AUTHOR);
-        assertThat(source).isPresent();
+        final SourceBook source = fetchEyeOfTheWorld(googleBooksClient);
 
-        final Book persisted = bookUpsertService.upsertFromSource(source.get());
+        final Book reloaded = catalogUpserts.upsertAndReloadByVolumeId(source);
 
-        final String volumeId = Objects.requireNonNull(persisted.getGoogleBooksVolumeId(),
-            "upsert left the source volume id unset");
-        final Optional<Book> reloaded = bookRepository.findByGoogleBooksVolumeId(volumeId);
-        assertThat(reloaded)
-            .isPresent()
-            .get()
-            .satisfies(book -> {
-                assertThat(book.getTitle()).containsIgnoringCase("Eye of the World");
-                assertThat(book.getAuthors()).extracting("name").containsExactly(EYE_OF_THE_WORLD_AUTHOR);
-            });
+        assertIsEyeOfTheWorld(reloaded);
     }
 }

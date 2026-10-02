@@ -3,7 +3,6 @@ package com.betterreads.features.comments;
 import java.io.UnsupportedEncodingException;
 
 import com.betterreads.book.BookRepository;
-import com.betterreads.ratelimit.RateLimitFilter;
 import com.betterreads.testsupport.Books;
 import com.betterreads.testsupport.RegisteredUserTest;
 
@@ -29,7 +28,6 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static com.betterreads.testsupport.Books.DUNE_KEY;
-import static com.betterreads.testsupport.Books.DUNE_TITLE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -116,21 +114,13 @@ class CommentsIntegrationTest extends RegisteredUserTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    @Autowired
-    private RateLimitFilter rateLimitFilter;
-
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         mockMvc = securedMockMvc();
         jdbcTemplate.update("DELETE FROM comment");
-        jdbcTemplate.update("DELETE FROM review");
-        jdbcTemplate.update("DELETE FROM book_author");
-        jdbcTemplate.update("DELETE FROM book");
-        jdbcTemplate.update("DELETE FROM app_user");
-        rateLimitFilter.reset();
-        Books.seedBook(bookRepository, DUNE_KEY, DUNE_TITLE);
+        resetToDune();
     }
 
     @Nested

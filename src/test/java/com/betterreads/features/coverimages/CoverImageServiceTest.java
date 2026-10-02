@@ -57,11 +57,8 @@ class CoverImageServiceTest {
     @Test
     @DisplayName("an un-stored cover is mirrored from the promoted book then served")
     void mirrorsPromotedBookOnMiss() {
-        when(imageStore.get(OBJECT_KEY))
-            .thenReturn(Optional.empty())
-            .thenReturn(Optional.of(new Image(JPEG, JPEG_TYPE)));
         when(books.findByDedupKey(KEY)).thenReturn(Optional.of(book(BOOK_ID)));
-        when(coverMirror.mirror(KEY, COVER_URL)).thenReturn(Optional.of(OBJECT_KEY));
+        stubMirrorOnMiss();
 
         final Optional<Image> cover = service.loadCover(KEY);
 
@@ -75,12 +72,9 @@ class CoverImageServiceTest {
         final PendingBook seed = new PendingBook();
         seed.setDedupKey(KEY);
         seed.setCoverUrl(COVER_URL);
-        when(imageStore.get(OBJECT_KEY))
-            .thenReturn(Optional.empty())
-            .thenReturn(Optional.of(new Image(JPEG, JPEG_TYPE)));
         when(books.findByDedupKey(KEY)).thenReturn(Optional.empty());
         when(pendingBooks.findByDedupKey(KEY)).thenReturn(Optional.of(seed));
-        when(coverMirror.mirror(KEY, COVER_URL)).thenReturn(Optional.of(OBJECT_KEY));
+        stubMirrorOnMiss();
 
         final Optional<Image> cover = service.loadCover(KEY);
 
@@ -110,5 +104,12 @@ class CoverImageServiceTest {
 
         assertThat(cover).isEmpty();
         verify(coverMirror, never()).mirror(any(), any());
+    }
+
+    private void stubMirrorOnMiss() {
+        when(imageStore.get(OBJECT_KEY))
+            .thenReturn(Optional.empty())
+            .thenReturn(Optional.of(new Image(JPEG, JPEG_TYPE)));
+        when(coverMirror.mirror(KEY, COVER_URL)).thenReturn(Optional.of(OBJECT_KEY));
     }
 }

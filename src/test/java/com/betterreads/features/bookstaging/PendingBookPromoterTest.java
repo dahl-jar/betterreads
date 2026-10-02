@@ -42,11 +42,7 @@ class PendingBookPromoterTest {
 
         promoter.promote(DEDUP_KEY, incompleteDune());
 
-        assertThat(row).satisfies(attempted -> {
-            assertThat(attempted.getAttemptCount()).isEqualTo(1);
-            assertThat(attempted.getLastAttemptAt()).isNotNull();
-            assertThat(attempted.getStatus()).isEqualTo(PendingBookStatus.PENDING);
-        });
+        assertOneAttemptStillPending(row);
     }
 
     @Test
@@ -87,6 +83,10 @@ class PendingBookPromoterTest {
 
         promoter.recordFailedAttempt(DEDUP_KEY);
 
+        assertOneAttemptStillPending(row);
+    }
+
+    private static void assertOneAttemptStillPending(final PendingBook row) {
         assertThat(row).satisfies(attempted -> {
             assertThat(attempted.getAttemptCount()).isEqualTo(1);
             assertThat(attempted.getLastAttemptAt()).isNotNull();

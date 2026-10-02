@@ -192,6 +192,32 @@ class SourceMergerTest {
         }
 
         @Test
+        void shouldTitleCaseASpacedCatalogTitle() {
+            final SourceBook openLibrary = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+                .title("Fathomless riches ; or how I went from pop to pulpit")
+                .isbn13("9781780226194")
+                .build();
+
+            final MergedBook merged = merger.merge(null, List.of(openLibrary));
+
+            assertThat(merged.book().title()).isEqualTo("Fathomless Riches: Or How I Went From Pop to Pulpit");
+        }
+
+        @Test
+        void shouldTakeTheCapitalizedTitleFromASpacedCatalogTitle() {
+            final SourceBook google = SourceBook.builder(BookFieldSource.GOOGLE_BOOKS)
+                .title("Batman: the long Halloween")
+                .build();
+            final SourceBook loc = SourceBook.builder(BookFieldSource.LOC)
+                .title("Batman : The Long Halloween")
+                .build();
+
+            final MergedBook merged = merger.merge(null, List.of(google, loc));
+
+            assertThat(merged.book().title()).isEqualTo("Batman: The Long Halloween");
+        }
+
+        @Test
         @DisplayName("the merged title is cleaned of edition tags")
         void mergedTitleIsCleaned() {
             final SourceBook google = SourceBook.builder(BookFieldSource.GOOGLE_BOOKS)
@@ -388,33 +414,31 @@ class SourceMergerTest {
         void shouldAddLocCoAuthorsAfterTheChosenAuthors() {
             final String martin = "George R.R. Martin";
             final String dozois = "Gardner Dozois";
-            final SourceBook hardcover = titled(BookFieldSource.HARDCOVER)
-                .authors(SourceAuthor.ofNames(List.of(martin)))
-                .build();
-            final SourceBook loc = titled(BookFieldSource.LOC)
-                .authors(SourceAuthor.ofNames(List.of("George R. R. Martin", dozois)))
-                .build();
 
-            final MergedBook merged = merger.merge(null, List.of(hardcover, loc));
+            final List<String> authors = mergedAuthors(List.of(martin), List.of("George R. R. Martin", dozois));
 
-            assertThat(merged.book().authors())
-                .extracting(SourceAuthor::name)
-                .containsExactly(martin, dozois);
+            assertThat(authors).containsExactly(martin, dozois);
         }
 
         @Test
         void shouldIgnoreLocAuthorsThatDoNotIncludeTheChosenAuthors() {
             final String cart = "Michael Cart";
+
+            final List<String> authors = mergedAuthors(List.of(cart), List.of("Christine Jenkins"));
+
+            assertThat(authors).containsExactly(cart);
+        }
+
+        private List<String> mergedAuthors(final List<String> hardcoverAuthors, final List<String> locAuthors) {
             final SourceBook hardcover = titled(BookFieldSource.HARDCOVER)
-                .authors(SourceAuthor.ofNames(List.of(cart)))
+                .authors(SourceAuthor.ofNames(hardcoverAuthors))
                 .build();
             final SourceBook loc = titled(BookFieldSource.LOC)
-                .authors(SourceAuthor.ofNames(List.of("Christine Jenkins")))
+                .authors(SourceAuthor.ofNames(locAuthors))
                 .build();
-
-            final MergedBook merged = merger.merge(null, List.of(hardcover, loc));
-
-            assertThat(merged.book().authors()).extracting(SourceAuthor::name).containsExactly(cart);
+            return merger.merge(null, List.of(hardcover, loc)).book().authors().stream()
+                .map(SourceAuthor::name)
+                .toList();
         }
 
         @Test
@@ -613,12 +637,16 @@ class SourceMergerTest {
                 .build();
             final SourceBook openLibrary = titled(BookFieldSource.OPEN_LIBRARY)
                 .publicationYear(ORIGINAL_YEAR)
+                .coverUrl(COVER_URL)
+                .rawSubjects(List.of(FANTASY))
                 .build();
 
             final MergedBook merged = merger.merge(null, List.of(google, openLibrary));
 
             assertThat(merged.provenanceOf(BookField.TITLE)).isEqualTo(BookFieldSource.GOOGLE_BOOKS);
             assertThat(merged.provenanceOf(BookField.PUBLICATION_YEAR)).isEqualTo(BookFieldSource.OPEN_LIBRARY);
+            assertThat(merged.provenanceOf(BookField.COVER)).isEqualTo(BookFieldSource.OPEN_LIBRARY);
+            assertThat(merged.provenanceOf(BookField.SUBJECTS)).isEqualTo(BookFieldSource.OPEN_LIBRARY);
         }
 
         @Test

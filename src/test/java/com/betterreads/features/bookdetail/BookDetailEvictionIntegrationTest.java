@@ -79,10 +79,7 @@ class BookDetailEvictionIntegrationTest extends ContainerizedTest {
 
         bookUpsertService.upsertFromSource(book(REVISED_TITLE));
 
-        await().atMost(EVICTION_TIMEOUT).pollInterval(EVICTION_POLL_INTERVAL).untilAsserted(() -> {
-            final BookDetailResponse fresh = bookDetailService.findByKey(ISBN).orElseThrow();
-            assertThat(fresh.title()).isEqualTo(REVISED_TITLE);
-        });
+        assertServesRevisedTitle();
     }
 
     @Test
@@ -93,6 +90,10 @@ class BookDetailEvictionIntegrationTest extends ContainerizedTest {
         final VerifiedMetadata verified = new VerifiedMetadata(REVISED_TITLE, null, null, null, null, null, null);
         bookUpsertService.applyVerified(bookId, verified);
 
+        assertServesRevisedTitle();
+    }
+
+    private void assertServesRevisedTitle() {
         await().atMost(EVICTION_TIMEOUT).pollInterval(EVICTION_POLL_INTERVAL).untilAsserted(() -> {
             final BookDetailResponse fresh = bookDetailService.findByKey(ISBN).orElseThrow();
             assertThat(fresh.title()).isEqualTo(REVISED_TITLE);

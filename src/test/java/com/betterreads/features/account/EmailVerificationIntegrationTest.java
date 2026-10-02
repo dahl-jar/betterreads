@@ -1,35 +1,24 @@
 package com.betterreads.features.account;
 
-import com.betterreads.features.session.RefreshTokenRepository;
-import com.betterreads.mailoutbox.MailOutboxRepository;
 import com.betterreads.mailoutbox.MailOutboxService;
-import com.betterreads.ratelimit.RateLimitFilter;
 import com.betterreads.testsupport.Accounts;
-import com.betterreads.testsupport.ContainerizedTest;
 import com.betterreads.users.User;
-import com.betterreads.users.UserRepository;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
-import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 import java.time.Instant;
 
 import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.web.servlet.MockMvc;
-import org.testcontainers.junit.jupiter.Testcontainers;
+import org.springframework.test.web.servlet.ResultActions;
 
 import static com.betterreads.features.account.AccountTestFixture.FIELD_TOKEN;
 import static com.betterreads.features.account.AccountTestFixture.UNKNOWN_EMAIL;
@@ -43,27 +32,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Covers issuing, consuming, and resending email-verification tokens.
- *
- * <p>The mail-outbox worker is off ({@code mail.outbox.worker-enabled=false}) so enqueued rows
- * stay in the database and a test can read the plaintext token out of the payload without
- * racing a real send.
- */
-@SpringBootTest
-@Testcontainers
+/** Covers issuing, consuming, and resending email-verification tokens. */
 @TestPropertySource(properties = {
-    "auth.refresh-cookie.secure=true",
     "auth.rate-limit.resend-verification-capacity=1000",
     "auth.rate-limit.resend-verification-refill-tokens=1000",
     "auth.rate-limit.resend-verification-refill-seconds=1",
     "auth.rate-limit.verify-email-capacity=1000",
     "auth.rate-limit.verify-email-refill-tokens=1000",
-    "auth.rate-limit.verify-email-refill-seconds=1",
-    "mail.app-base-url=https://test.example.com",
-    "mail.outbox.worker-enabled=false"
+    "auth.rate-limit.verify-email-refill-seconds=1"
 })
-class EmailVerificationIntegrationTest extends ContainerizedTest {
+class EmailVerificationIntegrationTest extends AccountMailTest {
 
     @Container
     @ServiceConnection
@@ -72,42 +50,6 @@ class EmailVerificationIntegrationTest extends ContainerizedTest {
     private static final String VERIFY_URL = "/api/v1/auth/verify-email";
 
     private static final String RESEND_URL = "/api/v1/auth/resend-verification";
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private EmailTokenRepository emailTokenRepository;
-
-    @Autowired
-    private EmailVerificationService emailVerificationService;
-
-    @Autowired
-    private MailOutboxRepository mailOutboxRepository;
-
-    @Autowired
-    private RefreshTokenRepository refreshTokenRepository;
-
-    @Autowired
-    private RateLimitFilter rateLimitFilter;
-
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
-
-    private MockMvc mockMvc;
-
-    @BeforeEach
-    void setUp() {
-        mockMvc = securedMockMvc();
-        mailOutboxRepository.deleteAll();
-        emailTokenRepository.deleteAll();
-        refreshTokenRepository.deleteAll();
-        userRepository.deleteAll();
-        rateLimitFilter.reset();
-    }
 
     @Nested
     @DisplayName("POST /auth/register")
@@ -147,9 +89,7 @@ class EmailVerificationIntegrationTest extends ContainerizedTest {
             final long userId = registerNewUser();
             final String token = AccountTestFixture.readEnqueuedToken(mailOutboxRepository, objectMapper);
 
-            mockMvc.perform(post(VERIFY_URL)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(verifyPayload(token)))
+            verify(token)
                 .andExpect(status().isNoContent());
 
             assertThat(verifiedAt(userId))
@@ -167,17 +107,13 @@ class EmailVerificationIntegrationTest extends ContainerizedTest {
             final long userId = registerNewUser();
             final String token = AccountTestFixture.readEnqueuedToken(mailOutboxRepository, objectMapper);
 
-            mockMvc.perform(post(VERIFY_URL)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(verifyPayload(token)))
+            verify(token)
                 .andExpect(status().isNoContent());
 
             final Instant verifiedAtAfterFirst = verifiedAt(userId);
             assertThat(verifiedAtAfterFirst).isNotNull();
 
-            mockMvc.perform(post(VERIFY_URL)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(verifyPayload(token)))
+            verify(token)
                 .andExpect(status().isNoContent());
 
             assertThat(verifiedAt(userId))
@@ -191,9 +127,7 @@ class EmailVerificationIntegrationTest extends ContainerizedTest {
             final String token = AccountTestFixture.readEnqueuedToken(mailOutboxRepository, objectMapper);
             AccountTestFixture.expireTokens(jdbcTemplate, userId, EmailToken.Purpose.EMAIL_VERIFICATION);
 
-            mockMvc.perform(post(VERIFY_URL)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(verifyPayload(token)))
+            verify(token)
                 .andExpect(status().isBadRequest());
 
             assertThat(verifiedAt(userId))
@@ -205,9 +139,7 @@ class EmailVerificationIntegrationTest extends ContainerizedTest {
         void rejectsUnknownToken() throws Exception {
             registerNewUser();
 
-            mockMvc.perform(post(VERIFY_URL)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(verifyPayload(UNKNOWN_TOKEN)))
+            verify(UNKNOWN_TOKEN)
                 .andExpect(status().isBadRequest());
         }
 
@@ -224,9 +156,7 @@ class EmailVerificationIntegrationTest extends ContainerizedTest {
             mailOutboxRepository.deleteAll();
             emailVerificationService.requestResend(EMAIL);
 
-            mockMvc.perform(post(VERIFY_URL)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(verifyPayload(firstToken)))
+            verify(firstToken)
                 .andExpect(status().isBadRequest());
 
             assertThat(verifiedAt(userId))
@@ -244,9 +174,7 @@ class EmailVerificationIntegrationTest extends ContainerizedTest {
             final long userId = registerNewUser();
             mailOutboxRepository.deleteAll();
 
-            mockMvc.perform(post(RESEND_URL)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(AccountTestFixture.emailPayload(objectMapper, EMAIL)))
+            resend(EMAIL)
                 .andExpect(status().isNoContent());
 
             assertThat(emailTokenRepository.findActive(
@@ -262,9 +190,7 @@ class EmailVerificationIntegrationTest extends ContainerizedTest {
 
         @Test
         void returnsNoContentForUnknownEmailWithoutEnqueueing() throws Exception {
-            mockMvc.perform(post(RESEND_URL)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(AccountTestFixture.emailPayload(objectMapper, UNKNOWN_EMAIL)))
+            resend(UNKNOWN_EMAIL)
                 .andExpect(status().isNoContent());
 
             assertThat(mailOutboxRepository.findAll())
@@ -282,9 +208,7 @@ class EmailVerificationIntegrationTest extends ContainerizedTest {
             emailVerificationService.verify(token);
             mailOutboxRepository.deleteAll();
 
-            mockMvc.perform(post(RESEND_URL)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(AccountTestFixture.emailPayload(objectMapper, EMAIL)))
+            resend(EMAIL)
                 .andExpect(status().isNoContent());
 
             assertThat(mailOutboxRepository.findAll())
@@ -301,9 +225,7 @@ class EmailVerificationIntegrationTest extends ContainerizedTest {
             registerNewUser();
             mailOutboxRepository.deleteAll();
 
-            mockMvc.perform(post(RESEND_URL)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(AccountTestFixture.emailPayload(objectMapper, MIXED_CASE_EMAIL)))
+            resend(MIXED_CASE_EMAIL)
                 .andExpect(status().isNoContent());
 
             assertThat(mailOutboxRepository.findAll())
@@ -341,9 +263,21 @@ class EmailVerificationIntegrationTest extends ContainerizedTest {
         return user.getEmailVerifiedAt();
     }
 
-    private String verifyPayload(final String token) {
+    // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
+    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
+    private ResultActions verify(final String token) throws Exception {
         final ObjectNode node = objectMapper.createObjectNode();
         node.put(FIELD_TOKEN, token);
-        return objectMapper.writeValueAsString(node);
+        return mockMvc.perform(post(VERIFY_URL)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(node)));
+    }
+
+    // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
+    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
+    private ResultActions resend(final String email) throws Exception {
+        return mockMvc.perform(post(RESEND_URL)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(AccountTestFixture.emailPayload(objectMapper, email)));
     }
 }

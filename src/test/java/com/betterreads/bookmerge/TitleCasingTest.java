@@ -46,16 +46,17 @@ class TitleCasingTest {
         "Sleeping with the fishes | Sleeping with the Fishes",
         "a tale worth fighting for | A Tale Worth Fighting For",
         "Fear of, and for, the dark | Fear of, and for, the Dark",
-        "The night  is watching | The Night  Is Watching"
+        "The night  is watching | The Night  Is Watching",
+        "how I went from pop to pulpit | How I Went From Pop to Pulpit",
+        "batman: the long halloween | Batman: The Long Halloween"
     })
     void shouldTitleCaseLowercaseEnglishTitle(final String lowercase, final String expected) {
         assertThat(TitleCasing.capitalize(lowercase, List.of(), ENGLISH)).isEqualTo(expected);
     }
 
-    @Test
-    void shouldKeepDeliberateCasing() {
-        final String title = "iPhone for seniors";
-
+    @ParameterizedTest(name = "\"{0}\" is left unchanged")
+    @CsvSource({"iPhone for seniors", "a history of Iran"})
+    void shouldKeepDeliberateCasing(final String title) {
         assertThat(TitleCasing.capitalize(title, List.of(), ENGLISH)).isEqualTo(title);
     }
 

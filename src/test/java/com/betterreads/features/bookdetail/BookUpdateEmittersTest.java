@@ -11,6 +11,8 @@ import java.util.stream.IntStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+// PMD.TooManyMethods: one test per stream lifecycle case plus the shared fixtures and assertion.
+@SuppressWarnings("PMD.TooManyMethods")
 class BookUpdateEmittersTest {
 
     private static final String KEY = "9780000000001";
@@ -34,8 +36,7 @@ class BookUpdateEmittersTest {
         emitters.open(KEY, detail(), Optional::empty);
         final RecordingEmitter emitter = streams.lastEmitter();
 
-        assertThat(emitter.sent()).singleElement().asString().startsWith(UPDATE_EVENT);
-        assertThat(emitter.completed()).isTrue();
+        assertSentOnceAndClosed(emitter);
     }
 
     @Test
@@ -80,8 +81,7 @@ class BookUpdateEmittersTest {
         emitters.open(KEY, incompleteDetail(), Optional::empty);
         final RecordingEmitter emitter = streams.lastEmitter();
 
-        assertThat(emitter.sent()).singleElement().asString().startsWith(UPDATE_EVENT);
-        assertThat(emitter.completed()).isTrue();
+        assertSentOnceAndClosed(emitter);
         assertThat(streams.openKeys()).doesNotContain(KEY);
     }
 
@@ -115,6 +115,11 @@ class BookUpdateEmittersTest {
         emitters.open(KEY, incompleteDetail(), () -> Optional.of(incompleteDetail()));
 
         assertThat(streams.openKeys()).containsExactly(KEY);
+    }
+
+    private static void assertSentOnceAndClosed(final RecordingEmitter emitter) {
+        assertThat(emitter.sent()).singleElement().asString().startsWith(UPDATE_EVENT);
+        assertThat(emitter.completed()).isTrue();
     }
 
     private void openIncomplete() {

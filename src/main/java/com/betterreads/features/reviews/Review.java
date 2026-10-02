@@ -5,13 +5,9 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-
+import com.betterreads.db.Timestamped;
 import org.jspecify.annotations.Nullable;
 
 /** One user's review of one book, a 1-5 rating with optional title and body. */
@@ -19,7 +15,7 @@ import org.jspecify.annotations.Nullable;
 @Table(name = "review")
 // NullAway.Init, PMD.DataClass: JPA sets the fields reflectively and an entity is a data holder.
 @SuppressWarnings({"NullAway.Init", "PMD.DataClass"})
-public class Review {
+public class Review extends Timestamped {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -44,30 +40,14 @@ public class Review {
     @Nullable
     private String body;
 
-    @Column(name = "created_at", nullable = false)
-    private OffsetDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private OffsetDateTime updatedAt;
-
     protected Review() {
+        super();
     }
 
     public Review(final Long userId, final Long bookId) {
+        super();
         this.userId = userId;
         this.bookId = bookId;
-    }
-
-    @PrePersist
-    void onCreate() {
-        final OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        this.createdAt = now;
-        this.updatedAt = now;
-    }
-
-    @PreUpdate
-    void onUpdate() {
-        this.updatedAt = OffsetDateTime.now(ZoneOffset.UTC);
     }
 
     public Long getReviewId() {
@@ -103,9 +83,5 @@ public class Review {
 
     public void setBody(@Nullable final String body) {
         this.body = body;
-    }
-
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
     }
 }

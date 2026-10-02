@@ -167,9 +167,8 @@ class MetadataCheckServiceTest {
             when(books.findSeriesNames()).thenReturn(List.of(LAST_KING));
             final VerifiedMetadata found =
                 new VerifiedMetadata(null, null, null, "last king of osten ard", 1, null, null);
-            when(client.check(any())).thenReturn(Optional.of(Map.of(BOOK_ID, found)));
 
-            service.checkNewBooks();
+            checkWithAnswer(found);
 
             verify(upsert).applyVerified(BOOK_ID,
                 new VerifiedMetadata(null, null, null, LAST_KING, 1, null, null));
@@ -181,9 +180,8 @@ class MetadataCheckServiceTest {
             when(books.findAuthorNames()).thenReturn(List.of(AUTHOR));
             final VerifiedMetadata found =
                 new VerifiedMetadata(null, List.of("BROWN, Pierce"), null, null, null, null, null);
-            when(client.check(any())).thenReturn(Optional.of(Map.of(BOOK_ID, found)));
 
-            service.checkNewBooks();
+            checkWithAnswer(found);
 
             verify(upsert).applyVerified(BOOK_ID,
                 new VerifiedMetadata(null, List.of(AUTHOR), null, null, null, null, null));
@@ -194,9 +192,8 @@ class MetadataCheckServiceTest {
             givenBooks(List.of(book(BOOK_ID)));
             final VerifiedMetadata found =
                 new VerifiedMetadata("Red Rising: Book One of the Red Rising Saga", null, null, null, null, null, null);
-            when(client.check(any())).thenReturn(Optional.of(Map.of(BOOK_ID, found)));
 
-            service.checkNewBooks();
+            checkWithAnswer(found);
 
             verify(upsert).applyVerified(BOOK_ID, new VerifiedMetadata(TITLE, null, null, null, null, null, null));
         }
@@ -220,6 +217,11 @@ class MetadataCheckServiceTest {
             service.checkNewBooks();
 
             verify(upsert).applyVerified(OTHER_ID, VerifiedMetadata.NONE);
+        }
+
+        private void checkWithAnswer(final VerifiedMetadata found) {
+            when(client.check(any())).thenReturn(Optional.of(Map.of(BOOK_ID, found)));
+            service.checkNewBooks();
         }
     }
 

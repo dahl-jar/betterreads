@@ -150,18 +150,15 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
 
         @Test
         void shouldDropThePrequelAtPositionZero() {
-            stubSearchAndBooks();
-
-            final Optional<SourceSeries> series = client.fetchSeries(QUERY);
-
-            assertThat(series).get()
-                .extracting(SourceSeries::volumes, list(SourceSeriesVolume.class))
-                .extracting(volume -> volume.book().title())
-                .doesNotContain("New Spring");
+            assertVolumeDropped("New Spring");
         }
 
         @Test
         void shouldDropVolumesPastThePrimaryBookCount() {
+            assertVolumeDropped("A Crown of Swords");
+        }
+
+        private void assertVolumeDropped(final String title) {
             stubSearchAndBooks();
 
             final Optional<SourceSeries> series = client.fetchSeries(QUERY);
@@ -169,7 +166,7 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
             assertThat(series).get()
                 .extracting(SourceSeries::volumes, list(SourceSeriesVolume.class))
                 .extracting(volume -> volume.book().title())
-                .doesNotContain("A Crown of Swords");
+                .doesNotContain(title);
         }
 
         @Test

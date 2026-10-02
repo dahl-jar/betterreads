@@ -20,8 +20,7 @@ class CoverBackfillSchedulerTest {
     @Test
     @DisplayName("runs the slice when enabled and not in full-sweep mode")
     void runsSlice() {
-        final CoverBackfillScheduler scheduler =
-            new CoverBackfillScheduler(service, new CoverBackfillProperties(true, false), sameThread);
+        final CoverBackfillScheduler scheduler = scheduler(true, false);
 
         scheduler.scheduledBackfill();
 
@@ -32,8 +31,7 @@ class CoverBackfillSchedulerTest {
     @Test
     @DisplayName("runs the full sweep when the flag is set")
     void runsFullSweep() {
-        final CoverBackfillScheduler scheduler =
-            new CoverBackfillScheduler(service, new CoverBackfillProperties(true, true), sameThread);
+        final CoverBackfillScheduler scheduler = scheduler(true, true);
 
         scheduler.scheduledBackfill();
 
@@ -44,8 +42,7 @@ class CoverBackfillSchedulerTest {
     @Test
     @DisplayName("does nothing when disabled")
     void skipsWhenDisabled() {
-        final CoverBackfillScheduler scheduler =
-            new CoverBackfillScheduler(service, new CoverBackfillProperties(false, false), sameThread);
+        final CoverBackfillScheduler scheduler = scheduler(false, false);
 
         scheduler.scheduledBackfill();
 
@@ -67,5 +64,9 @@ class CoverBackfillSchedulerTest {
         reentrantScheduler.scheduledBackfill();
 
         verify(service, times(1)).backfillSlice();
+    }
+
+    private CoverBackfillScheduler scheduler(final boolean enabled, final boolean fullSweep) {
+        return new CoverBackfillScheduler(service, new CoverBackfillProperties(enabled, fullSweep), sameThread);
     }
 }

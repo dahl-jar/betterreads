@@ -5,14 +5,11 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 
+import com.betterreads.db.Timestamped;
 import org.hibernate.annotations.SQLRestriction;
 import org.jspecify.annotations.Nullable;
 
@@ -27,7 +24,7 @@ import org.jspecify.annotations.Nullable;
 @SQLRestriction("deleted_at IS NULL")
 // NullAway.Init, PMD.DataClass: JPA sets the fields reflectively and an entity is a data holder.
 @SuppressWarnings({"NullAway.Init", "PMD.DataClass"})
-public class User {
+public class User extends Timestamped {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -59,27 +56,9 @@ public class User {
     @Nullable
     private Instant emailVerifiedAt;
 
-    @Column(name = "created_at", nullable = false)
-    private OffsetDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private OffsetDateTime updatedAt;
-
     @Column(name = "deleted_at")
     @Nullable
     private Instant deletedAt;
-
-    @PrePersist
-    void onCreate() {
-        final OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        this.createdAt = now;
-        this.updatedAt = now;
-    }
-
-    @PreUpdate
-    void onUpdate() {
-        this.updatedAt = OffsetDateTime.now(ZoneOffset.UTC);
-    }
 
     public Long getUserId() {
         return userId;

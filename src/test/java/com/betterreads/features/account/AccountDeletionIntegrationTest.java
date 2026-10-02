@@ -151,11 +151,7 @@ class AccountDeletionIntegrationTest extends ContainerizedTest {
 
         @Test
         void repeatDeleteIsIdempotent() throws Exception {
-            registerAndSeedOutstandingTokens();
-            final Tokens tokens = loginAndCapture(USERNAME);
-
-            mockMvc.perform(delete(Accounts.ME_URL).header(AUTH_HEADER, BEARER_PREFIX + tokens.accessToken()))
-                .andExpect(status().isNoContent());
+            final Tokens tokens = registerAndDeleteAccount();
 
             mockMvc.perform(delete(Accounts.ME_URL).header(AUTH_HEADER, BEARER_PREFIX + tokens.accessToken()))
                 .andExpect(status().isNoContent());
@@ -174,10 +170,7 @@ class AccountDeletionIntegrationTest extends ContainerizedTest {
 
         @Test
         void forgotPasswordIsSilentForDeletedAccount() throws Exception {
-            registerAndSeedOutstandingTokens();
-            final Tokens tokens = loginAndCapture(USERNAME);
-            mockMvc.perform(delete(Accounts.ME_URL).header(AUTH_HEADER, BEARER_PREFIX + tokens.accessToken()))
-                .andExpect(status().isNoContent());
+            registerAndDeleteAccount();
             mailOutboxRepository.deleteAll();
 
             mockMvc.perform(post(AccountTestFixture.FORGOT_URL)
@@ -193,10 +186,7 @@ class AccountDeletionIntegrationTest extends ContainerizedTest {
 
         @Test
         void reRegistrationDuringGraceIsBlocked() throws Exception {
-            registerAndSeedOutstandingTokens();
-            final Tokens tokens = loginAndCapture(USERNAME);
-            mockMvc.perform(delete(Accounts.ME_URL).header(AUTH_HEADER, BEARER_PREFIX + tokens.accessToken()))
-                .andExpect(status().isNoContent());
+            registerAndDeleteAccount();
 
             mockMvc.perform(post(Accounts.REGISTER_URL)
                     .contentType(MediaType.APPLICATION_JSON)
@@ -284,6 +274,16 @@ class AccountDeletionIntegrationTest extends ContainerizedTest {
                 .as("email_token rows cascade-deleted via ON DELETE CASCADE")
                 .isZero();
         }
+    }
+
+    // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
+    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
+    private Tokens registerAndDeleteAccount() throws Exception {
+        registerAndSeedOutstandingTokens();
+        final Tokens tokens = loginAndCapture(USERNAME);
+        mockMvc.perform(delete(Accounts.ME_URL).header(AUTH_HEADER, BEARER_PREFIX + tokens.accessToken()))
+            .andExpect(status().isNoContent());
+        return tokens;
     }
 
     // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.

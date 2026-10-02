@@ -2,7 +2,6 @@ package com.betterreads.clients.itunes;
 
 import com.betterreads.booksource.DescriptionLookup;
 import com.betterreads.clients.WireMockFixture;
-import com.betterreads.clients.http.WebClients;
 import com.betterreads.ratelimit.RateLimiter;
 import static com.betterreads.clients.itunes.ItunesSearchJson.search;
 import static com.github.tomakehurst.wiremock.client.WireMock.anyUrl;
@@ -29,11 +28,11 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.web.reactive.function.client.WebClient;
 
 @SpringBootTest(
     classes = {
         ItunesDescriptionSourceWireMockTest.StubBeans.class,
+        ItunesTestWebClientConfig.class,
         ItunesApi.class,
         ItunesDescriptionSource.class
     },
@@ -74,12 +73,6 @@ class ItunesDescriptionSourceWireMockTest extends WireMockFixture {
 
     @TestConfiguration
     static class StubBeans {
-
-        @Bean
-        WebClient itunesWebClient(final ItunesProperties properties) {
-            return WebClients.builderWithTimeouts(
-                properties.baseUrl(), properties.connectTimeout(), properties.readTimeout()).build();
-        }
 
         @Bean
         RateLimiter itunesRateLimiter() {

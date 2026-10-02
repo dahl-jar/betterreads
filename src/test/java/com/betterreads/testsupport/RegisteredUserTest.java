@@ -1,7 +1,11 @@
 package com.betterreads.testsupport;
 
+import com.betterreads.book.BookRepository;
+import com.betterreads.ratelimit.RateLimitFilter;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -28,6 +32,24 @@ public abstract class RegisteredUserTest extends ContainerizedTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private JdbcTemplate jdbc;
+
+    @Autowired
+    private RateLimitFilter rateLimit;
+
+    @Autowired
+    private BookRepository books;
+
+    protected void resetToDune() {
+        jdbc.update("DELETE FROM review");
+        jdbc.update("DELETE FROM book_author");
+        jdbc.update("DELETE FROM book");
+        jdbc.update("DELETE FROM app_user");
+        rateLimit.reset();
+        Books.seedBook(books, Books.DUNE_KEY, Books.DUNE_TITLE);
+    }
 
     // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")

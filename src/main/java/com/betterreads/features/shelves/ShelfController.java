@@ -2,6 +2,7 @@ package com.betterreads.features.shelves;
 
 import java.util.List;
 
+import com.betterreads.errors.AuthenticatedBookErrorResponses;
 import org.springframework.http.ProblemDetail;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -53,10 +54,7 @@ class ShelfController {
     @ApiResponse(responseCode = "200", description = "The updated shelf entry")
     @ApiResponse(responseCode = "400", description = "Unknown status value",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-    @ApiResponse(responseCode = "401", description = "Missing or invalid access token",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-    @ApiResponse(responseCode = "404", description = "No book with that key",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    @AuthenticatedBookErrorResponses
     public ShelfEntryResponse changeStatus(
         @AuthenticationPrincipal final Long userId,
         @PathVariable final String key,
@@ -67,10 +65,7 @@ class ShelfController {
     @PutMapping("/{key}/favorite")
     @Operation(summary = "Set the favorite flag for a book")
     @ApiResponse(responseCode = "200", description = "The updated shelf entry")
-    @ApiResponse(responseCode = "401", description = "Missing or invalid access token",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-    @ApiResponse(responseCode = "404", description = "No book with that key",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    @AuthenticatedBookErrorResponses
     public ShelfEntryResponse markFavorite(
         @AuthenticationPrincipal final Long userId,
         @PathVariable final String key,
@@ -97,10 +92,7 @@ class ShelfController {
     @DeleteMapping("/{key}")
     @Operation(summary = "Remove a book from the shelf")
     @ApiResponse(responseCode = "204", description = "Book removed or already absent")
-    @ApiResponse(responseCode = "401", description = "Missing or invalid access token",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-    @ApiResponse(responseCode = "404", description = "No book with that key",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    @AuthenticatedBookErrorResponses
     public ResponseEntity<Void> remove(
         @AuthenticationPrincipal final Long userId,
         @PathVariable final String key) {

@@ -20,8 +20,7 @@ class DescriptionBackfillSchedulerTest {
     @Test
     @DisplayName("runs the thin-only slice when enabled and not in full-sweep mode")
     void runsSlice() {
-        final DescriptionBackfillScheduler scheduler =
-            new DescriptionBackfillScheduler(service, new DescriptionBackfillProperties(true, false), sameThread);
+        final DescriptionBackfillScheduler scheduler = scheduler(true, false);
 
         scheduler.scheduledBackfill();
 
@@ -32,8 +31,7 @@ class DescriptionBackfillSchedulerTest {
     @Test
     @DisplayName("runs the full sweep when the flag is set")
     void runsFullSweep() {
-        final DescriptionBackfillScheduler scheduler =
-            new DescriptionBackfillScheduler(service, new DescriptionBackfillProperties(true, true), sameThread);
+        final DescriptionBackfillScheduler scheduler = scheduler(true, true);
 
         scheduler.scheduledBackfill();
 
@@ -44,8 +42,7 @@ class DescriptionBackfillSchedulerTest {
     @Test
     @DisplayName("does nothing when disabled")
     void skipsWhenDisabled() {
-        final DescriptionBackfillScheduler scheduler =
-            new DescriptionBackfillScheduler(service, new DescriptionBackfillProperties(false, false), sameThread);
+        final DescriptionBackfillScheduler scheduler = scheduler(false, false);
 
         scheduler.scheduledBackfill();
 
@@ -67,5 +64,10 @@ class DescriptionBackfillSchedulerTest {
         reentrantScheduler.scheduledBackfill();
 
         verify(service, times(1)).backfillSlice();
+    }
+
+    private DescriptionBackfillScheduler scheduler(final boolean enabled, final boolean fullSweep) {
+        final DescriptionBackfillProperties properties = new DescriptionBackfillProperties(enabled, fullSweep);
+        return new DescriptionBackfillScheduler(service, properties, sameThread);
     }
 }

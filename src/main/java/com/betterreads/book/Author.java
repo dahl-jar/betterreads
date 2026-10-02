@@ -5,22 +5,19 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.Collection;
 import java.util.List;
 
+import com.betterreads.db.Timestamped;
 import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(name = "author")
 // NullAway.Init, PMD.DataClass: JPA sets the fields reflectively and an entity is a data holder.
 @SuppressWarnings({"NullAway.Init", "PMD.DataClass"})
-public class Author {
+public class Author extends Timestamped {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -45,24 +42,6 @@ public class Author {
     @Column(name = "bio", columnDefinition = "TEXT")
     @Nullable
     private String bio;
-
-    @Column(name = "created_at", nullable = false)
-    private OffsetDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private OffsetDateTime updatedAt;
-
-    @PrePersist
-    void onCreate() {
-        final OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        this.createdAt = now;
-        this.updatedAt = now;
-    }
-
-    @PreUpdate
-    void onUpdate() {
-        this.updatedAt = OffsetDateTime.now(ZoneOffset.UTC);
-    }
 
     public String getName() {
         return name;

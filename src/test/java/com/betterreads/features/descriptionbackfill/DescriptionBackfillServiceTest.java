@@ -87,9 +87,7 @@ class DescriptionBackfillServiceTest {
     @Test
     @DisplayName("stamps a book the sources cannot improve as checked without writing a description")
     void stampsUnimprovableBook() {
-        final Book book = bookWithId(BOOK_ID);
-        when(books.findThinDescriptions(anyInt(), any(Pageable.class))).thenReturn(List.of(book));
-        when(selector.bestDescription(any(DescriptionLookup.class), any())).thenReturn(Optional.empty());
+        stubThinSliceWithoutImprovement(bookWithId(BOOK_ID));
 
         service.backfillSlice();
 
@@ -128,8 +126,7 @@ class DescriptionBackfillServiceTest {
         final Author author = new Author();
         author.setName(AUTHOR);
         book.setAuthors(Set.of(author));
-        when(books.findThinDescriptions(anyInt(), any(Pageable.class))).thenReturn(List.of(book));
-        when(selector.bestDescription(any(DescriptionLookup.class), any())).thenReturn(Optional.empty());
+        stubThinSliceWithoutImprovement(book);
 
         service.backfillSlice();
 
@@ -155,6 +152,11 @@ class DescriptionBackfillServiceTest {
 
         verify(books).updateDescription(eq(1L), eq(STRONG), any(OffsetDateTime.class));
         verify(books).updateDescription(eq(2L), eq(STRONG), any(OffsetDateTime.class));
+    }
+
+    private void stubThinSliceWithoutImprovement(final Book book) {
+        when(books.findThinDescriptions(anyInt(), any(Pageable.class))).thenReturn(List.of(book));
+        when(selector.bestDescription(any(DescriptionLookup.class), any())).thenReturn(Optional.empty());
     }
 
     private static Book bookWithId(final long bookId) {

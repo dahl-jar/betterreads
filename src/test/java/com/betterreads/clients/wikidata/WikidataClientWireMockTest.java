@@ -150,19 +150,20 @@ class WikidataClientWireMockTest extends WikidataWireMock {
 
         @Test
         void shouldSkipAnAuthorWhoseEntityIsNotFound() {
-            stubOnlyHit(novel().withAuthors(MISSING_AUTHOR_QID, HERBERT_QID));
             stubEntityStatus(MISSING_AUTHOR_QID, HTTP_NOT_FOUND);
-            stubEntity(herbert());
 
-            final SourceBook book = client.fetchByTitleAuthor(DUNE_TITLE, HERBERT_NAME).orElseThrow();
-
-            assertThat(book.authors()).extracting(SourceAuthor::name).containsExactly(HERBERT_NAME);
+            assertAuthorSkipped(MISSING_AUTHOR_QID);
         }
 
         @Test
         void shouldSkipAnAuthorWhoseQidRedirects() {
-            stubOnlyHit(novel().withAuthors(REDIRECTED_AUTHOR_QID, HERBERT_QID));
             stubRedirect(REDIRECTED_AUTHOR_QID, moore());
+
+            assertAuthorSkipped(REDIRECTED_AUTHOR_QID);
+        }
+
+        private void assertAuthorSkipped(final String skippedQid) {
+            stubOnlyHit(novel().withAuthors(skippedQid, HERBERT_QID));
             stubEntity(herbert());
 
             final SourceBook book = client.fetchByTitleAuthor(DUNE_TITLE, HERBERT_NAME).orElseThrow();

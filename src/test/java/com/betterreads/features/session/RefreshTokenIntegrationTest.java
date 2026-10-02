@@ -30,6 +30,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static com.betterreads.testsupport.Accounts.EMAIL;
@@ -137,10 +138,10 @@ class RefreshTokenIntegrationTest extends ContainerizedTest {
 
         @Test
         void rotatesAndRevokesOldToken() throws Exception {
-            final long userId = Accounts.seedUser(userRepository, passwordEncoder, USERNAME, EMAIL, PASSWORD);
+            final long userId = seedUser();
             final String original = loginAndExtractCookieValue();
 
-            mockMvc.perform(post(REFRESH_URL).cookie(new Cookie(COOKIE_NAME, original)))
+            refresh(original)
                 .andExpect(status().isOk())
                 .andExpect(cookie().exists(COOKIE_NAME))
                 .andExpect(cookie().value(COOKIE_NAME, Matchers.not(Matchers.equalTo(original))));
@@ -152,13 +153,13 @@ class RefreshTokenIntegrationTest extends ContainerizedTest {
 
         @Test
         void replayingRevokedTokenRevokesEntireChain() throws Exception {
-            final long userId = Accounts.seedUser(userRepository, passwordEncoder, USERNAME, EMAIL, PASSWORD);
+            final long userId = seedUser();
             final String original = loginAndExtractCookieValue();
 
-            mockMvc.perform(post(REFRESH_URL).cookie(new Cookie(COOKIE_NAME, original)))
+            refresh(original)
                 .andExpect(status().isOk());
 
-            mockMvc.perform(post(REFRESH_URL).cookie(new Cookie(COOKIE_NAME, original)))
+            refresh(original)
                 .andExpect(status().isUnauthorized());
 
             assertThat(Accounts.activeRefreshTokenCount(refreshTokenRepository, userId)).isZero();
@@ -166,41 +167,41 @@ class RefreshTokenIntegrationTest extends ContainerizedTest {
 
         @Test
         void rejectsExpiredToken() throws Exception {
-            final long userId = Accounts.seedUser(userRepository, passwordEncoder, USERNAME, EMAIL, PASSWORD);
+            final long userId = seedUser();
             final String original = loginAndExtractCookieValue();
             expireUserTokens(userId);
 
-            mockMvc.perform(post(REFRESH_URL).cookie(new Cookie(COOKIE_NAME, original)))
+            refresh(original)
                 .andExpect(status().isUnauthorized());
         }
 
         @Test
         void rejectsTokenForDeletedUser() throws Exception {
-            final long userId = Accounts.seedUser(userRepository, passwordEncoder, USERNAME, EMAIL, PASSWORD);
+            final long userId = seedUser();
             final String original = loginAndExtractCookieValue();
             final User user = userRepository.findById(userId).orElseThrow();
             user.setDeletedAt(Instant.now());
             userRepository.save(user);
 
-            mockMvc.perform(post(REFRESH_URL).cookie(new Cookie(COOKIE_NAME, original)))
+            refresh(original)
                 .andExpect(status().isUnauthorized());
         }
 
         @Test
         void shouldRejectUnknownToken() throws Exception {
-            mockMvc.perform(post(REFRESH_URL).cookie(new Cookie(COOKIE_NAME, "not-a-real-token")))
+            refresh("not-a-real-token")
                 .andExpect(status().isUnauthorized());
         }
 
         @Test
         void shouldRejectLoggedOutTokenWithoutRevokingOtherSessions() throws Exception {
-            final long userId = Accounts.seedUser(userRepository, passwordEncoder, USERNAME, EMAIL, PASSWORD);
+            final long userId = seedUser();
             final String loggedOut = loginAndExtractCookieValue();
             loginAndExtractCookieValue();
             mockMvc.perform(post(LOGOUT_URL).cookie(new Cookie(COOKIE_NAME, loggedOut)))
                 .andExpect(status().isNoContent());
 
-            mockMvc.perform(post(REFRESH_URL).cookie(new Cookie(COOKIE_NAME, loggedOut)))
+            refresh(loggedOut)
                 .andExpect(status().isUnauthorized());
 
             assertThat(Accounts.activeRefreshTokenCount(refreshTokenRepository, userId)).isEqualTo(1L);
@@ -219,7 +220,7 @@ class RefreshTokenIntegrationTest extends ContainerizedTest {
 
         @Test
         void revokesTokenAndClearsCookie() throws Exception {
-            final long userId = Accounts.seedUser(userRepository, passwordEncoder, USERNAME, EMAIL, PASSWORD);
+            final long userId = seedUser();
             final String original = loginAndExtractCookieValue();
 
             mockMvc.perform(post(LOGOUT_URL).cookie(new Cookie(COOKIE_NAME, original)))
@@ -236,6 +237,16 @@ class RefreshTokenIntegrationTest extends ContainerizedTest {
             mockMvc.perform(post(LOGOUT_URL))
                 .andExpect(status().isNoContent());
         }
+    }
+
+    private long seedUser() {
+        return Accounts.seedUser(userRepository, passwordEncoder, USERNAME, EMAIL, PASSWORD);
+    }
+
+    // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
+    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
+    private ResultActions refresh(final String cookieValue) throws Exception {
+        return mockMvc.perform(post(REFRESH_URL).cookie(new Cookie(COOKIE_NAME, cookieValue)));
     }
 
     // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.

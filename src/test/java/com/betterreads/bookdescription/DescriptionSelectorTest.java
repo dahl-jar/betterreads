@@ -118,11 +118,7 @@ class DescriptionSelectorTest {
         @Test
         @DisplayName("a fallback source fills in when the description is unusable and no other source has one")
         void fallbackFillsWhenNothingElseIsUsable() {
-            final DescriptionSelector selector =
-                new DescriptionSelector(List.of(source(null), fallbackSource(STRONG)));
-            final MergedBook merged = mergedWith(null);
-
-            final MergedBook selected = selector.withBestDescription(merged);
+            final MergedBook selected = selectWithEmptySourceAndStrongFallback(null);
 
             assertThat(selected.book().description()).isEqualTo(STRONG);
             assertThat(selected.provenanceOf(BookField.DESCRIPTION)).isEqualTo(BookFieldSource.WIKIPEDIA);
@@ -130,14 +126,18 @@ class DescriptionSelectorTest {
 
         @Test
         void shouldUseFallbackWhenStoredDescriptionIsNotEnglish() {
-            final DescriptionSelector selector =
-                new DescriptionSelector(List.of(source(null), fallbackSource(STRONG)));
-            final MergedBook merged = mergedWith(FRENCH);
-
-            final MergedBook selected = selector.withBestDescription(merged);
+            final MergedBook selected = selectWithEmptySourceAndStrongFallback(FRENCH);
 
             assertThat(selected.book().description()).isEqualTo(STRONG);
             assertThat(selected.provenanceOf(BookField.DESCRIPTION)).isEqualTo(BookFieldSource.WIKIPEDIA);
+        }
+
+        private MergedBook selectWithEmptySourceAndStrongFallback(final @Nullable String storedDescription) {
+            final DescriptionSelector selector =
+                new DescriptionSelector(List.of(source(null), fallbackSource(STRONG)));
+            final MergedBook merged = mergedWith(storedDescription);
+
+            return selector.withBestDescription(merged);
         }
     }
 

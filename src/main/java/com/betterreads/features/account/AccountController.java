@@ -64,10 +64,7 @@ class AccountController {
     @Operation(summary = "Start a password reset")
     @SecurityRequirements
     @ApiResponse(responseCode = "204", description = "Reset email dispatched if account exists")
-    @ApiResponse(responseCode = "400", description = "Validation failed",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-    @ApiResponse(responseCode = "429", description = "Rate limited",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    @ValidationAndRateLimitResponses
     public ResponseEntity<Void> forgotPassword(@Valid @RequestBody final ForgotPasswordRequest request) {
         passwordResetService.requestReset(request.email());
         return ResponseEntity.noContent().build();
@@ -105,10 +102,7 @@ class AccountController {
     @Operation(summary = "Resend an email-verification link")
     @SecurityRequirements
     @ApiResponse(responseCode = "204", description = "Resend email dispatched if account is unverified")
-    @ApiResponse(responseCode = "400", description = "Validation failed",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-    @ApiResponse(responseCode = "429", description = "Rate limited",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    @ValidationAndRateLimitResponses
     public ResponseEntity<Void> resendVerification(
         @Valid @RequestBody final ResendVerificationRequest request
     ) {

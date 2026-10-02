@@ -1,5 +1,6 @@
 package com.betterreads.book;
 
+import com.betterreads.book.CatalogUpserts.Reupsert;
 import com.betterreads.booksource.SourceBook;
 import com.betterreads.clients.openlibrary.OpenLibraryClient;
 import com.betterreads.testsupport.ContainerizedTest;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
@@ -33,6 +35,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
     "mail.outbox.worker-enabled=false"
 })
 @EnabledIfEnvironmentVariable(named = "RUN_OPENLIBRARY_LIVE", matches = "1")
+@Import(CatalogUpserts.class)
 class CatalogOpenLibraryPersistenceIntegrationTest extends ContainerizedTest {
 
     @Container
@@ -40,6 +43,9 @@ class CatalogOpenLibraryPersistenceIntegrationTest extends ContainerizedTest {
     static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
 
     private static final int HOBBIT_FIRST_PUBLISHED = 1937;
+
+    @Autowired
+    private CatalogUpserts catalogUpserts;
 
     @Autowired
     private OpenLibraryClient openLibraryClient;
@@ -50,13 +56,9 @@ class CatalogOpenLibraryPersistenceIntegrationTest extends ContainerizedTest {
     @Autowired
     private BookRepository bookRepository;
 
-    @Autowired
-    private AuthorRepository authorRepository;
-
     @BeforeEach
     void clearCatalog() {
-        bookRepository.deleteAll();
-        authorRepository.deleteAll();
+        catalogUpserts.clear();
     }
 
     @Test
@@ -96,20 +98,11 @@ class CatalogOpenLibraryPersistenceIntegrationTest extends ContainerizedTest {
     void upsertIsIdempotentForSameWork() {
         final SourceBook source = fetchHobbit();
 
-        final Book first = bookUpsertService.upsertFromSource(source);
-        final long firstId = first.getBookId();
+        final Reupsert reupsert = catalogUpserts.upsertTwiceKeepingOneBook(source);
 
-        final Book second = bookUpsertService.upsertFromSource(source);
-
-        assertThat(second.getBookId())
-            .as("second upsert reuses the existing book_id")
-            .isEqualTo(firstId);
-        assertThat(bookRepository.count())
-            .as("book row count remains one after re-upsert")
-            .isEqualTo(1L);
-        assertThat(second.getSubjects())
+        assertThat(reupsert.second().getSubjects())
             .as("subject row count remains stable after re-upsert")
-            .hasSize(first.getSubjects().size());
+            .hasSize(reupsert.first().getSubjects().size());
     }
 
     private SourceBook fetchHobbit() {

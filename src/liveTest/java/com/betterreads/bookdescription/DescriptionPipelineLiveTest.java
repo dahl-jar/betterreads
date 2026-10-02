@@ -10,10 +10,10 @@ import java.util.List;
 import java.util.Optional;
 
 import com.betterreads.booksource.DescriptionLookup;
-import com.betterreads.clients.http.WebClients;
 import com.betterreads.clients.itunes.ItunesApi;
 import com.betterreads.clients.itunes.ItunesDescriptionSource;
 import com.betterreads.clients.itunes.ItunesProperties;
+import com.betterreads.clients.itunes.ItunesTestWebClientConfig;
 import com.betterreads.clients.wikidata.WikidataApi;
 import com.betterreads.clients.wikidata.WikidataProperties;
 import com.betterreads.clients.wikidata.WikidataWebClientConfig;
@@ -32,7 +32,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
-import org.springframework.web.reactive.function.client.WebClient;
 
 /** Checks description selection against live Wikidata, Wikipedia, and Apple Books data. */
 @SpringBootTest(
@@ -40,6 +39,7 @@ import org.springframework.web.reactive.function.client.WebClient;
         WikidataWebClientConfig.class,
         WikipediaWebClientConfig.class,
         DescriptionPipelineLiveTest.ItunesBeans.class,
+        ItunesTestWebClientConfig.class,
         WikidataApi.class,
         WikipediaApi.class,
         ItunesApi.class,
@@ -121,12 +121,6 @@ class DescriptionPipelineLiveTest {
 
     @TestConfiguration
     static class ItunesBeans {
-
-        @Bean
-        WebClient itunesWebClient(final ItunesProperties properties) {
-            return WebClients.builderWithTimeouts(
-                properties.baseUrl(), properties.connectTimeout(), properties.readTimeout()).build();
-        }
 
         @Bean
         RateLimiter itunesRateLimiter() {

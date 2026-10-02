@@ -20,6 +20,8 @@ final class TitleCasing {
 
     private static final Pattern PUNCTUATION = Pattern.compile("\\p{Punct}");
 
+    private static final Pattern PRONOUN_I = Pattern.compile("(?<=\\s)I\\b");
+
     private static final Set<String> SMALL_WORDS = Set.of(
         "a", "an", "the", "and", "but", "or", "nor", "for", "so", "yet",
         "as", "at", "by", "in", "of", "on", "to", "up", "via", "with");
@@ -30,7 +32,7 @@ final class TitleCasing {
     static String capitalize(
         final String winner, final List<String> alternatives, final @Nullable String language) {
         return betterCasedAlternative(winner, alternatives)
-            .orElseGet(() -> ENGLISH.equals(language) && !hasCapitalAfterFirst(winner) ? titleCase(winner) : winner);
+            .orElseGet(() -> ENGLISH.equals(language) && !isCased(winner) ? titleCase(winner) : winner);
     }
 
     private static Optional<String> betterCasedAlternative(final String winner, final List<String> alternatives) {
@@ -47,18 +49,19 @@ final class TitleCasing {
             .count();
     }
 
-    private static boolean hasCapitalAfterFirst(final String title) {
-        return title.codePoints().skip(1).anyMatch(Character::isUpperCase);
+    private static boolean isCased(final String title) {
+        return PRONOUN_I.matcher(title).replaceAll("").codePoints().skip(1).anyMatch(Character::isUpperCase);
     }
 
     private static String titleCase(final String title) {
         final String[] words = title.split(SPACE);
-        final int last = words.length - 1;
-        return IntStream.rangeClosed(0, last)
-            .mapToObj(index -> index == 0 || index == last || !isSmallWord(words[index])
-                ? capitalizeWord(words[index])
-                : words[index])
+        return IntStream.range(0, words.length)
+            .mapToObj(index -> capitalizes(words, index) ? capitalizeWord(words[index]) : words[index])
             .collect(Collectors.joining(SPACE));
+    }
+
+    private static boolean capitalizes(final String[] words, final int index) {
+        return index == 0 || index == words.length - 1 || words[index - 1].endsWith(":") || !isSmallWord(words[index]);
     }
 
     private static boolean isSmallWord(final String word) {

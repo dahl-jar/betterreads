@@ -184,9 +184,8 @@ class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
         worker.drain();
 
         final MailOutbox row = onlyRow();
+        assertFailedUnsent(row);
         assertThat(row)
-            .satisfies(saved -> assertThat(saved.getFailedAt()).isNotNull())
-            .satisfies(saved -> assertThat(saved.getSentAt()).isNull())
             .satisfies(saved -> assertThat(saved.getAttemptCount()).isEqualTo(1))
             .satisfies(saved -> assertThat(saved.getPayload()).isEqualTo(CLEARED_PAYLOAD));
     }
@@ -233,22 +232,19 @@ class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
     void aPasswordResetRowSendsTheResetMail() {
         final String token = "tok-reset";
         outbox.enqueuePasswordReset(EMAIL, token);
-        sender.script.add(SendOutcome.success());
 
-        worker.drain();
-
-        final MailMessage sent = onlySentMessage();
-        assertThat(sent)
-            .satisfies(mail -> assertThat(mail.recipient()).isEqualTo(EMAIL))
-            .satisfies(mail -> assertThat(mail.subject()).isEqualTo("Reset your BetterReads password"))
-            .satisfies(mail -> assertThat(mail.body())
-                .contains(APP_BASE_URL + "/reset-password?token=" + token));
+        assertDrainSends("Reset your BetterReads password", "/reset-password?token=" + token);
     }
 
     @Test
     void anEmailVerificationRowSendsTheVerificationMail() {
         final String token = "tok-verify";
         outbox.enqueueEmailVerification(EMAIL, token);
+
+        assertDrainSends("Confirm your BetterReads email", "/verify-email?token=" + token);
+    }
+
+    private void assertDrainSends(final String subject, final String link) {
         sender.script.add(SendOutcome.success());
 
         worker.drain();
@@ -256,9 +252,8 @@ class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
         final MailMessage sent = onlySentMessage();
         assertThat(sent)
             .satisfies(mail -> assertThat(mail.recipient()).isEqualTo(EMAIL))
-            .satisfies(mail -> assertThat(mail.subject()).isEqualTo("Confirm your BetterReads email"))
-            .satisfies(mail -> assertThat(mail.body())
-                .contains(APP_BASE_URL + "/verify-email?token=" + token));
+            .satisfies(mail -> assertThat(mail.subject()).isEqualTo(subject))
+            .satisfies(mail -> assertThat(mail.body()).contains(APP_BASE_URL + link));
     }
 
     @Test
@@ -268,10 +263,8 @@ class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
         worker.drain();
 
         final MailOutbox row = onlyRow();
-        assertThat(row)
-            .satisfies(saved -> assertThat(saved.getFailedAt()).isNotNull())
-            .satisfies(saved -> assertThat(saved.getSentAt()).isNull())
-            .satisfies(saved -> assertThat(saved.getLastError()).contains("payload missing token"));
+        assertFailedUnsent(row);
+        assertThat(row.getLastError()).contains("payload missing token");
     }
 
     @Test
@@ -296,6 +289,11 @@ class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
         row.setCreatedAt(due);
         row.setNextAttemptAt(due);
         return repository.save(row);
+    }
+
+    private static void assertFailedUnsent(final MailOutbox row) {
+        assertThat(row.getFailedAt()).isNotNull();
+        assertThat(row.getSentAt()).isNull();
     }
 
     private MailOutbox onlyRow() {

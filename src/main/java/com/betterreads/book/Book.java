@@ -12,13 +12,10 @@ import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -29,6 +26,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 import com.betterreads.booksource.SourceBook;
+import com.betterreads.db.Timestamped;
 import org.jspecify.annotations.Nullable;
 
 /** A catalog book. Each source id column is unique and nullable, and any one of them identifies the row. */
@@ -39,7 +37,7 @@ import org.jspecify.annotations.Nullable;
     "NullAway.Init", "PMD.ExcessivePublicCount", "PMD.TooManyFields",
     "PMD.CyclomaticComplexity"
 })
-public class Book {
+public class Book extends Timestamped {
 
     private static final String ENGLISH = "en";
 
@@ -133,12 +131,6 @@ public class Book {
     @Nullable
     private Integer seriesPosition;
 
-    @Column(name = "created_at", nullable = false)
-    private OffsetDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private OffsetDateTime updatedAt;
-
     @Nullable
     @Column(name = "description_checked_at")
     private OffsetDateTime descriptionCheckedAt;
@@ -169,18 +161,6 @@ public class Book {
 
     @OneToMany(mappedBy = "book", cascade = CascadeType.ALL, orphanRemoval = true)
     private final List<BookAward> awards = new ArrayList<>();
-
-    @PrePersist
-    void onCreate() {
-        final OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        this.createdAt = now;
-        this.updatedAt = now;
-    }
-
-    @PreUpdate
-    void onUpdate() {
-        this.updatedAt = OffsetDateTime.now(ZoneOffset.UTC);
-    }
 
     /**
      * Overwrites the descriptive fields, null included. Source ids, ratings, subjects and awards
@@ -483,12 +463,8 @@ public class Book {
         return seriesPosition;
     }
 
-    public OffsetDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
     void setUpdatedAt(final OffsetDateTime updatedAt) {
-        this.updatedAt = updatedAt;
+        stampUpdatedAt(updatedAt);
     }
 
     public Set<Author> getAuthors() {

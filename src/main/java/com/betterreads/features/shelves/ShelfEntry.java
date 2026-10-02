@@ -5,15 +5,13 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
+import com.betterreads.db.Timestamped;
 import org.jspecify.annotations.Nullable;
 
 /** One book on one user's shelf. A user shelves a given book once. */
@@ -21,7 +19,7 @@ import org.jspecify.annotations.Nullable;
 @Table(name = "user_book_collection")
 // NullAway.Init, PMD.DataClass: JPA sets the fields reflectively and an entity is a data holder.
 @SuppressWarnings({"NullAway.Init", "PMD.DataClass"})
-public class ShelfEntry {
+public class ShelfEntry extends Timestamped {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -56,32 +54,16 @@ public class ShelfEntry {
     @Nullable
     private String notes;
 
-    @Column(name = "created_at", nullable = false)
-    private OffsetDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private OffsetDateTime updatedAt;
-
     protected ShelfEntry() {
+        super();
     }
 
     /** New entries start at WANT_TO_READ. */
     public ShelfEntry(final Long userId, final Long bookId) {
+        super();
         this.userId = userId;
         this.bookId = bookId;
         this.status = ReadingStatus.WANT_TO_READ;
-    }
-
-    @PrePersist
-    void onCreate() {
-        final OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        this.createdAt = now;
-        this.updatedAt = now;
-    }
-
-    @PreUpdate
-    void onUpdate() {
-        this.updatedAt = OffsetDateTime.now(ZoneOffset.UTC);
     }
 
     /**
@@ -111,10 +93,6 @@ public class ShelfEntry {
 
     public ReadingStatus getStatus() {
         return status;
-    }
-
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
     }
 
     public boolean isFavorite() {

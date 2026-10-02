@@ -55,4 +55,22 @@ class TitleCleanerTest {
     void trimsAfterStripping() {
         assertThat(TitleCleaner.clean("  Watchmen (2019 Edition)")).isEqualTo("Watchmen");
     }
+
+    @ParameterizedTest(name = "\"{0}\" becomes \"{1}\"")
+    @CsvSource(delimiter = '|', value = {
+        "Batman : Venom | Batman: Venom",
+        "The Rose Tattoo ; Camino Real ; Orpheus Descending | The Rose Tattoo; Camino Real; Orpheus Descending"
+    })
+    void shouldDropTheSpaceBeforeColonOrSemicolon(final String raw, final String expected) {
+        assertThat(TitleCleaner.closePunctuation(raw)).isEqualTo(expected);
+    }
+
+    @ParameterizedTest(name = "\"{0}\" becomes \"{1}\"")
+    @CsvSource(delimiter = '|', value = {
+        "Fathomless riches ; or how I went from pop to pulpit | Fathomless riches: or how I went from pop to pulpit",
+        "Moby Dick ; Or, the Whale | Moby Dick: Or, the Whale"
+    })
+    void shouldTurnSemicolonBeforeOrIntoColon(final String raw, final String expected) {
+        assertThat(TitleCleaner.closePunctuation(raw)).isEqualTo(expected);
+    }
 }
