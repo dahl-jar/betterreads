@@ -9,8 +9,10 @@ import com.betterreads.clients.hardcover.HardcoverWireMock;
 import com.betterreads.clients.hardcover.SeriesBooksJson;
 import com.betterreads.clients.hardcover.SeriesSearchJson;
 import static com.betterreads.clients.hardcover.BookByIdJson.COSMERE;
+import static com.betterreads.clients.hardcover.BookByIdJson.COSMERE_BOOKS;
 import static com.betterreads.clients.hardcover.BookByIdJson.COSMERE_VOLUME;
 import static com.betterreads.clients.hardcover.BookByIdJson.STORMLIGHT;
+import static com.betterreads.clients.hardcover.BookByIdJson.STORMLIGHT_BOOKS;
 import static com.betterreads.clients.hardcover.BookByIdJson.STORMLIGHT_VOLUME;
 import static com.betterreads.clients.hardcover.SeriesBooksJson.seriesBooks;
 import static com.betterreads.clients.hardcover.SeriesSearchJson.seriesSearch;
@@ -212,8 +214,8 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
         @Test
         void shouldKeepEachVolumesOwnPrimarySeries() {
             stub(cosmereSearch(), cosmereVolume()
-                .withMembership(COSMERE, COSMERE_VOLUME, false)
-                .withMembership(STORMLIGHT, STORMLIGHT_VOLUME, true));
+                .withMembership(COSMERE, COSMERE_VOLUME, false, COSMERE_BOOKS)
+                .withMembership(STORMLIGHT, STORMLIGHT_VOLUME, true, STORMLIGHT_BOOKS));
 
             final Optional<SourceSeries> series = client.fetchSeries(COSMERE_QUERY);
 
@@ -223,7 +225,7 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
 
         @Test
         void shouldLeaveTheSeriesEmptyWhenTheVolumeHasNoNumberedMembership() {
-            stub(cosmereSearch(), cosmereVolume().withMembership(COSMERE, 0, true));
+            stub(cosmereSearch(), cosmereVolume().withMembership(COSMERE, 0, true, COSMERE_BOOKS));
 
             final Optional<SourceSeries> series = client.fetchSeries(COSMERE_QUERY);
 

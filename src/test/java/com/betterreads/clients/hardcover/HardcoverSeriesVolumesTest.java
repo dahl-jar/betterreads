@@ -17,6 +17,8 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class HardcoverSeriesVolumesTest {
 
@@ -28,6 +30,14 @@ class HardcoverSeriesVolumesTest {
 
     private static final int SAGA_BOOKS = 7;
 
+    private static final String IRON_GOLD = "Iron Gold";
+
+    private static final int IRON_GOLD_VOLUME = 4;
+
+    private static final int ARC_BOOKS = 4;
+
+    private static final int UMBRELLA_BOOKS = 40;
+
     private static List<SeriesEntry> seriesOf(final HardcoverBookNode node) {
         final SourceBook book =
             HardcoverSeriesVolumes.withSeriesOf(SourceBook.builder(BookFieldSource.HARDCOVER), node).build();
@@ -35,7 +45,7 @@ class HardcoverSeriesVolumesTest {
     }
 
     @Test
-    void shouldListEveryMembershipWithFeaturedFirst() {
+    void shouldListALargerSeriesAfterThePrimary() {
         final HardcoverBookNode node = wordsOfRadiance().node();
 
         final List<SeriesEntry> series = seriesOf(node);
@@ -57,14 +67,26 @@ class HardcoverSeriesVolumesTest {
     }
 
     @ParameterizedTest
+    @NullSource
+    @ValueSource(ints = {ARC_BOOKS, SAGA_BOOKS})
+    void shouldLeaveOutASeriesNoLargerThanThePrimary(final @Nullable Integer arcBooks) {
+        final HardcoverBookNode node = bookById().withTitle(IRON_GOLD).withoutSeries()
+            .withSeries(RED_RISING_SAGA, IRON_GOLD_VOLUME, true, SAGA_BOOKS)
+            .withSeries(IRON_GOLD, 1, true, arcBooks)
+            .node();
+
+        final List<SeriesEntry> series = seriesOf(node);
+
+        assertThat(series).containsExactly(new SeriesEntry(RED_RISING_SAGA, IRON_GOLD_VOLUME));
+    }
+
+    @ParameterizedTest
     @CsvSource({
-        "'The Stormlight Archive: Words of Radiance', 1, ",
-        "'Words of Radiance Leatherbound', 1, 1",
-        "'Cosmere Companions', , "
+        "'The Stormlight Archive: Words of Radiance', 1",
+        "'Cosmere Companions', "
     })
-    void shouldSkipMembershipsThatAreNotVolumes(
-        final String name, final @Nullable Integer position, final @Nullable Integer books) {
-        final HardcoverBookNode node = wordsOfRadiance().withSeries(name, position, false, books).node();
+    void shouldSkipMembershipsThatAreNotVolumes(final String name, final @Nullable Integer position) {
+        final HardcoverBookNode node = wordsOfRadiance().withSeries(name, position, false, UMBRELLA_BOOKS).node();
 
         final List<SeriesEntry> series = seriesOf(node);
 

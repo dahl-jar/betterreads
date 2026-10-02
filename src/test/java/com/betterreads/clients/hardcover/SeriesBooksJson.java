@@ -16,6 +16,8 @@ public final class SeriesBooksJson {
 
     private static final String NAME = "name";
 
+    private static final String PRIMARY_BOOKS_COUNT = "primary_books_count";
+
     private static final int GRAPHIC_NOVEL_CATEGORY = 4;
 
     private final ObjectNode json = Fixtures.parse("""
@@ -88,7 +90,7 @@ public final class SeriesBooksJson {
     }
 
     public SeriesBooksJson withBookCount(final int count) {
-        series().put("primary_books_count", count);
+        series().put(PRIMARY_BOOKS_COUNT, count);
         return this;
     }
 
@@ -104,11 +106,12 @@ public final class SeriesBooksJson {
         return this;
     }
 
-    public SeriesBooksJson withMembership(final String name, final int position, final boolean featured) {
+    public SeriesBooksJson withMembership(
+        final String name, final int position, final boolean featured, final int books) {
         final ObjectNode lastVolume = (ObjectNode) volumes().get(volumes().size() - 1);
         lastVolume.withObject(BOOK).withArray(BOOK_SERIES).addObject()
             .put(POSITION, position).put("featured", featured)
-            .putObject("series").put(NAME, name);
+            .putObject("series").put(NAME, name).put(PRIMARY_BOOKS_COUNT, books);
         return this;
     }
 

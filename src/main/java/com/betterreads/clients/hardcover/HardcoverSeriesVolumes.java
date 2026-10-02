@@ -36,7 +36,7 @@ public final class HardcoverSeriesVolumes {
         final List<HardcoverBookNode.SeriesMembership> memberships = withoutOneBookSeries(all);
         return primaryMembership(memberships, title)
             .map(primary -> Stream.concat(Stream.of(primary), memberships.stream()
-                    .filter(membership -> !membership.equals(primary)
+                    .filter(membership -> BY_BOOK_COUNT.compare(membership, primary) > 0
                         && isVolume(membership) && !isIssueRun(membership, title)))
                 .map(HardcoverSeriesVolumes::toEntry)
                 .toList())

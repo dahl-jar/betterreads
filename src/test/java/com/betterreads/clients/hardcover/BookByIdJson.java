@@ -17,9 +17,9 @@ public final class BookByIdJson {
 
     public static final int COSMERE_VOLUME = 12;
 
-    private static final int STORMLIGHT_BOOKS = 5;
+    public static final int STORMLIGHT_BOOKS = 5;
 
-    private static final int COSMERE_BOOKS = 35;
+    public static final int COSMERE_BOOKS = 35;
 
     private static final String BOOK_SERIES = "book_series";
 
