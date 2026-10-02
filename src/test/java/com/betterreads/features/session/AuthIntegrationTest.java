@@ -13,7 +13,6 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -24,7 +23,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -39,6 +37,8 @@ import java.util.Objects;
 import static com.betterreads.testsupport.Accounts.PASSWORD;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -68,8 +68,6 @@ class AuthIntegrationTest extends ContainerizedTest {
 
     private static final String JSON_USER_USERNAME = "$.data.user.username";
 
-    private static final String JSON_USER_EMAIL = "$.data.user.email";
-
     private static final String JSON_USERNAME = "$.data.username";
 
     private static final String JSON_EMAIL = "$.data.email";
@@ -82,6 +80,10 @@ class AuthIntegrationTest extends ContainerizedTest {
         "éééééééééééééééééééééééééééééééééééééééé";
 
     private static final String JSON_DETAIL = "$.detail";
+
+    private static final String SET_COOKIE = "Set-Cookie";
+
+    private static final String WRONG_PASSWORD = "WrongPassword1!";
 
     private static final String USERNAME_TAKEN = "Username already taken";
 
@@ -121,15 +123,14 @@ class AuthIntegrationTest extends ContainerizedTest {
     class Register {
 
         @Test
-        void createsUserAndReturnsToken() throws Exception {
+        void shouldRegisterWithoutStartingASession() throws Exception {
             final String body =
                 Accounts.registerPayload(objectMapper, Accounts.USERNAME, Accounts.EMAIL, PASSWORD);
 
             AuthRequests.register(mockMvc, body)
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath(JSON_TOKEN).isNotEmpty())
-                .andExpect(jsonPath(JSON_USER_USERNAME).value(Accounts.USERNAME))
-                .andExpect(jsonPath(JSON_USER_EMAIL).value(Accounts.EMAIL));
+                .andExpect(header().doesNotExist(SET_COOKIE))
+                .andExpect(content().string(""));
 
             assertThat(userRepository.findByUsername(Accounts.USERNAME))
                 .isPresent()
@@ -221,8 +222,12 @@ class AuthIntegrationTest extends ContainerizedTest {
                 Accounts.registerPayload(objectMapper, MIXED_CASE_USERNAME, Accounts.EMAIL, PASSWORD);
 
             AuthRequests.register(mockMvc, body)
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath(JSON_USER_USERNAME).value(MIXED_CASE_USERNAME));
+                .andExpect(status().isCreated());
+
+            assertThat(userRepository.findByUsername(MIXED_CASE_USERNAME))
+                .get()
+                .extracting(User::getUsername)
+                .isEqualTo(MIXED_CASE_USERNAME);
         }
 
         @Test
@@ -292,7 +297,7 @@ class AuthIntegrationTest extends ContainerizedTest {
 
         @Test
         void rejectsWrongPasswordWithUnauthorized() throws Exception {
-            final String body = Accounts.loginPayload(objectMapper, Accounts.USERNAME, "WrongPassword1!");
+            final String body = Accounts.loginPayload(objectMapper, Accounts.USERNAME, WRONG_PASSWORD);
 
             AuthRequests.login(mockMvc, body)
                 .andExpect(status().isUnauthorized());
@@ -305,6 +310,34 @@ class AuthIntegrationTest extends ContainerizedTest {
             AuthRequests.login(mockMvc, body)
                 .andExpect(status().isUnauthorized());
         }
+
+        @Test
+        void shouldRejectLoginUntilTheEmailIsVerified() throws Exception {
+            registerMustang();
+            final String body = Accounts.loginPayload(objectMapper, OTHER_USERNAME, PASSWORD);
+
+            AuthRequests.login(mockMvc, body)
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath(JSON_DETAIL).value("Verify your email to log in"))
+                .andExpect(header().doesNotExist(SET_COOKIE));
+        }
+
+        @Test
+        void shouldAnswerUnauthorizedForAWrongPasswordOnAnUnverifiedAccount() throws Exception {
+            registerMustang();
+            final String body = Accounts.loginPayload(objectMapper, OTHER_USERNAME, WRONG_PASSWORD);
+
+            AuthRequests.login(mockMvc, body)
+                .andExpect(status().isUnauthorized());
+        }
+
+        // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
+        @SuppressWarnings("PMD.SignatureDeclareThrowsException")
+        private void registerMustang() throws Exception {
+            final String body = Accounts.registerPayload(objectMapper, OTHER_USERNAME, OTHER_EMAIL, PASSWORD);
+            AuthRequests.register(mockMvc, body)
+                .andExpect(status().isCreated());
+        }
     }
 
     @Nested
@@ -312,19 +345,14 @@ class AuthIntegrationTest extends ContainerizedTest {
     class Me {
 
         @Test
-        void apiIssuedTokenFromRegisterAuthenticatesMeRequest() throws Exception {
-            final String registerBody =
-                Accounts.registerPayload(objectMapper, Accounts.USERNAME, Accounts.EMAIL, PASSWORD);
+        void shouldAuthenticateMeWithTheTokenFromLogin() throws Exception {
+            Accounts.seedUser(userRepository, passwordEncoder, Accounts.USERNAME, Accounts.EMAIL, PASSWORD);
+            final String loginBody = Accounts.loginPayload(objectMapper, Accounts.USERNAME, PASSWORD);
 
-            final MvcResult registerResult = AuthRequests.register(mockMvc, registerBody)
-                .andExpect(status().isCreated())
+            final MvcResult loginResult = AuthRequests.login(mockMvc, loginBody)
+                .andExpect(status().isOk())
                 .andReturn();
-            final MockHttpServletResponse registerResponse = registerResult.getResponse();
-            final String registerJson = registerResponse.getContentAsString();
-            final JsonNode responseJson = objectMapper.readTree(registerJson);
-            final JsonNode responseData = responseJson.get("data");
-            final JsonNode accessToken = responseData.get("accessToken");
-            final String apiToken = accessToken.asString();
+            final String apiToken = AuthRequests.accessTokenOf(objectMapper, loginResult);
 
             mockMvc.perform(get(Accounts.ME_URL).header(AUTH_HEADER, BEARER_PREFIX + apiToken))
                 .andExpect(status().isOk())

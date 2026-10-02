@@ -19,7 +19,7 @@ final class HmacTokenHasherTest {
 
     @Test
     void matchesHmacSha256KnownAnswerVector() {
-        final JwtProperties properties = new JwtProperties(RFC_4231_KEY, ISSUER, 1, 1);
+        final JwtProperties properties = new JwtProperties(RFC_4231_KEY, ISSUER, 1, 1, 1);
         final HmacTokenHasher hasher = new HmacTokenHasher(properties);
 
         final String digest = hasher.hash(RFC_4231_MESSAGE);

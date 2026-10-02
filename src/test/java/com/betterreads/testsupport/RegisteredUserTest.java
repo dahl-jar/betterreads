@@ -62,6 +62,7 @@ public abstract class RegisteredUserTest extends ContainerizedTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(Accounts.registerPayload(objectMapper, username, email, PASSWORD)))
             .andExpect(status().isCreated());
+        Accounts.verifyEmail(jdbc, username);
         final MvcResult login = mockMvc.perform(post(LOGIN_URL)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(Accounts.loginPayload(objectMapper, username, PASSWORD)))

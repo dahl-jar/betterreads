@@ -51,9 +51,9 @@ class SessionController {
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(responseCode = "429", description = "Rate limited",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-    public ResponseEntity<AuthResponse> register(@Valid @RequestBody final RegisterRequest request) {
-        final SessionTokens tokens = sessionService.register(request);
-        return withRefreshCookie(ResponseEntity.status(HttpStatus.CREATED), tokens);
+    public ResponseEntity<Void> register(@Valid @RequestBody final RegisterRequest request) {
+        sessionService.register(request);
+        return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
     @PostMapping("/login")
@@ -63,6 +63,8 @@ class SessionController {
     @ApiResponse(responseCode = "400", description = "Validation failed",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(responseCode = "401", description = "Invalid credentials",
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "403", description = "Email not verified",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(responseCode = "429", description = "Rate limited",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
@@ -119,7 +121,8 @@ class SessionController {
         final ResponseEntity.BodyBuilder builder, final SessionTokens tokens
     ) {
         return builder
-            .header(HttpHeaders.SET_COOKIE, refreshCookies.issue(tokens.refreshToken()).toString())
+            .header(HttpHeaders.SET_COOKIE, refreshCookies.issue(
+                tokens.grant().plaintext(), tokens.grant().expiresAt(), tokens.grant().persistent()).toString())
             .body(tokens.body());
     }
 }

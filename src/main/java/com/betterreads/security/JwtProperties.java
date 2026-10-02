@@ -18,5 +18,6 @@ public record JwtProperties(
     @NotBlank String issuer,
     // TODO(once admins can ban users): drop to 15 minutes so a ban takes effect within 15 minutes
     @Positive long expirationMinutes,
-    @Positive long refreshExpirationDays
+    @Positive long refreshExpirationDays,
+    @Positive long sessionExpirationHours
 ) { }

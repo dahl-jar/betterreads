@@ -78,6 +78,7 @@ jwt:
   issuer: ${JWT_ISSUER:betterreads}
   expiration-minutes: ${JWT_EXPIRATION_MINUTES:120}
   refresh-expiration-days: ${JWT_REFRESH_EXPIRATION_DAYS:30}
+  session-expiration-hours: ${JWT_SESSION_EXPIRATION_HOURS:24}
 
 app:
   cors:

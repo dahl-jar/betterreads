@@ -17,6 +17,7 @@ import jakarta.servlet.http.Cookie;
 
 import java.time.Instant;
 
+import org.hamcrest.Matcher;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -37,7 +38,6 @@ import static com.betterreads.testsupport.Accounts.EMAIL;
 import static com.betterreads.testsupport.Accounts.LOGIN_URL;
 import static com.betterreads.testsupport.Accounts.PASSWORD;
 import static com.betterreads.testsupport.Accounts.REFRESH_URL;
-import static com.betterreads.testsupport.Accounts.REGISTER_URL;
 import static com.betterreads.testsupport.Accounts.USERNAME;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -66,6 +66,19 @@ class RefreshTokenIntegrationTest extends ContainerizedTest {
     private static final String SET_COOKIE_HEADER = "Set-Cookie";
 
     private static final long REFRESH_TTL_SECONDS = 30L * 24 * 60 * 60;
+
+    private static final int TEN_DAYS_SECONDS = 10 * 24 * 60 * 60;
+
+    private static final int MAX_AGE_SLACK_SECONDS = 30;
+
+    private static final String MAX_AGE = "max-age";
+
+    private static final String EXPIRES = "expires";
+
+    private static final String ENDS_IN_A_DAY_SQL = """
+        SELECT expires_at BETWEEN now() + interval '23 hours 59 minutes' AND now() + interval '24 hours 1 minute'
+        FROM refresh_token WHERE revoked_at IS NULL
+        """;
 
     @Autowired
     private UserRepository userRepository;
@@ -100,20 +113,19 @@ class RefreshTokenIntegrationTest extends ContainerizedTest {
     }
 
     @Nested
-    @DisplayName("Cookie contract on register")
+    @DisplayName("Cookie contract on login")
     class CookieContract {
 
         @Test
-        void carriesTheConfiguredCookieAttributes() throws Exception {
-            final MvcResult result = mockMvc.perform(post(REGISTER_URL)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(Accounts.registerPayload(objectMapper, USERNAME, EMAIL, PASSWORD)))
-                .andExpect(status().isCreated())
-                .andExpect(cookie().exists(COOKIE_NAME))
+        void shouldSetAThirtyDayCookieForARememberedLogin() throws Exception {
+            seedUser();
+
+            final MvcResult result = login(Accounts.loginPayload(objectMapper, USERNAME, PASSWORD, true))
+                .andExpect(status().isOk())
                 .andExpect(cookie().httpOnly(COOKIE_NAME, true))
                 .andExpect(cookie().secure(COOKIE_NAME, true))
                 .andExpect(cookie().path(COOKIE_NAME, COOKIE_PATH))
-                .andExpect(cookie().maxAge(COOKIE_NAME, (int) REFRESH_TTL_SECONDS))
+                .andExpect(cookie().maxAge(COOKIE_NAME, justUnder((int) REFRESH_TTL_SECONDS)))
                 .andReturn();
 
             assertThat(result.getResponse().getHeader(SET_COOKIE_HEADER))
@@ -122,11 +134,34 @@ class RefreshTokenIntegrationTest extends ContainerizedTest {
         }
 
         @Test
+        void shouldSetASessionCookieWhenRememberMeIsOff() throws Exception {
+            seedUser();
+
+            final MvcResult result = login(Accounts.loginPayload(objectMapper, USERNAME, PASSWORD, false))
+                .andExpect(status().isOk())
+                .andReturn();
+
+            assertThat(result.getResponse().getHeader(SET_COOKIE_HEADER))
+                .doesNotContainIgnoringCase(MAX_AGE)
+                .doesNotContainIgnoringCase(EXPIRES);
+        }
+
+        @Test
+        void shouldEndASessionOnlyLoginAfterTwentyFourHours() throws Exception {
+            seedUser();
+
+            login(Accounts.loginPayload(objectMapper, USERNAME, PASSWORD));
+
+            final Boolean endsInADay = jdbcTemplate.queryForObject(ENDS_IN_A_DAY_SQL, Boolean.class);
+            assertThat(endsInADay).isTrue();
+        }
+
+        @Test
         void omitsRefreshTokenFromJsonBody() throws Exception {
-            mockMvc.perform(post(REGISTER_URL)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(Accounts.registerPayload(objectMapper, USERNAME, EMAIL, PASSWORD)))
-                .andExpect(status().isCreated())
+            seedUser();
+
+            login(Accounts.loginPayload(objectMapper, USERNAME, PASSWORD))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.refreshToken").doesNotExist())
                 .andExpect(jsonPath("$.data.accessToken").isNotEmpty());
         }
@@ -214,6 +249,30 @@ class RefreshTokenIntegrationTest extends ContainerizedTest {
         }
 
         @Test
+        void shouldKeepTheSessionCookieAfterARotation() throws Exception {
+            seedUser();
+            final String original = loginAndExtractCookieValue();
+
+            final MvcResult rotated = refresh(original).andReturn();
+
+            assertThat(rotated.getResponse().getHeader(SET_COOKIE_HEADER))
+                .contains(COOKIE_NAME)
+                .doesNotContainIgnoringCase(MAX_AGE);
+        }
+
+        @Test
+        void shouldShortenTheCookieToTheTimeLeftAfterARotation() throws Exception {
+            seedUser();
+            final MvcResult remembered = login(Accounts.loginPayload(objectMapper, USERNAME, PASSWORD, true))
+                .andReturn();
+            jdbcTemplate.update("UPDATE refresh_token SET expires_at = now() + interval '10 days'");
+
+            final ResultActions rotated = refresh(Accounts.refreshCookie(remembered));
+
+            rotated.andExpect(cookie().maxAge(COOKIE_NAME, justUnder(TEN_DAYS_SECONDS)));
+        }
+
+        @Test
         void shouldRejectAFormPostWithoutRotatingTheToken() throws Exception {
             seedUser();
             final String original = loginAndExtractCookieValue();
@@ -292,10 +351,19 @@ class RefreshTokenIntegrationTest extends ContainerizedTest {
 
     // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
+    private ResultActions login(final String payload) throws Exception {
+        return mockMvc.perform(post(LOGIN_URL).contentType(MediaType.APPLICATION_JSON).content(payload));
+    }
+
+    private static Matcher<Integer> justUnder(final int seconds) {
+        final int earliest = seconds - MAX_AGE_SLACK_SECONDS;
+        return Matchers.allOf(Matchers.greaterThan(earliest), Matchers.lessThanOrEqualTo(seconds));
+    }
+
+    // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
+    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     private String loginAndExtractCookieValue() throws Exception {
-        final MvcResult result = mockMvc.perform(post(LOGIN_URL)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(Accounts.loginPayload(objectMapper, USERNAME, PASSWORD)))
+        final MvcResult result = login(Accounts.loginPayload(objectMapper, USERNAME, PASSWORD))
             .andExpect(status().isOk())
             .andExpect(cookie().exists(COOKIE_NAME))
             .andReturn();

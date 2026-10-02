@@ -6,13 +6,14 @@ import com.betterreads.users.UserResponse;
 interface SessionService {
 
     /** @throws com.betterreads.errors.BusinessRuleException duplicate username or email */
-    SessionTokens register(RegisterRequest request);
+    void register(RegisterRequest request);
 
     /**
      * The identifier is matched against username first, then email.
      *
      * @throws org.springframework.security.authentication.BadCredentialsException unknown user
      *     or wrong password
+     * @throws com.betterreads.errors.ForbiddenException the email is not verified
      */
     SessionTokens login(LoginRequest request);
 

@@ -100,9 +100,6 @@ class AccountDeletionIntegrationTest extends ContainerizedTest {
     private PasswordResetService passwordResetService;
 
     @Autowired
-    private EmailVerificationService emailVerificationService;
-
-    @Autowired
     private AccountDeletionSweep accountDeletionSweep;
 
     @Autowired
@@ -292,14 +289,15 @@ class AccountDeletionIntegrationTest extends ContainerizedTest {
     private long registerAndSeedOutstandingTokens() throws Exception {
         final long userId = registerUser(USERNAME, EMAIL);
         passwordResetService.requestReset(EMAIL);
-        emailVerificationService.requestResend(EMAIL);
         return userId;
     }
 
     // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     private long registerUser(final String username, final String email) throws Exception {
-        return AccountTestFixture.registerUser(mockMvc, objectMapper, userRepository, username, email);
+        final long userId = AccountTestFixture.registerUser(mockMvc, objectMapper, userRepository, username, email);
+        Accounts.verifyEmail(jdbcTemplate, username);
+        return userId;
     }
 
     // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.

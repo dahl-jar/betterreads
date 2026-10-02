@@ -192,6 +192,7 @@ class PasswordResetIntegrationTest extends AccountMailTest {
         @Test
         void shouldRejectVerificationToken() throws Exception {
             final long userId = seedUser();
+            Accounts.unverifyEmail(jdbcTemplate, USERNAME);
             emailVerificationService.requestResend(EMAIL);
             final String token = AccountTestFixture.readEnqueuedToken(mailOutboxRepository, objectMapper);
 

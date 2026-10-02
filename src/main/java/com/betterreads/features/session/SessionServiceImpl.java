@@ -2,6 +2,7 @@ package com.betterreads.features.session;
 
 import com.betterreads.crypto.PasswordByteLimit;
 import com.betterreads.errors.BusinessRuleException;
+import com.betterreads.errors.ForbiddenException;
 import com.betterreads.logging.LogSanitizer;
 import com.betterreads.security.JwtIssuer;
 import com.betterreads.users.EmailNormalizer;
@@ -33,6 +34,8 @@ class SessionServiceImpl implements SessionService {
     private static final String DUPLICATE_USERNAME_OR_EMAIL = "Username or email already registered";
 
     private static final String INVALID_CREDENTIALS = "Invalid credentials";
+
+    private static final String EMAIL_NOT_VERIFIED = "Verify your email to log in";
 
     private static final String INVALID_REFRESH_TOKEN = "Invalid refresh token";
 
@@ -70,7 +73,7 @@ class SessionServiceImpl implements SessionService {
 
     @Override
     @Transactional
-    public SessionTokens register(final RegisterRequest request) {
+    public void register(final RegisterRequest request) {
         final String normalizedEmail = EmailNormalizer.normalize(request.email());
         PasswordByteLimit.check(request.password());
 
@@ -97,7 +100,6 @@ class SessionServiceImpl implements SessionService {
         emailVerificationIssuer.issueVerification(saved.getUserId(), saved.getEmail());
         LOG.info("Registered new user userId={} username={}",
             saved.getUserId(), LogSanitizer.forLog(saved.getUsername()));
-        return sessionTokensFor(saved, refreshTokenService.issue(saved.getUserId()));
     }
 
     @Override
@@ -116,8 +118,13 @@ class SessionServiceImpl implements SessionService {
             LOG.warn("Login failed: password mismatch userId={}", user.getUserId());
             throw new BadCredentialsException(INVALID_CREDENTIALS);
         }
+        if (user.getEmailVerifiedAt() == null) {
+            LOG.warn("Login refused: email not verified userId={}", user.getUserId());
+            throw new ForbiddenException(EMAIL_NOT_VERIFIED);
+        }
         LOG.info("Logged in user userId={}", user.getUserId());
-        return sessionTokensFor(user, refreshTokenService.issue(user.getUserId()));
+        final boolean persistent = Boolean.TRUE.equals(request.rememberMe());
+        return sessionTokensFor(user, refreshTokenService.issue(user.getUserId(), persistent));
     }
 
     @Override
@@ -145,7 +152,7 @@ class SessionServiceImpl implements SessionService {
                 LOG.warn("Refresh rejected: token owner is gone userId={}", userId);
                 return new BadCredentialsException(INVALID_REFRESH_TOKEN);
             });
-        return sessionTokensFor(user, rotation.plaintext());
+        return sessionTokensFor(user, rotation.grant());
     }
 
     @Override
@@ -154,8 +161,8 @@ class SessionServiceImpl implements SessionService {
         refreshTokenService.revoke(refreshToken);
     }
 
-    private SessionTokens sessionTokensFor(final User user, final String refreshToken) {
+    private SessionTokens sessionTokensFor(final User user, final RefreshGrant grant) {
         return new SessionTokens(
-            new AuthResponse(jwtIssuer.issue(user.getUserId()), userMapper.toResponse(user)), refreshToken);
+            new AuthResponse(jwtIssuer.issue(user.getUserId()), userMapper.toResponse(user)), grant);
     }
 }

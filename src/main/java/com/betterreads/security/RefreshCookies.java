@@ -1,6 +1,7 @@
 package com.betterreads.security;
 
 import java.time.Duration;
+import java.time.Instant;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
 
@@ -11,17 +12,16 @@ public class RefreshCookies {
 
     public static final String COOKIE_PATH = "/api/v1/auth";
 
+    private static final Duration UNTIL_THE_BROWSER_CLOSES = Duration.ofSeconds(-1);
+
     private final RefreshCookieProperties cookieProperties;
 
-    private final Duration refreshLifetime;
-
-    RefreshCookies(final RefreshCookieProperties cookieProperties, final JwtProperties jwtProperties) {
+    RefreshCookies(final RefreshCookieProperties cookieProperties) {
         this.cookieProperties = cookieProperties;
-        this.refreshLifetime = Duration.ofDays(jwtProperties.refreshExpirationDays());
     }
 
-    public ResponseCookie issue(final String value) {
-        return cookie(value, refreshLifetime);
+    public ResponseCookie issue(final String value, final Instant expiresAt, final boolean persistent) {
+        return cookie(value, persistent ? Duration.between(Instant.now(), expiresAt) : UNTIL_THE_BROWSER_CLOSES);
     }
 
     public ResponseCookie clear() {

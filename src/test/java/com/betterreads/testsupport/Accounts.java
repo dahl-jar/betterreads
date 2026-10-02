@@ -9,7 +9,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpHeaders;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -44,6 +46,8 @@ public final class Accounts {
 
     private static final String FIELD_IDENTIFIER = "identifier";
 
+    private static final String FIELD_REMEMBER_ME = "rememberMe";
+
     private Accounts() {
     }
 
@@ -53,6 +57,7 @@ public final class Accounts {
         user.setUsername(username);
         user.setEmail(email);
         user.setPasswordHash(Objects.requireNonNull(encoder.encode(rawPassword)));
+        user.setEmailVerifiedAt(Instant.now());
         return users.save(user).getUserId();
     }
 
@@ -67,10 +72,26 @@ public final class Accounts {
 
     public static String loginPayload(final ObjectMapper objectMapper, final String identifier,
         final String password) {
+        return loginPayload(objectMapper, identifier, password, null);
+    }
+
+    public static String loginPayload(final ObjectMapper objectMapper, final String identifier,
+        final String password, final @Nullable Boolean rememberMe) {
         final ObjectNode node = objectMapper.createObjectNode();
         node.put(FIELD_IDENTIFIER, identifier);
         node.put(FIELD_PASSWORD, password);
+        if (rememberMe != null) {
+            node.put(FIELD_REMEMBER_ME, rememberMe);
+        }
         return objectMapper.writeValueAsString(node);
+    }
+
+    public static void verifyEmail(final JdbcTemplate jdbc, final String username) {
+        jdbc.update("UPDATE app_user SET email_verified_at = now() WHERE username = ?", username);
+    }
+
+    public static void unverifyEmail(final JdbcTemplate jdbc, final String username) {
+        jdbc.update("UPDATE app_user SET email_verified_at = NULL WHERE username = ?", username);
     }
 
     public static String refreshCookie(final MvcResult result) {

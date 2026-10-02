@@ -502,13 +502,6 @@ paths:
           description: Service Unavailable
         "201":
           description: Account created
-          content:
-            '*/*':
-              schema:
-                type: object
-                properties:
-                  data:
-                    $ref: "#/components/schemas/AuthResponse"
         "400":
           description: Validation failed
           content:
@@ -621,6 +614,12 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "401":
           description: Invalid credentials
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Email not verified
           content:
             '*/*':
               schema:
@@ -1609,6 +1608,11 @@ components:
           description: Account password
           example: '********'
           minLength: 1
+        rememberMe:
+          type: boolean
+          description: Keeps the reader logged in for 30 days. Without it the login
+            ends when the browser closes
+          example: true
       required:
       - identifier
       - password

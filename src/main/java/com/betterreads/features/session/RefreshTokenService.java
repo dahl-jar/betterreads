@@ -27,7 +27,9 @@ class RefreshTokenService {
 
     private final RefreshTokenChainRevoker chainRevoker;
 
-    private final Duration lifetime;
+    private final Duration rememberedLifetime;
+
+    private final Duration sessionLifetime;
 
     RefreshTokenService(
         final RefreshTokenRepository repository,
@@ -38,16 +40,18 @@ class RefreshTokenService {
         this.repository = repository;
         this.hasher = hasher;
         this.chainRevoker = chainRevoker;
-        this.lifetime = Duration.ofDays(jwtProperties.refreshExpirationDays());
+        this.rememberedLifetime = Duration.ofDays(jwtProperties.refreshExpirationDays());
+        this.sessionLifetime = Duration.ofHours(jwtProperties.sessionExpirationHours());
     }
 
-    /** Returns the plaintext, only its hash is saved. */
+    /** Only the hash of the plaintext is saved. */
     @Transactional
-    public String issue(final long userId) {
-        final String plaintext = TokenGenerator.randomToken(TOKEN_BYTES);
-        repository.save(newToken(userId, plaintext));
-        LOG.info("Issued refresh token userId={}", userId);
-        return plaintext;
+    public RefreshGrant issue(final long userId, final boolean persistent) {
+        final Instant expiresAt = Instant.now().plus(persistent ? rememberedLifetime : sessionLifetime);
+        final RefreshGrant grant = new RefreshGrant(TokenGenerator.randomToken(TOKEN_BYTES), expiresAt, persistent);
+        repository.save(newToken(userId, grant));
+        LOG.info("Issued refresh token userId={} persistent={}", userId, persistent);
+        return grant;
     }
 
     /**
@@ -75,15 +79,16 @@ class RefreshTokenService {
             return Optional.empty();
         }
 
-        final String newPlaintext = TokenGenerator.randomToken(TOKEN_BYTES);
-        final RefreshToken saved = repository.saveAndFlush(newToken(row.getUserId(), newPlaintext));
+        final RefreshGrant grant =
+            new RefreshGrant(TokenGenerator.randomToken(TOKEN_BYTES), row.getExpiresAt(), row.isPersistent());
+        final RefreshToken saved = repository.saveAndFlush(newToken(row.getUserId(), grant));
 
         row.setRevokedAt(Instant.now());
         row.setReplacedBy(saved.getRefreshTokenId());
         repository.saveAndFlush(row);
 
         LOG.info("Rotated refresh token userId={}", row.getUserId());
-        return Optional.of(new RefreshTokenRotation(row.getUserId(), newPlaintext));
+        return Optional.of(new RefreshTokenRotation(row.getUserId(), grant));
     }
 
     /** unknown and already revoked tokens are ignored so logout can't be used to probe which tokens exist */
@@ -97,11 +102,12 @@ class RefreshTokenService {
             });
     }
 
-    private RefreshToken newToken(final long userId, final String plaintext) {
+    private RefreshToken newToken(final long userId, final RefreshGrant grant) {
         final RefreshToken row = new RefreshToken();
         row.setUserId(userId);
-        row.setTokenHash(hasher.hash(plaintext));
-        row.setExpiresAt(Instant.now().plus(lifetime));
+        row.setTokenHash(hasher.hash(grant.plaintext()));
+        row.setExpiresAt(grant.expiresAt());
+        row.setPersistent(grant.persistent());
         return row;
     }
 }

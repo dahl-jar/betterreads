@@ -7,11 +7,11 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
 
+import com.betterreads.db.HashedToken;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -22,62 +22,25 @@ import org.jspecify.annotations.Nullable;
  */
 @Entity
 @Table(name = "email_token")
-// NullAway.Init, PMD.DataClass: JPA sets the fields reflectively and an entity is a data holder.
-@SuppressWarnings({"NullAway.Init", "PMD.DataClass"})
-public class EmailToken {
+// NullAway.Init: JPA sets the fields reflectively.
+@SuppressWarnings("NullAway.Init")
+public class EmailToken extends HashedToken {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "email_token_id")
     private Long emailTokenId;
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
-
     @Column(name = "purpose", nullable = false, columnDefinition = "TEXT")
     @Enumerated(EnumType.STRING)
     private Purpose purpose;
-
-    @Column(name = "token_hash", nullable = false, unique = true, columnDefinition = "TEXT")
-    private String tokenHash;
-
-    @Column(name = "issued_at", nullable = false)
-    private Instant issuedAt;
-
-    @Column(name = "expires_at", nullable = false)
-    private Instant expiresAt;
 
     @Column(name = "consumed_at")
     @Nullable
     private Instant consumedAt;
 
-    @PrePersist
-    void onCreate() {
-        issuedAt = Instant.now();
-    }
-
-    public Long getUserId() {
-        return userId;
-    }
-
-    public void setUserId(final Long userId) {
-        this.userId = userId;
-    }
-
     public void setPurpose(final Purpose purpose) {
         this.purpose = purpose;
-    }
-
-    public void setTokenHash(final String tokenHash) {
-        this.tokenHash = tokenHash;
-    }
-
-    public Instant getExpiresAt() {
-        return expiresAt;
-    }
-
-    public void setExpiresAt(final Instant expiresAt) {
-        this.expiresAt = expiresAt;
     }
 
     @Nullable
