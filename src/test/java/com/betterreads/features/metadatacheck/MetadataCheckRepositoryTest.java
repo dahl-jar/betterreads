@@ -3,6 +3,7 @@ package com.betterreads.features.metadatacheck;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
+import java.util.stream.IntStream;
 
 import com.betterreads.book.Author;
 import com.betterreads.book.AuthorRepository;
@@ -11,6 +12,7 @@ import com.betterreads.book.BookUpsertService;
 import com.betterreads.book.VerifiedMetadata;
 import com.betterreads.booksource.BookFieldSource;
 import com.betterreads.booksource.SeriesEntry;
+import com.betterreads.clients.websearch.SeriesBook;
 import com.betterreads.booksource.SourceAuthor;
 import com.betterreads.booksource.SourceBook;
 import com.betterreads.clients.websearch.MetadataJson;
@@ -48,6 +50,12 @@ class MetadataCheckRepositoryTest extends ContainerizedTest {
     private static final String SAGA = MetadataJson.SERIES;
 
     private static final String UNIVERSE = MetadataJson.UNIVERSE;
+
+    private static final int SERIES_LENGTH = 32;
+
+    private static final int LISTED_BOOKS = 30;
+
+    private static final String BOOK_KEY_PREFIX = "book-";
 
     private static final String REQUESTED_SQL =
         "UPDATE book SET metadata_check_requested_at = now() - make_interval(days => ?) WHERE book_id = ?";
@@ -123,6 +131,41 @@ class MetadataCheckRepositoryTest extends ContainerizedTest {
         final List<String> names = books.findSeriesNames();
 
         assertThat(names).containsExactlyInAnyOrder(SAGA, UNIVERSE);
+    }
+
+    @Test
+    void shouldListTheOtherBooksOfASeriesByPosition() {
+        final List<Long> fromLastToFirst = IntStream.iterate(SERIES_LENGTH, position -> position - 1)
+            .limit(SERIES_LENGTH)
+            .mapToObj(this::saveAtPosition)
+            .toList();
+        final long first = fromLastToFirst.getLast();
+        final List<SeriesBook> expected = IntStream.rangeClosed(2, LISTED_BOOKS + 1)
+            .mapToObj(position -> new SeriesBook(BOOK_KEY_PREFIX + position, position))
+            .toList();
+
+        final List<SeriesBook> found = books.findSeriesBooks(SAGA, first);
+
+        assertThat(found).containsExactlyElementsOf(expected);
+    }
+
+    @Test
+    void shouldLeaveOutBooksOfAnotherSeries() {
+        final long first = saveAtPosition(1);
+        final long other = save(BOOK_KEY_PREFIX + "other");
+        jdbc.update("INSERT INTO book_series (book_id, ordinal, series_name, position) VALUES (?, 0, ?, 2)",
+            other, UNIVERSE);
+
+        final List<SeriesBook> found = books.findSeriesBooks(SAGA, first);
+
+        assertThat(found).isEmpty();
+    }
+
+    private long saveAtPosition(final int position) {
+        final long bookId = save(BOOK_KEY_PREFIX + position);
+        jdbc.update("INSERT INTO book_series (book_id, ordinal, series_name, position) VALUES (?, 0, ?, ?)",
+            bookId, SAGA, position);
+        return bookId;
     }
 
     private static SourceBook.Builder redRising() {

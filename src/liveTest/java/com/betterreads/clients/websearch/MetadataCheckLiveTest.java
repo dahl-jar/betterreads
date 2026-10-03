@@ -3,7 +3,7 @@ package com.betterreads.clients.websearch;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
-import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 import com.betterreads.book.VerifiedMetadata;
@@ -42,12 +42,12 @@ class MetadataCheckLiveTest {
     @Test
     void shouldCorrectForeignEdition() {
         final MetadataCheckRequest witchwood = new MetadataCheckRequest(WITCHWOOD, "Die Hexenholzkrone",
-            List.of("Tad Williams"), YEAR, "Der letzte König von Osten Ard", 1.0, GERMAN_ISBN, null);
+            List.of("Tad Williams"), YEAR, "Der letzte König von Osten Ard", 1.0, GERMAN_ISBN, null, List.of());
 
-        final Optional<Map<Long, VerifiedMetadata>> checks = client.check(List.of(witchwood));
+        final Optional<CheckRun> result = client.check(List.of(witchwood));
 
-        assertThat(checks).get().satisfies(map -> {
-            final VerifiedMetadata metadata = map.get(WITCHWOOD);
+        assertThat(result).get().satisfies(run -> {
+            final VerifiedMetadata metadata = Objects.requireNonNull(run.books().get(WITCHWOOD)).metadata();
             assertThat(metadata.title()).isEqualTo("The Witchwood Crown");
             assertThat(metadata.seriesName()).endsWith("Last King of Osten Ard");
             assertThat(metadata.seriesPosition()).isEqualTo(1.0);

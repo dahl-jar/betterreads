@@ -17,6 +17,8 @@ final class WebSearchSamples {
 
     static final String HOOK_SCRIPT = "/opt/websearch/restrict-search.mjs";
 
+    static final SearchUsage USAGE = new SearchUsage(1, 0.022_122_8, 1611, 1);
+
     private WebSearchSamples() {
     }
 

@@ -13,10 +13,12 @@ public record MetadataCheckRequest(
     @Nullable String seriesName,
     @Nullable Double seriesPosition,
     @Nullable String isbn13,
-    @Nullable SeriesEntry universe
+    @Nullable SeriesEntry universe,
+    List<SeriesBook> seriesBooks
 ) {
 
     public MetadataCheckRequest {
         authors = List.copyOf(authors);
+        seriesBooks = List.copyOf(seriesBooks);
     }
 }

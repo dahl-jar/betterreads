@@ -1,6 +1,8 @@
 package com.betterreads.clients.websearch;
 
 import com.betterreads.booksource.SeriesEntry;
+import org.jspecify.annotations.Nullable;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -30,19 +32,25 @@ public final class MetadataJson {
 
     public static final String SOURCE = "https://en.wikipedia.org/wiki/Red_Rising";
 
-    static final String TITLE_FIELD = "title";
+    public static final long OTHER_ID = 2L;
 
-    static final String AUTHORS_FIELD = "authors";
+    public static final String GOLDEN_SON = "Golden Son";
 
-    static final String YEAR_FIELD = "year";
+    public static final String GERMAN_ISBN = "9783453315617";
 
-    static final String SERIES_FIELD = "series";
+    public static final String TITLE_FIELD = "title";
 
-    static final String UNIVERSE_FIELD = "universe";
+    public static final String AUTHORS_FIELD = "authors";
 
-    static final String DESCRIPTION_FIELD = "description";
+    public static final String YEAR_FIELD = "year";
 
-    static final String ISBN_FIELD = "isbn13";
+    public static final String SERIES_FIELD = "series";
+
+    public static final String UNIVERSE_FIELD = "universe";
+
+    public static final String DESCRIPTION_FIELD = "description";
+
+    public static final String ISBN_FIELD = "isbn13";
 
     private static final JsonMapper JSON = new JsonMapper();
 
@@ -68,8 +76,22 @@ public final class MetadataJson {
         return new MetadataJson();
     }
 
-    MetadataJson with(final String field, final Object value) {
+    public static JsonNode answer() {
+        return metadata().book.deepCopy();
+    }
+
+    MetadataJson without(final String field) {
+        book.putNull(field);
+        return this;
+    }
+
+    MetadataJson with(final String field, final @Nullable Object value) {
         ((ObjectNode) book.get(field)).set(VALUE, JSON.valueToTree(value));
+        return this;
+    }
+
+    MetadataJson withId(final String id) {
+        book.put("id", id);
         return this;
     }
 
@@ -83,7 +105,7 @@ public final class MetadataJson {
         return this;
     }
 
-    MetadataJson withSource(final String field, final String source) {
+    MetadataJson withSource(final String field, final @Nullable String source) {
         ((ObjectNode) book.get(field)).put(SOURCE_KEY, source);
         return this;
     }

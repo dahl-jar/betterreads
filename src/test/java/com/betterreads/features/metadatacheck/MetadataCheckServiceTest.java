@@ -20,19 +20,26 @@ import com.betterreads.book.Book;
 import com.betterreads.book.BookUpsertService;
 import com.betterreads.book.VerifiedMetadata;
 import com.betterreads.booksource.SeriesEntry;
+import com.betterreads.clients.websearch.CheckedBook;
 import com.betterreads.clients.websearch.MetadataCheckClient;
 import com.betterreads.clients.websearch.MetadataCheckRequest;
 import com.betterreads.clients.websearch.MetadataJson;
+import com.betterreads.clients.websearch.SeriesBook;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.data.domain.Pageable;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 class MetadataCheckServiceTest {
 
     private static final long BOOK_ID = MetadataJson.BOOK_ID;
 
-    private static final long OTHER_ID = 2L;
+    private static final long OTHER_ID = MetadataJson.OTHER_ID;
 
     private static final int YEAR = MetadataJson.YEAR;
 
@@ -47,6 +54,12 @@ class MetadataCheckServiceTest {
     private static final String LAST_KING = "The Last King of Osten Ard";
 
     private static final SeriesEntry UNIVERSE = MetadataJson.UNIVERSE_ENTRY;
+
+    private static final String GOLDEN_SON = MetadataJson.GOLDEN_SON;
+
+    private static final int LOGGED_LINE_LIMIT = 4000;
+
+    private static final String END_MARKER = "END";
 
     private static final VerifiedMetadata CORRECTED =
         new VerifiedMetadata(TITLE, List.of(AUTHOR), YEAR, SERIES, 1.0, null, ISBN, null);
@@ -74,7 +87,7 @@ class MetadataCheckServiceTest {
         @Test
         void shouldSendTenBooksPerCall() {
             givenBooks(booksNumbered(2 * MetadataCheckSamples.BATCH_SIZE));
-            when(client.check(any())).thenReturn(Optional.of(Map.of()));
+            givenAnswers(Map.of());
             final ArgumentCaptor<List<MetadataCheckRequest>> batches = ArgumentCaptor.captor();
 
             service.checkDueBooks();
@@ -129,20 +142,21 @@ class MetadataCheckServiceTest {
             book.setIsbn(ISBN);
             book.applySeries(List.of(new SeriesEntry(SERIES, 1), UNIVERSE), true);
             givenBooks(List.of(book));
-            when(client.check(any())).thenReturn(Optional.of(Map.of()));
+            when(books.findSeriesBooks(SERIES, BOOK_ID)).thenReturn(List.of(new SeriesBook(GOLDEN_SON, 2.0)));
+            givenAnswers(Map.of());
             final ArgumentCaptor<List<MetadataCheckRequest>> batch = ArgumentCaptor.captor();
 
             service.checkDueBooks();
 
             verify(client).check(batch.capture());
-            assertThat(batch.getValue()).containsExactly(
-                new MetadataCheckRequest(BOOK_ID, TITLE, List.of(AUTHOR), YEAR, SERIES, 1.0, ISBN, UNIVERSE));
+            assertThat(batch.getValue()).containsExactly(new MetadataCheckRequest(BOOK_ID, TITLE, List.of(AUTHOR),
+                YEAR, SERIES, 1.0, ISBN, UNIVERSE, List.of(new SeriesBook(GOLDEN_SON, 2.0))));
         }
 
         @Test
         void shouldApplyCorrections() {
             givenBooks(List.of(book(BOOK_ID)));
-            when(client.check(any())).thenReturn(Optional.of(Map.of(BOOK_ID, CORRECTED)));
+            givenAnswers(Map.of(BOOK_ID, MetadataCheckSamples.confirmed(CORRECTED)));
 
             service.checkDueBooks();
 
@@ -192,7 +206,7 @@ class MetadataCheckServiceTest {
         @Test
         void shouldMarkUnansweredBookChecked() {
             givenBooks(List.of(book(BOOK_ID)));
-            when(client.check(any())).thenReturn(Optional.of(Map.of()));
+            givenAnswers(Map.of());
 
             service.checkDueBooks();
 
@@ -202,7 +216,7 @@ class MetadataCheckServiceTest {
         @Test
         void shouldContinueAfterFailedBook() {
             givenBooks(List.of(book(BOOK_ID), book(OTHER_ID)));
-            when(client.check(any())).thenReturn(Optional.of(Map.of()));
+            givenAnswers(Map.of());
             when(upsert.applyVerified(BOOK_ID, VerifiedMetadata.NONE)).thenThrow(new IllegalArgumentException("gone"));
 
             service.checkDueBooks();
@@ -211,9 +225,78 @@ class MetadataCheckServiceTest {
         }
 
         private void checkWithAnswer(final VerifiedMetadata found) {
-            when(client.check(any())).thenReturn(Optional.of(Map.of(BOOK_ID, found)));
+            givenAnswers(Map.of(BOOK_ID, MetadataCheckSamples.confirmed(found)));
             service.checkDueBooks();
         }
+    }
+
+    @Nested
+    @ExtendWith(OutputCaptureExtension.class)
+    class Logging {
+
+        @Test
+        void shouldLogTheOutcomesOfEachAnsweredBook(final CapturedOutput output) {
+            givenBooks(List.of(book(BOOK_ID)));
+            givenAnswers(Map.of(BOOK_ID, MetadataCheckSamples.confirmed(CORRECTED)));
+
+            service.checkDueBooks();
+
+            assertThat(output.getOut())
+                .contains("catalog.metadata-check bookId=1 outcomes=title:CONFIRMED,authors:CONFIRMED,"
+                    + "year:CONFIRMED,series:CONFIRMED,universe:CONFIRMED,description:CONFIRMED,isbn13:CONFIRMED"
+                    + " answer={\"id\":1,\"title\":");
+        }
+
+        @Test
+        void shouldLogEachBatch(final CapturedOutput output) {
+            givenBooks(List.of(book(BOOK_ID)));
+            givenAnswers(Map.of(BOOK_ID, MetadataCheckSamples.confirmed(CORRECTED)));
+
+            service.checkDueBooks();
+
+            assertThat(output.getOut())
+                .contains("catalog.metadata-check batch books=1 turns=3 costUsd=0.25 durationMs=35210 deniedCalls=0");
+        }
+
+        @Test
+        void shouldCutALongAnswerLine(final CapturedOutput output) {
+            final ObjectNode longAnswer = new JsonMapper().createObjectNode()
+                .put("title", "x".repeat(LOGGED_LINE_LIMIT) + END_MARKER);
+            givenBooks(List.of(book(BOOK_ID)));
+            givenAnswers(Map.of(BOOK_ID, new CheckedBook(CORRECTED, Map.of(), longAnswer)));
+
+            service.checkDueBooks();
+
+            assertThat(output.getOut()).contains("x".repeat(LOGGED_LINE_LIMIT / 2)).doesNotContain(END_MARKER);
+        }
+
+        @Test
+        void shouldLogARunSummary(final CapturedOutput output) {
+            givenBooks(booksNumbered(MetadataCheckSamples.BATCH_SIZE + 1));
+            givenAnswers(Map.of(BOOK_ID, MetadataCheckSamples.confirmed(CORRECTED),
+                OTHER_ID, MetadataCheckSamples.unconfirmed()));
+
+            service.checkDueBooks();
+
+            assertThat(output.getOut())
+                .contains("catalog.metadata-check done books=11 confirmed=1 unconfirmed=10 turns=6 costUsd=0.50");
+        }
+
+        @Test
+        void shouldSkipTheSummaryWhenASearchFails(final CapturedOutput output) {
+            givenBooks(booksNumbered(2 * MetadataCheckSamples.BATCH_SIZE));
+            when(client.check(any())).thenReturn(Optional.empty());
+
+            service.checkDueBooks();
+
+            assertThat(output.getOut())
+                .contains("catalog.metadata-check stopped, the search failed")
+                .doesNotContain("catalog.metadata-check done");
+        }
+    }
+
+    private void givenAnswers(final Map<Long, CheckedBook> answers) {
+        when(client.check(any())).thenReturn(Optional.of(MetadataCheckSamples.run(answers)));
     }
 
     private static Book book(final long bookId) {

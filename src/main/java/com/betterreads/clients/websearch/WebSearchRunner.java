@@ -38,7 +38,7 @@ class WebSearchRunner {
 
     // PMD.DoNotUseThreads: restores the interrupt flag after an interrupted wait.
     @SuppressWarnings("PMD.DoNotUseThreads")
-    Optional<JsonNode> run(final String prompt, final String jsonSchema) {
+    Optional<WebSearchResult> run(final String prompt, final String jsonSchema) {
         if (!Files.isRegularFile(Path.of(properties.hookScript()))) {
             LOG.warn("web-search hook script missing, search blocked");
             return Optional.empty();
@@ -63,7 +63,7 @@ class WebSearchRunner {
         }
     }
 
-    private Optional<JsonNode> runInto(final Path output, final String prompt, final String jsonSchema)
+    private Optional<WebSearchResult> runInto(final Path output, final String prompt, final String jsonSchema)
         throws IOException, InterruptedException {
         final ProcessBuilder builder = new ProcessBuilder(WebSearchArgs.argv(properties, jsonSchema))
             .redirectOutput(output.toFile())
@@ -97,14 +97,20 @@ class WebSearchRunner {
         environment.put(DOMAINS_ENV, String.join(",", properties.allowedDomains()));
     }
 
-    private static Optional<JsonNode> structuredOutput(final String stdout) {
+    private static Optional<WebSearchResult> structuredOutput(final String stdout) {
         try {
             final JsonNode result = JSON.readTree(stdout);
             if (result.path("is_error").asBoolean(true)) {
                 LOG.warn("web-search reported an error: {}", LogSanitizer.forLog(result.path("subtype").asString("")));
                 return Optional.empty();
             }
-            return Optional.of(result.path("structured_output")).filter(JsonNode::isObject);
+            return Optional.of(result.path("structured_output"))
+                .filter(JsonNode::isObject)
+                .map(answer -> new WebSearchResult(answer, new SearchUsage(
+                    result.path("num_turns").asInt(0),
+                    result.path("total_cost_usd").asDouble(0),
+                    result.path("duration_ms").asLong(0),
+                    result.path("permission_denials").size())));
         } catch (JacksonException ex) {
             LOG.warn("web-search output was not JSON");
             return Optional.empty();

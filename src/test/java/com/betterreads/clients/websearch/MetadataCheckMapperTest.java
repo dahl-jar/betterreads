@@ -8,6 +8,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -21,12 +22,18 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 class MetadataCheckMapperTest {
 
-    private static final long OTHER_ID = 2L;
+    private static final long OTHER_ID = MetadataJson.OTHER_ID;
 
-    private static final String GERMAN_ISBN = "9783453315617";
+    private static final String GERMAN_ISBN = MetadataJson.GERMAN_ISBN;
+
+    private static final String ENGLISH_ISBN = "9780553103540";
+
+    private static final int LOGGED_DESCRIPTION_LENGTH = 200;
 
     private static final String OTHER_SITE = "https://www.goodreads.com/book/1";
 
@@ -40,7 +47,7 @@ class MetadataCheckMapperTest {
 
     private static final int MAX_POSITION = 999;
 
-    private static final int EARLIEST_YEAR = 1450;
+    private static final int EARLIEST_YEAR = -3000;
 
     private static final int NEXT_YEAR = Year.now(ZoneOffset.UTC).getValue() + 1;
 
@@ -49,17 +56,27 @@ class MetadataCheckMapperTest {
     }
 
     private static VerifiedMetadata map(final MetadataJson json, final @Nullable String storedIsbn) {
-        final Map<Long, VerifiedMetadata> metadata =
-            map(json.node(), List.of(request(MetadataJson.BOOK_ID, storedIsbn)));
-        return Objects.requireNonNull(metadata.get(MetadataJson.BOOK_ID));
+        return check(json, storedIsbn).metadata();
     }
 
     private static Map<Long, VerifiedMetadata> map(final JsonNode output, final List<MetadataCheckRequest> asked) {
-        return MetadataCheckMapper.toMetadata(output, asked, WebSearchSamples.DOMAINS);
+        return MetadataCheckMapper.toCheckedBooks(output, asked, WebSearchSamples.DOMAINS).entrySet().stream()
+            .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().metadata()));
+    }
+
+    private static Map<String, FieldOutcome> outcomes(final MetadataJson json) {
+        return check(json, GERMAN_ISBN).outcomes();
+    }
+
+    private static CheckedBook check(final MetadataJson json, final @Nullable String storedIsbn) {
+        final Map<Long, CheckedBook> books = MetadataCheckMapper.toCheckedBooks(
+            json.node(), List.of(request(MetadataJson.BOOK_ID, storedIsbn)), WebSearchSamples.DOMAINS);
+        return Objects.requireNonNull(books.get(MetadataJson.BOOK_ID));
     }
 
     private static MetadataCheckRequest request(final long bookId, final @Nullable String isbn) {
-        return new MetadataCheckRequest(bookId, MetadataJson.TITLE, List.of(), null, null, null, isbn, null);
+        return new MetadataCheckRequest(
+            bookId, MetadataJson.TITLE, List.of(), null, null, null, isbn, null, List.of());
     }
 
     private static List<String> authors(final int count) {
@@ -231,7 +248,7 @@ class MetadataCheckMapperTest {
 
         @Test
         void shouldKeepStoredEnglishIsbn() {
-            final VerifiedMetadata metadata = map(metadata(), "9780553103540");
+            final VerifiedMetadata metadata = map(metadata(), ENGLISH_ISBN);
 
             assertThat(metadata.isbn13()).isNull();
         }
@@ -249,7 +266,7 @@ class MetadataCheckMapperTest {
     class Limits {
 
         static Stream<Integer> badYears() {
-            return Stream.of(EARLIEST_YEAR - 1, NEXT_YEAR + 1);
+            return Stream.of(EARLIEST_YEAR - 1, 0, NEXT_YEAR + 1);
         }
 
         static Stream<Arguments> badSeries() {
@@ -303,24 +320,143 @@ class MetadataCheckMapperTest {
 
             assertThat(metadata.year()).isEqualTo(EARLIEST_YEAR);
         }
+
+        @ParameterizedTest
+        @ValueSource(doubles = {2014.5})
+        void shouldRejectAYearThatIsNotAWholeNumber(final double year) {
+            final VerifiedMetadata metadata = map(metadata().with(MetadataJson.YEAR_FIELD, year));
+
+            assertThat(metadata.year()).isNull();
+        }
+
+        @Test
+        void shouldRejectAMissingYear() {
+            final VerifiedMetadata metadata = map(metadata().with(MetadataJson.YEAR_FIELD, null));
+
+            assertThat(metadata.year()).isNull();
+        }
+    }
+
+    @Nested
+    class Outcomes {
+
+        @Test
+        void shouldMarkAFieldFromAnUnlistedSiteAsSourceNotAllowed() {
+            final MetadataJson json = metadata().withSource(MetadataJson.YEAR_FIELD, OTHER_SITE);
+
+            final Map<String, FieldOutcome> outcomes = outcomes(json);
+
+            assertThat(outcomes).containsEntry(MetadataJson.YEAR_FIELD, FieldOutcome.SOURCE_NOT_ALLOWED);
+        }
+
+        @Test
+        void shouldMarkAYearOutOfRangeAsValueRejected() {
+            final MetadataJson json = metadata().with(MetadataJson.YEAR_FIELD, NEXT_YEAR + 1);
+
+            final Map<String, FieldOutcome> outcomes = outcomes(json);
+
+            assertThat(outcomes).containsEntry(MetadataJson.YEAR_FIELD, FieldOutcome.VALUE_REJECTED);
+        }
+
+        @Test
+        void shouldRecordAMissingIsbnInTheTitleSource() {
+            final CheckedBook book = check(metadata(), MetadataJson.ISBN);
+
+            assertThat(book.outcomes()).containsEntry(MetadataJson.TITLE_FIELD, FieldOutcome.TITLE_SOURCE_WITHOUT_ISBN);
+        }
+
+        @Test
+        void shouldMarkAMissingFieldAsNotAnswered() {
+            final MetadataJson json = metadata().without(MetadataJson.YEAR_FIELD);
+
+            final Map<String, FieldOutcome> outcomes = outcomes(json);
+
+            assertThat(outcomes).containsEntry(MetadataJson.YEAR_FIELD, FieldOutcome.NOT_ANSWERED);
+        }
+
+        @Test
+        void shouldMarkANullValueAsNotAnswered() {
+            final MetadataJson json = metadata().with(MetadataJson.YEAR_FIELD, null);
+
+            final Map<String, FieldOutcome> outcomes = outcomes(json);
+
+            assertThat(outcomes).containsEntry(MetadataJson.YEAR_FIELD, FieldOutcome.NOT_ANSWERED);
+        }
+
+        @Test
+        void shouldMarkANullValueWithoutASourceAsNotAnswered() {
+            final MetadataJson json = metadata().with(MetadataJson.YEAR_FIELD, null)
+                .withSource(MetadataJson.YEAR_FIELD, null);
+
+            final Map<String, FieldOutcome> outcomes = outcomes(json);
+
+            assertThat(outcomes).containsEntry(MetadataJson.YEAR_FIELD, FieldOutcome.NOT_ANSWERED);
+        }
+
+        @Test
+        void shouldMarkAnIsbnForAnEnglishEditionAsValueRejected() {
+            final CheckedBook book = check(metadata(), ENGLISH_ISBN);
+
+            assertThat(book.outcomes()).containsEntry(MetadataJson.ISBN_FIELD, FieldOutcome.VALUE_REJECTED);
+        }
+
+        @Test
+        void shouldMarkAUniverseWithoutASeriesAsValueRejected() {
+            final MetadataJson json = metadata().withSeries(MetadataJson.SERIES, 0)
+                .withUniverse(MetadataJson.UNIVERSE, MetadataJson.UNIVERSE_NUMBER);
+
+            final Map<String, FieldOutcome> outcomes = outcomes(json);
+
+            assertThat(outcomes).containsEntry(MetadataJson.UNIVERSE_FIELD, FieldOutcome.VALUE_REJECTED);
+        }
+
+        @Test
+        void shouldShortenTheDescriptionInTheLoggedAnswer() {
+            final CheckedBook book = check(metadata(), GERMAN_ISBN);
+
+            assertThat(book.answer().at("/description/value").asString())
+                .isEqualTo(MetadataJson.DESCRIPTION.substring(0, LOGGED_DESCRIPTION_LENGTH));
+        }
     }
 
     @Nested
     class Ids {
 
         @Test
-        void shouldLeaveMissingBookUnconfirmed() {
+        void shouldLeaveOutABookTheAnswerSkips() {
             final Map<Long, VerifiedMetadata> metadata =
                 map(metadata().node(), List.of(request(MetadataJson.BOOK_ID, null), request(OTHER_ID, null)));
 
-            assertThat(metadata).containsEntry(OTHER_ID, VerifiedMetadata.NONE);
+            assertThat(metadata).containsOnlyKeys(MetadataJson.BOOK_ID);
         }
 
         @Test
         void shouldDropUnaskedId() {
             final Map<Long, VerifiedMetadata> metadata = map(metadata().node(), List.of(request(OTHER_ID, null)));
 
-            assertThat(metadata).containsOnlyKeys(OTHER_ID);
+            assertThat(metadata).isEmpty();
+        }
+
+        @Test
+        void shouldIgnoreAnAnswerWithoutANumericId() {
+            final Map<Long, VerifiedMetadata> metadata =
+                map(metadata().withId("Red Rising").node(), List.of(request(0, null)));
+
+            assertThat(metadata).isEmpty();
+        }
+
+        @Test
+        void shouldKeepTheFirstAnswerForARepeatedId() {
+            final ObjectNode answer = metadata().node();
+            final ArrayNode answered = (ArrayNode) answer.get("books");
+            final ObjectNode repeated = (ObjectNode) answered.get(0).deepCopy();
+            ((ObjectNode) repeated.get(MetadataJson.TITLE_FIELD)).put("value", MetadataJson.GOLDEN_SON);
+            answered.add(repeated);
+
+            final Map<Long, VerifiedMetadata> metadata = map(answer, List.of(request(MetadataJson.BOOK_ID, null)));
+
+            assertThat(metadata.get(MetadataJson.BOOK_ID)).extracting(VerifiedMetadata::title)
+                .isEqualTo(MetadataJson.TITLE);
         }
     }
 }
