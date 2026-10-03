@@ -4,12 +4,14 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.security.Keys;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
+import java.util.Optional;
 import java.util.UUID;
 
 import javax.crypto.SecretKey;
@@ -18,13 +20,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
- * Issues and parses HS256 access tokens. The subject carries the user id, and every token gets an
- * {@code aud} and its own {@code jti}.
+ * Issues and parses HS256 access tokens. The subject carries the user id, the {@code cv} claim the
+ * user's credential version, and every token gets an {@code aud} and its own {@code jti}.
  */
 @Component
 public final class JwtIssuer {
 
     static final String AUDIENCE = "betterreads-api";
+
+    static final String CREDENTIAL_VERSION_CLAIM = "cv";
 
     private final SecretKey signingKey;
 
@@ -43,13 +47,14 @@ public final class JwtIssuer {
         this.expiration = expiration;
     }
 
-    public String issue(final long userId) {
+    public String issue(final long userId, final int credentialVersion) {
         final Instant now = Instant.now();
         return Jwts.builder()
             .issuer(issuer)
             .audience().add(AUDIENCE).and()
             .id(UUID.randomUUID().toString())
             .subject(Long.toString(userId))
+            .claim(CREDENTIAL_VERSION_CLAIM, credentialVersion)
             .issuedAt(Date.from(now))
             .expiration(Date.from(now.plus(expiration)))
             .signWith(signingKey)
@@ -60,9 +65,9 @@ public final class JwtIssuer {
      * The audience check rejects a token issued for another service.
      *
      * @throws InvalidJwtException malformed, bad signature, expired, wrong issuer, wrong
-     *         audience, or non-numeric subject
+     *         audience, non-numeric subject, or no credential version
      */
-    public long parseUserId(final String token) {
+    public AccessToken parse(final String token) {
         try {
             final Jws<Claims> parsed = Jwts.parser()
                 .verifyWith(signingKey)
@@ -70,7 +75,10 @@ public final class JwtIssuer {
                 .requireAudience(AUDIENCE)
                 .build()
                 .parseSignedClaims(token);
-            return Long.parseLong(parsed.getPayload().getSubject());
+            final Claims claims = parsed.getPayload();
+            final int credentialVersion = Optional.ofNullable(claims.get(CREDENTIAL_VERSION_CLAIM, Integer.class))
+                .orElseThrow(() -> new MalformedJwtException("token has no credential version"));
+            return new AccessToken(Long.parseLong(claims.getSubject()), credentialVersion);
         } catch (final JwtException | IllegalArgumentException ex) {
             throw new InvalidJwtException("Invalid JWT: " + ex.getClass().getSimpleName(), ex);
         }

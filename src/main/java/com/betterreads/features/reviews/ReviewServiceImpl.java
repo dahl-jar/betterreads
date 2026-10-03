@@ -2,6 +2,7 @@ package com.betterreads.features.reviews;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -25,7 +26,7 @@ class ReviewServiceImpl implements ReviewService {
 
     private static final Logger LOG = LoggerFactory.getLogger(ReviewServiceImpl.class);
 
-    private static final int MAX_UPSERT_ATTEMPTS = 3;
+    private static final int MAX_WRITE_ATTEMPTS = 3;
 
     private static final int HIGHEST_STAR = 5;
 
@@ -68,9 +69,19 @@ class ReviewServiceImpl implements ReviewService {
     public ReviewResponse upsert(
         final Long userId, final String bookKey, final UpsertReviewRequest request) {
         final long bookId = bookIds.requireBookId(bookKey);
-        return ConflictRetry.retryOnConflict(MAX_UPSERT_ATTEMPTS, LOG,
-            "review.upsert conflict, retrying userId=" + userId + " bookId=" + bookId,
-            () -> writer.upsert(userId, bookId, bookKey, request));
+        return retryOnConflict(userId, bookId, () -> writer.upsert(userId, bookId, bookKey, request));
+    }
+
+    @Override
+    public ReviewResponse rate(final Long userId, final String bookKey, final int rating) {
+        final long bookId = bookIds.requireBookId(bookKey);
+        return retryOnConflict(userId, bookId, () -> writer.rate(userId, bookId, bookKey, rating));
+    }
+
+    private static ReviewResponse retryOnConflict(
+        final Long userId, final long bookId, final Supplier<ReviewResponse> write) {
+        return ConflictRetry.retryOnConflict(MAX_WRITE_ATTEMPTS, LOG,
+            "review write conflict, retrying userId=" + userId + " bookId=" + bookId, write);
     }
 
     @Override

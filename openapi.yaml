@@ -197,6 +197,102 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/books/{key}/reviews/me/rating:
+    put:
+      tags:
+      - Reviews
+      summary: "Set the caller's rating of a book, keeping any review text"
+      operationId: rate
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetRatingRequest"
+        required: true
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: The saved review
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ReviewResponse"
+        "400":
+          description: Rating missing or out of range
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Rate limited
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "401":
+          description: Missing or invalid access token
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: No book with that key
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/auth/me/password:
+    put:
+      tags:
+      - Authentication
+      summary: Change the current account's password
+      operationId: changePassword
+      parameters:
+      - name: br_refresh
+        in: cookie
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordRequest"
+        required: true
+      responses:
+        "503":
+          description: Service Unavailable
+        "204":
+          description: "Password changed. Other sessions are signed out at once, and\
+            \ this session keeps its refresh token."
+        "400":
+          description: Wrong current password or invalid new password
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "401":
+          description: Missing or invalid access token
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Rate limited
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/reviews/{reviewId}/comments:
     get:
       tags:
@@ -943,6 +1039,36 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/me/books/counts:
+    get:
+      tags:
+      - Shelf
+      summary: Count the books on the current user's shelf
+      operationId: myShelfCounts
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: The number of books on the shelf
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/MyShelfCountsResponse"
+        "401":
+          description: Missing or invalid access token
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Rate limited
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/images/covers/{key}:
     get:
       tags:
@@ -1185,7 +1311,7 @@ paths:
         "503":
           description: Service Unavailable
         "200":
-          description: A page of reviews
+          description: A page of reviews that have a title or body
           content:
             '*/*':
               schema:
@@ -1315,7 +1441,7 @@ paths:
         "503":
           description: Service Unavailable
         "204":
-          description: Account deleted
+          description: Account deleted and every session signed out at once
         "401":
           description: Missing or invalid access token
           content:
@@ -1471,6 +1597,33 @@ components:
         commentCount:
           type: integer
           format: int64
+    SetRatingRequest:
+      type: object
+      properties:
+        rating:
+          type: integer
+          format: int32
+          maximum: 5
+          minimum: 1
+      required:
+      - rating
+    ChangePasswordRequest:
+      type: object
+      properties:
+        currentPassword:
+          type: string
+          example: '********'
+          maxLength: 72
+          minLength: 0
+        newPassword:
+          type: string
+          description: 8-72 bytes
+          example: '********'
+          maxLength: 72
+          minLength: 8
+      required:
+      - currentPassword
+      - newPassword
     CreateCommentRequest:
       type: object
       properties:
@@ -1778,6 +1931,12 @@ components:
         limit:
           type: integer
           format: int32
+    MyShelfCountsResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
     BookCardResponse:
       type: object
       properties:

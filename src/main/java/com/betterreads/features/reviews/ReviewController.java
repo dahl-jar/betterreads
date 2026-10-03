@@ -1,6 +1,7 @@
 package com.betterreads.features.reviews;
 
 import com.betterreads.errors.AuthenticatedBookErrorResponses;
+import com.betterreads.errors.RateLimitedResponse;
 import com.betterreads.web.PageQuery;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,7 +38,7 @@ class ReviewController {
     @GetMapping("/api/v1/books/{key}/reviews")
     @Operation(summary = "List a book's reviews")
     @SecurityRequirements
-    @ApiResponse(responseCode = "200", description = "A page of reviews")
+    @ApiResponse(responseCode = "200", description = "A page of reviews that have a title or body")
     @ApiResponse(responseCode = "404", description = "No book with that key",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     public ReviewPage listForBook(
@@ -67,6 +68,20 @@ class ReviewController {
         @PathVariable final String key,
         @Valid @RequestBody final UpsertReviewRequest request) {
         return reviewService.upsert(userId, key, request);
+    }
+
+    @PutMapping("/api/v1/books/{key}/reviews/me/rating")
+    @Operation(summary = "Set the caller's rating of a book, keeping any review text")
+    @ApiResponse(responseCode = "200", description = "The saved review")
+    @ApiResponse(responseCode = "400", description = "Rating missing or out of range",
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    @RateLimitedResponse
+    @AuthenticatedBookErrorResponses
+    public ReviewResponse rate(
+        @AuthenticationPrincipal final Long userId,
+        @PathVariable final String key,
+        @Valid @RequestBody final SetRatingRequest request) {
+        return reviewService.rate(userId, key, request.rating());
     }
 
     @DeleteMapping("/api/v1/books/{key}/reviews/me")

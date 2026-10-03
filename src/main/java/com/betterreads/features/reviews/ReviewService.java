@@ -8,6 +8,8 @@ interface ReviewService {
     /** Also recomputes the book's community rating. */
     ReviewResponse upsert(Long userId, String bookKey, UpsertReviewRequest request);
 
+    ReviewResponse rate(Long userId, String bookKey, int rating);
+
     /** Also recomputes the community rating. Removing a missing review does nothing. */
     void remove(Long userId, String bookKey);
 

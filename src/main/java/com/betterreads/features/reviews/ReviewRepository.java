@@ -27,6 +27,7 @@ interface ReviewRepository extends JpaRepository<Review, Long> {
 
     /** reviews edited in the same instant would swap between pages, so the review id breaks the tie */
     @Query("SELECT r FROM Review r WHERE r.bookId = :bookId "
+        + "AND (r.title IS NOT NULL OR r.body IS NOT NULL) "
         + "ORDER BY r.updatedAt DESC, r.reviewId DESC")
     Page<Review> findForBook(@Param("bookId") Long bookId, Pageable pageable);
 

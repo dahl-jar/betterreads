@@ -354,7 +354,7 @@ class BookTest {
         void shouldMarkAuthorsVerified() {
             final Book book = new Book();
 
-            book.applyVerified(new VerifiedMetadata(null, List.of("Darrow"), null, null, null, null, null, null), NOW);
+            book.applyVerified(new VerifiedMetadata(null, List.of("Author"), null, null, null, null, null, null), NOW);
 
             assertThat(book.getVerifiedFields()).containsExactly(VerifiedField.AUTHORS);
         }

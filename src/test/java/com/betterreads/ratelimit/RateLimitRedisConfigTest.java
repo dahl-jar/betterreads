@@ -14,9 +14,9 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 class RateLimitRedisConfigTest {
 
-    private static final String USERNAME = "darrow";
+    private static final String USERNAME = "user";
 
-    private static final String PASSWORD = "howler";
+    private static final String PASSWORD = "Passw0rd-user!";
 
     private static final String HOST = "localhost";
 

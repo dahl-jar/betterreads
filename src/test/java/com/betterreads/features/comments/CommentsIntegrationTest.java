@@ -1,6 +1,7 @@
 package com.betterreads.features.comments;
 
 import com.betterreads.book.BookRepository;
+import com.betterreads.testsupport.Accounts;
 import com.betterreads.testsupport.Books;
 import com.betterreads.testsupport.Comments;
 import com.betterreads.testsupport.RegisteredUserTest;
@@ -26,6 +27,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import static com.betterreads.testsupport.Accounts.OTHER_USER;
+import static com.betterreads.testsupport.Accounts.USER;
+import static com.betterreads.testsupport.Accounts.USER_EMAIL;
 import static com.betterreads.testsupport.Books.DUNE_KEY;
 import static com.betterreads.testsupport.Comments.reviewCommentsUrl;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -45,23 +49,11 @@ class CommentsIntegrationTest extends RegisteredUserTest {
     @ServiceConnection
     static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
 
-    private static final String AUTH_HEADER = "Authorization";
-
-    private static final String BEARER_PREFIX = "Bearer ";
-
     private static final String MESSIAH_KEY = "OL893416W";
 
     private static final String MESSIAH_TITLE = "Dune Messiah";
 
     private static final int MAX_BODY_LENGTH = 5000;
-
-    private static final String DARROW = "darrow";
-
-    private static final String DARROW_EMAIL = "darrow@example.com";
-
-    private static final String GOBLIN = "goblin";
-
-    private static final String GOBLIN_EMAIL = "goblin@example.com";
 
     private static final String FIRST_COMMENT = "The desert ecology is the real protagonist.";
 
@@ -123,19 +115,19 @@ class CommentsIntegrationTest extends RegisteredUserTest {
 
         @Test
         void postingACommentReturnsItWithBody() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, USER_EMAIL);
 
             final ResultActions response = postBookComment(token, DUNE_KEY, FIRST_COMMENT, null);
 
             response
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath(JSON_BODY).value(FIRST_COMMENT))
-                .andExpect(jsonPath("$.data.author").value(DARROW));
+                .andExpect(jsonPath("$.data.author").value(USER));
         }
 
         @Test
         void aBooksCommentsArePublicAndPaged() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, USER_EMAIL);
             postBookComment(token, DUNE_KEY, FIRST_COMMENT, null);
 
             final ResultActions list = getBookComments(DUNE_KEY);
@@ -149,10 +141,9 @@ class CommentsIntegrationTest extends RegisteredUserTest {
 
         @Test
         void shouldShowDeletedForACommenterWhoseAccountIsDeleted() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, USER_EMAIL);
             postBookComment(token, DUNE_KEY, FIRST_COMMENT, null);
-            final int deleted = jdbcTemplate.update(
-                "UPDATE app_user SET deleted_at = now() WHERE username = ?", DARROW);
+            final int deleted = Accounts.softDelete(jdbcTemplate, USER);
             assertThat(deleted).isOne();
 
             final ResultActions list = getBookComments(DUNE_KEY);
@@ -165,7 +156,7 @@ class CommentsIntegrationTest extends RegisteredUserTest {
 
         @Test
         void anOffsetNotAlignedToTheLimitReturnsTheExactRow() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, USER_EMAIL);
             postBookComment(token, DUNE_KEY, "oldest", null);
             postBookComment(token, DUNE_KEY, MIDDLE_COMMENT, null);
             postBookComment(token, DUNE_KEY, "newest", null);
@@ -181,7 +172,7 @@ class CommentsIntegrationTest extends RegisteredUserTest {
 
         @Test
         void commentingOnAnUnknownBookReturns404() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, USER_EMAIL);
 
             final ResultActions response = postBookComment(token, UNKNOWN_BOOK_KEY, FIRST_COMMENT, null);
 
@@ -207,7 +198,7 @@ class CommentsIntegrationTest extends RegisteredUserTest {
 
         @Test
         void emptyBodyIsRejected() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, USER_EMAIL);
 
             final ResultActions response = postBookComment(token, DUNE_KEY, "   ", null);
 
@@ -216,7 +207,7 @@ class CommentsIntegrationTest extends RegisteredUserTest {
 
         @Test
         void shouldRejectCommentOver5000Characters() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, USER_EMAIL);
             final String overlong = "x".repeat(MAX_BODY_LENGTH + 1);
 
             final ResultActions response = postBookComment(token, DUNE_KEY, overlong, null);
@@ -247,7 +238,7 @@ class CommentsIntegrationTest extends RegisteredUserTest {
 
         @Test
         void aReplyCountsTowardItsParentsReplyCount() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, USER_EMAIL);
             final long parentId = commentOnBook(token, DUNE_KEY, FIRST_COMMENT, null);
             postBookComment(token, DUNE_KEY, A_REPLY, parentId);
 
@@ -260,7 +251,7 @@ class CommentsIntegrationTest extends RegisteredUserTest {
 
         @Test
         void repliesAreFetchedSeparately() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, USER_EMAIL);
             final long parentId = commentOnBook(token, DUNE_KEY, FIRST_COMMENT, null);
             postBookComment(token, DUNE_KEY, A_REPLY, parentId);
 
@@ -275,7 +266,7 @@ class CommentsIntegrationTest extends RegisteredUserTest {
 
         @Test
         void replyingToAReplyIsRejected() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, USER_EMAIL);
             final long parentId = commentOnBook(token, DUNE_KEY, FIRST_COMMENT, null);
             final long replyId = commentOnBook(token, DUNE_KEY, A_REPLY, parentId);
 
@@ -286,7 +277,7 @@ class CommentsIntegrationTest extends RegisteredUserTest {
 
         @Test
         void shouldReturnNotFoundForReplyToUnknownParent() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, USER_EMAIL);
 
             final ResultActions response = postBookComment(token, DUNE_KEY, A_REPLY, UNKNOWN_COMMENT_ID);
 
@@ -295,7 +286,7 @@ class CommentsIntegrationTest extends RegisteredUserTest {
 
         @Test
         void replyingToACommentOnAnotherTargetIsRejected() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, USER_EMAIL);
             final long reviewId = postReview(token, DUNE_KEY);
             final long bookCommentId = commentOnBook(token, DUNE_KEY, FIRST_COMMENT, null);
 
@@ -307,7 +298,7 @@ class CommentsIntegrationTest extends RegisteredUserTest {
         @Test
         void shouldRejectReplyWhenParentIsOnAnotherBook() throws Exception {
             Books.seedBook(bookRepository, MESSIAH_KEY, MESSIAH_TITLE);
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, USER_EMAIL);
             final long parentId = commentOnBook(token, DUNE_KEY, FIRST_COMMENT, null);
 
             final ResultActions response = postBookComment(token, MESSIAH_KEY, A_REPLY, parentId);
@@ -322,7 +313,7 @@ class CommentsIntegrationTest extends RegisteredUserTest {
 
         @Test
         void aCommentCanTargetAReview() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, USER_EMAIL);
             final long reviewId = postReview(token, DUNE_KEY);
 
             final ResultActions response = postReviewComment(token, reviewId, FIRST_COMMENT, null);
@@ -334,7 +325,7 @@ class CommentsIntegrationTest extends RegisteredUserTest {
 
         @Test
         void shouldReturnNotFoundForCommentOnUnknownReview() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, USER_EMAIL);
 
             final ResultActions response = postReviewComment(token, UNKNOWN_REVIEW_ID, FIRST_COMMENT, null);
 
@@ -343,7 +334,7 @@ class CommentsIntegrationTest extends RegisteredUserTest {
 
         @Test
         void shouldListCommentsOnReview() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, USER_EMAIL);
             final long reviewId = postReview(token, DUNE_KEY);
             postReviewComment(token, reviewId, FIRST_COMMENT, null);
 
@@ -364,14 +355,14 @@ class CommentsIntegrationTest extends RegisteredUserTest {
 
         @Test
         void deletingAReviewDeletesItsComments() throws Exception {
-            final String reviewerToken = registerAndLogin(DARROW, DARROW_EMAIL);
-            final String commenterToken = registerAndLogin(GOBLIN, GOBLIN_EMAIL);
+            final String reviewerToken = registerAndLogin(USER, USER_EMAIL);
+            final String commenterToken = registerAndLogin(OTHER_USER, Accounts.OTHER_USER_EMAIL);
             final long reviewId = postReview(reviewerToken, DUNE_KEY);
             final ResultActions commented = postReviewComment(commenterToken, reviewId, FIRST_COMMENT, null);
             commented.andExpect(status().isCreated());
 
             mockMvc.perform(delete(BOOKS_BASE + DUNE_KEY + OWN_REVIEW_SUFFIX)
-                    .header(AUTH_HEADER, BEARER_PREFIX + reviewerToken))
+                    .header(Accounts.AUTH_HEADER, Accounts.BEARER_PREFIX + reviewerToken))
                 .andExpect(status().isNoContent());
 
             final Long orphans = jdbcTemplate.queryForObject(
@@ -387,10 +378,10 @@ class CommentsIntegrationTest extends RegisteredUserTest {
 
         @Test
         void anAuthorCanDeleteTheirOwnComment() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, USER_EMAIL);
             final long id = commentOnBook(token, DUNE_KEY, FIRST_COMMENT, null);
 
-            mockMvc.perform(delete(COMMENTS_BASE + id).header(AUTH_HEADER, BEARER_PREFIX + token))
+            mockMvc.perform(delete(COMMENTS_BASE + id).header(Accounts.AUTH_HEADER, Accounts.BEARER_PREFIX + token))
                 .andExpect(status().isNoContent());
 
             final ResultActions remaining = getBookComments(DUNE_KEY);
@@ -399,12 +390,12 @@ class CommentsIntegrationTest extends RegisteredUserTest {
 
         @Test
         void deletingAnotherUsersCommentIsForbidden() throws Exception {
-            final String darrowToken = registerAndLogin(DARROW, DARROW_EMAIL);
-            final String goblinToken = registerAndLogin(GOBLIN, GOBLIN_EMAIL);
-            final long id = commentOnBook(darrowToken, DUNE_KEY, FIRST_COMMENT, null);
+            final String userToken = registerAndLogin(USER, USER_EMAIL);
+            final String otherUserToken = registerAndLogin(OTHER_USER, Accounts.OTHER_USER_EMAIL);
+            final long id = commentOnBook(userToken, DUNE_KEY, FIRST_COMMENT, null);
 
             final ResultActions response = mockMvc.perform(
-                delete(COMMENTS_BASE + id).header(AUTH_HEADER, BEARER_PREFIX + goblinToken));
+                delete(COMMENTS_BASE + id).header(Accounts.AUTH_HEADER, Accounts.BEARER_PREFIX + otherUserToken));
 
             response.andExpect(status().isForbidden());
             final ResultActions remaining = getBookComments(DUNE_KEY);
@@ -413,7 +404,7 @@ class CommentsIntegrationTest extends RegisteredUserTest {
 
         @Test
         void shouldReturnUnauthorizedWhenDeletingWithoutToken() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, USER_EMAIL);
             final long id = commentOnBook(token, DUNE_KEY, FIRST_COMMENT, null);
 
             final ResultActions response = mockMvc.perform(delete(COMMENTS_BASE + id));
@@ -425,21 +416,23 @@ class CommentsIntegrationTest extends RegisteredUserTest {
 
         @Test
         void deletingAnUnknownCommentIsANoOp() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, USER_EMAIL);
 
             final ResultActions response = mockMvc.perform(
-                delete(COMMENTS_BASE + UNKNOWN_COMMENT_ID).header(AUTH_HEADER, BEARER_PREFIX + token));
+                delete(COMMENTS_BASE + UNKNOWN_COMMENT_ID)
+                    .header(Accounts.AUTH_HEADER, Accounts.BEARER_PREFIX + token));
 
             response.andExpect(status().isNoContent());
         }
 
         @Test
         void deletingACommentDeletesItsReplies() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, USER_EMAIL);
             final long parentId = commentOnBook(token, DUNE_KEY, FIRST_COMMENT, null);
             postBookComment(token, DUNE_KEY, A_REPLY, parentId);
 
-            mockMvc.perform(delete(COMMENTS_BASE + parentId).header(AUTH_HEADER, BEARER_PREFIX + token))
+            mockMvc.perform(delete(COMMENTS_BASE + parentId)
+                    .header(Accounts.AUTH_HEADER, Accounts.BEARER_PREFIX + token))
                 .andExpect(status().isNoContent());
 
             final Long remaining = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM comment", Long.class);
@@ -492,7 +485,7 @@ class CommentsIntegrationTest extends RegisteredUserTest {
         final ObjectNode node = objectMapper.createObjectNode();
         node.put("rating", A_RATING);
         final ResultActions created = mockMvc.perform(put(BOOKS_BASE + key + OWN_REVIEW_SUFFIX)
-            .header(AUTH_HEADER, BEARER_PREFIX + token)
+            .header(Accounts.AUTH_HEADER, Accounts.BEARER_PREFIX + token)
             .contentType(MediaType.APPLICATION_JSON)
             .content(objectMapper.writeValueAsString(node)));
         return idOf(created);

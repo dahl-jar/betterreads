@@ -133,9 +133,9 @@ class LocMapperTest {
             final SourceBook book = map(sruResponse().withoutNames()
                 .withContributor("Jenkins, Christine,", author)
                 .withPrimaryContributor("Cart, Michael,", author)
-                .withContributor("Valka, Onderra,", "editor"));
+                .withContributor("Editor, Book,", "editor"));
 
-            assertThat(book.authorNames()).containsExactly("Michael Cart", "Christine Jenkins", "Onderra Valka");
+            assertThat(book.authorNames()).containsExactly("Michael Cart", "Christine Jenkins", "Book Editor");
         }
 
         @Test

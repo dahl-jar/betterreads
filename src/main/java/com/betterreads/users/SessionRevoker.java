@@ -1,8 +1,10 @@
 package com.betterreads.users;
 
-// PMD.ImplicitFunctionalInterface: a Spring service contract implemented by one @Component.
-@SuppressWarnings("PMD.ImplicitFunctionalInterface")
+import org.jspecify.annotations.Nullable;
+
 public interface SessionRevoker {
 
     void revokeAllInCurrentTransaction(long userId);
+
+    void revokeOthersInCurrentTransaction(long userId, @Nullable String keptRefreshToken);
 }

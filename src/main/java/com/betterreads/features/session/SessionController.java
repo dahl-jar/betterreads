@@ -1,5 +1,6 @@
 package com.betterreads.features.session;
 
+import com.betterreads.errors.RateLimitedResponse;
 import com.betterreads.security.RefreshCookies;
 import com.betterreads.users.UserResponse;
 
@@ -49,8 +50,7 @@ class SessionController {
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(responseCode = "409", description = "Username or email already taken",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-    @ApiResponse(responseCode = "429", description = "Rate limited",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    @RateLimitedResponse
     public ResponseEntity<Void> register(@Valid @RequestBody final RegisterRequest request) {
         sessionService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED).build();
@@ -66,8 +66,7 @@ class SessionController {
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(responseCode = "403", description = "Email not verified",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-    @ApiResponse(responseCode = "429", description = "Rate limited",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    @RateLimitedResponse
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody final LoginRequest request) {
         final SessionTokens tokens = sessionService.login(request);
         return withRefreshCookie(ResponseEntity.ok(), tokens);

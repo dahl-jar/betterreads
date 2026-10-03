@@ -1,9 +1,9 @@
 package com.betterreads.book;
 
+import static com.betterreads.book.BookSeriesSamples.AUTHOR;
 import static com.betterreads.book.BookSeriesSamples.COSMERE;
-import static com.betterreads.book.BookSeriesSamples.DARROW;
 import static com.betterreads.book.BookSeriesSamples.HARDCOVER_ID;
-import static com.betterreads.book.BookSeriesSamples.MUSTANG;
+import static com.betterreads.book.BookSeriesSamples.OTHER_AUTHOR;
 import static com.betterreads.book.BookSeriesSamples.STORMLIGHT;
 import static com.betterreads.book.BookSeriesSamples.wordsOfRadiance;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -131,7 +131,7 @@ class BookSeriesPersistenceIntegrationTest extends ContainerizedTest {
 
         assertThat(views).singleElement().satisfies(view -> {
             assertThat(view.series()).containsExactly(STORMLIGHT, COSMERE);
-            assertThat(view.authors()).containsExactly(DARROW, MUSTANG);
+            assertThat(view.authors()).containsExactly(AUTHOR, OTHER_AUTHOR);
         });
     }
 

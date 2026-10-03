@@ -36,6 +36,6 @@ class OpenLibraryWireMock extends WireMockFixture {
     @DynamicPropertySource
     static void openLibraryProperties(final DynamicPropertyRegistry registry) {
         registerSource(registry, "openlibrary", "");
-        registry.add("openlibrary.contact-email", () -> "darrow@example.com");
+        registry.add("openlibrary.contact-email", () -> "user@example.com");
     }
 }

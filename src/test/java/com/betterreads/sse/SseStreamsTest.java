@@ -21,9 +21,9 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter.SseEvent
 
 class SseStreamsTest {
 
-    private static final String KEY = "mustang";
+    private static final String KEY = "book-one";
 
-    private static final String OTHER_KEY = "darrow";
+    private static final String OTHER_KEY = "book-two";
 
     private static final int STREAM_CAP = 500;
 

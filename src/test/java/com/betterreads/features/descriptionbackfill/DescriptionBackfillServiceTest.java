@@ -55,7 +55,7 @@ class DescriptionBackfillServiceTest {
 
     private static final String TITLE = "A Book";
 
-    private static final String AUTHOR = "Darrow";
+    private static final String AUTHOR = "Author";
 
     private static final int SLICE_SIZE = 50;
 

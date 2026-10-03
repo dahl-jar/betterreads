@@ -1,20 +1,18 @@
 package com.betterreads.features.account;
 
-import com.betterreads.crypto.PasswordByteLimit;
 import com.betterreads.errors.InvalidRequestException;
 import com.betterreads.mailoutbox.MailOutboxService;
 import com.betterreads.users.EmailNormalizer;
 import com.betterreads.users.SessionRevoker;
 import com.betterreads.users.User;
+import com.betterreads.users.UserPasswords;
 import com.betterreads.users.UserRepository;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Objects;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,7 +36,7 @@ class PasswordResetService {
 
     private final MailOutboxService mailOutbox;
 
-    private final PasswordEncoder passwordEncoder;
+    private final UserPasswords userPasswords;
 
     private final SessionRevoker sessionRevoker;
 
@@ -49,14 +47,14 @@ class PasswordResetService {
         final EmailTokenIssuer tokenIssuer,
         final EmailTokenRedeemer redeemer,
         final MailOutboxService mailOutbox,
-        final PasswordEncoder passwordEncoder,
+        final UserPasswords userPasswords,
         final SessionRevoker sessionRevoker
     ) {
         this.userRepository = userRepository;
         this.tokenIssuer = tokenIssuer;
         this.redeemer = redeemer;
         this.mailOutbox = mailOutbox;
-        this.passwordEncoder = passwordEncoder;
+        this.userPasswords = userPasswords;
         this.sessionRevoker = sessionRevoker;
     }
 
@@ -91,7 +89,6 @@ class PasswordResetService {
      */
     @Transactional
     public void resetPassword(final String presentedToken, final String newPassword) {
-        PasswordByteLimit.check(newPassword);
         final EmailTokenRedeemer.Locked locked = redeemer.lockForRedeem(
             presentedToken, EmailToken.Purpose.PASSWORD_RESET, INVALID_OR_EXPIRED_TOKEN);
         final User user = locked.user();
@@ -106,7 +103,7 @@ class PasswordResetService {
             throw new InvalidRequestException(INVALID_OR_EXPIRED_TOKEN);
         }
 
-        user.setPasswordHash(Objects.requireNonNull(passwordEncoder.encode(newPassword)));
+        userPasswords.setPassword(user, newPassword);
         userRepository.save(user);
 
         redeemer.consume(row, Instant.now());

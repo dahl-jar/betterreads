@@ -3,6 +3,7 @@ package com.betterreads.features.shelves;
 import java.util.List;
 
 import com.betterreads.errors.AuthenticatedBookErrorResponses;
+import com.betterreads.errors.RateLimitedResponse;
 import org.springframework.http.ProblemDetail;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -47,6 +48,16 @@ class ShelfController {
         @AuthenticationPrincipal final Long userId,
         @RequestParam(name = "status", required = false) final @Nullable ReadingStatus status) {
         return shelfService.list(userId, status);
+    }
+
+    @GetMapping("/counts")
+    @Operation(summary = "Count the books on the current user's shelf")
+    @ApiResponse(responseCode = "200", description = "The number of books on the shelf")
+    @ApiResponse(responseCode = "401", description = "Missing or invalid access token",
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    @RateLimitedResponse
+    public MyShelfCountsResponse myShelfCounts(@AuthenticationPrincipal final Long userId) {
+        return shelfService.countsForUser(userId);
     }
 
     @PutMapping("/{key}/status")

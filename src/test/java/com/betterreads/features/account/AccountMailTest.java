@@ -3,15 +3,19 @@ package com.betterreads.features.account;
 import com.betterreads.features.session.RefreshTokenRepository;
 import com.betterreads.mailoutbox.MailOutboxRepository;
 import com.betterreads.ratelimit.RateLimitFilter;
+import com.betterreads.testsupport.Accounts;
 import com.betterreads.testsupport.ContainerizedTest;
 import com.betterreads.users.UserRepository;
 
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.Objects;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -30,8 +34,17 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 })
 abstract class AccountMailTest extends ContainerizedTest {
 
+    protected static final String OLD_PASSWORD = "OldP4ssword!";
+
+    protected static final String NEW_PASSWORD = "BrandN3wPass!";
+
+    protected static final String MULTIBYTE_PASSWORD = "é".repeat(40);
+
     @Autowired
     protected UserRepository userRepository;
+
+    @Autowired
+    protected PasswordEncoder passwordEncoder;
 
     @Autowired
     protected EmailTokenRepository emailTokenRepository;
@@ -62,7 +75,20 @@ abstract class AccountMailTest extends ContainerizedTest {
         mailOutboxRepository.deleteAll();
         emailTokenRepository.deleteAll();
         refreshTokenRepository.deleteAll();
-        userRepository.deleteAll();
+        jdbcTemplate.update("DELETE FROM app_user");
         rateLimitFilter.reset();
+    }
+
+    protected long seedUser() {
+        return Accounts.seedUser(userRepository, passwordEncoder, Accounts.USER, Accounts.USER_EMAIL, OLD_PASSWORD);
+    }
+
+    protected String storedHash(final long userId) {
+        return Objects.requireNonNull(jdbcTemplate.queryForObject(
+            "SELECT password_hash FROM app_user WHERE user_id = ?", String.class, userId));
+    }
+
+    protected boolean storedPasswordMatches(final long userId, final String rawPassword) {
+        return passwordEncoder.matches(rawPassword, storedHash(userId));
     }
 }

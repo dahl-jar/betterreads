@@ -60,11 +60,11 @@ class RefreshTokenService {
      */
     @Transactional
     public Optional<RefreshTokenRotation> rotate(final String presented) {
-        final Optional<RefreshToken> rowOpt = repository.findByTokenHashForUpdate(hasher.hash(presented));
-        if (rowOpt.isEmpty()) {
+        final String hash = hasher.hash(presented);
+        if (repository.lockOwnerOfToken(hash).isEmpty()) {
             return Optional.empty();
         }
-        final RefreshToken row = rowOpt.get();
+        final RefreshToken row = repository.findByTokenHashForUpdate(hash).orElseThrow();
 
         if (row.getRevokedAt() != null) {
             if (row.getReplacedBy() != null) {

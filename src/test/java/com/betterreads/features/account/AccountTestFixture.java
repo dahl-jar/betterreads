@@ -3,20 +3,10 @@ package com.betterreads.features.account;
 import com.betterreads.mailoutbox.MailOutbox;
 import com.betterreads.mailoutbox.MailOutboxRepository;
 import com.betterreads.testsupport.Accounts;
-import com.betterreads.users.User;
 import com.betterreads.users.UserRepository;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -39,9 +29,7 @@ final class AccountTestFixture {
 
     static final String FIELD_TOKEN = "token";
 
-    private static final int CONCURRENT_THREADS = 16;
-
-    private static final int CONCURRENT_TIMEOUT_SECONDS = 10;
+    static final int CONCURRENT_THREADS = 16;
 
     private AccountTestFixture() {
     }
@@ -80,9 +68,8 @@ final class AccountTestFixture {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(Accounts.registerPayload(objectMapper, username, email, Accounts.PASSWORD)))
             .andExpect(status().isCreated());
-        final User user = users.findByEmail(email)
+        return users.findIdByEmail(email)
             .orElseThrow(() -> new IllegalStateException("registration succeeded but user not found"));
-        return user.getUserId();
     }
 
     // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
@@ -110,27 +97,5 @@ final class AccountTestFixture {
             "UPDATE email_token SET issued_at = ?, expires_at = ? "
                 + "WHERE user_id = ? AND purpose = ? AND consumed_at IS NULL",
             issued, issued.plusSeconds(1), userId, purpose.name());
-    }
-
-    // PMD.DoNotUseThreads: the race needs real threads
-    @SuppressWarnings("PMD.DoNotUseThreads")
-    static void runConcurrently(final Runnable action)
-        throws InterruptedException, ExecutionException, TimeoutException {
-        final CountDownLatch start = new CountDownLatch(1);
-        final List<Future<?>> futures = new ArrayList<>(CONCURRENT_THREADS);
-
-        try (ExecutorService pool = Executors.newFixedThreadPool(CONCURRENT_THREADS)) {
-            for (int i = 0; i < CONCURRENT_THREADS; i++) {
-                futures.add(pool.submit(() -> {
-                    start.await();
-                    action.run();
-                    return null;
-                }));
-            }
-            start.countDown();
-            for (final Future<?> future : futures) {
-                future.get(CONCURRENT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            }
-        }
     }
 }

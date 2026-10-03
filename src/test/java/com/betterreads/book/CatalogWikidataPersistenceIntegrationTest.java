@@ -35,11 +35,11 @@ class CatalogWikidataPersistenceIntegrationTest extends ContainerizedTest {
 
     private static final String RED_RISING_QID = "Q1";
     private static final String RED_RISING_TITLE = "Red Rising";
-    private static final String DARROW_NAME = "Darrow";
-    private static final String REAPER_NAME = "Reaper";
-    private static final String DARROW_QID = "Q2";
-    private static final String DARROW_PHOTO = "https://photos.example.test/darrow.jpg";
-    private static final String DARROW_BIO = "https://wiki.example.test/Darrow";
+    private static final String AUTHOR_NAME = "Author";
+    private static final String OTHER_AUTHOR_NAME = "Other Author";
+    private static final String AUTHOR_QID = "Q2";
+    private static final String AUTHOR_PHOTO = "https://photos.example.test/author.jpg";
+    private static final String AUTHOR_BIO = "https://wiki.example.test/Author";
     private static final String HUGO = "Hugo Award for Best Novel";
     private static final String NEBULA = "Nebula Award for Best Novel";
 
@@ -61,15 +61,15 @@ class CatalogWikidataPersistenceIntegrationTest extends ContainerizedTest {
         authorRepository.deleteAll();
     }
 
-    private static SourceAuthor darrow() {
-        return new SourceAuthor(DARROW_NAME, DARROW_QID, DARROW_PHOTO, DARROW_BIO);
+    private static SourceAuthor author() {
+        return new SourceAuthor(AUTHOR_NAME, AUTHOR_QID, AUTHOR_PHOTO, AUTHOR_BIO);
     }
 
     private static SourceBook redRising(final @Nullable List<String> awards) {
         return SourceBook.builder(BookFieldSource.WIKIDATA)
             .wikidataQid(RED_RISING_QID)
             .title(RED_RISING_TITLE)
-            .authors(List.of(darrow()))
+            .authors(List.of(author()))
             .awards(awards)
             .build();
     }
@@ -128,20 +128,20 @@ class CatalogWikidataPersistenceIntegrationTest extends ContainerizedTest {
         void persistsThePhotoAndBioOntoTheAuthorRow() {
             bookUpsertService.upsertFromSource(redRising(List.of()));
 
-            assertThat(authorRepository.findByWikidataQid(DARROW_QID))
+            assertThat(authorRepository.findByWikidataQid(AUTHOR_QID))
                 .isPresent()
                 .get()
                 .satisfies(author -> {
-                    assertThat(author.getName()).isEqualTo(DARROW_NAME);
-                    assertThat(author.getPhotoUrl()).isEqualTo(DARROW_PHOTO);
-                    assertThat(author.getBio()).isEqualTo(DARROW_BIO);
+                    assertThat(author.getName()).isEqualTo(AUTHOR_NAME);
+                    assertThat(author.getPhotoUrl()).isEqualTo(AUTHOR_PHOTO);
+                    assertThat(author.getBio()).isEqualTo(AUTHOR_BIO);
                 });
         }
 
         @Test
         void shouldFillQidOnAuthorMatchedByName() {
             final Author existing = new Author();
-            existing.setName(DARROW_NAME);
+            existing.setName(AUTHOR_NAME);
             authorRepository.saveAndFlush(existing);
 
             bookUpsertService.upsertFromSource(redRising(List.of()));
@@ -149,42 +149,42 @@ class CatalogWikidataPersistenceIntegrationTest extends ContainerizedTest {
             assertThat(authorRepository.count())
                 .as("the name lookup reuses the existing row")
                 .isEqualTo(1L);
-            assertThat(authorRepository.findByWikidataQid(DARROW_QID))
+            assertThat(authorRepository.findByWikidataQid(AUTHOR_QID))
                 .get()
                 .extracting(Author::getPhotoUrl)
-                .isEqualTo(DARROW_PHOTO);
+                .isEqualTo(AUTHOR_PHOTO);
         }
 
         @Test
         void shouldReuseAuthorMatchedByQidUnderAnotherName() {
             final Author existing = new Author();
-            existing.setName(REAPER_NAME);
-            existing.setWikidataQid(DARROW_QID);
+            existing.setName(OTHER_AUTHOR_NAME);
+            existing.setWikidataQid(AUTHOR_QID);
             authorRepository.saveAndFlush(existing);
 
             bookUpsertService.upsertFromSource(redRising(List.of()));
 
             assertThat(authorRepository.count()).isEqualTo(1L);
-            assertThat(storedAuthorNames()).containsExactly(REAPER_NAME);
+            assertThat(storedAuthorNames()).containsExactly(OTHER_AUTHOR_NAME);
         }
 
         @Test
         void shouldApplyVerifiedAuthors() {
             final long bookId = bookUpsertService.upsertFromSource(redRising(List.of())).getBookId();
 
-            bookUpsertService.applyVerified(bookId, verifiedAuthor(REAPER_NAME));
+            bookUpsertService.applyVerified(bookId, verifiedAuthor(OTHER_AUTHOR_NAME));
 
-            assertThat(storedAuthorNames()).containsExactly(REAPER_NAME);
+            assertThat(storedAuthorNames()).containsExactly(OTHER_AUTHOR_NAME);
         }
 
         @Test
         void shouldKeepVerifiedAuthorsOnRefresh() {
             final long bookId = bookUpsertService.upsertFromSource(redRising(List.of())).getBookId();
-            bookUpsertService.applyVerified(bookId, verifiedAuthor(REAPER_NAME));
+            bookUpsertService.applyVerified(bookId, verifiedAuthor(OTHER_AUTHOR_NAME));
 
             bookUpsertService.upsertFromSource(redRising(List.of()));
 
-            assertThat(storedAuthorNames()).containsExactly(REAPER_NAME);
+            assertThat(storedAuthorNames()).containsExactly(OTHER_AUTHOR_NAME);
         }
 
         private static VerifiedMetadata verifiedAuthor(final String name) {
@@ -196,7 +196,7 @@ class CatalogWikidataPersistenceIntegrationTest extends ContainerizedTest {
             final long bookId = bookUpsertService.upsertFromSource(redRising(List.of())).getBookId();
             jdbc.update("UPDATE book SET updated_at = now() - interval '10 days' WHERE book_id = ?", bookId);
 
-            bookUpsertService.upsertFromSource(redRisingBy(List.of(SourceAuthor.ofName(REAPER_NAME))));
+            bookUpsertService.upsertFromSource(redRisingBy(List.of(SourceAuthor.ofName(OTHER_AUTHOR_NAME))));
 
             final OffsetDateTime updatedAt = bookRepository.findById(bookId).orElseThrow().getUpdatedAt();
             assertThat(updatedAt).isAfter(OffsetDateTime.now(ZoneOffset.UTC).minusHours(1));
@@ -208,7 +208,7 @@ class CatalogWikidataPersistenceIntegrationTest extends ContainerizedTest {
 
             bookUpsertService.upsertFromSource(redRisingBy(null));
 
-            assertThat(storedAuthorNames()).containsExactly(DARROW_NAME);
+            assertThat(storedAuthorNames()).containsExactly(AUTHOR_NAME);
         }
 
         @Test
@@ -217,7 +217,7 @@ class CatalogWikidataPersistenceIntegrationTest extends ContainerizedTest {
 
             bookUpsertService.upsertFromSource(redRisingBy(SourceAuthor.ofNames(List.of(" "))));
 
-            assertThat(storedAuthorNames()).containsExactly(DARROW_NAME);
+            assertThat(storedAuthorNames()).containsExactly(AUTHOR_NAME);
         }
 
         private List<String> storedAuthorNames() {

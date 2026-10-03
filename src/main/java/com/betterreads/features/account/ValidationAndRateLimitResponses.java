@@ -1,5 +1,7 @@
 package com.betterreads.features.account;
 
+import com.betterreads.errors.RateLimitedResponse;
+
 import org.springframework.http.ProblemDetail;
 
 import io.swagger.v3.oas.annotations.media.Content;
@@ -15,7 +17,6 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @ApiResponse(responseCode = "400", description = "Validation failed",
     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-@ApiResponse(responseCode = "429", description = "Rate limited",
-    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+@RateLimitedResponse
 @interface ValidationAndRateLimitResponses {
 }

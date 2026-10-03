@@ -4,7 +4,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 import com.betterreads.bookaccess.BookIdLookup;
 import com.betterreads.bookaccess.BookSummary;
@@ -118,14 +117,19 @@ class ShelfServiceImpl implements ShelfService {
     @Override
     @Transactional(readOnly = true)
     public ShelfCountsResponse countsForBook(final String bookKey) {
-        final Map<ReadingStatus, Long> countByStatus =
-            entries.countByStatusForBook(bookIds.requireBookId(bookKey)).stream()
-                .collect(Collectors.toMap(StatusCount::status, StatusCount::count));
+        final StatusCounts counts =
+            StatusCounts.from(entries.countByStatusForBook(bookIds.requireBookId(bookKey)));
         return new ShelfCountsResponse(
-            countByStatus.getOrDefault(ReadingStatus.WANT_TO_READ, 0L),
-            countByStatus.getOrDefault(ReadingStatus.CURRENTLY_READING, 0L),
-            countByStatus.getOrDefault(ReadingStatus.FINISHED, 0L),
-            countByStatus.getOrDefault(ReadingStatus.DROPPED, 0L));
+            counts.of(ReadingStatus.WANT_TO_READ),
+            counts.of(ReadingStatus.CURRENTLY_READING),
+            counts.of(ReadingStatus.FINISHED),
+            counts.of(ReadingStatus.DROPPED));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public MyShelfCountsResponse countsForUser(final Long userId) {
+        return new MyShelfCountsResponse(entries.countByUserId(userId));
     }
 
     private ShelfEntryResponse toResponse(
@@ -147,16 +151,11 @@ class ShelfServiceImpl implements ShelfService {
     private static void applyDates(final ShelfEntry entry, final UpdateEntryRequest request) {
         final LocalDate started = firstNonNull(request.startedAt(), entry.getStartedAt());
         final LocalDate finished = firstNonNull(request.finishedAt(), entry.getFinishedAt());
-        rejectFinishedBeforeStarted(started, finished);
-        entry.setStartedAt(started);
-        entry.setFinishedAt(finished);
-    }
-
-    private static void rejectFinishedBeforeStarted(
-        final @Nullable LocalDate started, final @Nullable LocalDate finished) {
         if (started != null && finished != null && finished.isBefore(started)) {
             throw new InvalidRequestException("Finished date cannot be before the started date");
         }
+        entry.setStartedAt(started);
+        entry.setFinishedAt(finished);
     }
 
     private static @Nullable LocalDate firstNonNull(

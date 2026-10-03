@@ -8,6 +8,9 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import tools.jackson.databind.ObjectMapper;
+
+import java.net.URI;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +20,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static com.betterreads.ratelimit.RateLimitFixtures.LOGIN_BURST;
@@ -29,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -53,6 +58,12 @@ class AuthRateLimitIntegrationTest extends ContainerizedTest {
     private static final int REGISTER_RATE_LIMIT_BURST = 5;
 
     private static final int OVER_BURST = 5;
+
+    private static final URI ENCODED_LOGIN_URL = URI.create("/api/v1/auth/%6Cogin");
+
+    private static final String JSON_DETAIL = "$.detail";
+
+    private static final String INVALID_CREDENTIALS = "Invalid credentials";
 
     @Autowired
     private RateLimitFilter rateLimitFilter;
@@ -123,6 +134,23 @@ class AuthRateLimitIntegrationTest extends ContainerizedTest {
         assertThat(retryAfter)
             .isNotNull()
             .satisfies(value -> assertThat(Long.parseLong(value)).isGreaterThanOrEqualTo(1L));
+    }
+
+    @Test
+    void shouldRateLimitALoginOnAnEncodedPath() throws Exception {
+        final String body = loginPayload(objectMapper);
+        for (int i = 0; i < LOGIN_BURST; i++) {
+            final ResultActions allowed = mockMvc.perform(
+                post(ENCODED_LOGIN_URL).contentType(MediaType.APPLICATION_JSON).content(body));
+            allowed
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath(JSON_DETAIL).value(INVALID_CREDENTIALS));
+        }
+
+        final ResultActions response = mockMvc.perform(
+            post(ENCODED_LOGIN_URL).contentType(MediaType.APPLICATION_JSON).content(body));
+
+        response.andExpect(status().isTooManyRequests());
     }
 
     // PMD.AvoidUsingHardCodedIP: private test addresses vary X-Forwarded-For without network calls.

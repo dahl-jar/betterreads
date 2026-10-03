@@ -2,6 +2,7 @@ package com.betterreads.features.account;
 
 import com.betterreads.mailoutbox.MailOutboxService;
 import com.betterreads.testsupport.Accounts;
+import com.betterreads.testsupport.ConcurrentCalls;
 import com.betterreads.users.User;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.testcontainers.junit.jupiter.Container;
@@ -23,11 +24,11 @@ import org.springframework.test.web.servlet.ResultActions;
 import static com.betterreads.features.account.AccountTestFixture.FIELD_TOKEN;
 import static com.betterreads.features.account.AccountTestFixture.UNKNOWN_EMAIL;
 import static com.betterreads.features.account.AccountTestFixture.UNKNOWN_TOKEN;
-import static com.betterreads.testsupport.Accounts.EMAIL;
 import static com.betterreads.testsupport.Accounts.MIXED_CASE_EMAIL;
 import static com.betterreads.testsupport.Accounts.PASSWORD;
 import static com.betterreads.testsupport.Accounts.REGISTER_URL;
-import static com.betterreads.testsupport.Accounts.USERNAME;
+import static com.betterreads.testsupport.Accounts.USER;
+import static com.betterreads.testsupport.Accounts.USER_EMAIL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -59,14 +60,14 @@ class EmailVerificationIntegrationTest extends AccountMailTest {
         void shouldEnqueueVerificationMail() throws Exception {
             mockMvc.perform(post(REGISTER_URL)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(Accounts.registerPayload(objectMapper, USERNAME, EMAIL, PASSWORD)))
+                    .content(Accounts.registerPayload(objectMapper, USER, USER_EMAIL, PASSWORD)))
                 .andExpect(status().isCreated());
 
             assertThat(mailOutboxRepository.findAll())
                 .as("registration enqueues exactly one verification mail addressed to the user")
                 .hasSize(1)
                 .first()
-                .satisfies(row -> assertThat(row.getRecipient()).isEqualTo(EMAIL))
+                .satisfies(row -> assertThat(row.getRecipient()).isEqualTo(USER_EMAIL))
                 .satisfies(row -> assertThat(row.getTemplate())
                     .isEqualTo(MailOutboxService.TEMPLATE_EMAIL_VERIFICATION))
                 .satisfies(row -> assertThat(AccountTestFixture.payloadField(objectMapper, row, FIELD_TOKEN))
@@ -154,7 +155,7 @@ class EmailVerificationIntegrationTest extends AccountMailTest {
             final long userId = registerNewUser();
             final String firstToken = AccountTestFixture.readEnqueuedToken(mailOutboxRepository, objectMapper);
             mailOutboxRepository.deleteAll();
-            emailVerificationService.requestResend(EMAIL);
+            emailVerificationService.requestResend(USER_EMAIL);
 
             verify(firstToken)
                 .andExpect(status().isBadRequest());
@@ -174,7 +175,7 @@ class EmailVerificationIntegrationTest extends AccountMailTest {
             final long userId = registerNewUser();
             mailOutboxRepository.deleteAll();
 
-            resend(EMAIL)
+            resend(USER_EMAIL)
                 .andExpect(status().isNoContent());
 
             assertThat(emailTokenRepository.findActive(
@@ -185,7 +186,7 @@ class EmailVerificationIntegrationTest extends AccountMailTest {
                 .as("resend enqueues a fresh verification mail")
                 .hasSize(1)
                 .first()
-                .satisfies(row -> assertThat(row.getRecipient()).isEqualTo(EMAIL));
+                .satisfies(row -> assertThat(row.getRecipient()).isEqualTo(USER_EMAIL));
         }
 
         @Test
@@ -208,7 +209,7 @@ class EmailVerificationIntegrationTest extends AccountMailTest {
             emailVerificationService.verify(token);
             mailOutboxRepository.deleteAll();
 
-            resend(EMAIL)
+            resend(USER_EMAIL)
                 .andExpect(status().isNoContent());
 
             assertThat(mailOutboxRepository.findAll())
@@ -242,7 +243,10 @@ class EmailVerificationIntegrationTest extends AccountMailTest {
         void concurrentResendLeavesOneActiveToken() throws Exception {
             final long userId = registerNewUser();
 
-            AccountTestFixture.runConcurrently(() -> emailVerificationService.requestResend(EMAIL));
+            ConcurrentCalls.run(AccountTestFixture.CONCURRENT_THREADS, () -> {
+                emailVerificationService.requestResend(USER_EMAIL);
+                return true;
+            });
 
             assertThat(emailTokenRepository.findActive(
                     userId, EmailToken.Purpose.EMAIL_VERIFICATION))
@@ -254,7 +258,7 @@ class EmailVerificationIntegrationTest extends AccountMailTest {
     // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     private long registerNewUser() throws Exception {
-        return AccountTestFixture.registerUser(mockMvc, objectMapper, userRepository, USERNAME, EMAIL);
+        return AccountTestFixture.registerUser(mockMvc, objectMapper, userRepository, USER, USER_EMAIL);
     }
 
     @Nullable

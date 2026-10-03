@@ -39,7 +39,7 @@ import org.springframework.test.context.TestPropertySource;
 @EnableConfigurationProperties(OpenLibraryProperties.class)
 @TestPropertySource(properties = {
     "openlibrary.base-url=https://openlibrary.org",
-    "openlibrary.contact-email=darrow@example.com",
+    "openlibrary.contact-email=user@example.com",
     "openlibrary.connect-timeout=5000",
     "openlibrary.read-timeout=15000"
 })

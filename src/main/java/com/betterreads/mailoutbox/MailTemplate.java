@@ -1,6 +1,6 @@
 package com.betterreads.mailoutbox;
 
-/** Subject and body for one kind of outbox mail. */
+/** Subject and content for one kind of outbox mail. */
 interface MailTemplate {
 
     /** Must match the {@code mail_outbox.template} value the row was queued with. */
@@ -8,5 +8,5 @@ interface MailTemplate {
 
     String subject();
 
-    String renderBody(String payload);
+    MailLayout.MailContent content(String payload);
 }

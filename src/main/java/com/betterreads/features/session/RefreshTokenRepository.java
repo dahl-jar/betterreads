@@ -25,4 +25,12 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
     Optional<RefreshToken> findByTokenHashForUpdate(@Param("tokenHash") String tokenHash);
 
     List<RefreshToken> findAllByUserIdAndRevokedAtIsNull(long userId);
+
+    @Query(value = """
+        SELECT u.user_id FROM app_user u
+        JOIN refresh_token rt ON rt.user_id = u.user_id
+        WHERE rt.token_hash = :tokenHash
+        FOR UPDATE OF u
+        """, nativeQuery = true)
+    Optional<Long> lockOwnerOfToken(@Param("tokenHash") String tokenHash);
 }

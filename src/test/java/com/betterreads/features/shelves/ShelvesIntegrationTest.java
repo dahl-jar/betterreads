@@ -1,37 +1,29 @@
 package com.betterreads.features.shelves;
 
-import com.betterreads.book.Book;
-import com.betterreads.book.BookRepository;
-import com.betterreads.testsupport.Books;
-import com.betterreads.testsupport.RegisteredUserTest;
+import com.betterreads.testsupport.Accounts;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
-import java.util.Map;
 
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
-import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import static com.betterreads.testsupport.Accounts.OTHER_USER;
+import static com.betterreads.testsupport.Accounts.USER;
 import static com.betterreads.testsupport.Books.DUNE_KEY;
 import static com.betterreads.testsupport.Books.DUNE_TITLE;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -45,37 +37,21 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @Testcontainers
-class ShelvesIntegrationTest extends RegisteredUserTest {
+class ShelvesIntegrationTest extends ShelfApiTest {
 
     @Container
     @ServiceConnection
     static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
 
-    private static final String SHELF_URL = "/api/v1/me/books";
+    private static final String DROPPED = "DROPPED";
 
-    private static final String AUTH_HEADER = "Authorization";
+    private static final String JSON_WANT_TO_READ_COUNT = "$.data.wantToRead";
 
-    private static final String BEARER_PREFIX = "Bearer ";
+    private static final String JSON_CURRENTLY_READING_COUNT = "$.data.currentlyReading";
 
-    private static final String HOBBIT_KEY = "OL262758W";
+    private static final String JSON_FINISHED_COUNT = "$.data.finished";
 
-    private static final String HOBBIT_TITLE = "The Hobbit";
-
-    private static final String DARROW = "darrow";
-
-    private static final String DARROW_EMAIL = "darrow@example.com";
-
-    private static final String GOBLIN = "goblin";
-
-    private static final String GOBLIN_EMAIL = "goblin@example.com";
-
-    private static final String WANT_TO_READ = "WANT_TO_READ";
-
-    private static final String CURRENTLY_READING = "CURRENTLY_READING";
-
-    private static final String FINISHED = "FINISHED";
-
-    private static final String STATUS_FIELD = "status";
+    private static final String JSON_DROPPED_COUNT = "$.data.dropped";
 
     private static final String JSON_STATUS = "$.data.status";
 
@@ -86,8 +62,6 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
     private static final String JSON_FINISHED = "$.data.finishedAt";
 
     private static final String JSON_LENGTH = "$.data.length()";
-
-    private static final String STATUS_SUFFIX = "/status";
 
     private static final String START_DATE = "2026-01-02";
 
@@ -100,12 +74,6 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
     private static final String BAD_STATUS = "NOT_A_STATUS";
 
     private static final String READING_NOTE = "still going";
-
-    private static final String RATED_KEY = "OL27448W";
-
-    private static final String RATED_TITLE = "The Way of Kings";
-
-    private static final BigDecimal RATED_AVERAGE = new BigDecimal("4.50");
 
     private static final int GIVEN_RATING = 4;
 
@@ -123,43 +91,11 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
     private static final String OVERSIZED_NOTE = "x".repeat(2001);
 
-    private static final String DROPPED = "DROPPED";
-
     private static final String BOOKS_PATH = "/api/v1/books/";
 
     private static final int THREE_READERS = 3;
 
     private static final int FOUR_READERS = 4;
-
-    private static final String JSON_WANT_TO_READ_COUNT = "$.data.wantToRead";
-
-    private static final String JSON_CURRENTLY_READING_COUNT = "$.data.currentlyReading";
-
-    private static final String JSON_FINISHED_COUNT = "$.data.finished";
-
-    private static final String JSON_DROPPED_COUNT = "$.data.dropped";
-
-    @Autowired
-    private BookRepository bookRepository;
-
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
-
-    private MockMvc mockMvc;
-
-    @BeforeEach
-    void setUp() {
-        mockMvc = securedMockMvc();
-        jdbcTemplate.update("DELETE FROM user_book_collection");
-        resetToDune();
-        Books.seedBook(bookRepository, HOBBIT_KEY, HOBBIT_TITLE);
-        final Book rated = Books.book(RATED_KEY, RATED_TITLE);
-        rated.setAverageRating(RATED_AVERAGE);
-        bookRepository.save(rated);
-    }
 
     @Nested
     @DisplayName("PUT /me/books/{key}/status")
@@ -167,7 +103,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void firstStatusInsertsTheShelfRowAtThatStatus() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
 
             final ResultActions response = putStatus(token, DUNE_KEY, WANT_TO_READ);
 
@@ -181,7 +117,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void changingStatusUpdatesTheSameRow() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
             putStatus(token, DUNE_KEY, WANT_TO_READ);
 
             putStatus(token, DUNE_KEY, CURRENTLY_READING);
@@ -194,7 +130,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void enteringReadingStampsTheStartedDate() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
             final LocalDate today = LocalDate.now(ZoneOffset.UTC);
 
             final ResultActions response = putStatus(token, DUNE_KEY, CURRENTLY_READING);
@@ -206,7 +142,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void markingFinishedStampsTheFinishedDate() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
             final LocalDate today = LocalDate.now(ZoneOffset.UTC);
 
             final ResultActions response = putStatus(token, DUNE_KEY, FINISHED);
@@ -216,7 +152,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void rereadingKeepsTheOriginalStartDate() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
             putStatus(token, DUNE_KEY, CURRENTLY_READING);
             patchEntry(token, DUNE_KEY, START_DATE, null, null);
             putStatus(token, DUNE_KEY, FINISHED);
@@ -228,7 +164,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void shouldKeepTheFinishDateWhenFinishedAgain() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
             putStatus(token, DUNE_KEY, FINISHED);
             patchEntry(token, DUNE_KEY, START_DATE, FINISH_DATE, null);
 
@@ -239,7 +175,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void movingFromFinishedBackToReadingClearsTheFinishedDate() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
             putStatus(token, DUNE_KEY, FINISHED);
 
             final ResultActions response = putStatus(token, DUNE_KEY, CURRENTLY_READING);
@@ -252,7 +188,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void unknownStatusValueIsRejected() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
 
             final ResultActions response = putStatus(token, DUNE_KEY, BAD_STATUS);
 
@@ -261,7 +197,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void shelvingUnknownBookKeyReturns404() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
 
             final ResultActions response = putStatus(token, UNKNOWN_KEY, CURRENTLY_READING);
 
@@ -284,7 +220,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void favoriteIsSeparateFromStatus() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
             putStatus(token, DUNE_KEY, FINISHED);
 
             final ResultActions response = putFavorite(token, DUNE_KEY, true);
@@ -297,7 +233,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void favoritingAnUnshelvedBookOpensTheRowAtWantToRead() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
 
             final ResultActions response = putFavorite(token, DUNE_KEY, true);
 
@@ -309,7 +245,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void shouldClearTheFavoriteWhenSetToFalse() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
             putFavorite(token, DUNE_KEY, true);
 
             final ResultActions response = putFavorite(token, DUNE_KEY, false);
@@ -326,7 +262,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void datesAndNotesArePersisted() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
             putStatus(token, DUNE_KEY, CURRENTLY_READING);
 
             final ResultActions response = patchEntry(token, DUNE_KEY, START_DATE, FINISH_DATE, NOTE);
@@ -340,7 +276,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void finishedBeforeStartedIsRejected() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
             putStatus(token, DUNE_KEY, CURRENTLY_READING);
 
             final ResultActions response = patchEntry(token, DUNE_KEY, FINISH_DATE, START_DATE, null);
@@ -350,7 +286,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void shouldRejectAFinishDateBeforeTheStoredStartDate() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
             putStatus(token, DUNE_KEY, CURRENTLY_READING);
             patchEntry(token, DUNE_KEY, FINISH_DATE, null, null);
 
@@ -365,7 +301,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void shouldRejectANoteOver2000Characters() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
             putStatus(token, DUNE_KEY, CURRENTLY_READING);
 
             final ResultActions response = patchEntry(token, DUNE_KEY, null, null, OVERSIZED_NOTE);
@@ -375,7 +311,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void shouldKeepTheStoredNoteWhenOnlyDatesArePatched() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
             putStatus(token, DUNE_KEY, CURRENTLY_READING);
             patchEntry(token, DUNE_KEY, null, null, NOTE);
 
@@ -388,7 +324,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void patchingOnlyTheNoteKeepsTheStoredDates() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
             putStatus(token, DUNE_KEY, CURRENTLY_READING);
             patchEntry(token, DUNE_KEY, START_DATE, FINISH_DATE, NOTE);
 
@@ -403,7 +339,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void patchingAnUnshelvedBookReturns404() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
 
             final ResultActions response = patchEntry(token, DUNE_KEY, START_DATE, null, null);
 
@@ -417,7 +353,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void deleteRemovesTheBookFromTheShelf() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
             putStatus(token, DUNE_KEY, CURRENTLY_READING);
 
             final ResultActions removed = deleteEntry(token, DUNE_KEY);
@@ -429,7 +365,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void deletingAnUnshelvedBookIsANoOp() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
 
             final ResultActions response = deleteEntry(token, DUNE_KEY);
 
@@ -438,7 +374,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void shouldReturn404WhenDeletingAnUnknownBook() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
 
             final ResultActions response = deleteEntry(token, UNKNOWN_KEY);
 
@@ -452,7 +388,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void filtersByStatus() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
             putStatus(token, DUNE_KEY, CURRENTLY_READING);
             putStatus(token, HOBBIT_KEY, FINISHED);
 
@@ -466,7 +402,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void withoutAFilterReturnsEveryShelvedBook() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
             putStatus(token, DUNE_KEY, CURRENTLY_READING);
             putStatus(token, HOBBIT_KEY, FINISHED);
 
@@ -481,7 +417,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void unknownStatusFilterReturns400() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
 
             final ResultActions response = getShelf(token, BAD_STATUS);
 
@@ -490,13 +426,13 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void oneUsersShelfIsInvisibleToAnother() throws Exception {
-            final String darrowToken = registerAndLogin(DARROW, DARROW_EMAIL);
-            final String goblinToken = registerAndLogin(GOBLIN, GOBLIN_EMAIL);
-            putStatus(darrowToken, DUNE_KEY, CURRENTLY_READING);
+            final String userToken = registerAndLogin(USER, Accounts.USER_EMAIL);
+            final String otherUserToken = registerAndLogin(OTHER_USER, Accounts.OTHER_USER_EMAIL);
+            putStatus(userToken, DUNE_KEY, CURRENTLY_READING);
 
-            final ResultActions goblinShelf = getShelf(goblinToken, null);
+            final ResultActions otherUserShelf = getShelf(otherUserToken, null);
 
-            goblinShelf
+            otherUserShelf
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(JSON_LENGTH).value(0));
         }
@@ -508,7 +444,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void shelvingABookRecordsTheDateItWasAdded() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
             final LocalDate today = LocalDate.now(ZoneOffset.UTC);
 
             final ResultActions response = putStatus(token, DUNE_KEY, WANT_TO_READ);
@@ -520,7 +456,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void averageRatingCarriesTheBooksSourceRating() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
 
             final ResultActions response = putStatus(token, RATED_KEY, WANT_TO_READ);
 
@@ -531,7 +467,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void shouldShowMyRatingWhenShelvingARatedBook() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
             rateBook(token, RATED_KEY, GIVEN_RATING);
 
             final ResultActions response = putStatus(token, RATED_KEY, WANT_TO_READ);
@@ -543,7 +479,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void ratedBookShowsTheRatingOnTheShelf() throws Exception {
-            final String token = registerAndLogin(DARROW, DARROW_EMAIL);
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
             putStatus(token, RATED_KEY, WANT_TO_READ);
             rateBook(token, RATED_KEY, GIVEN_RATING);
 
@@ -556,14 +492,14 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void oneUsersRatingIsInvisibleToAnother() throws Exception {
-            final String darrowToken = registerAndLogin(DARROW, DARROW_EMAIL);
-            final String goblinToken = registerAndLogin(GOBLIN, GOBLIN_EMAIL);
-            rateBook(darrowToken, RATED_KEY, GIVEN_RATING);
-            putStatus(goblinToken, RATED_KEY, WANT_TO_READ);
+            final String userToken = registerAndLogin(USER, Accounts.USER_EMAIL);
+            final String otherUserToken = registerAndLogin(OTHER_USER, Accounts.OTHER_USER_EMAIL);
+            rateBook(userToken, RATED_KEY, GIVEN_RATING);
+            putStatus(otherUserToken, RATED_KEY, WANT_TO_READ);
 
-            final ResultActions goblinShelf = getShelf(goblinToken, null);
+            final ResultActions otherUserShelf = getShelf(otherUserToken, null);
 
-            goblinShelf
+            otherUserShelf
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(JSON_FIRST_KEY).value(RATED_KEY))
                 .andExpect(jsonPath(JSON_FIRST_MY_RATING).doesNotExist());
@@ -576,10 +512,10 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void shouldCountReadersPerStatus() throws Exception {
-            shelveForEach(DUNE_KEY, WANT_TO_READ, DARROW);
-            shelveForEach(DUNE_KEY, CURRENTLY_READING, GOBLIN, "mustang");
-            shelveForEach(DUNE_KEY, FINISHED, "sevro", "cassius", "victra");
-            shelveForEach(DUNE_KEY, DROPPED, "ragnar", "roque", "dancer", "holiday");
+            shelveForEach(DUNE_KEY, WANT_TO_READ, USER);
+            shelveForEach(DUNE_KEY, CURRENTLY_READING, OTHER_USER, Accounts.THIRD_USER);
+            shelveForEach(DUNE_KEY, FINISHED, "fourthuser", "fifthuser", "sixthuser");
+            shelveForEach(DUNE_KEY, DROPPED, "seventhuser", "eighthuser", "ninthuser", "tenthuser");
 
             final ResultActions response = getShelfCounts(DUNE_KEY);
 
@@ -605,8 +541,8 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void shouldNotCountReadersOfAnotherBook() throws Exception {
-            shelveForEach(HOBBIT_KEY, FINISHED, DARROW);
-            shelveForEach(DUNE_KEY, FINISHED, GOBLIN);
+            shelveForEach(HOBBIT_KEY, FINISHED, USER);
+            shelveForEach(DUNE_KEY, FINISHED, OTHER_USER);
 
             final ResultActions response = getShelfCounts(DUNE_KEY);
 
@@ -617,9 +553,8 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
         @Test
         void shouldNotCountReadersWithDeletedAccounts() throws Exception {
-            shelveForEach(DUNE_KEY, FINISHED, DARROW, GOBLIN);
-            final int deleted = jdbcTemplate.update(
-                "UPDATE app_user SET deleted_at = now() WHERE username = ?", GOBLIN);
+            shelveForEach(DUNE_KEY, FINISHED, USER, OTHER_USER);
+            final int deleted = Accounts.softDelete(jdbcTemplate, OTHER_USER);
             assertThat(deleted).isOne();
 
             final ResultActions response = getShelfCounts(DUNE_KEY);
@@ -639,6 +574,16 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
         }
     }
 
+    // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
+    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
+    private ResultActions putFavorite(final String token, final String key, final boolean value)
+        throws Exception {
+        return mockMvc.perform(put(SHELF_URL + "/" + key + "/favorite")
+            .header(Accounts.AUTH_HEADER, Accounts.BEARER_PREFIX + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(jsonBody("favorite", value)));
+    }
+
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     private void shelveForEach(final String key, final String readingStatus, final String... readers)
         throws Exception {
@@ -656,31 +601,11 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
 
     // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
-    private ResultActions putStatus(final String token, final String key, final String value)
-        throws Exception {
-        return mockMvc.perform(put(SHELF_URL + "/" + key + STATUS_SUFFIX)
-            .header(AUTH_HEADER, BEARER_PREFIX + token)
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(jsonBody(STATUS_FIELD, value)));
-    }
-
-    // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
-    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
-    private ResultActions putFavorite(final String token, final String key, final boolean value)
-        throws Exception {
-        return mockMvc.perform(put(SHELF_URL + "/" + key + "/favorite")
-            .header(AUTH_HEADER, BEARER_PREFIX + token)
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(jsonBody("favorite", value)));
-    }
-
-    // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
-    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     private ResultActions patchEntry(final String token, final String key,
         final @Nullable String startedAt, final @Nullable String finishedAt,
         final @Nullable String notes) throws Exception {
         return mockMvc.perform(patch(SHELF_URL + "/" + key)
-            .header(AUTH_HEADER, BEARER_PREFIX + token)
+            .header(Accounts.AUTH_HEADER, Accounts.BEARER_PREFIX + token)
             .contentType(MediaType.APPLICATION_JSON)
             .content(patchPayload(startedAt, finishedAt, notes)));
     }
@@ -688,7 +613,8 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
     // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     private ResultActions deleteEntry(final String token, final String key) throws Exception {
-        return mockMvc.perform(delete(SHELF_URL + "/" + key).header(AUTH_HEADER, BEARER_PREFIX + token));
+        return mockMvc.perform(delete(SHELF_URL + "/" + key)
+            .header(Accounts.AUTH_HEADER, Accounts.BEARER_PREFIX + token));
     }
 
     // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
@@ -696,7 +622,7 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
     private ResultActions getShelf(final String token, final @Nullable String statusFilter)
         throws Exception {
         final MockHttpServletRequestBuilder request =
-            get(SHELF_URL).header(AUTH_HEADER, BEARER_PREFIX + token);
+            get(SHELF_URL).header(Accounts.AUTH_HEADER, Accounts.BEARER_PREFIX + token);
         if (statusFilter != null) {
             request.param(STATUS_FIELD, statusFilter);
         }
@@ -707,14 +633,10 @@ class ShelvesIntegrationTest extends RegisteredUserTest {
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     private void rateBook(final String token, final String key, final int rating) throws Exception {
         mockMvc.perform(put(BOOKS_PATH + key + "/reviews/me")
-                .header(AUTH_HEADER, BEARER_PREFIX + token)
+                .header(Accounts.AUTH_HEADER, Accounts.BEARER_PREFIX + token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(jsonBody("rating", rating)))
             .andExpect(status().isOk());
-    }
-
-    private String jsonBody(final String field, final Object value) {
-        return objectMapper.writeValueAsString(Map.of(field, value));
     }
 
     private String patchPayload(final @Nullable String startedAt, final @Nullable String finishedAt,

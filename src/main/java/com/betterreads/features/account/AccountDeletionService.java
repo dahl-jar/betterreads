@@ -40,10 +40,8 @@ class AccountDeletionService {
     /**
      * Idempotent. No-op if the user is missing.
      *
-     * <p>Skips {@code SELECT ... FOR UPDATE} on {@code app_user} on purpose. The refresh-rotate
-     * path locks the refresh row first and then takes an FK lock on the user, so locking the
-     * user on delete would deadlock against a concurrent {@code POST /refresh}. A plain
-     * {@code UPDATE} only takes {@code FOR NO KEY UPDATE}, which is compatible with rotate.
+     * <p>The soft-delete UPDATE locks the user row, and refresh-rotate locks that row before its
+     * token rows, so a delete and a concurrent refresh run one after the other.
      *
      * <p>A refresh that races this delete may issue one successor token before the commit
      * lands. That successor is dead on the next call because {@code @SQLRestriction} hides

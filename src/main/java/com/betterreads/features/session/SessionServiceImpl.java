@@ -1,6 +1,5 @@
 package com.betterreads.features.session;
 
-import com.betterreads.crypto.PasswordByteLimit;
 import com.betterreads.errors.BusinessRuleException;
 import com.betterreads.errors.ForbiddenException;
 import com.betterreads.logging.LogSanitizer;
@@ -8,17 +7,16 @@ import com.betterreads.security.JwtIssuer;
 import com.betterreads.users.EmailNormalizer;
 import com.betterreads.users.EmailVerificationIssuer;
 import com.betterreads.users.User;
+import com.betterreads.users.UserLookup;
 import com.betterreads.users.UserMapper;
+import com.betterreads.users.UserPasswords;
 import com.betterreads.users.UserRepository;
 import com.betterreads.users.UserResponse;
-
-import java.util.Objects;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,11 +37,11 @@ class SessionServiceImpl implements SessionService {
 
     private static final String INVALID_REFRESH_TOKEN = "Invalid refresh token";
 
-    private static final String SESSION_NO_LONGER_VALID = "Session no longer valid";
-
     private final UserRepository userRepository;
 
-    private final PasswordEncoder passwordEncoder;
+    private final UserPasswords userPasswords;
+
+    private final UserLookup userLookup;
 
     private final JwtIssuer jwtIssuer;
 
@@ -53,18 +51,20 @@ class SessionServiceImpl implements SessionService {
 
     private final EmailVerificationIssuer emailVerificationIssuer;
 
-    // PMD.ExcessiveParameterList: register, login and refresh each need a different mix of these six beans.
+    // PMD.ExcessiveParameterList: register, login, current user and refresh each need a different mix of beans.
     @SuppressWarnings("PMD.ExcessiveParameterList")
     SessionServiceImpl(
         final UserRepository userRepository,
-        final PasswordEncoder passwordEncoder,
+        final UserPasswords userPasswords,
+        final UserLookup userLookup,
         final JwtIssuer jwtIssuer,
         final UserMapper userMapper,
         final RefreshTokenService refreshTokenService,
         final EmailVerificationIssuer emailVerificationIssuer
     ) {
         this.userRepository = userRepository;
-        this.passwordEncoder = passwordEncoder;
+        this.userPasswords = userPasswords;
+        this.userLookup = userLookup;
         this.jwtIssuer = jwtIssuer;
         this.userMapper = userMapper;
         this.refreshTokenService = refreshTokenService;
@@ -75,7 +75,6 @@ class SessionServiceImpl implements SessionService {
     @Transactional
     public void register(final RegisterRequest request) {
         final String normalizedEmail = EmailNormalizer.normalize(request.email());
-        PasswordByteLimit.check(request.password());
 
         if (userRepository.existsByUsername(request.username())) {
             throw new BusinessRuleException(DUPLICATE_USERNAME);
@@ -87,7 +86,7 @@ class SessionServiceImpl implements SessionService {
         final User user = new User();
         user.setUsername(request.username());
         user.setEmail(normalizedEmail);
-        user.setPasswordHash(Objects.requireNonNull(passwordEncoder.encode(request.password())));
+        userPasswords.setPassword(user, request.password());
 
         final User saved;
         try {
@@ -107,14 +106,15 @@ class SessionServiceImpl implements SessionService {
     public SessionTokens login(final LoginRequest request) {
         final String identifier = request.identifier().trim();
         final String email = EmailNormalizer.normalize(identifier);
-        final User user = userRepository.findByUsername(identifier)
-            .or(() -> userRepository.findByEmail(email))
+        final User user = userRepository.findIdByUsername(identifier)
+            .or(() -> userRepository.findIdByEmail(email))
+            .flatMap(userRepository::findByIdForUpdate)
             .orElseThrow(() -> {
                 LOG.warn("Login failed: no user matches identifier");
                 return new BadCredentialsException(INVALID_CREDENTIALS);
             });
 
-        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        if (!userPasswords.matches(user, request.password())) {
             LOG.warn("Login failed: password mismatch userId={}", user.getUserId());
             throw new BadCredentialsException(INVALID_CREDENTIALS);
         }
@@ -130,12 +130,7 @@ class SessionServiceImpl implements SessionService {
     @Override
     @Transactional(readOnly = true)
     public UserResponse currentUser(final long userId) {
-        final User user = userRepository.findById(userId)
-            .orElseThrow(() -> {
-                LOG.warn("Current-user lookup rejected: bearer points to deleted or missing user userId={}", userId);
-                return new BadCredentialsException(SESSION_NO_LONGER_VALID);
-            });
-        return userMapper.toResponse(user);
+        return userMapper.toResponse(userLookup.require(userId));
     }
 
     @Override
@@ -146,13 +141,7 @@ class SessionServiceImpl implements SessionService {
                 LOG.warn("Refresh rejected: token unknown, expired, or already revoked");
                 return new BadCredentialsException(INVALID_REFRESH_TOKEN);
             });
-        final long userId = rotation.userId();
-        final User user = userRepository.findById(userId)
-            .orElseThrow(() -> {
-                LOG.warn("Refresh rejected: token owner is gone userId={}", userId);
-                return new BadCredentialsException(INVALID_REFRESH_TOKEN);
-            });
-        return sessionTokensFor(user, rotation.grant());
+        return sessionTokensFor(userLookup.require(rotation.userId()), rotation.grant());
     }
 
     @Override
@@ -162,7 +151,7 @@ class SessionServiceImpl implements SessionService {
     }
 
     private SessionTokens sessionTokensFor(final User user, final RefreshGrant grant) {
-        return new SessionTokens(
-            new AuthResponse(jwtIssuer.issue(user.getUserId()), userMapper.toResponse(user)), grant);
+        final String accessToken = jwtIssuer.issue(user.getUserId(), user.getCredentialVersion());
+        return new SessionTokens(new AuthResponse(accessToken, userMapper.toResponse(user)), grant);
     }
 }

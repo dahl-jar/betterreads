@@ -64,10 +64,12 @@ class MailOutboxWorker {
         final MailMessage message;
         try {
             final MailTemplate template = templateFor(row.getTemplate());
+            final MailLayout.MailContent content = template.content(row.getPayload());
             message = new MailMessage(
                 row.getRecipient(),
                 template.subject(),
-                template.renderBody(row.getPayload()),
+                MailLayout.text(content),
+                MailLayout.html(content),
                 IDEMPOTENCY_KEY_PREFIX + outboxId
             );
         } catch (final IllegalStateException failure) {

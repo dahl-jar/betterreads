@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Review writes, in their own bean so each upsert retry gets a fresh transaction. The review and the
+ * Review writes, in their own bean so each conflict retry gets a fresh transaction. The review and the
  * rating recompute commit together.
  */
 @Component
@@ -38,14 +38,19 @@ class ReviewWriter {
     public ReviewResponse upsert(
         final Long userId, final long bookId, final String bookKey,
         final UpsertReviewRequest request) {
-        final Review review = reviews.findByUserIdAndBookId(userId, bookId)
-            .orElseGet(() -> new Review(userId, bookId));
+        final Review review = findOrNew(userId, bookId);
         review.setRating(request.rating());
         review.setTitle(blankToNull(request.title()));
         review.setBody(blankToNull(request.body()));
-        final Review saved = reviews.saveAndFlush(review);
-        recomputeRating(bookId);
-        return assembler.assembleOne(saved, bookKey);
+        return saveAndRecompute(review, bookKey);
+    }
+
+    @Transactional
+    public ReviewResponse rate(
+        final Long userId, final long bookId, final String bookKey, final int rating) {
+        final Review review = findOrNew(userId, bookId);
+        review.setRating(rating);
+        return saveAndRecompute(review, bookKey);
     }
 
     @Transactional
@@ -53,6 +58,16 @@ class ReviewWriter {
         if (reviews.deleteByUserIdAndBookId(userId, bookId) > 0) {
             recomputeRating(bookId);
         }
+    }
+
+    private Review findOrNew(final Long userId, final long bookId) {
+        return reviews.findByUserIdAndBookId(userId, bookId).orElseGet(() -> new Review(userId, bookId));
+    }
+
+    private ReviewResponse saveAndRecompute(final Review review, final String bookKey) {
+        final Review saved = reviews.saveAndFlush(review);
+        recomputeRating(review.getBookId());
+        return assembler.assembleOne(saved, bookKey);
     }
 
     private void recomputeRating(final long bookId) {

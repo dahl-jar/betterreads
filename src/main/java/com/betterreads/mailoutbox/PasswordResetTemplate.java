@@ -1,9 +1,13 @@
 package com.betterreads.mailoutbox;
 
+import java.util.List;
+
 import org.springframework.stereotype.Component;
 
 @Component
 class PasswordResetTemplate implements MailTemplate {
+
+    private static final String RESET_PATH = "/reset-password";
 
     private final MailPayloadReader payloads;
 
@@ -22,11 +26,13 @@ class PasswordResetTemplate implements MailTemplate {
     }
 
     @Override
-    public String renderBody(final String payload) {
-        final String resetLink = payloads.tokenLink(payload, name(), "/reset-password");
-        return "Someone asked to reset the password on this account.\n\n"
-            + "If that was you, open this link within 15 minutes:\n"
-            + resetLink + "\n\n"
-            + "If it was not you, ignore this email. Your password stays unchanged.\n";
+    public MailLayout.MailContent content(final String payload) {
+        return new MailLayout.MailContent(
+            "Reset your password",
+            List.of("Someone asked to reset the password on this account.",
+                "If that was you, reset it within 15 minutes."),
+            "Reset password",
+            payloads.tokenLink(payload, name(), RESET_PATH),
+            "If it was not you, ignore this email. Your password stays unchanged.");
     }
 }

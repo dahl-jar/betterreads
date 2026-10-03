@@ -132,19 +132,19 @@ class SourceMergerTest {
 
         @Test
         void shouldUseNextSourceAuthorsWhenFirstListIsEmpty() {
-            final String darrow = "Darrow";
+            final String author = "Author";
             final SourceBook hardcover = titled(BookFieldSource.HARDCOVER)
                 .authors(List.of())
                 .build();
             final SourceBook google = titled(BookFieldSource.GOOGLE_BOOKS)
-                .authors(SourceAuthor.ofNames(List.of(darrow)))
+                .authors(SourceAuthor.ofNames(List.of(author)))
                 .build();
 
             final MergedBook merged = merger.merge(null, List.of(hardcover, google));
 
             assertThat(merged.book().authors())
                 .extracting(SourceAuthor::name)
-                .containsExactly(darrow);
+                .containsExactly(author);
         }
 
         @Test
@@ -583,7 +583,7 @@ class SourceMergerTest {
 
         private static final String AUTHOR = Books.DUNE_AUTHOR;
 
-        private static final String STALE_AUTHOR = "Valka";
+        private static final String STALE_AUTHOR = "Stale Author";
 
         private static final String COMICS = "comics";
 

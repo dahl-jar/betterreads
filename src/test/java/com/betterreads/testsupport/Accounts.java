@@ -4,6 +4,7 @@ import com.betterreads.features.session.RefreshTokenRepository;
 import com.betterreads.users.User;
 import com.betterreads.users.UserRepository;
 
+import java.io.UnsupportedEncodingException;
 import java.net.HttpCookie;
 import java.time.Duration;
 import java.time.Instant;
@@ -22,11 +23,23 @@ public final class Accounts {
 
     public static final String PASSWORD = "Sup3rSecret!";
 
-    public static final String USERNAME = "darrow";
+    public static final String USER = "user";
 
-    public static final String EMAIL = "darrow@example.com";
+    public static final String USER_EMAIL = "user@example.com";
 
-    public static final String MIXED_CASE_EMAIL = "Darrow@Example.COM";
+    public static final String OTHER_USER = "otheruser";
+
+    public static final String OTHER_USER_EMAIL = "otheruser@example.com";
+
+    public static final String THIRD_USER = "thirduser";
+
+    public static final String THIRD_USER_EMAIL = "thirduser@example.com";
+
+    public static final String AUTH_HEADER = "Authorization";
+
+    public static final String BEARER_PREFIX = "Bearer ";
+
+    public static final String MIXED_CASE_EMAIL = "User@Example.COM";
 
     public static final String REGISTER_URL = "/api/v1/auth/register";
 
@@ -101,8 +114,18 @@ public final class Accounts {
         return HttpCookie.parse(setCookie).getFirst().getValue();
     }
 
+    public static String accessTokenOf(final ObjectMapper objectMapper, final MvcResult result)
+        throws UnsupportedEncodingException {
+        final String body = result.getResponse().getContentAsString();
+        return objectMapper.readTree(body).at("/data/accessToken").asString();
+    }
+
     public static long activeRefreshTokenCount(final RefreshTokenRepository tokens, final long userId) {
         return tokens.findAllByUserIdAndRevokedAtIsNull(userId).size();
+    }
+
+    public static int softDelete(final JdbcTemplate jdbc, final String username) {
+        return jdbc.update("UPDATE app_user SET deleted_at = now() WHERE username = ?", username);
     }
 
     public static Instant expiredIssuedAt() {

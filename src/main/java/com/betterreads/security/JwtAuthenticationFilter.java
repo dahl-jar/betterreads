@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import com.betterreads.logging.LogSanitizer;
+import com.betterreads.users.AccessTokenCheck;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -33,9 +34,12 @@ class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtIssuer jwtIssuer;
 
-    JwtAuthenticationFilter(final JwtIssuer jwtIssuer) {
+    private final AccessTokenCheck accessTokenCheck;
+
+    JwtAuthenticationFilter(final JwtIssuer jwtIssuer, final AccessTokenCheck accessTokenCheck) {
         super();
         this.jwtIssuer = jwtIssuer;
+        this.accessTokenCheck = accessTokenCheck;
     }
 
     @Override
@@ -61,7 +65,13 @@ class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private void authenticate(final String token, final HttpServletRequest request) {
         try {
-            final long userId = jwtIssuer.parseUserId(token);
+            final AccessToken accessToken = jwtIssuer.parse(token);
+            final long userId = accessToken.userId();
+            if (!accessTokenCheck.isCurrent(userId, accessToken.credentialVersion())) {
+                SecurityContextHolder.clearContext();
+                LOG.warn("Rejected JWT with an old credential version or for a deleted account userId={}", userId);
+                return;
+            }
             final UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken(userId, null, List.of());
             authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

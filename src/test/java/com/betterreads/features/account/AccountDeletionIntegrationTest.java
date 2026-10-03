@@ -12,7 +12,6 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import jakarta.servlet.http.Cookie;
@@ -37,11 +36,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import static com.betterreads.testsupport.Accounts.EMAIL;
 import static com.betterreads.testsupport.Accounts.PASSWORD;
-import static com.betterreads.testsupport.Accounts.USERNAME;
+import static com.betterreads.testsupport.Accounts.USER;
+import static com.betterreads.testsupport.Accounts.USER_EMAIL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -72,13 +72,7 @@ class AccountDeletionIntegrationTest extends ContainerizedTest {
     @ServiceConnection
     static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
 
-    private static final String AUTH_HEADER = "Authorization";
-
-    private static final String BEARER_PREFIX = "Bearer ";
-
-    private static final String OTHER_USERNAME = "mustang";
-
-    private static final String OTHER_EMAIL = "mustang@example.com";
+    private static final String MY_BOOKS_URL = "/api/v1/me/books";
 
     private static final long IN_GRACE_HOURS_AGO = 1L;
 
@@ -129,11 +123,7 @@ class AccountDeletionIntegrationTest extends ContainerizedTest {
 
         @Test
         void softDeletesUserAndKillsAuthSession() throws Exception {
-            final long userId = registerAndSeedOutstandingTokens();
-            final Tokens tokens = loginAndCapture(USERNAME);
-
-            mockMvc.perform(delete(Accounts.ME_URL).header(AUTH_HEADER, BEARER_PREFIX + tokens.accessToken()))
-                .andExpect(status().isNoContent());
+            final long userId = registerAndDeleteAccount().userId();
 
             assertThat(deletedAt(userId))
                 .as("soft-delete writes a non-null timestamp, the row stays in app_user during the grace window")
@@ -147,11 +137,12 @@ class AccountDeletionIntegrationTest extends ContainerizedTest {
         }
 
         @Test
-        void repeatDeleteIsIdempotent() throws Exception {
-            final Tokens tokens = registerAndDeleteAccount();
+        void shouldRejectTheAccessTokenOfADeletedAccount() throws Exception {
+            final DeletedAccount account = registerAndDeleteAccount();
 
-            mockMvc.perform(delete(Accounts.ME_URL).header(AUTH_HEADER, BEARER_PREFIX + tokens.accessToken()))
-                .andExpect(status().isNoContent());
+            mockMvc.perform(get(MY_BOOKS_URL)
+                    .header(Accounts.AUTH_HEADER, Accounts.BEARER_PREFIX + account.tokens().accessToken()))
+                .andExpect(status().isUnauthorized());
         }
 
         @Test
@@ -172,7 +163,7 @@ class AccountDeletionIntegrationTest extends ContainerizedTest {
 
             mockMvc.perform(post(AccountTestFixture.FORGOT_URL)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(AccountTestFixture.emailPayload(objectMapper, EMAIL)))
+                    .content(AccountTestFixture.emailPayload(objectMapper, USER_EMAIL)))
                 .andExpect(status().isNoContent());
 
             assertThat(mailOutboxRepository.findAll())
@@ -187,10 +178,10 @@ class AccountDeletionIntegrationTest extends ContainerizedTest {
 
             mockMvc.perform(post(Accounts.REGISTER_URL)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(Accounts.registerPayload(objectMapper, USERNAME, EMAIL, PASSWORD)))
+                    .content(Accounts.registerPayload(objectMapper, USER, USER_EMAIL, PASSWORD)))
                 .andExpect(status().isConflict());
 
-            assertThat(rawRowCountForEmail(EMAIL))
+            assertThat(rawRowCountForEmail(USER_EMAIL))
                 .as("the soft-deleted row still occupies the email slot, no second row was inserted")
                 .isOne();
         }
@@ -202,24 +193,25 @@ class AccountDeletionIntegrationTest extends ContainerizedTest {
 
         @Test
         void deleteDoesNotTouchOtherUsersAuthMaterial() throws Exception {
-            registerUser(USERNAME, EMAIL);
-            final long mustangId = registerUser(OTHER_USERNAME, OTHER_EMAIL);
-            passwordResetService.requestReset(OTHER_EMAIL);
-            final Tokens darrowTokens = loginAndCapture(USERNAME);
-            final Tokens mustangTokens = loginAndCapture(OTHER_USERNAME);
+            registerUser(USER, USER_EMAIL);
+            final long otherUserId = registerUser(Accounts.OTHER_USER, Accounts.OTHER_USER_EMAIL);
+            passwordResetService.requestReset(Accounts.OTHER_USER_EMAIL);
+            final Tokens userTokens = loginAndCapture(USER);
+            final Tokens otherUserTokens = loginAndCapture(Accounts.OTHER_USER);
 
-            mockMvc.perform(delete(Accounts.ME_URL).header(AUTH_HEADER, BEARER_PREFIX + darrowTokens.accessToken()))
+            mockMvc.perform(delete(Accounts.ME_URL)
+                    .header(Accounts.AUTH_HEADER, Accounts.BEARER_PREFIX + userTokens.accessToken()))
                 .andExpect(status().isNoContent());
 
-            assertThat(Accounts.activeRefreshTokenCount(refreshTokenRepository, mustangId))
-                .as("mustang's refresh tokens are untouched when darrow deletes their account")
+            assertThat(Accounts.activeRefreshTokenCount(refreshTokenRepository, otherUserId))
+                .as("the other user's refresh tokens are untouched when the user deletes their account")
                 .isPositive();
-            assertThat(activeEmailTokenCount(mustangId))
-                .as("mustang's outstanding password-reset token is untouched")
+            assertThat(activeEmailTokenCount(otherUserId))
+                .as("the other user's outstanding password-reset token is untouched")
                 .isPositive();
             mockMvc.perform(post(Accounts.REFRESH_URL)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .cookie(new Cookie(RefreshCookies.COOKIE_NAME, mustangTokens.refreshCookieValue())))
+                    .cookie(new Cookie(RefreshCookies.COOKIE_NAME, otherUserTokens.refreshCookieValue())))
                 .andExpect(status().isOk());
         }
     }
@@ -230,8 +222,8 @@ class AccountDeletionIntegrationTest extends ContainerizedTest {
 
         @Test
         void sweepDeletesOnlyUsersPastGrace() throws Exception {
-            final long inGraceUserId = registerUser(USERNAME, EMAIL);
-            final long pastGraceUserId = registerUser(OTHER_USERNAME, OTHER_EMAIL);
+            final long inGraceUserId = registerUser(USER, USER_EMAIL);
+            final long pastGraceUserId = registerUser(Accounts.OTHER_USER, Accounts.OTHER_USER_EMAIL);
             setDeletedAt(inGraceUserId, Instant.now().minus(IN_GRACE_HOURS_AGO, ChronoUnit.HOURS));
             setDeletedAt(pastGraceUserId, Instant.now().minus(PAST_GRACE_HOURS_AGO, ChronoUnit.HOURS));
 
@@ -251,7 +243,7 @@ class AccountDeletionIntegrationTest extends ContainerizedTest {
         @Test
         void sweepHardDeletesAndCascadesDependentRows() throws Exception {
             final long userId = registerAndSeedOutstandingTokens();
-            loginAndCapture(USERNAME);
+            loginAndCapture(USER);
             assertThat(refreshTokenCount(userId))
                 .as("seeded refresh token before sweep")
                 .isPositive();
@@ -276,19 +268,20 @@ class AccountDeletionIntegrationTest extends ContainerizedTest {
 
     // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
-    private Tokens registerAndDeleteAccount() throws Exception {
-        registerAndSeedOutstandingTokens();
-        final Tokens tokens = loginAndCapture(USERNAME);
-        mockMvc.perform(delete(Accounts.ME_URL).header(AUTH_HEADER, BEARER_PREFIX + tokens.accessToken()))
+    private DeletedAccount registerAndDeleteAccount() throws Exception {
+        final long userId = registerAndSeedOutstandingTokens();
+        final Tokens tokens = loginAndCapture(USER);
+        mockMvc.perform(delete(Accounts.ME_URL)
+                .header(Accounts.AUTH_HEADER, Accounts.BEARER_PREFIX + tokens.accessToken()))
             .andExpect(status().isNoContent());
-        return tokens;
+        return new DeletedAccount(userId, tokens);
     }
 
     // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     private long registerAndSeedOutstandingTokens() throws Exception {
-        final long userId = registerUser(USERNAME, EMAIL);
-        passwordResetService.requestReset(EMAIL);
+        final long userId = registerUser(USER, USER_EMAIL);
+        passwordResetService.requestReset(USER_EMAIL);
         return userId;
     }
 
@@ -305,10 +298,7 @@ class AccountDeletionIntegrationTest extends ContainerizedTest {
     private Tokens loginAndCapture(final String identifier) throws Exception {
         final MvcResult result =
             AccountTestFixture.login(mockMvc, objectMapper, identifier, PASSWORD);
-        final String body = result.getResponse().getContentAsString();
-        final JsonNode root = objectMapper.readTree(body);
-        final String accessToken = root.at("/data/accessToken").asString();
-        return new Tokens(accessToken, Accounts.refreshCookie(result));
+        return new Tokens(Accounts.accessTokenOf(objectMapper, result), Accounts.refreshCookie(result));
     }
 
     private long refreshTokenCount(final long userId) {
@@ -358,4 +348,6 @@ class AccountDeletionIntegrationTest extends ContainerizedTest {
     }
 
     private record Tokens(String accessToken, String refreshCookieValue) { }
+
+    private record DeletedAccount(long userId, Tokens tokens) { }
 }

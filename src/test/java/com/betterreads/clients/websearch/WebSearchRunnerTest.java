@@ -22,7 +22,7 @@ class WebSearchRunnerTest {
 
     private static final Duration TIMEOUT = Duration.ofSeconds(1);
 
-    private static final String PROMPT = "Darrow of Lykos";
+    private static final String PROMPT = "Red Rising";
 
     private static final String PASSED_ENV = "PATH|HOME|USER|LANG|CLAUDE_CONFIG_DIR|CLAUDE_CODE_OAUTH_TOKEN"
         + "|WEB_SEARCH_ALLOWED_DOMAINS|PWD|SHLVL|_";

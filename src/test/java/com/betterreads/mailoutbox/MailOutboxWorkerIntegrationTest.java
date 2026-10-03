@@ -24,6 +24,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import static com.betterreads.testsupport.Accounts.USER_EMAIL;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
@@ -51,8 +52,6 @@ class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
 
     private static final int CLAIM_BATCH_SIZE = 2;
 
-    private static final String EMAIL = "darrow@example.com";
-
     private static final String IDEMPOTENCY_PREFIX = "outbox-";
 
     private static final String TRANSIENT_ERROR = "temporary";
@@ -60,6 +59,10 @@ class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
     private static final String CLEARED_PAYLOAD = "{}";
 
     private static final String APP_BASE_URL = "https://test.example.com";
+
+    private static final String RESET_LINK_PATH = "/reset-password?token=";
+
+    private static final String VERIFY_LINK_PATH = "/verify-email?token=";
 
     @Autowired
     private MailOutboxRepository repository;
@@ -85,7 +88,7 @@ class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
 
     @Test
     void successfulSendMarksRowAsSent() {
-        outbox.enqueuePasswordReset(EMAIL, "tok-1");
+        outbox.enqueuePasswordReset(USER_EMAIL, "tok-1");
         sender.script.add(SendOutcome.success());
 
         worker.drain();
@@ -100,7 +103,7 @@ class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
     @Test
     void successfulSendClearsPayload() {
         final String secretToken = "secret-token-must-not-linger";
-        outbox.enqueuePasswordReset(EMAIL, secretToken);
+        outbox.enqueuePasswordReset(USER_EMAIL, secretToken);
         sender.script.add(SendOutcome.success());
 
         worker.drain();
@@ -112,7 +115,7 @@ class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
     @Test
     void retryableFailureSchedulesNextAttempt() {
         final String retryToken = "tok-2";
-        outbox.enqueuePasswordReset(EMAIL, retryToken);
+        outbox.enqueuePasswordReset(USER_EMAIL, retryToken);
         sender.script.add(SendOutcome.retryable(TRANSIENT_ERROR));
 
         final Instant beforeDrain = Instant.now();
@@ -132,7 +135,7 @@ class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
 
     @Test
     void shouldWaitThirtyMinutesBeforeThirdAttempt() {
-        outbox.enqueuePasswordReset(EMAIL, "tok-7");
+        outbox.enqueuePasswordReset(USER_EMAIL, "tok-7");
         sender.script.add(SendOutcome.retryable(TRANSIENT_ERROR));
         sender.script.add(SendOutcome.retryable(TRANSIENT_ERROR));
         worker.drain();
@@ -149,9 +152,9 @@ class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
 
     @Test
     void shouldClaimAtMostBatchSizeRowsPerDrain() {
-        outbox.enqueuePasswordReset(EMAIL, "tok-8");
-        outbox.enqueuePasswordReset(EMAIL, "tok-9");
-        outbox.enqueuePasswordReset(EMAIL, "tok-10");
+        outbox.enqueuePasswordReset(USER_EMAIL, "tok-8");
+        outbox.enqueuePasswordReset(USER_EMAIL, "tok-9");
+        outbox.enqueuePasswordReset(USER_EMAIL, "tok-10");
         sender.script.add(SendOutcome.success());
         sender.script.add(SendOutcome.success());
         sender.script.add(SendOutcome.success());
@@ -168,7 +171,7 @@ class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
 
     @Test
     void shouldNotReclaimRowWhileLeaseHolds() {
-        outbox.enqueuePasswordReset(EMAIL, "tok-11");
+        outbox.enqueuePasswordReset(USER_EMAIL, "tok-11");
         claimer.claimBatch();
 
         final List<Long> reclaimed = claimer.claimBatch();
@@ -178,7 +181,7 @@ class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
 
     @Test
     void nonRetryableFailureMarksRowFailedImmediately() {
-        outbox.enqueuePasswordReset(EMAIL, "tok-3");
+        outbox.enqueuePasswordReset(USER_EMAIL, "tok-3");
         sender.script.add(SendOutcome.nonRetryable("400 Bad Request"));
 
         worker.drain();
@@ -192,7 +195,7 @@ class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
 
     @Test
     void retryableFailureMarksRowFailedAtMaxAttempts() {
-        outbox.enqueuePasswordReset(EMAIL, "tok-4");
+        outbox.enqueuePasswordReset(USER_EMAIL, "tok-4");
         sender.script.add(SendOutcome.retryable("retry 1"));
         sender.script.add(SendOutcome.retryable("retry 2"));
         sender.script.add(SendOutcome.retryable("retry 3"));
@@ -212,7 +215,7 @@ class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
 
     @Test
     void idempotencyKeyStaysStableAcrossRetries() {
-        outbox.enqueuePasswordReset(EMAIL, "tok-5");
+        outbox.enqueuePasswordReset(USER_EMAIL, "tok-5");
         sender.script.add(SendOutcome.retryable("first"));
         sender.script.add(SendOutcome.success());
 
@@ -231,17 +234,17 @@ class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
     @Test
     void aPasswordResetRowSendsTheResetMail() {
         final String token = "tok-reset";
-        outbox.enqueuePasswordReset(EMAIL, token);
+        outbox.enqueuePasswordReset(USER_EMAIL, token);
 
-        assertDrainSends("Reset your BetterReads password", "/reset-password?token=" + token);
+        assertDrainSends("Reset your BetterReads password", RESET_LINK_PATH + token);
     }
 
     @Test
     void anEmailVerificationRowSendsTheVerificationMail() {
         final String token = "tok-verify";
-        outbox.enqueueEmailVerification(EMAIL, token);
+        outbox.enqueueEmailVerification(USER_EMAIL, token);
 
-        assertDrainSends("Confirm your BetterReads email", "/verify-email?token=" + token);
+        assertDrainSends("Confirm your BetterReads email", VERIFY_LINK_PATH + token);
     }
 
     private void assertDrainSends(final String subject, final String link) {
@@ -251,9 +254,10 @@ class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
 
         final MailMessage sent = onlySentMessage();
         assertThat(sent)
-            .satisfies(mail -> assertThat(mail.recipient()).isEqualTo(EMAIL))
+            .satisfies(mail -> assertThat(mail.recipient()).isEqualTo(USER_EMAIL))
             .satisfies(mail -> assertThat(mail.subject()).isEqualTo(subject))
-            .satisfies(mail -> assertThat(mail.body()).contains(APP_BASE_URL + link));
+            .satisfies(mail -> assertThat(mail.text()).contains(APP_BASE_URL + link))
+            .satisfies(mail -> assertThat(mail.html()).contains("href=\"" + APP_BASE_URL + link + "\""));
     }
 
     @Test
@@ -271,20 +275,20 @@ class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
     void shouldSendRestOfBatchWhenOneRowCannotRender() {
         final String token = "tok-6";
         saveRowWithoutToken();
-        outbox.enqueuePasswordReset(EMAIL, token);
+        outbox.enqueuePasswordReset(USER_EMAIL, token);
         sender.script.add(SendOutcome.success());
 
         worker.drain();
 
         final MailMessage sent = onlySentMessage();
-        assertThat(sent.body()).contains(token);
+        assertThat(sent.text()).contains(token);
     }
 
     private MailOutbox saveRowWithoutToken() {
         final Instant due = Instant.now().minusSeconds(60);
         final MailOutbox row = new MailOutbox();
         row.setTemplate(MailOutboxService.TEMPLATE_PASSWORD_RESET);
-        row.setRecipient(EMAIL);
+        row.setRecipient(USER_EMAIL);
         row.setPayload(CLEARED_PAYLOAD);
         row.setCreatedAt(due);
         row.setNextAttemptAt(due);

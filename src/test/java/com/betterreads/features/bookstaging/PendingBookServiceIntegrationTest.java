@@ -48,7 +48,7 @@ class PendingBookServiceIntegrationTest extends ContainerizedTest {
     @ServiceConnection
     static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
 
-    private static final String STALE_AUTHOR = "Valka";
+    private static final String STALE_AUTHOR = "Stale Author";
 
     private static final String AUTHOR_NAME_FIELD = "name";
 

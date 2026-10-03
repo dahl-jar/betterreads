@@ -22,7 +22,7 @@ final class ConflictRetryTest {
 
     private static final int MAX_ATTEMPTS = 3;
 
-    private static final String WINNER = "Darrow";
+    private static final String WINNER = "winner";
 
     private final AtomicInteger calls = new AtomicInteger();
 

@@ -37,4 +37,6 @@ interface ShelfService {
     List<ShelfEntryResponse> list(Long userId, @Nullable ReadingStatus status);
 
     ShelfCountsResponse countsForBook(String bookKey);
+
+    MyShelfCountsResponse countsForUser(Long userId);
 }

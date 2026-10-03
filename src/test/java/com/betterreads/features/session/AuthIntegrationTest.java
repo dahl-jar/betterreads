@@ -54,15 +54,7 @@ class AuthIntegrationTest extends ContainerizedTest {
     @ServiceConnection
     static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
 
-    private static final String OTHER_USERNAME = "mustang";
-
-    private static final String OTHER_EMAIL = "mustang@example.com";
-
-    private static final String UNKNOWN_USERNAME = "lysander";
-
-    private static final String AUTH_HEADER = "Authorization";
-
-    private static final String BEARER_PREFIX = "Bearer ";
+    private static final String UNKNOWN_USERNAME = "unknownuser";
 
     private static final String JSON_TOKEN = "$.data.accessToken";
 
@@ -72,9 +64,9 @@ class AuthIntegrationTest extends ContainerizedTest {
 
     private static final String JSON_EMAIL = "$.data.email";
 
-    private static final String LOWERCASE_USERNAME = "goblin";
+    private static final String LOWERCASE_USERNAME = "thirduser";
 
-    private static final String MIXED_CASE_USERNAME = "Goblin";
+    private static final String MIXED_CASE_USERNAME = "ThirdUser";
 
     private static final String PASSWORD_40_CHARS_80_BYTES =
         "éééééééééééééééééééééééééééééééééééééééé";
@@ -125,26 +117,27 @@ class AuthIntegrationTest extends ContainerizedTest {
         @Test
         void shouldRegisterWithoutStartingASession() throws Exception {
             final String body =
-                Accounts.registerPayload(objectMapper, Accounts.USERNAME, Accounts.EMAIL, PASSWORD);
+                Accounts.registerPayload(objectMapper, Accounts.USER, Accounts.USER_EMAIL, PASSWORD);
 
             AuthRequests.register(mockMvc, body)
                 .andExpect(status().isCreated())
                 .andExpect(header().doesNotExist(SET_COOKIE))
                 .andExpect(content().string(""));
 
-            assertThat(userRepository.findByUsername(Accounts.USERNAME))
+            assertThat(userRepository.findIdByUsername(Accounts.USER).flatMap(userRepository::findById))
                 .isPresent()
                 .get()
                 .satisfies(stored -> {
-                    assertThat(stored.getEmail()).isEqualTo(Accounts.EMAIL);
+                    assertThat(stored.getEmail()).isEqualTo(Accounts.USER_EMAIL);
                     assertThat(passwordEncoder.matches(PASSWORD, stored.getPasswordHash())).isTrue();
                 });
         }
 
         @Test
         void rejectsDuplicateUsernameWithConflict() throws Exception {
-            Accounts.seedUser(userRepository, passwordEncoder, Accounts.USERNAME, Accounts.EMAIL, PASSWORD);
-            final String body = Accounts.registerPayload(objectMapper, Accounts.USERNAME, OTHER_EMAIL, PASSWORD);
+            Accounts.seedUser(userRepository, passwordEncoder, Accounts.USER, Accounts.USER_EMAIL, PASSWORD);
+            final String body =
+                Accounts.registerPayload(objectMapper, Accounts.USER, Accounts.OTHER_USER_EMAIL, PASSWORD);
 
             AuthRequests.register(mockMvc, body)
                 .andExpect(conflictWithDetail(USERNAME_TAKEN));
@@ -152,8 +145,9 @@ class AuthIntegrationTest extends ContainerizedTest {
 
         @Test
         void rejectsDuplicateEmailWithConflict() throws Exception {
-            Accounts.seedUser(userRepository, passwordEncoder, Accounts.USERNAME, Accounts.EMAIL, PASSWORD);
-            final String body = Accounts.registerPayload(objectMapper, OTHER_USERNAME, Accounts.EMAIL, PASSWORD);
+            Accounts.seedUser(userRepository, passwordEncoder, Accounts.USER, Accounts.USER_EMAIL, PASSWORD);
+            final String body =
+                Accounts.registerPayload(objectMapper, Accounts.OTHER_USER, Accounts.USER_EMAIL, PASSWORD);
 
             AuthRequests.register(mockMvc, body)
                 .andExpect(conflictWithDetail("Email already registered"));
@@ -162,12 +156,13 @@ class AuthIntegrationTest extends ContainerizedTest {
         @Test
         void shouldRejectUsernameHeldBySoftDeletedUserWithConflict() throws Exception {
             final User deleted = new User();
-            deleted.setUsername(Accounts.USERNAME);
-            deleted.setEmail(Accounts.EMAIL);
+            deleted.setUsername(Accounts.USER);
+            deleted.setEmail(Accounts.USER_EMAIL);
             deleted.setPasswordHash(Objects.requireNonNull(passwordEncoder.encode(PASSWORD)));
             deleted.setDeletedAt(Instant.now());
             userRepository.save(deleted);
-            final String body = Accounts.registerPayload(objectMapper, Accounts.USERNAME, OTHER_EMAIL, PASSWORD);
+            final String body =
+                Accounts.registerPayload(objectMapper, Accounts.USER, Accounts.OTHER_USER_EMAIL, PASSWORD);
 
             AuthRequests.register(mockMvc, body)
                 .andExpect(conflictWithDetail("Username or email already registered"));
@@ -175,10 +170,10 @@ class AuthIntegrationTest extends ContainerizedTest {
 
         @ParameterizedTest(name = "rejects invalid {0} with 400")
         @CsvSource({
-            "short password,        darrow,                darrow@example.com, short",
-            "invalid email,         darrow,                not-an-email,       Sup3rSecret!",
-            "email-shaped username, mustang@example.com,  mustang@other.com,  Sup3rSecret!",
-            "password over 72 bytes, darrow,               darrow@example.com, " + PASSWORD_40_CHARS_80_BYTES
+            "short password,        user,                    user@example.com,    short",
+            "invalid email,         user,                    not-an-email,        Sup3rSecret!",
+            "email-shaped username, otheruser@example.com,   otheruser@other.com, Sup3rSecret!",
+            "password over 72 bytes, user,                   user@example.com, " + PASSWORD_40_CHARS_80_BYTES
         })
         void rejectsInvalidFieldWithBadRequest(
             final String invalidField,
@@ -195,22 +190,22 @@ class AuthIntegrationTest extends ContainerizedTest {
         @Test
         void normalizesEmailToLowercaseOnRegister() throws Exception {
             final String body =
-                Accounts.registerPayload(objectMapper, Accounts.USERNAME, Accounts.MIXED_CASE_EMAIL, PASSWORD);
+                Accounts.registerPayload(objectMapper, Accounts.USER, Accounts.MIXED_CASE_EMAIL, PASSWORD);
 
             AuthRequests.register(mockMvc, body)
                 .andExpect(status().isCreated());
 
-            assertThat(userRepository.findByUsername(Accounts.USERNAME))
+            assertThat(userRepository.findIdByUsername(Accounts.USER).flatMap(userRepository::findById))
                 .get()
                 .extracting(User::getEmail)
-                .isEqualTo(Accounts.EMAIL);
+                .isEqualTo(Accounts.USER_EMAIL);
         }
 
         @Test
         void rejectsUsernameDifferingOnlyByCaseWithConflict() throws Exception {
-            Accounts.seedUser(userRepository, passwordEncoder, LOWERCASE_USERNAME, Accounts.EMAIL, PASSWORD);
+            Accounts.seedUser(userRepository, passwordEncoder, LOWERCASE_USERNAME, Accounts.USER_EMAIL, PASSWORD);
             final String body =
-                Accounts.registerPayload(objectMapper, MIXED_CASE_USERNAME, OTHER_EMAIL, PASSWORD);
+                Accounts.registerPayload(objectMapper, MIXED_CASE_USERNAME, Accounts.OTHER_USER_EMAIL, PASSWORD);
 
             AuthRequests.register(mockMvc, body)
                 .andExpect(conflictWithDetail(USERNAME_TAKEN));
@@ -219,12 +214,12 @@ class AuthIntegrationTest extends ContainerizedTest {
         @Test
         void preservesUsernameCaseOnRegister() throws Exception {
             final String body =
-                Accounts.registerPayload(objectMapper, MIXED_CASE_USERNAME, Accounts.EMAIL, PASSWORD);
+                Accounts.registerPayload(objectMapper, MIXED_CASE_USERNAME, Accounts.USER_EMAIL, PASSWORD);
 
             AuthRequests.register(mockMvc, body)
                 .andExpect(status().isCreated());
 
-            assertThat(userRepository.findByUsername(MIXED_CASE_USERNAME))
+            assertThat(userRepository.findIdByUsername(MIXED_CASE_USERNAME).flatMap(userRepository::findById))
                 .get()
                 .extracting(User::getUsername)
                 .isEqualTo(MIXED_CASE_USERNAME);
@@ -232,7 +227,7 @@ class AuthIntegrationTest extends ContainerizedTest {
 
         @Test
         void rejectsBadJsonBodyWithBadRequest() throws Exception {
-            AuthRequests.register(mockMvc, "{\"username\": \"darrow\"")
+            AuthRequests.register(mockMvc, "{\"username\": \"user\"")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath(JSON_DETAIL).value("Malformed request body"));
         }
@@ -244,22 +239,22 @@ class AuthIntegrationTest extends ContainerizedTest {
 
         @BeforeEach
         void seed() {
-            Accounts.seedUser(userRepository, passwordEncoder, Accounts.USERNAME, Accounts.EMAIL, PASSWORD);
+            Accounts.seedUser(userRepository, passwordEncoder, Accounts.USER, Accounts.USER_EMAIL, PASSWORD);
         }
 
         @Test
         void succeedsWithUsername() throws Exception {
-            final String body = Accounts.loginPayload(objectMapper, Accounts.USERNAME, PASSWORD);
+            final String body = Accounts.loginPayload(objectMapper, Accounts.USER, PASSWORD);
 
             AuthRequests.login(mockMvc, body)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(JSON_TOKEN).isNotEmpty())
-                .andExpect(jsonPath(JSON_USER_USERNAME).value(Accounts.USERNAME));
+                .andExpect(jsonPath(JSON_USER_USERNAME).value(Accounts.USER));
         }
 
         @Test
         void succeedsWithUsernameInDifferentCase() throws Exception {
-            Accounts.seedUser(userRepository, passwordEncoder, LOWERCASE_USERNAME, OTHER_EMAIL, PASSWORD);
+            Accounts.seedUser(userRepository, passwordEncoder, LOWERCASE_USERNAME, Accounts.OTHER_USER_EMAIL, PASSWORD);
             final String body = Accounts.loginPayload(objectMapper, MIXED_CASE_USERNAME, PASSWORD);
 
             AuthRequests.login(mockMvc, body)
@@ -270,7 +265,7 @@ class AuthIntegrationTest extends ContainerizedTest {
 
         @Test
         void succeedsWithEmail() throws Exception {
-            final String body = Accounts.loginPayload(objectMapper, Accounts.EMAIL, PASSWORD);
+            final String body = Accounts.loginPayload(objectMapper, Accounts.USER_EMAIL, PASSWORD);
 
             AuthRequests.login(mockMvc, body)
                 .andExpect(status().isOk())
@@ -288,16 +283,16 @@ class AuthIntegrationTest extends ContainerizedTest {
 
         @Test
         void shouldLogInWithIdentifierSurroundedByWhitespace() throws Exception {
-            final String body = Accounts.loginPayload(objectMapper, " " + Accounts.USERNAME + " ", PASSWORD);
+            final String body = Accounts.loginPayload(objectMapper, " " + Accounts.USER + " ", PASSWORD);
 
             AuthRequests.login(mockMvc, body)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath(JSON_USER_USERNAME).value(Accounts.USERNAME));
+                .andExpect(jsonPath(JSON_USER_USERNAME).value(Accounts.USER));
         }
 
         @Test
         void rejectsWrongPasswordWithUnauthorized() throws Exception {
-            final String body = Accounts.loginPayload(objectMapper, Accounts.USERNAME, WRONG_PASSWORD);
+            final String body = Accounts.loginPayload(objectMapper, Accounts.USER, WRONG_PASSWORD);
 
             AuthRequests.login(mockMvc, body)
                 .andExpect(status().isUnauthorized());
@@ -313,8 +308,8 @@ class AuthIntegrationTest extends ContainerizedTest {
 
         @Test
         void shouldRejectLoginUntilTheEmailIsVerified() throws Exception {
-            registerMustang();
-            final String body = Accounts.loginPayload(objectMapper, OTHER_USERNAME, PASSWORD);
+            registerOtherUser();
+            final String body = Accounts.loginPayload(objectMapper, Accounts.OTHER_USER, PASSWORD);
 
             AuthRequests.login(mockMvc, body)
                 .andExpect(status().isForbidden())
@@ -324,8 +319,8 @@ class AuthIntegrationTest extends ContainerizedTest {
 
         @Test
         void shouldAnswerUnauthorizedForAWrongPasswordOnAnUnverifiedAccount() throws Exception {
-            registerMustang();
-            final String body = Accounts.loginPayload(objectMapper, OTHER_USERNAME, WRONG_PASSWORD);
+            registerOtherUser();
+            final String body = Accounts.loginPayload(objectMapper, Accounts.OTHER_USER, WRONG_PASSWORD);
 
             AuthRequests.login(mockMvc, body)
                 .andExpect(status().isUnauthorized());
@@ -333,8 +328,9 @@ class AuthIntegrationTest extends ContainerizedTest {
 
         // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
         @SuppressWarnings("PMD.SignatureDeclareThrowsException")
-        private void registerMustang() throws Exception {
-            final String body = Accounts.registerPayload(objectMapper, OTHER_USERNAME, OTHER_EMAIL, PASSWORD);
+        private void registerOtherUser() throws Exception {
+            final String body =
+                Accounts.registerPayload(objectMapper, Accounts.OTHER_USER, Accounts.OTHER_USER_EMAIL, PASSWORD);
             AuthRequests.register(mockMvc, body)
                 .andExpect(status().isCreated());
         }
@@ -346,18 +342,18 @@ class AuthIntegrationTest extends ContainerizedTest {
 
         @Test
         void shouldAuthenticateMeWithTheTokenFromLogin() throws Exception {
-            Accounts.seedUser(userRepository, passwordEncoder, Accounts.USERNAME, Accounts.EMAIL, PASSWORD);
-            final String loginBody = Accounts.loginPayload(objectMapper, Accounts.USERNAME, PASSWORD);
+            Accounts.seedUser(userRepository, passwordEncoder, Accounts.USER, Accounts.USER_EMAIL, PASSWORD);
+            final String loginBody = Accounts.loginPayload(objectMapper, Accounts.USER, PASSWORD);
 
             final MvcResult loginResult = AuthRequests.login(mockMvc, loginBody)
                 .andExpect(status().isOk())
                 .andReturn();
-            final String apiToken = AuthRequests.accessTokenOf(objectMapper, loginResult);
+            final String apiToken = Accounts.accessTokenOf(objectMapper, loginResult);
 
-            mockMvc.perform(get(Accounts.ME_URL).header(AUTH_HEADER, BEARER_PREFIX + apiToken))
+            mockMvc.perform(get(Accounts.ME_URL).header(Accounts.AUTH_HEADER, Accounts.BEARER_PREFIX + apiToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath(JSON_USERNAME).value(Accounts.USERNAME))
-                .andExpect(jsonPath(JSON_EMAIL).value(Accounts.EMAIL));
+                .andExpect(jsonPath(JSON_USERNAME).value(Accounts.USER))
+                .andExpect(jsonPath(JSON_EMAIL).value(Accounts.USER_EMAIL));
         }
 
         @Test
@@ -368,19 +364,22 @@ class AuthIntegrationTest extends ContainerizedTest {
 
         @Test
         void rejectsMalformedToken() throws Exception {
-            mockMvc.perform(get(Accounts.ME_URL).header(AUTH_HEADER, BEARER_PREFIX + "not.a.real.jwt"))
+            mockMvc.perform(get(Accounts.ME_URL)
+                    .header(Accounts.AUTH_HEADER, Accounts.BEARER_PREFIX + "not.a.real.jwt"))
                 .andExpect(status().isUnauthorized());
         }
 
         @Test
         void rejectsExpiredToken() throws Exception {
             final long userId = Accounts.seedUser(
-                userRepository, passwordEncoder, Accounts.USERNAME, Accounts.EMAIL, PASSWORD);
+                userRepository, passwordEncoder, Accounts.USER, Accounts.USER_EMAIL, PASSWORD);
+            final User user = userRepository.findById(userId).orElseThrow();
+            final int credentialVersion = user.getCredentialVersion();
             final JwtIssuer expiredIssuer =
                 new JwtIssuer(jwtProperties.secret(), jwtProperties.issuer(), Duration.ofSeconds(-1));
-            final String expiredToken = expiredIssuer.issue(userId);
+            final String expiredToken = expiredIssuer.issue(userId, credentialVersion);
 
-            mockMvc.perform(get(Accounts.ME_URL).header(AUTH_HEADER, BEARER_PREFIX + expiredToken))
+            mockMvc.perform(get(Accounts.ME_URL).header(Accounts.AUTH_HEADER, Accounts.BEARER_PREFIX + expiredToken))
                 .andExpect(status().isUnauthorized());
         }
     }

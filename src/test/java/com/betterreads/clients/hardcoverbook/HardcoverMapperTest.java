@@ -159,7 +159,7 @@ class HardcoverMapperTest {
         @Test
         void shouldIgnoreEditorsWhenAnAuthorIsCredited() {
             final HardcoverDocument document = bookSearch().withoutCredits()
-                .withCredit(AUTHOR_ROLE, SNYDER).withCredit("Editor", "Darrow").document();
+                .withCredit(AUTHOR_ROLE, SNYDER).withCredit("Editor", "Book Editor").document();
 
             final SourceBook book = map(document);
 

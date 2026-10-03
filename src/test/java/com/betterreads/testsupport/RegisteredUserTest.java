@@ -68,8 +68,7 @@ public abstract class RegisteredUserTest extends ContainerizedTest {
                 .content(Accounts.loginPayload(objectMapper, username, PASSWORD)))
             .andExpect(status().isOk())
             .andReturn();
-        final String body = login.getResponse().getContentAsString();
-        return objectMapper.readTree(body).at("/data/accessToken").asString();
+        return Accounts.accessTokenOf(objectMapper, login);
     }
 
     protected long idOf(final ResultActions created) throws UnsupportedEncodingException {

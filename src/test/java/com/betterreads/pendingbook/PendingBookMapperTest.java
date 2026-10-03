@@ -48,7 +48,7 @@ class PendingBookMapperTest {
         .seriesPosition(FIRST_VOLUME)
         .rawSubjects(List.of("Science Fiction", "Dystopia"))
         .awards(List.of("Goodreads Choice"))
-        .authors(List.of(SourceAuthor.ofName("Darrow"), SourceAuthor.ofName("Mustang")))
+        .authors(List.of(SourceAuthor.ofName("Author"), SourceAuthor.ofName("Other Author")))
         .build();
 
     private static final MergedBook MERGED = new MergedBook(ORIGINAL,

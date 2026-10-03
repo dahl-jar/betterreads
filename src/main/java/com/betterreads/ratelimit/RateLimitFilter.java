@@ -27,13 +27,13 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.UrlPathHelper;
 
 /**
- * Per-IP token-bucket rate limiter for the public endpoints, shared across replicas through Redis.
+ * Per-IP token-bucket rate limiter, shared across replicas through Redis.
  *
- * <p>Auth paths, search, event streams, comment posts, cover images and the other public reads
- * each draw from their own per-IP bucket, so a burst against one does not eat another's budget.
- * An empty bucket returns 429 with {@code Retry-After}.
+ * <p>Each limited endpoint draws from its own bucket, and an empty bucket returns 429 with
+ * {@code Retry-After}.
  */
 @Component
 public final class RateLimitFilter extends OncePerRequestFilter {
@@ -52,6 +52,10 @@ public final class RateLimitFilter extends OncePerRequestFilter {
 
     private static final String RESEND_VERIFICATION_PATH = "/api/v1/auth/resend-verification";
 
+    private static final String CHANGE_PASSWORD_PATH = "/api/v1/auth/me/password";
+
+    private static final String SHELF_COUNTS_PATH = "/api/v1/me/books/counts";
+
     private static final String SEARCH_PATH = "/api/v1/search/books";
 
     private static final String BOOK_DETAIL_PREFIX = "/api/v1/books/";
@@ -65,6 +69,8 @@ public final class RateLimitFilter extends OncePerRequestFilter {
 
     private static final String COMMENTS_SUFFIX = "/comments";
 
+    private static final String RATING_SUFFIX = "/reviews/me/rating";
+
     private static final String RETRY_AFTER_HEADER = "Retry-After";
 
     private final Map<String, Endpoint> endpoints;
@@ -74,6 +80,8 @@ public final class RateLimitFilter extends OncePerRequestFilter {
     private final Endpoint eventStreamEndpoint;
 
     private final Endpoint commentWriteEndpoint;
+
+    private final Endpoint ratingWriteEndpoint;
 
     private final Endpoint imageEndpoint;
 
@@ -90,14 +98,12 @@ public final class RateLimitFilter extends OncePerRequestFilter {
     ) {
         super();
         this.endpoints = buildEndpoints(properties);
-        this.publicReadEndpoint = endpoint(HttpMethod.GET, "book-detail", properties.searchCapacity(),
-            properties.searchRefillTokens(), properties.searchRefillSeconds());
+        this.publicReadEndpoint = searchBudget(HttpMethod.GET, "book-detail", properties);
         this.eventStreamEndpoint = endpoint(HttpMethod.GET, "event-stream",
             properties.eventStreamCapacity(),
             properties.eventStreamRefillTokens(), properties.eventStreamRefillSeconds());
-        this.commentWriteEndpoint = endpoint(HttpMethod.POST, "comment-write",
-            properties.searchCapacity(),
-            properties.searchRefillTokens(), properties.searchRefillSeconds());
+        this.commentWriteEndpoint = searchBudget(HttpMethod.POST, "comment-write", properties);
+        this.ratingWriteEndpoint = searchBudget(HttpMethod.PUT, "rating-write", properties);
         this.imageEndpoint = endpoint(HttpMethod.GET, "image", properties.imageCapacity(),
             properties.imageRefillTokens(), properties.imageRefillSeconds());
         this.clientIpResolver = new ClientIpResolver(properties.trustedProxies());
@@ -123,9 +129,18 @@ public final class RateLimitFilter extends OncePerRequestFilter {
             Map.entry(RESEND_VERIFICATION_PATH, endpoint(HttpMethod.POST, "resend-verification",
                 props.resendVerificationCapacity(),
                 props.resendVerificationRefillTokens(), props.resendVerificationRefillSeconds())),
-            Map.entry(SEARCH_PATH, endpoint(HttpMethod.GET, "search", props.searchCapacity(),
-                props.searchRefillTokens(), props.searchRefillSeconds()))
+            Map.entry(CHANGE_PASSWORD_PATH, endpoint(HttpMethod.PUT, "change-password",
+                props.changePasswordCapacity(),
+                props.changePasswordRefillTokens(), props.changePasswordRefillSeconds())),
+            Map.entry(SHELF_COUNTS_PATH, searchBudget(HttpMethod.GET, "shelf-counts", props)),
+            Map.entry(SEARCH_PATH, searchBudget(HttpMethod.GET, "search", props))
         );
+    }
+
+    private static Endpoint searchBudget(
+        final HttpMethod method, final String keyPrefix, final RateLimitProperties props) {
+        return endpoint(method, keyPrefix, props.searchCapacity(), props.searchRefillTokens(),
+            props.searchRefillSeconds());
     }
 
     private static Endpoint endpoint(
@@ -144,7 +159,8 @@ public final class RateLimitFilter extends OncePerRequestFilter {
     public void reset() {
         Stream.concat(
                 endpoints.values().stream(),
-                Stream.of(publicReadEndpoint, eventStreamEndpoint, commentWriteEndpoint, imageEndpoint))
+                Stream.of(publicReadEndpoint, eventStreamEndpoint, commentWriteEndpoint, ratingWriteEndpoint,
+                    imageEndpoint))
             .map(Endpoint::keyPrefix)
             .forEach(prefix -> {
                 final List<String> keys = redis.sync().keys(prefix + ":*");
@@ -184,15 +200,25 @@ public final class RateLimitFilter extends OncePerRequestFilter {
 
     @Nullable
     private Endpoint endpointFor(final HttpServletRequest request) {
-        final String uri = request.getRequestURI();
+        final String uri = UrlPathHelper.defaultInstance.getPathWithinApplication(request);
         final Endpoint exact = endpoints.get(uri);
         if (exact != null && exact.method().matches(request.getMethod())) {
             return exact;
         }
-        if (HttpMethod.POST.matches(request.getMethod())) {
-            return uri.endsWith(COMMENTS_SUFFIX) ? commentWriteEndpoint : null;
+        return HttpMethod.GET.matches(request.getMethod())
+            ? readEndpointFor(uri)
+            : writeEndpointFor(request.getMethod(), uri);
+    }
+
+    @Nullable
+    private Endpoint writeEndpointFor(final String method, final String uri) {
+        if (HttpMethod.POST.matches(method) && uri.endsWith(COMMENTS_SUFFIX)) {
+            return commentWriteEndpoint;
         }
-        return HttpMethod.GET.matches(request.getMethod()) ? readEndpointFor(uri) : null;
+        if (HttpMethod.PUT.matches(method) && uri.endsWith(RATING_SUFFIX)) {
+            return ratingWriteEndpoint;
+        }
+        return null;
     }
 
     @Nullable

@@ -2,7 +2,7 @@ package com.betterreads.features.account;
 
 import com.betterreads.mailoutbox.MailOutboxService;
 import com.betterreads.testsupport.Accounts;
-import com.betterreads.users.User;
+import com.betterreads.testsupport.ConcurrentCalls;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.postgresql.PostgreSQLContainer;
@@ -15,18 +15,19 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 
 import static com.betterreads.features.account.AccountTestFixture.FIELD_TOKEN;
 import static com.betterreads.features.account.AccountTestFixture.FORGOT_URL;
 import static com.betterreads.features.account.AccountTestFixture.UNKNOWN_EMAIL;
 import static com.betterreads.features.account.AccountTestFixture.UNKNOWN_TOKEN;
-import static com.betterreads.testsupport.Accounts.EMAIL;
 import static com.betterreads.testsupport.Accounts.MIXED_CASE_EMAIL;
-import static com.betterreads.testsupport.Accounts.USERNAME;
+import static com.betterreads.testsupport.Accounts.USER;
+import static com.betterreads.testsupport.Accounts.USER_EMAIL;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -47,19 +48,10 @@ class PasswordResetIntegrationTest extends AccountMailTest {
 
     private static final String RESET_URL = "/api/v1/auth/reset-password";
 
-    private static final String OLD_PASSWORD = "OldP4ssword!";
-
-    private static final String NEW_PASSWORD = "BrandN3wPass!";
-
-    private static final String MULTIBYTE_PASSWORD = "é".repeat(40);
-
     private static final String FIELD_NEW_PASSWORD = "newPassword";
 
     @Autowired
     private PasswordResetService passwordResetService;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
 
     @Nested
     @DisplayName("POST /auth/forgot-password")
@@ -71,14 +63,14 @@ class PasswordResetIntegrationTest extends AccountMailTest {
 
             mockMvc.perform(post(FORGOT_URL)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(AccountTestFixture.emailPayload(objectMapper, EMAIL)))
+                    .content(AccountTestFixture.emailPayload(objectMapper, USER_EMAIL)))
                 .andExpect(status().isNoContent());
 
             assertThat(mailOutboxRepository.findAll())
                 .as("exactly one outbox row enqueued for the matching account, addressed to the original email")
                 .hasSize(1)
                 .first()
-                .satisfies(row -> assertThat(row.getRecipient()).isEqualTo(EMAIL))
+                .satisfies(row -> assertThat(row.getRecipient()).isEqualTo(USER_EMAIL))
                 .satisfies(row -> assertThat(row.getTemplate()).isEqualTo(MailOutboxService.TEMPLATE_PASSWORD_RESET))
                 .satisfies(row -> assertThat(AccountTestFixture.payloadField(objectMapper, row, FIELD_TOKEN))
                     .isNotBlank());
@@ -130,7 +122,10 @@ class PasswordResetIntegrationTest extends AccountMailTest {
         void concurrentRequestsLeaveOneActiveToken() throws Exception {
             final long userId = seedUser();
 
-            AccountTestFixture.runConcurrently(() -> passwordResetService.requestReset(EMAIL));
+            ConcurrentCalls.run(AccountTestFixture.CONCURRENT_THREADS, () -> {
+                passwordResetService.requestReset(USER_EMAIL);
+                return true;
+            });
 
             assertThat(emailTokenRepository.findActive(userId, EmailToken.Purpose.PASSWORD_RESET))
                 .as("serialized requests leave exactly one active token, never zero or a duplicate")
@@ -145,7 +140,7 @@ class PasswordResetIntegrationTest extends AccountMailTest {
         @Test
         void resetsPasswordAndRevokesAllRefreshTokens() throws Exception {
             final long userId = seedUser();
-            AccountTestFixture.login(mockMvc, objectMapper, USERNAME, OLD_PASSWORD);
+            AccountTestFixture.login(mockMvc, objectMapper, USER, OLD_PASSWORD);
             final String token = requestResetToken();
 
             resetPassword(token, NEW_PASSWORD)
@@ -157,6 +152,20 @@ class PasswordResetIntegrationTest extends AccountMailTest {
             assertThat(storedPasswordMatches(userId, NEW_PASSWORD))
                 .as("the stored hash is the new password")
                 .isTrue();
+        }
+
+        @Test
+        void shouldRejectAnAccessTokenIssuedBeforeTheReset() throws Exception {
+            seedUser();
+            final MvcResult session = AccountTestFixture.login(mockMvc, objectMapper, USER, OLD_PASSWORD);
+            final String token = requestResetToken();
+            resetPassword(token, NEW_PASSWORD)
+                .andExpect(status().isNoContent());
+
+            final ResultActions response = mockMvc.perform(get(Accounts.ME_URL)
+                .header(Accounts.AUTH_HEADER, Accounts.BEARER_PREFIX + Accounts.accessTokenOf(objectMapper, session)));
+
+            response.andExpect(status().isUnauthorized());
         }
 
         @Test
@@ -192,8 +201,8 @@ class PasswordResetIntegrationTest extends AccountMailTest {
         @Test
         void shouldRejectVerificationToken() throws Exception {
             final long userId = seedUser();
-            Accounts.unverifyEmail(jdbcTemplate, USERNAME);
-            emailVerificationService.requestResend(EMAIL);
+            Accounts.unverifyEmail(jdbcTemplate, USER);
+            emailVerificationService.requestResend(USER_EMAIL);
             final String token = AccountTestFixture.readEnqueuedToken(mailOutboxRepository, objectMapper);
 
             resetPassword(token, NEW_PASSWORD)
@@ -227,16 +236,12 @@ class PasswordResetIntegrationTest extends AccountMailTest {
         }
     }
 
-    private long seedUser() {
-        return Accounts.seedUser(userRepository, passwordEncoder, USERNAME, EMAIL, OLD_PASSWORD);
-    }
-
     // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     private String requestResetToken() throws Exception {
         mockMvc.perform(post(FORGOT_URL)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(AccountTestFixture.emailPayload(objectMapper, EMAIL)))
+                .content(AccountTestFixture.emailPayload(objectMapper, USER_EMAIL)))
             .andExpect(status().isNoContent());
         return AccountTestFixture.readEnqueuedToken(mailOutboxRepository, objectMapper);
     }
@@ -247,11 +252,6 @@ class PasswordResetIntegrationTest extends AccountMailTest {
         return mockMvc.perform(post(RESET_URL)
             .contentType(MediaType.APPLICATION_JSON)
             .content(resetPayload(token, newPassword)));
-    }
-
-    private boolean storedPasswordMatches(final long userId, final String rawPassword) {
-        final User user = userRepository.findById(userId).orElseThrow();
-        return passwordEncoder.matches(rawPassword, user.getPasswordHash());
     }
 
     private String resetPayload(final String token, final String newPassword) {

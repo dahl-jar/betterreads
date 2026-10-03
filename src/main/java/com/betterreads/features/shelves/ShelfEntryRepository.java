@@ -25,4 +25,6 @@ interface ShelfEntryRepository extends JpaRepository<ShelfEntry, Long> {
         GROUP BY e.status
         """)
     List<StatusCount> countByStatusForBook(@Param("bookId") Long bookId);
+
+    long countByUserId(Long userId);
 }

@@ -59,7 +59,8 @@ class ResendMailSender implements MailSender {
             "from", fromAddress,
             "to", List.of(message.recipient()),
             "subject", message.subject(),
-            "text", message.body()
+            "text", message.text(),
+            "html", message.html()
         );
         try {
             client.post()

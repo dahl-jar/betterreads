@@ -13,11 +13,11 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    /** Matches the username case-insensitively. */
-    @Query("SELECT u FROM User u WHERE lower(u.username) = lower(:username)")
-    Optional<User> findByUsername(@Param("username") String username);
+    @Query("SELECT u.userId FROM User u WHERE lower(u.username) = lower(:username)")
+    Optional<Long> findIdByUsername(@Param("username") String username);
 
-    Optional<User> findByEmail(String email);
+    @Query("SELECT u.userId FROM User u WHERE u.email = :email")
+    Optional<Long> findIdByEmail(@Param("email") String email);
 
     /** Compares the username case-insensitively. */
     @Query("SELECT count(u) > 0 FROM User u WHERE lower(u.username) = lower(:username)")

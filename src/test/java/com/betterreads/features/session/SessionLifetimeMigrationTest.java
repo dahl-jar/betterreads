@@ -1,5 +1,8 @@
 package com.betterreads.features.session;
 
+import static com.betterreads.testsupport.Accounts.OTHER_USER;
+import static com.betterreads.testsupport.Accounts.THIRD_USER;
+import static com.betterreads.testsupport.Accounts.USER;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
@@ -33,12 +36,6 @@ class SessionLifetimeMigrationTest {
     private static final int RECENT_LOGIN_DAYS = 10;
 
     private static final int OLD_LOGIN_DAYS = 40;
-
-    private static final String DARROW = "darrow";
-
-    private static final String MUSTANG = "mustang";
-
-    private static final String GOBLIN = "goblin";
 
     private static final String ADD_USER_SQL = """
         INSERT INTO app_user (username, email, password_hash, email_verified_at)
@@ -87,41 +84,41 @@ class SessionLifetimeMigrationTest {
 
     @Test
     void shouldEndASessionThirtyDaysAfterItsLogin() {
-        seedRotatedSession(DARROW, true, RECENT_LOGIN_DAYS);
+        seedRotatedSession(USER, true, RECENT_LOGIN_DAYS);
 
         flyway(AFTER).migrate();
 
-        final OffsetDateTime expiry = jdbc.queryForObject(EXPIRY_SQL, OffsetDateTime.class, DARROW);
+        final OffsetDateTime expiry = jdbc.queryForObject(EXPIRY_SQL, OffsetDateTime.class, USER);
         final OffsetDateTime expected = OffsetDateTime.now(ZoneOffset.UTC).plusDays(LIFETIME_DAYS - RECENT_LOGIN_DAYS);
-        assertThat(isRevoked(DARROW)).isFalse();
+        assertThat(isRevoked(USER)).isFalse();
         assertThat(expiry).isCloseTo(expected, within(1, ChronoUnit.MINUTES));
     }
 
     @Test
     void shouldKeepAnExistingSessionRemembered() {
-        seedRotatedSession(DARROW, true, RECENT_LOGIN_DAYS);
+        seedRotatedSession(USER, true, RECENT_LOGIN_DAYS);
 
         flyway(AFTER).migrate();
 
-        assertThat(jdbc.queryForObject(PERSISTENT_SQL, Boolean.class, DARROW)).isTrue();
+        assertThat(jdbc.queryForObject(PERSISTENT_SQL, Boolean.class, USER)).isTrue();
     }
 
     @Test
     void shouldRevokeASessionWhoseLoginIsThirtyDaysOld() {
-        seedRotatedSession(MUSTANG, true, OLD_LOGIN_DAYS);
+        seedRotatedSession(THIRD_USER, true, OLD_LOGIN_DAYS);
 
         flyway(AFTER).migrate();
 
-        assertThat(isRevoked(MUSTANG)).isTrue();
+        assertThat(isRevoked(THIRD_USER)).isTrue();
     }
 
     @Test
     void shouldRevokeTheSessionOfAnUnverifiedAccount() {
-        seedRotatedSession(GOBLIN, false, RECENT_LOGIN_DAYS);
+        seedRotatedSession(OTHER_USER, false, RECENT_LOGIN_DAYS);
 
         flyway(AFTER).migrate();
 
-        assertThat(isRevoked(GOBLIN)).isTrue();
+        assertThat(isRevoked(OTHER_USER)).isTrue();
     }
 
     private void seedRotatedSession(final String username, final boolean verified, final int loginDaysAgo) {

@@ -10,10 +10,6 @@ import tools.jackson.databind.node.ObjectNode;
 
 public final class Comments {
 
-    private static final String AUTH_HEADER = "Authorization";
-
-    private static final String BEARER_PREFIX = "Bearer ";
-
     private Comments() {
     }
 
@@ -34,7 +30,7 @@ public final class Comments {
     public static MockHttpServletRequestBuilder request(final ObjectMapper objectMapper, final String token,
         final String url, final String body, final @Nullable Long parentId) {
         return MockMvcRequestBuilders.post(url)
-            .header(AUTH_HEADER, BEARER_PREFIX + token)
+            .header(Accounts.AUTH_HEADER, Accounts.BEARER_PREFIX + token)
             .contentType(MediaType.APPLICATION_JSON)
             .content(payload(objectMapper, body, parentId));
     }

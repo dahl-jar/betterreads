@@ -4,6 +4,7 @@ import static com.betterreads.ratelimit.RateLimitFixtures.RETRY_AFTER_HEADER;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -21,12 +22,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/**
- * Search, public catalog reads, and comment writes are rate limited per client, so a burst past
- * the configured capacity is rejected with 429 before it reaches Meilisearch or Postgres.
- */
+/** A burst past the search-sized budget gets 429 per client. */
 @SpringBootTest
 @Testcontainers
 @TestPropertySource(properties = {
@@ -45,6 +44,12 @@ class SearchRateLimitIntegrationTest extends ContainerizedTest {
     private static final String REVIEW_COMMENTS_URL = "/api/v1/reviews/404/comments";
 
     private static final String COMMENT_BODY = "{\"body\":\"Break the chains\"}";
+
+    private static final String RATING_URL = "/api/v1/books/OL45804W/reviews/me/rating";
+
+    private static final String RATING_BODY = "{\"rating\":4}";
+
+    private static final String SHELF_COUNTS_URL = "/api/v1/me/books/counts";
 
     private static final String QUERY = "dune";
 
@@ -101,5 +106,56 @@ class SearchRateLimitIntegrationTest extends ContainerizedTest {
                 .content(COMMENT_BODY))
             .andExpect(status().isTooManyRequests())
             .andExpect(header().exists(RETRY_AFTER_HEADER));
+    }
+
+    @Test
+    void shouldRejectRatingBurstPastCapacity() throws Exception {
+        spendRatingBucket();
+
+        final ResultActions response = putRating();
+
+        response
+            .andExpect(status().isTooManyRequests())
+            .andExpect(header().exists(RETRY_AFTER_HEADER));
+    }
+
+    @Test
+    void shouldRejectShelfCountsBurstPastCapacity() throws Exception {
+        for (int i = 0; i < CAPACITY; i++) {
+            final ResultActions allowed = mockMvc.perform(get(SHELF_COUNTS_URL));
+            allowed.andExpect(status().isUnauthorized());
+        }
+
+        final ResultActions response = mockMvc.perform(get(SHELF_COUNTS_URL));
+
+        response
+            .andExpect(status().isTooManyRequests())
+            .andExpect(header().exists(RETRY_AFTER_HEADER));
+    }
+
+    @Test
+    void shouldKeepShelfCountsOpenWhenTheRatingBucketIsSpent() throws Exception {
+        spendRatingBucket();
+
+        final ResultActions response = mockMvc.perform(get(SHELF_COUNTS_URL));
+
+        response.andExpect(status().isUnauthorized());
+    }
+
+    // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
+    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
+    private void spendRatingBucket() throws Exception {
+        for (int i = 0; i < CAPACITY; i++) {
+            final ResultActions allowed = putRating();
+            allowed.andExpect(status().isUnauthorized());
+        }
+    }
+
+    // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
+    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
+    private ResultActions putRating() throws Exception {
+        return mockMvc.perform(put(RATING_URL)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(RATING_BODY));
     }
 }

@@ -15,9 +15,9 @@ final class BookSeriesSamples {
 
     static final SeriesEntry COSMERE = new SeriesEntry("The Cosmere", 12);
 
-    static final String DARROW = "Darrow";
+    static final String AUTHOR = "Author";
 
-    static final String MUSTANG = "Mustang";
+    static final String OTHER_AUTHOR = "Other Author";
 
     private BookSeriesSamples() {
     }
@@ -26,7 +26,7 @@ final class BookSeriesSamples {
         return SourceBook.builder(BookFieldSource.HARDCOVER)
             .hardcoverId(HARDCOVER_ID)
             .title("Words of Radiance")
-            .authors(SourceAuthor.ofNames(List.of(DARROW, MUSTANG)))
+            .authors(SourceAuthor.ofNames(List.of(AUTHOR, OTHER_AUTHOR)))
             .series(series)
             .build();
     }

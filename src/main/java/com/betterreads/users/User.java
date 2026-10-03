@@ -60,6 +60,9 @@ public class User extends Timestamped {
     @Nullable
     private Instant deletedAt;
 
+    @Column(name = "credential_version", nullable = false)
+    private int credentialVersion;
+
     public Long getUserId() {
         return userId;
     }
@@ -114,5 +117,13 @@ public class User extends Timestamped {
 
     public void setDeletedAt(@Nullable final Instant deletedAt) {
         this.deletedAt = deletedAt;
+    }
+
+    public int getCredentialVersion() {
+        return credentialVersion;
+    }
+
+    public void bumpCredentialVersion() {
+        this.credentialVersion++;
     }
 }

@@ -123,6 +123,9 @@ auth:
     resend-verification-capacity: 3
     resend-verification-refill-tokens: 1
     resend-verification-refill-seconds: 300
+    change-password-capacity: 5
+    change-password-refill-tokens: 1
+    change-password-refill-seconds: 60
     search-capacity: 30
     search-refill-tokens: 10
     search-refill-seconds: 10
