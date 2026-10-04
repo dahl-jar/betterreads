@@ -26,6 +26,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static com.betterreads.testsupport.Accounts.OTHER_USER;
@@ -103,6 +104,22 @@ class ReviewsIntegrationTest extends ReviewApiTest {
     private static final String FIRST_POSTED_DATE = "2026-03-14";
 
     private static final String OTHER_USER_REVIEW_BODY = "Slow start, but the sandworms earn it.";
+
+    private static final String STARTED_ON = "2026-08-26";
+
+    private static final String FINISHED_ON = "2026-09-07";
+
+    private static final String JSON_FIRST_READ_STARTED = "$.data[0].readStartedAt";
+
+    private static final String JSON_FIRST_READ_FINISHED = "$.data[0].readFinishedAt";
+
+    private static final String SHELF_URL = "/api/v1/me/books/";
+
+    private static final String OTHER_BOOK_KEY = "other-book";
+
+    private static final String OTHER_BOOK_TITLE = "Other Book";
+
+    private static final String OTHER_BOOK_AUTHOR = "Other Author";
 
     @Autowired
     private BookRepository bookRepository;
@@ -184,13 +201,15 @@ class ReviewsIntegrationTest extends ReviewApiTest {
         }
 
         @Test
-        void overlongBodyIsRejected() throws Exception {
+        void shouldRejectAnOverlongBody() throws Exception {
             final String token = registerAndLogin(USER, USER_EMAIL);
             final String overlong = "x".repeat(OVERLONG_BODY_LENGTH);
 
             final ResultActions response = putReview(token, DUNE_KEY, FIVE_STARS, null, overlong);
 
             response.andExpect(status().isBadRequest());
+            final ResultActions remaining = getBookReviews(DUNE_KEY);
+            remaining.andExpect(jsonPath(JSON_LENGTH).value(0));
         }
 
         @Test
@@ -382,11 +401,7 @@ class ReviewsIntegrationTest extends ReviewApiTest {
 
         @Test
         void shouldCountOnlyTopLevelCommentsOnAReview() throws Exception {
-            final String token = registerAndLogin(USER, USER_EMAIL);
-            final long reviewId = postReview(token, DUNE_KEY, FIVE_STARS, REVIEW_TITLE, REVIEW_BODY);
-            final long parentId = commentOnReview(token, reviewId, FIRST_COMMENT, null);
-            commentOnReview(token, reviewId, SECOND_COMMENT, null);
-            commentOnReview(token, reviewId, A_REPLY, parentId);
+            reviewWithTwoCommentsAndAReply();
 
             final ResultActions response = getBookReviews(DUNE_KEY);
 
@@ -461,8 +476,84 @@ class ReviewsIntegrationTest extends ReviewApiTest {
     }
 
     @Nested
+    @DisplayName("Reviewer read dates on a review")
+    class ReadDates {
+
+        @Test
+        void shouldReturnTheReviewersReadDatesOnABooksReviews() throws Exception {
+            final String token = reviewDuneAsUser();
+            shelveWithDates(token, DUNE_KEY);
+
+            final ResultActions response = getBookReviews(DUNE_KEY);
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_FIRST_READ_STARTED).value(STARTED_ON))
+                .andExpect(jsonPath(JSON_FIRST_READ_FINISHED).value(FINISHED_ON));
+        }
+
+        @Test
+        void shouldHideTheReadDatesOfADeletedReviewer() throws Exception {
+            final String token = reviewDuneAsUser();
+            shelveWithDates(token, DUNE_KEY);
+            Accounts.softDelete(jdbcTemplate, USER);
+
+            final ResultActions response = getBookReviews(DUNE_KEY);
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_FIRST_AUTHOR).value(DELETED_AUTHOR))
+                .andExpect(jsonPath(JSON_FIRST_READ_STARTED).doesNotExist())
+                .andExpect(jsonPath(JSON_FIRST_READ_FINISHED).doesNotExist());
+        }
+
+        @Test
+        void shouldReturnOnlyTheReviewersReadDatesForThatBook() throws Exception {
+            final Author otherAuthor = authorRepository.save(Books.author(OTHER_BOOK_AUTHOR));
+            bookRepository.save(Books.promoted(OTHER_BOOK_KEY, OTHER_BOOK_TITLE, otherAuthor));
+            final String userToken = reviewDuneAsUser();
+            final String otherUserToken = registerAndLogin(OTHER_USER, OTHER_USER_EMAIL);
+            postReview(otherUserToken, OTHER_BOOK_KEY, THREE_STARS, null, OTHER_USER_REVIEW_BODY);
+            shelveWithDates(userToken, OTHER_BOOK_KEY);
+            shelveWithDates(otherUserToken, DUNE_KEY);
+
+            final ResultActions response = getRecentReviews();
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_LENGTH).value(2))
+                .andExpect(jsonPath("$.data[*].readStartedAt").isEmpty())
+                .andExpect(jsonPath("$.data[*].readFinishedAt").isEmpty());
+        }
+    }
+
+    @Nested
     @DisplayName("GET /reviews/recent")
     class RecentReviews {
+
+        @Test
+        void shouldCountTopLevelCommentsOnRecentReviews() throws Exception {
+            reviewWithTwoCommentsAndAReply();
+
+            final ResultActions response = getRecentReviews();
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_FIRST_COMMENT_COUNT).value(2));
+        }
+
+        @Test
+        void shouldReturnTheReviewersReadDatesOnRecentReviews() throws Exception {
+            final String token = reviewDuneAsUser();
+            shelveWithDates(token, DUNE_KEY);
+
+            final ResultActions response = getRecentReviews();
+
+            response
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_FIRST_READ_STARTED).value(STARTED_ON))
+                .andExpect(jsonPath(JSON_FIRST_READ_FINISHED).value(FINISHED_ON));
+        }
 
         @Test
         void shouldListARecentReviewWithItsBook() throws Exception {
@@ -576,6 +667,29 @@ class ReviewsIntegrationTest extends ReviewApiTest {
         final String otherUserToken = registerAndLogin(OTHER_USER, OTHER_USER_EMAIL);
         putReview(otherUserToken, DUNE_KEY, THREE_STARS, REVIEW_TITLE, REVIEW_BODY);
         return userToken;
+    }
+
+    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
+    private void reviewWithTwoCommentsAndAReply() throws Exception {
+        final String token = registerAndLogin(USER, USER_EMAIL);
+        final long reviewId = postReview(token, DUNE_KEY, FIVE_STARS, REVIEW_TITLE, REVIEW_BODY);
+        final long parentId = commentOnReview(token, reviewId, FIRST_COMMENT, null);
+        commentOnReview(token, reviewId, SECOND_COMMENT, null);
+        commentOnReview(token, reviewId, A_REPLY, parentId);
+    }
+
+    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
+    private void shelveWithDates(final String token, final String key) throws Exception {
+        mockMvc.perform(put(SHELF_URL + key + "/status")
+                .header(Accounts.AUTH_HEADER, Accounts.BEARER_PREFIX + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"FINISHED\"}"))
+            .andExpect(status().isOk());
+        mockMvc.perform(MockMvcRequestBuilders.patch(SHELF_URL + key)
+                .header(Accounts.AUTH_HEADER, Accounts.BEARER_PREFIX + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"startedAt\":\"" + STARTED_ON + "\",\"finishedAt\":\"" + FINISHED_ON + "\"}"))
+            .andExpect(status().isOk());
     }
 
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")

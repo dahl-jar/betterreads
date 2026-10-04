@@ -87,6 +87,10 @@ public class ShelfEntry extends Timestamped {
         }
     }
 
+    public Long getUserId() {
+        return userId;
+    }
+
     public Long getBookId() {
         return bookId;
     }

@@ -15,6 +15,8 @@ public record ReviewResponse(
     @Nullable String body,
     LocalDate createdAt,
     String author,
-    long commentCount
+    long commentCount,
+    @Nullable LocalDate readStartedAt,
+    @Nullable LocalDate readFinishedAt
 ) {
 }

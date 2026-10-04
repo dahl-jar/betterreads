@@ -11,6 +11,9 @@ public record RecentReviewResponse(
     @Nullable String title,
     String body,
     LocalDate createdAt,
-    ReviewedBook book
+    ReviewedBook book,
+    long commentCount,
+    @Nullable LocalDate readStartedAt,
+    @Nullable LocalDate readFinishedAt
 ) {
 }
