@@ -12,7 +12,7 @@ import org.springframework.data.repository.query.Param;
 
 interface MetadataCheckRepository extends JpaRepository<Book, Long> {
 
-    @EntityGraph(attributePaths = {"authors", "series"})
+    @EntityGraph(attributePaths = {"credits", "credits.author", "series"})
     @Query("""
         SELECT b FROM Book b
         WHERE b.metadataCheckRequestedAt IS NOT NULL

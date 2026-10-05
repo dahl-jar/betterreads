@@ -110,6 +110,6 @@ public final class HardcoverBookNodeMapper {
 
     private static @Nullable List<SourceAuthor> authors(final HardcoverBookNode node) {
         final List<HardcoverBookNode.Contribution> contributions = node.contributions();
-        return contributions == null ? null : HardcoverContributors.authors(contributions);
+        return contributions == null ? null : HardcoverContributors.credits(contributions);
     }
 }

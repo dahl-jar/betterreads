@@ -69,6 +69,8 @@ class BookDetailIntegrationTest extends ContainerizedTest {
 
     private static final String AUTHORS_PATH = "$.data.authors[0]";
 
+    private static final String SECOND_AUTHOR_PATH = "$.data.authors[1]";
+
     private static final String COMPLETE_PATH = "$.data.complete";
 
     private static final String COVER_URL = "https://covers.example/kings.jpg";
@@ -101,6 +103,12 @@ class BookDetailIntegrationTest extends ContainerizedTest {
     private static final int COSMERE_VOLUME = 11;
 
     private static final double NOVELLA_POSITION = 2.5;
+
+    private static final String MCSWEENEY = "Ben McSweeney";
+
+    private static final String ORULLIAN = "Peter Orullian";
+
+    private static final String ILLUSTRATOR = "ILLUSTRATOR";
 
     @Autowired
     private TransactionTemplate transactionTemplate;
@@ -166,6 +174,18 @@ class BookDetailIntegrationTest extends ContainerizedTest {
         }
 
         @Test
+        void shouldListPendingAuthorsInCreditOrder() throws Exception {
+            final PendingBook seed = newPendingSeed();
+            seed.setAuthors(AUTHOR + "\nAnn Leckie");
+            pendingBooks.save(seed);
+
+            mockMvc.perform(get(BOOK_PATH, PENDING_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(AUTHORS_PATH).value(AUTHOR))
+                .andExpect(jsonPath(SECOND_AUTHOR_PATH).value("Ann Leckie"));
+        }
+
+        @Test
         void shouldListEverySeriesPrimaryFirst() throws Exception {
             saveCompleteBook(HARDCOVER_KEY);
             jdbcTemplate.update(ADD_SERIES_SQL, 1, COSMERE, COSMERE_VOLUME, HARDCOVER_KEY);
@@ -202,6 +222,31 @@ class BookDetailIntegrationTest extends ContainerizedTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(PRIMARY_SERIES_PATH).value(STORMLIGHT))
                 .andExpect(jsonPath(PRIMARY_POSITION_PATH).value(NOVELLA_POSITION));
+        }
+
+        @Test
+        void shouldListContributorsWithRoles() throws Exception {
+            saveCompleteBook(HARDCOVER_KEY);
+            credit(MCSWEENEY, ILLUSTRATOR, 1);
+
+            mockMvc.perform(get(BOOK_PATH, HARDCOVER_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.authors.length()").value(1))
+                .andExpect(jsonPath("$.data.contributors[1].name").value(MCSWEENEY))
+                .andExpect(jsonPath("$.data.contributors[1].role").value(ILLUSTRATOR))
+                .andExpect(jsonPath("$.data.contributors[1].authorId").isNumber());
+        }
+
+        @Test
+        void shouldListAuthorsInCreditOrder() throws Exception {
+            saveCompleteBook(HARDCOVER_KEY);
+            jdbcTemplate.update("UPDATE book_author SET position = 1");
+            credit(ORULLIAN, "AUTHOR", 0);
+
+            mockMvc.perform(get(BOOK_PATH, HARDCOVER_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(AUTHORS_PATH).value(ORULLIAN))
+                .andExpect(jsonPath(SECOND_AUTHOR_PATH).value(AUTHOR));
         }
 
         @Test
@@ -267,6 +312,14 @@ class BookDetailIntegrationTest extends ContainerizedTest {
         book.setAverageRating(AVERAGE_RATING);
         book.setRatingCount(RATING_COUNT);
         books.save(book);
+    }
+
+    private void credit(final String name, final String role, final int position) {
+        final long authorId = authors.save(Books.author(name)).getAuthorId();
+        jdbcTemplate.update("""
+            INSERT INTO book_author (book_id, author_id, role, position)
+            SELECT book_id, ?, ?, ? FROM book WHERE hardcover_id = ?
+            """, authorId, role, position, HARDCOVER_KEY);
     }
 
     private void savePendingSeed() {

@@ -1,18 +1,15 @@
 package com.betterreads.bookmerge;
 
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import com.betterreads.booksource.SourceAuthor;
+import com.betterreads.text.AuthorNames;
 import org.jspecify.annotations.Nullable;
 
 final class CoAuthors {
-
-    private static final Pattern NON_LETTERS = Pattern.compile("[^\\p{L}]");
 
     private CoAuthors() {
     }
@@ -22,9 +19,8 @@ final class CoAuthors {
         if (chosen == null || chosen.isEmpty() || candidates == null) {
             return chosen;
         }
-        final Set<String> chosenKeys = chosen.stream().map(CoAuthors::key).collect(Collectors.toSet());
-        final Set<String> candidateKeys = candidates.stream().map(CoAuthors::key).collect(Collectors.toSet());
-        if (!candidateKeys.containsAll(chosenKeys)) {
+        final Set<String> chosenKeys = keys(chosen);
+        if (!keys(candidates).containsAll(keys(SourceAuthor.primary(chosen)))) {
             return chosen;
         }
         return Stream.concat(
@@ -33,7 +29,11 @@ final class CoAuthors {
             .toList();
     }
 
+    private static Set<String> keys(final List<SourceAuthor> authors) {
+        return authors.stream().map(CoAuthors::key).collect(Collectors.toSet());
+    }
+
     private static String key(final SourceAuthor author) {
-        return NON_LETTERS.matcher(author.name()).replaceAll("").toLowerCase(Locale.ROOT);
+        return AuthorNames.key(author.name());
     }
 }

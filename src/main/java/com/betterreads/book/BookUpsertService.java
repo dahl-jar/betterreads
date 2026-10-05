@@ -1,6 +1,9 @@
 package com.betterreads.book;
 
+import java.util.List;
+
 import com.betterreads.booksource.MergedBook;
+import com.betterreads.booksource.SourceAuthor;
 import com.betterreads.booksource.SourceBook;
 
 /** Upserts books and authors from merged external sources under a row lock. */
@@ -18,4 +21,6 @@ public interface BookUpsertService {
     Book upsertFromSource(MergedBook merged);
 
     Book applyVerified(long bookId, VerifiedMetadata metadata);
+
+    Book applyCredits(long bookId, List<SourceAuthor> credits);
 }

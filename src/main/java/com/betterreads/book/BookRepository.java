@@ -25,7 +25,7 @@ public interface BookRepository extends JpaRepository<Book, Long> {
     @Query("SELECT b FROM Book b WHERE b.bookId = :bookId")
     Optional<Book> findForUpdate(@Param("bookId") Long bookId);
 
-    @EntityGraph(attributePaths = {"authors", "subjects"})
+    @EntityGraph(attributePaths = {"credits", "credits.author", "subjects"})
     Optional<Book> findByDedupKey(String dedupKey);
 
     @Query("""
@@ -36,25 +36,25 @@ public interface BookRepository extends JpaRepository<Book, Long> {
     List<Long> findIdsChangedSince(
         @Param("since") OffsetDateTime since, @Param("afterId") long afterId, Pageable pageable);
 
-    @EntityGraph(attributePaths = {"authors", "subjects", "series"})
+    @EntityGraph(attributePaths = {"credits", "credits.author", "subjects", "series"})
     List<Book> findWithSubjectsByBookIdIn(Collection<Long> bookIds);
 
-    @EntityGraph(attributePaths = "authors")
+    @EntityGraph(attributePaths = {"credits", "credits.author"})
     List<Book> findByBookIdIn(Collection<Long> bookIds);
 
-    @EntityGraph(attributePaths = {"authors", "subjects"})
+    @EntityGraph(attributePaths = {"credits", "credits.author", "subjects"})
     Optional<Book> findByGoogleBooksVolumeId(String googleBooksVolumeId);
 
-    @EntityGraph(attributePaths = {"authors", "subjects"})
+    @EntityGraph(attributePaths = {"credits", "credits.author", "subjects"})
     Optional<Book> findByOpenLibraryWorkKey(String openLibraryWorkKey);
 
-    @EntityGraph(attributePaths = {"authors", "subjects"})
+    @EntityGraph(attributePaths = {"credits", "credits.author", "subjects"})
     Optional<Book> findByHardcoverId(String hardcoverId);
 
-    @EntityGraph(attributePaths = {"authors", "subjects"})
+    @EntityGraph(attributePaths = {"credits", "credits.author", "subjects"})
     Optional<Book> findByLocLccn(String locLccn);
 
-    @EntityGraph(attributePaths = {"authors", "subjects"})
+    @EntityGraph(attributePaths = {"credits", "credits.author", "subjects"})
     Optional<Book> findByWikidataQid(String wikidataQid);
 
     @EntityGraph(attributePaths = "awards")

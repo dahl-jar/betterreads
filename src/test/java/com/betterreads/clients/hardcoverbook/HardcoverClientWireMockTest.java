@@ -10,6 +10,7 @@ import com.betterreads.clients.hardcover.HardcoverWebClientConfig;
 import com.betterreads.clients.hardcover.HardcoverWireMock;
 import static com.betterreads.clients.hardcover.BookByIdJson.bookById;
 import static com.betterreads.clients.hardcover.BookSearchJson.bookSearch;
+import static com.github.tomakehurst.wiremock.client.WireMock.containing;
 import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -232,6 +233,16 @@ class HardcoverClientWireMockTest extends HardcoverWireMock {
             final Optional<SourceBook> book = client.fetchByHardcoverId(ABSOLUTE_BATMAN_ID);
 
             assertThat(book).get().extracting(SourceBook::seriesName).isEqualTo(COLLECTED_SERIES);
+        }
+
+        @Test
+        void shouldAskForContributionsInCreditOrder() {
+            stubGraphQl(bookById());
+
+            client.fetchByHardcoverId(ABSOLUTE_BATMAN_ID);
+
+            WIREMOCK.verify(postRequestedFor(urlPathEqualTo(GRAPHQL_PATH))
+                .withRequestBody(containing("contributions(order_by: {id: asc})")));
         }
 
         @Test

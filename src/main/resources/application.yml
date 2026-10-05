@@ -153,6 +153,11 @@ betterreads:
     description-backfill:
       enabled: ${CATALOG_DESCRIPTION_BACKFILL_ENABLED:true}
       full-sweep: ${CATALOG_DESCRIPTION_FULL_SWEEP:false}
+    credit-backfill:
+      enabled: ${CATALOG_CREDIT_BACKFILL_ENABLED:false}
+      slice-size: ${CATALOG_CREDIT_BACKFILL_SLICE_SIZE:50}
+      cron: ${CATALOG_CREDIT_BACKFILL_CRON:0 * * * * *}
+      pause: ${CATALOG_CREDIT_BACKFILL_PAUSE:1s}
     cover-backfill:
       enabled: ${CATALOG_COVER_BACKFILL_ENABLED:true}
       full-sweep: ${CATALOG_COVER_FULL_SWEEP:false}
@@ -225,6 +230,7 @@ meilisearch:
   host: ${MEILISEARCH_HOST:http://localhost:7700}
   master-key: ${MEILI_MASTER_KEY}
   index-name: ${MEILISEARCH_INDEX_NAME:books}
+  authors-index-name: ${MEILISEARCH_AUTHORS_INDEX_NAME:authors}
 
 minio:
   endpoint: ${MINIO_ENDPOINT:http://localhost:9000}

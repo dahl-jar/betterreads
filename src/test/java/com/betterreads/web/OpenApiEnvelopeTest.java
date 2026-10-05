@@ -53,6 +53,10 @@ class OpenApiEnvelopeTest extends ContainerizedTest {
 
     private static final String DATA_PROPERTY = ".properties.data";
 
+    private static final String META_PROPERTY = ".properties.meta";
+
+    private static final String NOT_FOUND = ".404";
+
     @Autowired
     private WebApplicationContext webApplicationContext;
 
@@ -75,7 +79,28 @@ class OpenApiEnvelopeTest extends ContainerizedTest {
         mockMvc.perform(get(API_DOCS))
             .andExpect(status().isOk())
             .andExpect(jsonPath(SEARCH_200 + ".properties.data.type").value("array"))
-            .andExpect(jsonPath(SEARCH_200 + ".properties.meta").exists());
+            .andExpect(jsonPath(SEARCH_200 + META_PROPERTY).exists());
+    }
+
+    @Test
+    void shouldDocumentAuthorSearchAsPaged() throws Exception {
+        final String authorSearch = "$.paths.['/api/v1/search/authors'].get.responses.200.content.['*/*'].schema";
+
+        mockMvc.perform(get(API_DOCS))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath(authorSearch + ".properties.data.items.$ref")
+                .value("#/components/schemas/AuthorSearchDocument"))
+            .andExpect(jsonPath(authorSearch + META_PROPERTY).exists());
+    }
+
+    @Test
+    void shouldDocumentAuthorPageErrorResponses() throws Exception {
+        final String authorPage = "$.paths.['/api/v1/authors/{authorId}'].get.responses";
+
+        mockMvc.perform(get(API_DOCS))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath(authorPage + ".308").exists())
+            .andExpect(jsonPath(authorPage + NOT_FOUND).exists());
     }
 
     @Test
@@ -114,6 +139,8 @@ class OpenApiEnvelopeTest extends ContainerizedTest {
             .andExpect(jsonPath("$.paths.['/api/v1/books/{key}/shelf-counts'].get.security.length()").value(0))
             .andExpect(jsonPath("$.paths.['/api/v1/books/{key}/series'].get.security.length()").value(0))
             .andExpect(jsonPath("$.paths.['/api/v1/reviews/recent'].get.security.length()").value(0))
+            .andExpect(jsonPath("$.paths.['/api/v1/search/authors'].get.security.length()").value(0))
+            .andExpect(jsonPath("$.paths.['/api/v1/authors/{authorId}'].get.security.length()").value(0))
             .andExpect(jsonPath("$.paths.['/healthz'].get.security.length()").value(0));
     }
 
@@ -136,7 +163,7 @@ class OpenApiEnvelopeTest extends ContainerizedTest {
             .andExpect(jsonPath(cover + ".200.content.['image/jpeg'].schema.format").value("binary"))
             .andExpect(jsonPath(cover + ".200.content.['image/jpeg'].schema.properties").doesNotExist())
             .andExpect(jsonPath(cover + ".304").exists())
-            .andExpect(jsonPath(cover + ".404").exists());
+            .andExpect(jsonPath(cover + NOT_FOUND).exists());
     }
 
     @Test

@@ -44,7 +44,7 @@ public class BookSummaryReader {
             book.getBookId(),
             book.getDedupKey(),
             book.getTitle(),
-            Author.sortedNames(book.getAuthors()),
+            Author.names(book.getAuthors()),
             coverImages.servedUrl(book),
             book.getAverageRating());
     }

@@ -149,17 +149,29 @@ final class LocRecords {
         return this;
     }
 
+    LocRecords withContributorRoles(final String namePart, final List<String> roles) {
+        return withName(namePart, roles, false);
+    }
+
     private LocRecords withName(final String namePart, final @Nullable String role, final boolean primary) {
+        return withName(namePart, role == null ? List.of() : List.of(role), primary);
+    }
+
+    private LocRecords withName(final String namePart, final List<String> roles, final boolean primary) {
         final Element name = element(NAME, null);
         name.setAttribute(TYPE, "personal");
         if (primary) {
             name.setAttribute("usage", "primary");
         }
         name.appendChild(element(NAME_PART, namePart));
-        if (role != null) {
-            final Element roleTerm = element("roleTerm", role);
-            roleTerm.setAttribute(TYPE, "text");
-            name.appendChild(element("role", null)).appendChild(roleTerm);
+        if (!roles.isEmpty()) {
+            final Element role = element("role", null);
+            roles.forEach(term -> {
+                final Element roleTerm = element("roleTerm", term);
+                roleTerm.setAttribute(TYPE, "text");
+                role.appendChild(roleTerm);
+            });
+            name.appendChild(role);
         }
         record().appendChild(name);
         return this;

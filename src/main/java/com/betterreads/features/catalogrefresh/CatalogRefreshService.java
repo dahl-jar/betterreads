@@ -1,6 +1,5 @@
 package com.betterreads.features.catalogrefresh;
 
-import com.betterreads.book.Author;
 import com.betterreads.book.AuthorRepository;
 import com.betterreads.bookdiscovery.BookDiscovery;
 import com.betterreads.logging.LogSanitizer;
@@ -45,7 +44,7 @@ class CatalogRefreshService {
      */
     public void refresh() {
         if (properties.authorsEnabled()) {
-            authors.findAll().stream().map(Author::getName).forEach(this::refreshAuthor);
+            authors.findPrimaryCreditNames().forEach(this::refreshAuthor);
         }
         if (properties.seriesEnabled()) {
             dueSeries.refresh();

@@ -16,12 +16,14 @@ import org.springframework.validation.annotation.Validated;
 public record MeilisearchProperties(
     @NotBlank String host,
     @NotBlank String masterKey,
-    @NotBlank String indexName
+    @NotBlank String indexName,
+    @NotBlank String authorsIndexName
 ) {
 
     /** Redacts the master key so it cannot reach a log line or an exception message. */
     @Override
     public String toString() {
-        return "MeilisearchProperties[host=" + host + ", indexName=" + indexName + ", masterKey=***]";
+        return "MeilisearchProperties[host=" + host + ", indexName=" + indexName
+            + ", authorsIndexName=" + authorsIndexName + ", masterKey=***]";
     }
 }

@@ -68,7 +68,7 @@ public record SourceBook(
 
     @Nullable
     public List<String> authorNames() {
-        return authors == null ? null : authors.stream().map(SourceAuthor::name).toList();
+        return authors == null ? null : SourceAuthor.primary(authors).stream().map(SourceAuthor::name).toList();
     }
 
     /** ISBN-13 goes first because most sources share it, so two sources for one book land on one staging row */

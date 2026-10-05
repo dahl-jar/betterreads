@@ -2,9 +2,11 @@ package com.betterreads.testsupport;
 
 import com.betterreads.book.Author;
 import com.betterreads.book.Book;
+import com.betterreads.book.ResolvedCredit;
+import com.betterreads.booksource.CreditRole;
 import com.betterreads.book.BookRepository;
 
-import java.util.Set;
+import java.util.List;
 
 public final class Books {
 
@@ -54,7 +56,7 @@ public final class Books {
         book.setDescription(DESCRIPTION);
         book.setCoverUrl("https://covers.example/" + key + ".jpg");
         book.setFirstPublishYear(PUBLISH_YEAR);
-        book.setAuthors(Set.of(author));
+        book.replaceCredits(List.of(new ResolvedCredit(author, CreditRole.AUTHOR)));
         return book;
     }
 }

@@ -48,7 +48,7 @@ public class BookIndexViewReader {
             book.getSeriesName(),
             book.getSeriesPosition(),
             book.getSeries(),
-            Author.sortedNames(book.getAuthors()),
+            Author.names(book.getAuthors()),
             book.getSubjects().stream().map(BookSubject::getSubject).toList(),
             book.getLanguage(),
             coverImages.servedUrl(book),

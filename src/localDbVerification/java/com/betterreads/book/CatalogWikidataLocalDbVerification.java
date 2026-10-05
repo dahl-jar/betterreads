@@ -9,6 +9,7 @@ import java.util.stream.Stream;
 import com.betterreads.booksource.SourceAuthor;
 import com.betterreads.booksource.SourceBook;
 import com.betterreads.clients.wikidata.WikidataClient;
+import com.betterreads.text.AuthorNames;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.TestInstance;
@@ -81,7 +82,7 @@ class CatalogWikidataLocalDbVerification {
             .isPresent()
             .get()
             .satisfies(book -> assertThat(book.getTitle()).isEqualTo(title));
-        assertThat(authorRepository.findByName(author))
+        assertThat(authorRepository.findByNameKey(AuthorNames.key(author)))
             .isPresent()
             .get()
             .satisfies(stored -> {

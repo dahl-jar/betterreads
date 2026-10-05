@@ -6,12 +6,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.betterreads.book.VerifiedMetadata;
 import com.betterreads.booksource.SeriesEntry;
+import com.betterreads.text.AuthorNames;
 import org.jspecify.annotations.Nullable;
 
 final class StoredNames {
@@ -21,10 +21,6 @@ final class StoredNames {
     private static final Pattern NOT_LETTER_OR_DIGIT = Pattern.compile("[^\\p{L}\\p{M}\\p{N}]");
 
     private static final Pattern SUBTITLE_SEPARATOR = Pattern.compile(":| \\(| - ");
-
-    private static final Pattern LAST_FIRST = Pattern.compile("^([^,]+),\\s*(.+)$");
-
-    private static final Pattern NAME_SUFFIX = Pattern.compile("(?i)(jr|sr|ii|iii|iv)\\.?");
 
     private final Map<String, Optional<String>> series;
 
@@ -94,9 +90,7 @@ final class StoredNames {
     }
 
     private static String authorKey(final String name) {
-        final Matcher lastFirst = LAST_FIRST.matcher(name.strip());
-        final boolean swap = lastFirst.matches() && !NAME_SUFFIX.matcher(lastFirst.group(2).strip()).matches();
-        return key(swap ? lastFirst.group(2) + " " + lastFirst.group(1) : name);
+        return AuthorNames.key(name);
     }
 
     private static String key(final String text) {

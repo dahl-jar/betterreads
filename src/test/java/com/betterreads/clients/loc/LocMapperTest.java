@@ -1,9 +1,13 @@
 package com.betterreads.clients.loc;
 
 import com.betterreads.booksource.BookFieldSource;
+import com.betterreads.booksource.CreditRole;
+import com.betterreads.booksource.SourceAuthor;
 import com.betterreads.booksource.SourceBook;
 import static com.betterreads.clients.loc.LocRecords.sruResponse;
 import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.List;
 
 import java.util.Optional;
 
@@ -18,6 +22,12 @@ import org.junit.jupiter.params.provider.CsvSource;
 class LocMapperTest {
 
     private static final int MARC_YEAR = 2019;
+
+    private static final String AUTHOR_ROLE = "author";
+
+    private static final String LETTERER = "letterer";
+
+    private static final String ILLUSTRATOR_ROLE = "illustrator";
 
     private static final String IMPRINT = "Bantam spectra";
 
@@ -128,22 +138,45 @@ class LocMapperTest {
 
         @Test
         void shouldListCoAuthorsAfterThePrimaryAuthor() {
-            final String author = "author";
+            final String author = AUTHOR_ROLE;
 
             final SourceBook book = map(sruResponse().withoutNames()
                 .withContributor("Jenkins, Christine,", author)
                 .withPrimaryContributor("Cart, Michael,", author)
                 .withContributor("Editor, Book,", "editor"));
 
-            assertThat(book.authorNames()).containsExactly("Michael Cart", "Christine Jenkins", "Book Editor");
+            assertThat(book.authors())
+                .extracting(SourceAuthor::name)
+                .containsExactly("Michael Cart", "Christine Jenkins", "Book Editor");
+        }
+
+        @Test
+        void shouldMapArtistAndLettererRoles() {
+            final SourceBook book = map(sruResponse().withoutNames()
+                .withContributor("Staples, Fiona,", "artist")
+                .withContributor("Fonografiks,", LETTERER)
+                .withPrimaryContributor("Vaughan, Brian K.,", AUTHOR_ROLE));
+
+            assertThat(book.authors()).containsExactly(
+                SourceAuthor.withRole("Brian K. Vaughan", CreditRole.AUTHOR),
+                SourceAuthor.withRole("Fiona Staples", CreditRole.ILLUSTRATOR),
+                SourceAuthor.withRole("Fonografiks", CreditRole.ILLUSTRATOR));
+        }
+
+        @Test
+        void shouldPreferAuthorRoleAmongSeveral() {
+            final SourceBook book = map(sruResponse().withoutNames()
+                .withContributorRoles("Smith, Jeff,", List.of(ILLUSTRATOR_ROLE, AUTHOR_ROLE)));
+
+            assertThat(book.authors()).containsExactly(SourceAuthor.withRole("Jeff Smith", CreditRole.AUTHOR));
         }
 
         @Test
         void shouldDropNonWriterNames() {
             final SourceBook book = map(sruResponse().withoutNames()
                 .withPrimaryContributor("David, Peter (Peter Allen),", "screenwriter")
-                .withContributor("Lee, Jae,", "illustrator")
-                .withContributor("Eliopoulos, Chris,", "letterer")
+                .withContributor("Lee, Jae,", ILLUSTRATOR_ROLE)
+                .withContributor("Eliopoulos, Chris,", LETTERER)
                 .withContributor("King, Stephen,", null));
 
             assertThat(book.authorNames()).containsExactly("Peter David");

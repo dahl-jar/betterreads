@@ -8,9 +8,11 @@ import java.util.function.Function;
 
 import com.betterreads.booksource.BookField;
 import com.betterreads.booksource.BookFieldSource;
+import com.betterreads.booksource.CreditRole;
 import com.betterreads.booksource.MergedBook;
 import com.betterreads.booksource.SourceAuthor;
 import com.betterreads.booksource.SourceBook;
+import com.betterreads.text.AuthorNames;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
@@ -18,12 +20,15 @@ import org.springframework.stereotype.Component;
  * Converts between a merged book and the flat pending-book row.
  *
  * <p>The row holds subjects, awards, and authors as newline-joined text and splits them back on
- * read. Newline never appears in a title, name, or canonical genre, so it is a safe delimiter.
+ * read. Each author line ends in a tab and the credit role, and author names are stored with
+ * whitespace collapsed so a source name cannot add a line or a role.
  */
 @Component
 public class PendingBookMapper {
 
     private static final String LIST_DELIMITER = "\n";
+
+    private static final String ROLE_DELIMITER = "\t";
 
     public void applyTo(final PendingBook row, final MergedBook merged) {
         final SourceBook book = merged.book();
@@ -82,7 +87,7 @@ public class PendingBookMapper {
             .seriesPosition(row.getSeriesPosition())
             .rawSubjects(splitField(row.getSubjects(), Function.identity()))
             .awards(splitField(row.getAwards(), Function.identity()))
-            .authors(splitField(row.getAuthors(), SourceAuthor::ofName))
+            .authors(splitField(row.getAuthors(), PendingBookMapper::credit))
             .build();
     }
 
@@ -100,7 +105,19 @@ public class PendingBookMapper {
 
     private static @Nullable String joinAuthors(final @Nullable List<SourceAuthor> authors) {
         return authors == null ? null
-            : String.join(LIST_DELIMITER, authors.stream().map(SourceAuthor::name).toList());
+            : String.join(LIST_DELIMITER, authors.stream()
+                .map(author -> AuthorNames.collapseSpaces(author.name()) + ROLE_DELIMITER + author.role())
+                .toList());
+    }
+
+    private static SourceAuthor credit(final String line) {
+        final int tab = line.lastIndexOf(ROLE_DELIMITER);
+        final String suffix = tab < 0 ? "" : line.substring(tab + 1);
+        return Arrays.stream(CreditRole.values())
+            .filter(role -> role.name().equals(suffix))
+            .findFirst()
+            .map(role -> SourceAuthor.withRole(line.substring(0, tab), role))
+            .orElseGet(() -> SourceAuthor.ofName(line));
     }
 
     private static @Nullable String joinSources(final Set<BookFieldSource> sources) {

@@ -64,7 +64,7 @@ class HardcoverMapper {
         final List<HardcoverBookNode.Contribution> contributions = document.contributions();
         return contributions == null || contributions.isEmpty()
             ? SourceAuthor.ofNames(document.authorNames())
-            : HardcoverContributors.authors(contributions);
+            : HardcoverContributors.credits(contributions);
     }
 
     private static @Nullable String coverUrl(final HardcoverDocument document) {

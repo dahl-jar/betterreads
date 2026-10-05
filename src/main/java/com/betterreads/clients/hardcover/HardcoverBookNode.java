@@ -48,7 +48,7 @@ public record HardcoverBookNode(
         is_partial_book
         image { url }
         default_physical_edition { language { language } reading_format { format } }
-        contributions { contribution author { name } }
+        contributions(order_by: {id: asc}) { contribution author { name } }
         book_series { position featured series { name primary_books_count } }
         featured_book_series { position featured series { name primary_books_count } }
         """;

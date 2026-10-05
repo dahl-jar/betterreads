@@ -1,8 +1,10 @@
 package com.betterreads.book;
 
 import com.betterreads.booksource.BookFieldSource;
+import com.betterreads.booksource.CreditRole;
 import com.betterreads.booksource.SourceAuthor;
 import com.betterreads.booksource.SourceBook;
+import com.betterreads.testsupport.Books;
 import com.betterreads.testsupport.ContainerizedTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.testcontainers.junit.jupiter.Container;
@@ -62,7 +64,7 @@ class CatalogWikidataPersistenceIntegrationTest extends ContainerizedTest {
     }
 
     private static SourceAuthor author() {
-        return new SourceAuthor(AUTHOR_NAME, AUTHOR_QID, AUTHOR_PHOTO, AUTHOR_BIO);
+        return new SourceAuthor(AUTHOR_NAME, AUTHOR_QID, AUTHOR_PHOTO, AUTHOR_BIO, CreditRole.AUTHOR);
     }
 
     private static SourceBook redRising(final @Nullable List<String> awards) {
@@ -140,9 +142,7 @@ class CatalogWikidataPersistenceIntegrationTest extends ContainerizedTest {
 
         @Test
         void shouldFillQidOnAuthorMatchedByName() {
-            final Author existing = new Author();
-            existing.setName(AUTHOR_NAME);
-            authorRepository.saveAndFlush(existing);
+            authorRepository.saveAndFlush(Books.author(AUTHOR_NAME));
 
             bookUpsertService.upsertFromSource(redRising(List.of()));
 
@@ -157,8 +157,7 @@ class CatalogWikidataPersistenceIntegrationTest extends ContainerizedTest {
 
         @Test
         void shouldReuseAuthorMatchedByQidUnderAnotherName() {
-            final Author existing = new Author();
-            existing.setName(OTHER_AUTHOR_NAME);
+            final Author existing = Books.author(OTHER_AUTHOR_NAME);
             existing.setWikidataQid(AUTHOR_QID);
             authorRepository.saveAndFlush(existing);
 
@@ -170,7 +169,8 @@ class CatalogWikidataPersistenceIntegrationTest extends ContainerizedTest {
 
         @Test
         void shouldApplyVerifiedAuthors() {
-            final long bookId = bookUpsertService.upsertFromSource(redRising(List.of())).getBookId();
+            final Book stored = bookUpsertService.upsertFromSource(redRising(List.of()));
+            final long bookId = stored.getBookId();
 
             bookUpsertService.applyVerified(bookId, verifiedAuthor(OTHER_AUTHOR_NAME));
 
@@ -179,7 +179,8 @@ class CatalogWikidataPersistenceIntegrationTest extends ContainerizedTest {
 
         @Test
         void shouldKeepVerifiedAuthorsOnRefresh() {
-            final long bookId = bookUpsertService.upsertFromSource(redRising(List.of())).getBookId();
+            final Book stored = bookUpsertService.upsertFromSource(redRising(List.of()));
+            final long bookId = stored.getBookId();
             bookUpsertService.applyVerified(bookId, verifiedAuthor(OTHER_AUTHOR_NAME));
 
             bookUpsertService.upsertFromSource(redRising(List.of()));
@@ -187,13 +188,10 @@ class CatalogWikidataPersistenceIntegrationTest extends ContainerizedTest {
             assertThat(storedAuthorNames()).containsExactly(OTHER_AUTHOR_NAME);
         }
 
-        private static VerifiedMetadata verifiedAuthor(final String name) {
-            return new VerifiedMetadata(null, List.of(name), null, null, null, null, null, null);
-        }
-
         @Test
         void shouldMarkBookChangedWhenOnlyAuthorsChange() {
-            final long bookId = bookUpsertService.upsertFromSource(redRising(List.of())).getBookId();
+            final Book stored = bookUpsertService.upsertFromSource(redRising(List.of()));
+            final long bookId = stored.getBookId();
             jdbc.update("UPDATE book SET updated_at = now() - interval '10 days' WHERE book_id = ?", bookId);
 
             bookUpsertService.upsertFromSource(redRisingBy(List.of(SourceAuthor.ofName(OTHER_AUTHOR_NAME))));
@@ -219,10 +217,107 @@ class CatalogWikidataPersistenceIntegrationTest extends ContainerizedTest {
 
             assertThat(storedAuthorNames()).containsExactly(AUTHOR_NAME);
         }
+    }
 
-        private List<String> storedAuthorNames() {
-            final Book book = bookRepository.findByWikidataQid(RED_RISING_QID).orElseThrow();
-            return book.getAuthors().stream().map(Author::getName).toList();
+    @Nested
+    class Credits {
+
+        private static final String KING = "Stephen King";
+
+        private static final String SMITH = "Zadie Smith";
+
+        private static final String LECKIE = "Ann Leckie";
+
+        private static final String SIMONETTI = "Marc Simonetti";
+
+        private static final String SNYDER = "Ray Snyder";
+
+        private static final String RIO = "Al Rio";
+
+        private static final String SNYDER_AND_RIO = SNYDER + "; " + RIO;
+
+        private static final String AS_ILLUSTRATOR = " ILLUSTRATOR";
+
+        private static final String AS_AUTHOR = " AUTHOR";
+
+        @Test
+        void shouldReuseAuthorByNameKey() {
+            authorRepository.saveAndFlush(Books.author(KING));
+
+            bookUpsertService.upsertFromSource(redRisingBy(SourceAuthor.ofNames(List.of("STEPHEN KING"))));
+
+            assertThat(authorRepository.count()).isEqualTo(1L);
+            assertThat(storedAuthorNames()).containsExactly(KING);
         }
+
+        @Test
+        void shouldStoreCreditOrder() {
+            bookUpsertService.upsertFromSource(redRisingBy(SourceAuthor.ofNames(List.of(SMITH, LECKIE))));
+
+            assertThat(storedAuthorNames()).containsExactly(SMITH, LECKIE);
+        }
+
+        @Test
+        void shouldSplitMultiPersonName() {
+            bookUpsertService.upsertFromSource(redRisingBy(SourceAuthor.ofNames(List.of(SNYDER_AND_RIO))));
+
+            assertThat(storedAuthorNames()).containsExactly(SNYDER, RIO);
+        }
+
+        @Test
+        void shouldKeepRoleOnSplitNames() {
+            bookUpsertService.upsertFromSource(redRisingBy(List.of(
+                SourceAuthor.ofName(AUTHOR_NAME),
+                SourceAuthor.withRole(SNYDER_AND_RIO, CreditRole.ILLUSTRATOR))));
+
+            assertThat(storedCredits()).containsExactly(
+                AUTHOR_NAME + AS_AUTHOR, SNYDER + AS_ILLUSTRATOR, RIO + AS_ILLUSTRATOR);
+        }
+
+        @Test
+        void shouldListOnlyPrimaryCreditNames() {
+            bookUpsertService.upsertFromSource(redRisingBy(List.of(
+                SourceAuthor.ofName(AUTHOR_NAME), SourceAuthor.withRole(SIMONETTI, CreditRole.ILLUSTRATOR))));
+
+            final List<String> names = authorRepository.findPrimaryCreditNames();
+
+            assertThat(names).containsExactly(AUTHOR_NAME);
+        }
+
+        @Test
+        void shouldStoreNameWithSingleSpaces() {
+            bookUpsertService.upsertFromSource(redRisingBy(SourceAuthor.ofNames(List.of("Michael  Kelly"))));
+
+            assertThat(storedAuthorNames()).containsExactly("Michael Kelly");
+        }
+
+        @Test
+        void shouldKeepVerifiedCredits() {
+            final SourceBook source = redRisingBy(List.of(
+                SourceAuthor.ofName(AUTHOR_NAME), SourceAuthor.withRole(SIMONETTI, CreditRole.ILLUSTRATOR)));
+            final Book stored = bookUpsertService.upsertFromSource(source);
+            final long bookId = stored.getBookId();
+
+            bookUpsertService.applyVerified(bookId, verifiedAuthor(OTHER_AUTHOR_NAME));
+
+            assertThat(storedCredits()).containsExactly(
+                OTHER_AUTHOR_NAME + AS_AUTHOR, SIMONETTI + AS_ILLUSTRATOR);
+        }
+
+        private List<String> storedCredits() {
+            final Book book = bookRepository.findByWikidataQid(RED_RISING_QID).orElseThrow();
+            return book.getCredits().stream()
+                .map(credit -> credit.getAuthor().getName() + " " + credit.getRole())
+                .toList();
+        }
+    }
+
+    private List<String> storedAuthorNames() {
+        final Book book = bookRepository.findByWikidataQid(RED_RISING_QID).orElseThrow();
+        return book.getAuthors().stream().map(Author::getName).toList();
+    }
+
+    private static VerifiedMetadata verifiedAuthor(final String name) {
+        return new VerifiedMetadata(null, List.of(name), null, null, null, null, null, null);
     }
 }

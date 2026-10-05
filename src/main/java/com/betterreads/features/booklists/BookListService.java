@@ -44,7 +44,7 @@ class BookListService {
         return new BookCardResponse(
             book.getDedupKey(),
             book.getTitle(),
-            Author.sortedNames(book.getAuthors()),
+            Author.names(book.getAuthors()),
             coverImages.servedUrl(book),
             book.getFirstPublishYear(),
             book.getAverageRating(),

@@ -10,8 +10,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.JoinTable;
-import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.OrderColumn;
@@ -21,8 +19,8 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumSet;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
@@ -156,13 +154,9 @@ public class Book extends Timestamped {
     @Column(name = "verified_fields", nullable = false)
     private final Set<VerifiedField> verifiedFields = EnumSet.noneOf(VerifiedField.class);
 
-    @ManyToMany
-    @JoinTable(
-        name = "book_author",
-        joinColumns = @JoinColumn(name = "book_id"),
-        inverseJoinColumns = @JoinColumn(name = "author_id")
-    )
-    private Set<Author> authors = new HashSet<>();
+    @OneToMany(mappedBy = "book", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("position")
+    private final Set<BookAuthor> credits = new LinkedHashSet<>();
 
     /**
      * A fetch that joins authors and subjects in one query repeats each subject row per author. The
@@ -513,11 +507,15 @@ public class Book extends Timestamped {
         stampUpdatedAt(updatedAt);
     }
 
-    public Set<Author> getAuthors() {
-        return authors;
+    public List<BookAuthor> getCredits() {
+        return credits.stream().sorted(Comparator.comparingInt(BookAuthor::getPosition)).toList();
     }
 
-    public void setAuthors(final Set<Author> authors) {
-        this.authors = authors;
+    public List<Author> getAuthors() {
+        return Credits.primary(getCredits());
+    }
+
+    public boolean replaceCredits(final List<ResolvedCredit> resolved) {
+        return Credits.replace(this, credits, resolved);
     }
 }

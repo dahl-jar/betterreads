@@ -2,10 +2,12 @@ package com.betterreads.clients.loc;
 
 import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
-import java.util.Set;
+import java.util.Optional;
 import java.util.regex.Pattern;
 
+import com.betterreads.booksource.CreditRole;
+import com.betterreads.booksource.SourceAuthor;
+import com.betterreads.text.AuthorNames;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
@@ -15,42 +17,34 @@ final class ModsNames {
 
     private static final String PRIMARY = "primary";
 
-    private static final Set<String> AUTHOR_ROLES =
-        Set.of("author", "editor", "screenwriter", "writer", "compiler");
-
     private static final Pattern PARENTHETICAL = Pattern.compile("\\s*\\([^)]*\\)");
-    private static final Pattern TRAILING_PUNCTUATION = Pattern.compile("[,\\s]+$|(?<=\\p{L}{2})\\.\\s*$");
 
     private ModsNames() {
     }
 
-    static List<String> authorNames(final JsonNode mods) {
+    static List<SourceAuthor> credits(final JsonNode mods) {
         return LocSruTree.elements(mods, "name")
-            .filter(ModsNames::isCreditedAuthor)
             .sorted(Comparator.comparing(name -> !isPrimary(name)))
-            .map(ModsNames::catalogNamePart)
-            .filter(namePart -> namePart != null)
-            .map(ModsNames::displayName)
+            .flatMap(name -> credit(name).stream())
             .toList();
     }
 
-    private static String displayName(final String catalogName) {
-        final String bare = TRAILING_PUNCTUATION.matcher(PARENTHETICAL.matcher(catalogName).replaceAll("").strip())
-            .replaceAll("");
-        final int comma = bare.indexOf(',');
-        if (comma < 0) {
-            return bare;
-        }
-        return bare.substring(comma + 1).strip() + " " + bare.substring(0, comma).strip();
+    private static Optional<SourceAuthor> credit(final JsonNode name) {
+        final String namePart = catalogNamePart(name);
+        return namePart == null
+            ? Optional.empty()
+            : Optional.of(SourceAuthor.withRole(
+                AuthorNames.display(PARENTHETICAL.matcher(namePart).replaceAll("")), role(name)));
     }
 
-    private static boolean isCreditedAuthor(final JsonNode name) {
-        final List<String> roles = LocSruTree.elements(name, "role")
+    private static CreditRole role(final JsonNode name) {
+        final CreditRole roleless = isPrimary(name) ? CreditRole.AUTHOR : CreditRole.OTHER;
+        return LocSruTree.elements(name, "role")
             .flatMap(role -> LocSruTree.elements(role, "roleTerm"))
             .flatMap(LocSruTree::textOf)
-            .map(role -> role.strip().toLowerCase(Locale.ROOT))
-            .toList();
-        return roles.isEmpty() ? isPrimary(name) : roles.stream().anyMatch(AUTHOR_ROLES::contains);
+            .map(CreditRole::fromSourceText)
+            .min(Comparator.naturalOrder())
+            .orElse(roleless);
     }
 
     private static boolean isPrimary(final JsonNode name) {

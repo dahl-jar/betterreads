@@ -58,10 +58,12 @@ public final class RateLimitFilter extends OncePerRequestFilter {
 
     private static final String SEARCH_PATH = "/api/v1/search/books";
 
+    private static final String AUTHOR_SEARCH_PATH = "/api/v1/search/authors";
+
     private static final String BOOK_DETAIL_PREFIX = "/api/v1/books/";
 
     private static final List<String> PUBLIC_READ_PREFIXES = List.of(
-        BOOK_DETAIL_PREFIX, "/api/v1/reviews/", "/api/v1/comments/");
+        BOOK_DETAIL_PREFIX, "/api/v1/reviews/", "/api/v1/comments/", "/api/v1/authors/");
 
     private static final String IMAGE_PREFIX = "/api/v1/images/";
 
@@ -133,7 +135,8 @@ public final class RateLimitFilter extends OncePerRequestFilter {
                 props.changePasswordCapacity(),
                 props.changePasswordRefillTokens(), props.changePasswordRefillSeconds())),
             Map.entry(SHELF_COUNTS_PATH, searchBudget(HttpMethod.GET, "shelf-counts", props)),
-            Map.entry(SEARCH_PATH, searchBudget(HttpMethod.GET, "search", props))
+            Map.entry(SEARCH_PATH, searchBudget(HttpMethod.GET, "search", props)),
+            Map.entry(AUTHOR_SEARCH_PATH, searchBudget(HttpMethod.GET, "author-search", props))
         );
     }
 

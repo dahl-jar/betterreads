@@ -57,7 +57,8 @@ class CacheConfig {
 
     @Bean
     CacheManager searchCacheManager() {
-        final CaffeineCacheManager manager = new CaffeineCacheManager(SearchResultsCache.NAME);
+        final CaffeineCacheManager manager = new CaffeineCacheManager(
+            SearchResultsCache.NAME, SearchResultsCache.AUTHORS_NAME);
         manager.setCaffeine(Caffeine.newBuilder()
             .expireAfterWrite(searchResultTtl)
             .maximumSize(SEARCH_MAX_ENTRIES));

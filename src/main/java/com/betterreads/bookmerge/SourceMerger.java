@@ -13,6 +13,7 @@ import com.betterreads.booksource.BookField;
 import com.betterreads.booksource.BookFieldSource;
 import com.betterreads.booksource.IssueRunSeries;
 import com.betterreads.booksource.MergedBook;
+import com.betterreads.booksource.SourceAuthor;
 import com.betterreads.booksource.SourceBook;
 import com.betterreads.isbn.IsbnLanguage;
 import org.jspecify.annotations.Nullable;
@@ -125,7 +126,8 @@ public class SourceMerger {
             .pageCount(valueOf(pick(bySource, PAGE_COUNT_CHAIN, SourceBook::pageCount)))
             .language(language)
             .authors(CoAuthors.addFrom(
-                valueOf(pick(bySource, AUTHORS_CHAIN, Predicate.not(List::isEmpty), SourceBook::authors)),
+                valueOf(pick(bySource, AUTHORS_CHAIN,
+                    authors -> !SourceAuthor.primary(authors).isEmpty(), SourceBook::authors)),
                 valueOf(pick(bySource, List.of(BookFieldSource.LOC), SourceBook::authors))))
             .rawSubjects(subjects.values().isEmpty() ? null : subjects.values())
             .awards(valueOf(pick(bySource, AWARDS_CHAIN, Predicate.not(List::isEmpty), SourceBook::awards)))

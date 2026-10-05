@@ -12,13 +12,22 @@ public record SourceAuthor(
         String name,
         @Nullable String wikidataQid,
         @Nullable String photoUrl,
-        @Nullable String bio) {
+        @Nullable String bio,
+        CreditRole role) {
 
     public static SourceAuthor ofName(final String name) {
-        return new SourceAuthor(name, null, null, null);
+        return withRole(name, CreditRole.AUTHOR);
+    }
+
+    public static SourceAuthor withRole(final String name, final CreditRole role) {
+        return new SourceAuthor(name, null, null, null, role);
     }
 
     public static @Nullable List<SourceAuthor> ofNames(final @Nullable List<String> names) {
         return names == null ? null : names.stream().map(SourceAuthor::ofName).toList();
+    }
+
+    public static List<SourceAuthor> primary(final List<SourceAuthor> credits) {
+        return credits.stream().filter(credit -> credit.role().isPrimary()).toList();
     }
 }

@@ -20,7 +20,7 @@ interface BookDescriptionRepository extends JpaRepository<Book, Long> {
      * recently checked first, so a book the sources cannot improve does not block the ones behind it.
      * Authors are fetched for the Apple Books title and author search.
      */
-    @EntityGraph(attributePaths = "authors")
+    @EntityGraph(attributePaths = {"credits", "credits.author"})
     @Query("""
         SELECT b FROM Book b
         WHERE (b.description IS NULL OR LENGTH(b.description) < :minLength)
@@ -30,7 +30,7 @@ interface BookDescriptionRepository extends JpaRepository<Book, Long> {
         """)
     List<Book> findThinDescriptions(int minLength, Pageable pageable);
 
-    @EntityGraph(attributePaths = "authors")
+    @EntityGraph(attributePaths = {"credits", "credits.author"})
     @Query("""
         SELECT b FROM Book b
         WHERE (b.wikidataQid IS NOT NULL OR b.isbn IS NOT NULL)

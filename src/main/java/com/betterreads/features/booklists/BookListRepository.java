@@ -13,11 +13,11 @@ import org.springframework.data.repository.query.Param;
 /** Catalog reads for the book lists and a book's series. */
 interface BookListRepository extends JpaRepository<Book, Long> {
 
-    @EntityGraph(attributePaths = "authors")
+    @EntityGraph(attributePaths = {"credits", "credits.author"})
     @Query("SELECT b FROM Book b ORDER BY b.createdAt DESC")
     List<Book> findRecentlyAdded(Pageable pageable);
 
-    @EntityGraph(attributePaths = "authors")
+    @EntityGraph(attributePaths = {"credits", "credits.author"})
     @Query("SELECT b FROM Book b WHERE b.ratingCount > :ratingFloor ORDER BY b.averageRating DESC")
     List<Book> findTopRated(@Param("ratingFloor") int ratingFloor, Pageable pageable);
 

@@ -100,7 +100,7 @@ class MetadataCheckService {
         return new MetadataCheckRequest(
             book.getBookId(),
             book.getTitle(),
-            book.getAuthors().stream().map(Author::getName).sorted().toList(),
+            Author.names(book.getAuthors()),
             book.getFirstPublishYear(),
             seriesName,
             book.getSeriesPosition(),

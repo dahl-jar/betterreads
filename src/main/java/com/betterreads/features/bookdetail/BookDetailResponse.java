@@ -20,6 +20,7 @@ public record BookDetailResponse(
     String title,
     @Nullable String subtitle,
     List<String> authors,
+    @JsonSetter(nulls = Nulls.AS_EMPTY) List<ContributorResponse> contributors,
     @Nullable String description,
     @Nullable String coverUrl,
     @Nullable Integer firstPublishYear,
@@ -37,6 +38,7 @@ public record BookDetailResponse(
 
     public BookDetailResponse {
         authors = List.copyOf(authors);
+        contributors = List.copyOf(contributors);
         series = List.copyOf(series);
         subjects = List.copyOf(subjects);
         awards = List.copyOf(awards);
@@ -62,7 +64,7 @@ public record BookDetailResponse(
     }
 
     /**
-     * Builds the response by field name. The record has eighteen components and
+     * Builds the response by field name. The record has nineteen components and
      * several share a type, so positional construction swaps two of them unnoticed.
      */
     // PMD.TooManyMethods, PMD.TooManyFields, PMD.AvoidFieldNameMatchingMethodName: one setter per record field.
@@ -74,6 +76,7 @@ public record BookDetailResponse(
         private String title = "";
         private @Nullable String subtitle;
         private List<String> authors = List.of();
+        private List<ContributorResponse> contributors = List.of();
         private @Nullable String description;
         private @Nullable String coverUrl;
         private @Nullable Integer firstPublishYear;
@@ -105,6 +108,11 @@ public record BookDetailResponse(
 
         public Builder authors(final List<String> value) {
             this.authors = List.copyOf(value);
+            return this;
+        }
+
+        public Builder contributors(final List<ContributorResponse> value) {
+            this.contributors = List.copyOf(value);
             return this;
         }
 
@@ -175,7 +183,7 @@ public record BookDetailResponse(
 
         public BookDetailResponse build() {
             return new BookDetailResponse(
-                key, complete, title, subtitle, authors, description, coverUrl, firstPublishYear,
+                key, complete, title, subtitle, authors, contributors, description, coverUrl, firstPublishYear,
                 isbn, pageCount, language, averageRating, ratingCount, seriesName, seriesPosition,
                 series, subjects, awards);
         }

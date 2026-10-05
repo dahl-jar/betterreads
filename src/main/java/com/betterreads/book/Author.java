@@ -7,10 +7,10 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-import java.util.Collection;
 import java.util.List;
 
 import com.betterreads.db.Timestamped;
+import com.betterreads.text.AuthorNames;
 import org.jspecify.annotations.Nullable;
 
 @Entity
@@ -35,6 +35,9 @@ public class Author extends Timestamped {
     @Column(name = "name", nullable = false)
     private String name;
 
+    @Column(name = "name_key", nullable = false, unique = true)
+    private String nameKey;
+
     @Column(name = "photo_url", columnDefinition = "TEXT")
     @Nullable
     private String photoUrl;
@@ -43,12 +46,21 @@ public class Author extends Timestamped {
     @Nullable
     private String bio;
 
+    public Long getAuthorId() {
+        return authorId;
+    }
+
+    String getNameKey() {
+        return nameKey;
+    }
+
     public String getName() {
         return name;
     }
 
     public void setName(final String name) {
         this.name = name;
+        this.nameKey = AuthorNames.key(name);
     }
 
     @Nullable
@@ -78,7 +90,7 @@ public class Author extends Timestamped {
         this.bio = bio;
     }
 
-    public static List<String> sortedNames(final Collection<Author> authors) {
-        return authors.stream().map(Author::getName).sorted().toList();
+    public static List<String> names(final List<Author> authors) {
+        return authors.stream().map(Author::getName).toList();
     }
 }

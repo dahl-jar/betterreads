@@ -12,14 +12,15 @@ import static org.mockito.Mockito.when;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.LongStream;
 
-import com.betterreads.book.Author;
 import com.betterreads.book.Book;
+import com.betterreads.book.ResolvedCredit;
+import com.betterreads.booksource.CreditRole;
 import com.betterreads.book.BookUpsertService;
 import com.betterreads.book.VerifiedMetadata;
 import com.betterreads.booksource.SeriesEntry;
+import com.betterreads.testsupport.Books;
 import com.betterreads.clients.websearch.CheckedBook;
 import com.betterreads.clients.websearch.MetadataCheckClient;
 import com.betterreads.clients.websearch.MetadataCheckRequest;
@@ -46,6 +47,8 @@ class MetadataCheckServiceTest {
     private static final String TITLE = MetadataJson.TITLE;
 
     private static final String AUTHOR = MetadataJson.AUTHOR;
+
+    private static final String CO_AUTHOR = "Ann Leckie";
 
     private static final String SERIES = MetadataJson.SERIES;
 
@@ -135,9 +138,9 @@ class MetadataCheckServiceTest {
         @Test
         void shouldSendBookDetails() {
             final Book book = book(BOOK_ID);
-            final Author author = new Author();
-            author.setName(AUTHOR);
-            book.setAuthors(Set.of(author));
+            book.replaceCredits(List.of(
+                new ResolvedCredit(Books.author(AUTHOR), CreditRole.AUTHOR),
+                new ResolvedCredit(Books.author(CO_AUTHOR), CreditRole.AUTHOR)));
             book.setFirstPublishYear(YEAR);
             book.setIsbn(ISBN);
             book.applySeries(List.of(new SeriesEntry(SERIES, 1), UNIVERSE), true);
@@ -149,16 +152,14 @@ class MetadataCheckServiceTest {
             service.checkDueBooks();
 
             verify(client).check(batch.capture());
-            assertThat(batch.getValue()).containsExactly(new MetadataCheckRequest(BOOK_ID, TITLE, List.of(AUTHOR),
+            assertThat(batch.getValue()).containsExactly(new MetadataCheckRequest(
+                BOOK_ID, TITLE, List.of(AUTHOR, CO_AUTHOR),
                 YEAR, SERIES, 1.0, ISBN, UNIVERSE, List.of(new SeriesBook(GOLDEN_SON, 2.0))));
         }
 
         @Test
         void shouldApplyCorrections() {
-            givenBooks(List.of(book(BOOK_ID)));
-            givenAnswers(Map.of(BOOK_ID, MetadataCheckSamples.confirmed(CORRECTED)));
-
-            service.checkDueBooks();
+            checkConfirmedBook();
 
             verify(upsert).applyVerified(BOOK_ID, CORRECTED);
         }
@@ -236,10 +237,7 @@ class MetadataCheckServiceTest {
 
         @Test
         void shouldLogTheOutcomesOfEachAnsweredBook(final CapturedOutput output) {
-            givenBooks(List.of(book(BOOK_ID)));
-            givenAnswers(Map.of(BOOK_ID, MetadataCheckSamples.confirmed(CORRECTED)));
-
-            service.checkDueBooks();
+            checkConfirmedBook();
 
             assertThat(output.getOut())
                 .contains("catalog.metadata-check bookId=1 outcomes=title:CONFIRMED,authors:CONFIRMED,"
@@ -249,10 +247,7 @@ class MetadataCheckServiceTest {
 
         @Test
         void shouldLogEachBatch(final CapturedOutput output) {
-            givenBooks(List.of(book(BOOK_ID)));
-            givenAnswers(Map.of(BOOK_ID, MetadataCheckSamples.confirmed(CORRECTED)));
-
-            service.checkDueBooks();
+            checkConfirmedBook();
 
             assertThat(output.getOut())
                 .contains("catalog.metadata-check batch books=1 turns=3 costUsd=0.25 durationMs=35210 deniedCalls=0");
@@ -305,5 +300,11 @@ class MetadataCheckServiceTest {
         book.setDedupKey("book-" + bookId);
         book.setTitle(TITLE);
         return book;
+    }
+
+    private void checkConfirmedBook() {
+        givenBooks(List.of(book(BOOK_ID)));
+        givenAnswers(Map.of(BOOK_ID, MetadataCheckSamples.confirmed(CORRECTED)));
+        service.checkDueBooks();
     }
 }

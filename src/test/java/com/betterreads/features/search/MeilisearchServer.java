@@ -31,11 +31,20 @@ final class MeilisearchServer {
             () -> "http://" + CONTAINER.getHost() + ":" + CONTAINER.getMappedPort(PORT));
         registry.add("meilisearch.master-key", () -> MASTER_KEY);
         registry.add("meilisearch.index-name", () -> indexName);
+        registry.add("meilisearch.authors-index-name", () -> authorsIndex(indexName));
+    }
+
+    static String authorsIndex(final String indexName) {
+        return indexName + "-authors";
     }
 
     static void addToIndex(final Client client, final String indexName, final String json) {
+        addToIndex(client, indexName, json, BookSearchDocument.PRIMARY_KEY);
+    }
+
+    static void addToIndex(final Client client, final String indexName, final String json, final String primaryKey) {
         final Index index = client.index(indexName);
-        index.waitForTask(index.addDocuments(json, BookSearchDocument.PRIMARY_KEY).getTaskUid());
+        index.waitForTask(index.addDocuments(json, primaryKey).getTaskUid());
     }
 
     static void removeFromIndex(final Client client, final String indexName, final String bookId) {

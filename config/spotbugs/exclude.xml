@@ -69,13 +69,15 @@
             <Class name="com.betterreads.clients.openlibrary.OpenLibraryClientImpl"/>
             <Class name="com.betterreads.clients.loc.LocSru"/>
             <Class name="com.betterreads.clients.wikidata.WikidataApi"/>
+            <Class name="com.betterreads.bookindex.AuthorIndexViewReader"/>
         </Or>
     </Match>
 
     <!--
-      EI_EXPOSE_REP / EI_EXPOSE_REP2 on JPA entities. Hibernate tracks the live collection
-      instance for dirty-checking and cascade. Returning or accepting a defensive copy would
-      break orphan removal and managed-collection semantics. Entities are not value objects.
+      EI_EXPOSE_REP / EI_EXPOSE_REP2 on JPA entities and the credit record that carries them.
+      Hibernate tracks the live collection instance for dirty-checking and cascade. Returning or
+      accepting a defensive copy would break orphan removal and managed-collection semantics.
+      Entities are not value objects.
     -->
     <Match>
         <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
@@ -83,6 +85,8 @@
             <Class name="com.betterreads.book.Book"/>
             <Class name="com.betterreads.book.BookAward"/>
             <Class name="com.betterreads.book.BookSubject"/>
+            <Class name="com.betterreads.book.BookAuthor"/>
+            <Class name="com.betterreads.book.ResolvedCredit"/>
         </Or>
     </Match>
 
@@ -94,6 +98,14 @@
     <Match>
         <Bug pattern="NP_UNWRITTEN_FIELD,UWF_UNWRITTEN_FIELD"/>
         <Class name="~.*Test(\$.+)?"/>
+    </Match>
+
+    <!--
+      UWF_UNWRITTEN_FIELD on the book_author id class. Hibernate writes the id fields reflectively.
+    -->
+    <Match>
+        <Bug pattern="UWF_UNWRITTEN_FIELD"/>
+        <Class name="com.betterreads.book.BookAuthorId"/>
     </Match>
 
     <!--
@@ -161,11 +173,16 @@
         <Class name="com.betterreads.bookmerge.LanguageCodes"/>
     </Match>
 
+    <!--
+      IMPROPER_UNICODE on title and name casing. Case changes only build display text or a
+      comparison key, never an identity or security check.
+    -->
     <Match>
         <Bug pattern="IMPROPER_UNICODE"/>
         <Or>
             <Class name="com.betterreads.bookmerge.TitleCasing"/>
             <Class name="com.betterreads.booksource.IssueRunSeries"/>
+            <Class name="com.betterreads.text.AuthorNames"/>
         </Or>
     </Match>
 

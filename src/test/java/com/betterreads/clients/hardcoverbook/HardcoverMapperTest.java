@@ -1,5 +1,7 @@
 package com.betterreads.clients.hardcoverbook;
 
+import com.betterreads.booksource.CreditRole;
+import com.betterreads.booksource.SourceAuthor;
 import com.betterreads.booksource.SourceBook;
 import com.betterreads.clients.hardcover.HardcoverBookNode;
 import com.betterreads.clients.hardcover.HardcoverBookNodeMapper;
@@ -23,6 +25,14 @@ class HardcoverMapperTest {
     private static final String AUTHOR_ROLE = "Author";
 
     private static final String SNYDER = "Scott Snyder";
+
+    private static final String BOOK_EDITOR = "Book Editor";
+
+    private static final String CAPULLO = "Greg Capullo";
+
+    private static final String SIMONETTI = "Marc Simonetti";
+
+    private static final String ROTHFUSS = "Patrick Rothfuss";
 
     private static final String COMPANIONS = "The Dark Tower Companions";
 
@@ -157,34 +167,35 @@ class HardcoverMapperTest {
     class AuthorsFromSearchDocument {
 
         @Test
-        void shouldIgnoreEditorsWhenAnAuthorIsCredited() {
+        void shouldKeepEditorAlongsideAuthorInOrder() {
             final HardcoverDocument document = bookSearch().withoutCredits()
-                .withCredit(AUTHOR_ROLE, SNYDER).withCredit("Editor", "Book Editor").document();
+                .withCredit("Editor", BOOK_EDITOR).withCredit(AUTHOR_ROLE, SNYDER).document();
 
             final SourceBook book = map(document);
 
-            assertThat(book.authorNames()).containsExactly(SNYDER);
+            assertThat(book.authorNames()).containsExactly(BOOK_EDITOR, SNYDER);
         }
 
         @Test
-        void shouldFallBackToEditorsWhenNoAuthorIsCredited() {
-            final String gorman = "Ed Gorman";
-            final HardcoverDocument document = bookSearch().withoutCredits()
-                .withCredit("Editor / Contributor", gorman).withCredit("Contributor", "David Morrell").document();
-
-            final SourceBook book = map(document);
-
-            assertThat(book.authorNames()).containsExactly(gorman);
-        }
-
-        @Test
-        void shouldLeaveAuthorsUnsetWhenOnlyNonWritersAreCredited() {
+        void shouldKeepIllustratorWithRole() {
             final HardcoverDocument document =
-                bookSearch().withoutCredits().withCredit("Illustrator", "Greg Capullo").document();
+                bookSearch().withoutCredits().withCredit("Illustrator", CAPULLO).document();
 
             final SourceBook book = map(document);
 
-            assertThat(book.authors()).isNull();
+            assertThat(book.authors()).containsExactly(SourceAuthor.withRole(CAPULLO, CreditRole.ILLUSTRATOR));
+        }
+
+        @Test
+        void shouldKeepCreditOrder() {
+            final HardcoverDocument document = bookSearch().withoutCredits()
+                .withCredit("Cover Artist", SIMONETTI).withCredit(AUTHOR_ROLE, ROTHFUSS).document();
+
+            final SourceBook book = map(document);
+
+            assertThat(book.authors())
+                .extracting(SourceAuthor::name)
+                .containsExactly(SIMONETTI, ROTHFUSS);
         }
 
         @Test

@@ -1,6 +1,8 @@
 package com.betterreads.book;
 
+import static com.betterreads.testsupport.Books.author;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
@@ -9,6 +11,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 
 import com.betterreads.booksource.BookFieldSource;
+import com.betterreads.booksource.CreditRole;
 import com.betterreads.booksource.SeriesEntry;
 import com.betterreads.booksource.SourceBook;
 import org.jspecify.annotations.Nullable;
@@ -369,6 +372,79 @@ class BookTest {
 
             assertThat(book.getIsbn()).isEqualTo(ENGLISH_ISBN);
             assertThat(book.getLanguage()).isEqualTo("en");
+        }
+    }
+
+    @Nested
+    class Credits {
+
+        @Test
+        void shouldListAnthologyEditorFirst() {
+            final Book book = new Book();
+            final Author editor = author("Stephen Jones");
+            final Author contributor = author("H. P. Lovecraft");
+            book.replaceCredits(List.of(
+                new ResolvedCredit(editor, CreditRole.EDITOR),
+                new ResolvedCredit(author("Dave Carson"), CreditRole.ILLUSTRATOR),
+                new ResolvedCredit(contributor, CreditRole.AUTHOR)));
+
+            final List<Author> authors = book.getAuthors();
+
+            assertThat(authors).containsExactly(editor, contributor);
+        }
+
+        @Test
+        void shouldListNovelAuthorBeforeLaterEditor() {
+            final Book book = new Book();
+            final Author novelist = author("Ursula K. Le Guin");
+            final Author editor = author("Betsy Wollheim");
+            book.replaceCredits(List.of(
+                new ResolvedCredit(novelist, CreditRole.AUTHOR),
+                new ResolvedCredit(editor, CreditRole.EDITOR)));
+
+            final List<Author> authors = book.getAuthors();
+
+            assertThat(authors).containsExactly(novelist, editor);
+        }
+
+        @Test
+        void shouldReportOrderChange() {
+            final Book book = new Book();
+            final Author first = author("Joe Lansdale");
+            final Author second = author("Kasey Lansdale");
+            book.replaceCredits(List.of(
+                new ResolvedCredit(first, CreditRole.AUTHOR), new ResolvedCredit(second, CreditRole.AUTHOR)));
+
+            final boolean changed = book.replaceCredits(List.of(
+                new ResolvedCredit(second, CreditRole.AUTHOR), new ResolvedCredit(first, CreditRole.AUTHOR)));
+
+            assertThat(changed).isTrue();
+            assertThat(book.getAuthors()).containsExactly(second, first);
+        }
+
+        @Test
+        void shouldReportNoChangeForSameCredits() {
+            final Book book = new Book();
+            final Author only = author("Patrick Rothfuss");
+            book.replaceCredits(List.of(new ResolvedCredit(only, CreditRole.AUTHOR)));
+
+            final boolean changed = book.replaceCredits(List.of(new ResolvedCredit(only, CreditRole.AUTHOR)));
+
+            assertThat(changed).isFalse();
+        }
+
+        @Test
+        void shouldCreditAuthorOnceForTwoRoles() {
+            final Book book = new Book();
+            final Author creator = author("Jeff Smith");
+            book.replaceCredits(List.of(
+                new ResolvedCredit(creator, CreditRole.AUTHOR), new ResolvedCredit(creator, CreditRole.ILLUSTRATOR)));
+
+            final List<BookAuthor> credits = book.getCredits();
+
+            assertThat(credits)
+                .extracting(BookAuthor::getAuthor, BookAuthor::getRole, BookAuthor::getPosition)
+                .containsExactly(tuple(creator, CreditRole.AUTHOR, 0));
         }
     }
 

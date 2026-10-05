@@ -7,7 +7,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.betterreads.book.Author;
 import com.betterreads.book.AuthorRepository;
 import com.betterreads.bookdiscovery.BookDiscovery;
 import java.util.List;
@@ -34,7 +33,7 @@ class CatalogRefreshServiceTest {
 
     @Test
     void shouldRefreshEveryAuthorWhenAuthorsAreEnabled() {
-        when(authors.findAll()).thenReturn(List.of(author(JORDAN), author(SANDERSON)));
+        when(authors.findPrimaryCreditNames()).thenReturn(List.of(JORDAN, SANDERSON));
 
         service(true, false).refresh();
 
@@ -44,7 +43,7 @@ class CatalogRefreshServiceTest {
 
     @Test
     void shouldSkipAuthorsWhenAuthorsAreDisabled() {
-        when(authors.findAll()).thenReturn(List.of(author(JORDAN)));
+        when(authors.findPrimaryCreditNames()).thenReturn(List.of(JORDAN));
 
         service(false, true).refresh();
 
@@ -54,7 +53,7 @@ class CatalogRefreshServiceTest {
     @Test
     @DisplayName("a failure on one author does not stop the remaining authors")
     void oneFailureDoesNotStopTheRest() {
-        when(authors.findAll()).thenReturn(List.of(author(JORDAN), author(SANDERSON)));
+        when(authors.findPrimaryCreditNames()).thenReturn(List.of(JORDAN, SANDERSON));
         doThrow(new DataAccessResourceFailureException("boom"))
             .when(discovery).searchAuthorAndStage(JORDAN);
 
@@ -75,11 +74,5 @@ class CatalogRefreshServiceTest {
         service(true, false).refresh();
 
         verify(dueSeries, never()).refresh();
-    }
-
-    private static Author author(final String name) {
-        final Author author = new Author();
-        author.setName(name);
-        return author;
     }
 }

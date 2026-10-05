@@ -4,14 +4,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
+import java.util.Objects;
 
 import com.betterreads.booksource.BookField;
 import com.betterreads.booksource.BookFieldSource;
+import com.betterreads.booksource.CreditRole;
 import com.betterreads.booksource.MergedBook;
 import com.betterreads.booksource.SeriesEntry;
 import com.betterreads.booksource.SourceAuthor;
 import com.betterreads.booksource.SourceBook;
 import com.betterreads.testsupport.Books;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -38,6 +41,12 @@ class SourceMergerTest {
     private static final String EDITION_TITLE = "Dune (2019 Edition)";
 
     private static final String SERIES = "Dune Saga";
+
+    private static final String SIMONETTI = "Marc Simonetti";
+
+    private static final String MARTIN = "George R.R. Martin";
+
+    private static final String DOZOIS = "Gardner Dozois";
 
     private static final double HARDCOVER_VOLUME = 1;
 
@@ -107,7 +116,7 @@ class SourceMergerTest {
                 .authors(SourceAuthor.ofNames(List.of(author)))
                 .build();
             final SourceBook openLibrary = titled(BookFieldSource.OPEN_LIBRARY)
-                .authors(SourceAuthor.ofNames(List.of(author, "Marc Simonetti")))
+                .authors(SourceAuthor.ofNames(List.of(author, SIMONETTI)))
                 .build();
 
             final MergedBook merged = merger.merge(null, List.of(openLibrary, hardcover));
@@ -131,10 +140,10 @@ class SourceMergerTest {
         }
 
         @Test
-        void shouldUseNextSourceAuthorsWhenFirstListIsEmpty() {
-            final String author = "Author";
+        void shouldPreferSourceWithPrimaryCredit() {
+            final String author = "Ursula K. Le Guin";
             final SourceBook hardcover = titled(BookFieldSource.HARDCOVER)
-                .authors(List.of())
+                .authors(List.of(SourceAuthor.withRole("Illustrator", CreditRole.ILLUSTRATOR)))
                 .build();
             final SourceBook google = titled(BookFieldSource.GOOGLE_BOOKS)
                 .authors(SourceAuthor.ofNames(List.of(author)))
@@ -434,33 +443,44 @@ class SourceMergerTest {
 
         @Test
         void shouldAddLocCoAuthorsAfterTheChosenAuthors() {
-            final String martin = "George R.R. Martin";
-            final String dozois = "Gardner Dozois";
 
-            final List<String> authors = mergedAuthors(List.of(martin), List.of("George R. R. Martin", dozois));
+            final List<String> authors =
+                mergedAuthors(SourceAuthor.ofNames(List.of(MARTIN)), List.of("George R. R. Martin", DOZOIS));
 
-            assertThat(authors).containsExactly(martin, dozois);
+            assertThat(authors).containsExactly(MARTIN, DOZOIS);
         }
 
         @Test
         void shouldIgnoreLocAuthorsThatDoNotIncludeTheChosenAuthors() {
             final String cart = "Michael Cart";
 
-            final List<String> authors = mergedAuthors(List.of(cart), List.of("Christine Jenkins"));
+            final List<String> authors =
+                mergedAuthors(SourceAuthor.ofNames(List.of(cart)), List.of("Christine Jenkins"));
 
             assertThat(authors).containsExactly(cart);
         }
 
-        private List<String> mergedAuthors(final List<String> hardcoverAuthors, final List<String> locAuthors) {
+        @Test
+        void shouldAddLocCoAuthorsWhenChosenHasIllustrator() {
+            final List<SourceAuthor> chosen = List.of(
+                SourceAuthor.ofName(MARTIN), SourceAuthor.withRole(SIMONETTI, CreditRole.ILLUSTRATOR));
+
+            final List<String> authors = mergedAuthors(chosen, List.of(MARTIN, DOZOIS));
+
+            assertThat(authors).containsExactly(MARTIN, SIMONETTI, DOZOIS);
+        }
+
+        private List<String> mergedAuthors(
+            final @Nullable List<SourceAuthor> hardcoverAuthors, final List<String> locAuthors) {
             final SourceBook hardcover = titled(BookFieldSource.HARDCOVER)
-                .authors(SourceAuthor.ofNames(hardcoverAuthors))
+                .authors(hardcoverAuthors)
                 .build();
             final SourceBook loc = titled(BookFieldSource.LOC)
                 .authors(SourceAuthor.ofNames(locAuthors))
                 .build();
-            return merger.merge(null, List.of(hardcover, loc)).book().authors().stream()
-                .map(SourceAuthor::name)
-                .toList();
+            final MergedBook merged = merger.merge(null, List.of(hardcover, loc));
+            final List<SourceAuthor> credits = Objects.requireNonNull(merged.book().authors());
+            return credits.stream().map(SourceAuthor::name).toList();
         }
 
         @Test

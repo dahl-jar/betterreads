@@ -29,7 +29,8 @@ class ResponseEnvelopeOpenApiCustomizer {
     private static final Map<String, String> PAGED_ITEM_BY_TYPE = Map.of(
         "CommentPage", "CommentResponse",
         "ReviewPage", "ReviewResponse",
-        "BookSearchResult", "BookSearchDocument");
+        "BookSearchResult", "BookSearchDocument",
+        "AuthorSearchResult", "AuthorSearchDocument");
 
     private static final String HEALTH_SCHEMA = HealthResponse.class.getSimpleName();
 

@@ -67,6 +67,7 @@ final class SecurityConfig {
     private static final String[] PUBLIC_CATALOG_GET_PATHS = {
         "/api/v1/search/**",
         "/api/v1/books/**",
+        "/api/v1/authors/**",
         "/api/v1/reviews/**",
         "/api/v1/comments/**",
         "/api/v1/images/**"

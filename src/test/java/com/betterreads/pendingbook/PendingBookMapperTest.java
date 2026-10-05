@@ -8,6 +8,7 @@ import java.util.Set;
 
 import com.betterreads.booksource.BookField;
 import com.betterreads.booksource.BookFieldSource;
+import com.betterreads.booksource.CreditRole;
 import com.betterreads.booksource.MergedBook;
 import com.betterreads.booksource.SourceAuthor;
 import com.betterreads.booksource.SourceBook;
@@ -26,6 +27,8 @@ class PendingBookMapperTest {
     private static final int PAGES = 382;
 
     private static final double FIRST_VOLUME = 1;
+
+    private static final String TABBED_NAME = "Patrick\tRothfuss";
 
     private static final SourceBook ORIGINAL = SourceBook.builder(BookFieldSource.GOOGLE_BOOKS)
         .isbn13(ISBN)
@@ -89,6 +92,50 @@ class PendingBookMapperTest {
     }
 
     @Test
+    void shouldRoundTripRoles() {
+        final List<SourceAuthor> credits = List.of(
+            SourceAuthor.ofName("Patrick Rothfuss"), SourceAuthor.withRole("Marc Simonetti", CreditRole.ILLUSTRATOR));
+        final PendingBook row = stored(credits);
+
+        final SourceBook readBack = mapper.toSourceBook(row);
+
+        assertThat(readBack.authors()).isEqualTo(credits);
+    }
+
+    @Test
+    void shouldReadRolelessLinesAsAuthor() {
+        final PendingBook row = new PendingBook();
+        row.setAuthors("Patrick Rothfuss\nMarc Simonetti");
+
+        final SourceBook readBack = mapper.toSourceBook(row);
+
+        assertThat(readBack.authors())
+            .extracting(SourceAuthor::role)
+            .containsExactly(CreditRole.AUTHOR, CreditRole.AUTHOR);
+    }
+
+    @Test
+    void shouldKeepOneCreditForANameWithTabAndNewline() {
+        final SourceAuthor illustrator = SourceAuthor.withRole("Marc\tSimonetti\nCover", CreditRole.ILLUSTRATOR);
+        final PendingBook row = stored(List.of(illustrator));
+
+        final SourceBook readBack = mapper.toSourceBook(row);
+
+        assertThat(readBack.authors())
+            .containsExactly(SourceAuthor.withRole("Marc Simonetti Cover", CreditRole.ILLUSTRATOR));
+    }
+
+    @Test
+    void shouldReadUnknownRoleSuffixAsAuthorName() {
+        final PendingBook row = new PendingBook();
+        row.setAuthors(TABBED_NAME);
+
+        final SourceBook readBack = mapper.toSourceBook(row);
+
+        assertThat(readBack.authors()).containsExactly(SourceAuthor.ofName(TABBED_NAME));
+    }
+
+    @Test
     void shouldReadBackEmptyListColumnsAsMissing() {
         final PendingBook row = new PendingBook();
         row.setSubjects("");
@@ -102,5 +149,12 @@ class PendingBookMapperTest {
             assertThat(book.awards()).isNull();
             assertThat(book.authors()).isNull();
         });
+    }
+
+    private PendingBook stored(final List<SourceAuthor> credits) {
+        final PendingBook row = new PendingBook();
+        final SourceBook book = ORIGINAL.toBuilder().authors(credits).build();
+        mapper.applyTo(row, new MergedBook(book, Map.of(), Set.of(), Set.of()));
+        return row;
     }
 }

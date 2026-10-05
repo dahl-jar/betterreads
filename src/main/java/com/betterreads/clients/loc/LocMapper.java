@@ -26,7 +26,7 @@ class LocMapper {
 
     private static SourceBook mapRecord(final JsonNode mods) {
         final List<String> genres = genres(mods);
-        final List<String> authors = ModsNames.authorNames(mods);
+        final List<SourceAuthor> authors = ModsNames.credits(mods);
         return SourceBook.builder(BookFieldSource.LOC)
             .isbn13(ModsIdentifiers.isbn13(mods))
             .locLccn(ModsIdentifiers.firstOfType(mods, "lccn"))
@@ -35,7 +35,7 @@ class LocMapper {
             .publicationYear(marcYear(mods).orElse(null))
             .pageCount(pageCount(mods).orElse(null))
             .language(languageCode(mods))
-            .authors(SourceAuthor.ofNames(authors.isEmpty() ? null : authors))
+            .authors(authors.isEmpty() ? null : authors)
             .rawSubjects(genres.isEmpty() ? null : genres)
             .seriesName(ModsSeries.name(mods))
             .seriesPosition(ModsSeries.position(mods).map(Integer::doubleValue).orElse(null))

@@ -13,15 +13,16 @@ import static org.mockito.Mockito.when;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
-import com.betterreads.book.Author;
 import com.betterreads.book.Book;
+import com.betterreads.book.ResolvedCredit;
+import com.betterreads.booksource.CreditRole;
 import com.betterreads.book.BookDetailCache;
 import com.betterreads.bookdescription.DescriptionSelector;
 import com.betterreads.booksource.BookFieldSource;
 import com.betterreads.booksource.DescriptionLookup;
 import com.betterreads.booksource.SourceBook;
+import com.betterreads.testsupport.Books;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -123,9 +124,7 @@ class DescriptionBackfillServiceTest {
             .openLibraryWorkKey(WORK_KEY)
             .hardcoverId(HARDCOVER_ID)
             .build());
-        final Author author = new Author();
-        author.setName(AUTHOR);
-        book.setAuthors(Set.of(author));
+        book.replaceCredits(List.of(new ResolvedCredit(Books.author(AUTHOR), CreditRole.AUTHOR)));
         stubThinSliceWithoutImprovement(book);
 
         service.backfillSlice();

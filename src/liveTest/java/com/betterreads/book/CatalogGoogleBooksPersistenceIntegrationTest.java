@@ -3,6 +3,7 @@ package com.betterreads.book;
 import com.betterreads.booksource.SourceBook;
 import com.betterreads.clients.googlebooks.GoogleBooksClient;
 import com.betterreads.testsupport.ContainerizedTest;
+import com.betterreads.text.AuthorNames;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.postgresql.PostgreSQLContainer;
@@ -64,7 +65,7 @@ class CatalogGoogleBooksPersistenceIntegrationTest extends ContainerizedTest {
                 assertThat(book.getGoogleBooksVolumeId()).isEqualTo(source.googleBooksVolumeId());
                 assertThat(book.getFirstPublishYear()).isEqualTo(source.publicationYear());
             });
-        assertThat(authorRepository.findByName(EYE_OF_THE_WORLD_AUTHOR))
+        assertThat(authorRepository.findByNameKey(AuthorNames.key(EYE_OF_THE_WORLD_AUTHOR)))
             .as("author row remains independently readable")
             .isPresent();
     }

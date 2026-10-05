@@ -9,13 +9,11 @@ import static org.assertj.core.api.Assertions.within;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
-import java.util.Map;
 
-import org.flywaydb.core.Flyway;
+import com.betterreads.testsupport.Migrations;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
@@ -65,28 +63,16 @@ class SessionLifetimeMigrationTest {
 
     private JdbcTemplate jdbc;
 
-    private static Flyway flyway(final String target) {
-        return Flyway.configure()
-            .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
-            .placeholders(Map.of("appPassword", "app-password"))
-            .cleanDisabled(false)
-            .target(target)
-            .load();
-    }
-
     @BeforeEach
     void migrateToTheVersionBefore() {
-        jdbc = new JdbcTemplate(
-            new DriverManagerDataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword()));
-        flyway(BEFORE).clean();
-        flyway(BEFORE).migrate();
+        jdbc = Migrations.resetTo(POSTGRES, BEFORE);
     }
 
     @Test
     void shouldEndASessionThirtyDaysAfterItsLogin() {
         seedRotatedSession(USER, true, RECENT_LOGIN_DAYS);
 
-        flyway(AFTER).migrate();
+        Migrations.migrateTo(POSTGRES, AFTER);
 
         final OffsetDateTime expiry = jdbc.queryForObject(EXPIRY_SQL, OffsetDateTime.class, USER);
         final OffsetDateTime expected = OffsetDateTime.now(ZoneOffset.UTC).plusDays(LIFETIME_DAYS - RECENT_LOGIN_DAYS);
@@ -98,7 +84,7 @@ class SessionLifetimeMigrationTest {
     void shouldKeepAnExistingSessionRemembered() {
         seedRotatedSession(USER, true, RECENT_LOGIN_DAYS);
 
-        flyway(AFTER).migrate();
+        Migrations.migrateTo(POSTGRES, AFTER);
 
         assertThat(jdbc.queryForObject(PERSISTENT_SQL, Boolean.class, USER)).isTrue();
     }
@@ -107,7 +93,7 @@ class SessionLifetimeMigrationTest {
     void shouldRevokeASessionWhoseLoginIsThirtyDaysOld() {
         seedRotatedSession(THIRD_USER, true, OLD_LOGIN_DAYS);
 
-        flyway(AFTER).migrate();
+        Migrations.migrateTo(POSTGRES, AFTER);
 
         assertThat(isRevoked(THIRD_USER)).isTrue();
     }
@@ -116,7 +102,7 @@ class SessionLifetimeMigrationTest {
     void shouldRevokeTheSessionOfAnUnverifiedAccount() {
         seedRotatedSession(OTHER_USER, false, RECENT_LOGIN_DAYS);
 
-        flyway(AFTER).migrate();
+        Migrations.migrateTo(POSTGRES, AFTER);
 
         assertThat(isRevoked(OTHER_USER)).isTrue();
     }

@@ -41,6 +41,10 @@ class SearchRateLimitIntegrationTest extends ContainerizedTest {
 
     private static final String SEARCH_URL = "/api/v1/search/books";
 
+    private static final String AUTHOR_SEARCH_URL = "/api/v1/search/authors";
+
+    private static final String AUTHOR_PAGE_URL = "/api/v1/authors/404";
+
     private static final String REVIEW_COMMENTS_URL = "/api/v1/reviews/404/comments";
 
     private static final String COMMENT_BODY = "{\"body\":\"Break the chains\"}";
@@ -77,6 +81,28 @@ class SearchRateLimitIntegrationTest extends ContainerizedTest {
         mockMvc.perform(get(SEARCH_URL).param("q", QUERY))
             .andExpect(status().isTooManyRequests())
             .andExpect(header().exists(RETRY_AFTER_HEADER));
+    }
+
+    @Test
+    void shouldThrottleAuthorSearch() throws Exception {
+        for (int i = 0; i < CAPACITY; i++) {
+            mockMvc.perform(get(AUTHOR_SEARCH_URL).param("q", QUERY))
+                .andExpect(status().isOk());
+        }
+
+        mockMvc.perform(get(AUTHOR_SEARCH_URL).param("q", QUERY))
+            .andExpect(status().isTooManyRequests());
+    }
+
+    @Test
+    void shouldThrottleAuthorPage() throws Exception {
+        for (int i = 0; i < CAPACITY; i++) {
+            mockMvc.perform(get(AUTHOR_PAGE_URL))
+                .andExpect(status().isNotFound());
+        }
+
+        mockMvc.perform(get(AUTHOR_PAGE_URL))
+            .andExpect(status().isTooManyRequests());
     }
 
     @Test

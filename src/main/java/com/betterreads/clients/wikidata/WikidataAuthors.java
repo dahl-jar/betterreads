@@ -1,5 +1,6 @@
 package com.betterreads.clients.wikidata;
 
+import com.betterreads.booksource.CreditRole;
 import com.betterreads.booksource.SourceAuthor;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
@@ -22,7 +23,7 @@ final class WikidataAuthors {
 
     static SourceAuthor fromEntity(final JsonNode entity, final String qid) {
         final String name = WikidataLabels.displayName(entity, qid);
-        return new SourceAuthor(name, qid, photoUrl(entity), bioLink(entity));
+        return new SourceAuthor(name, qid, photoUrl(entity), bioLink(entity), CreditRole.AUTHOR);
     }
 
     private static @Nullable String photoUrl(final JsonNode entity) {

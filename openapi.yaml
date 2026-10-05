@@ -921,6 +921,54 @@ paths:
               schema:
                 $ref: "#/components/schemas/BookSearchDocument"
       security: []
+  /api/v1/search/authors:
+    get:
+      tags:
+      - Search
+      summary: Search authors by name
+      operationId: searchAuthors
+      parameters:
+      - name: q
+        in: query
+        required: true
+        schema:
+          type: string
+          maxLength: 200
+          minLength: 0
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AuthorSearchDocument"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+      security: []
   /api/v1/reviews/recent:
     get:
       tags:
@@ -1408,6 +1456,40 @@ paths:
                   data:
                     $ref: "#/components/schemas/BookCountResponse"
       security: []
+  /api/v1/authors/{authorId}:
+    get:
+      tags:
+      - Catalog
+      summary: Get an author and their books
+      operationId: getAuthor
+      parameters:
+      - name: authorId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "503":
+          description: Service Unavailable
+        "200":
+          description: The author
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AuthorPageResponse"
+        "308":
+          description: "The author was merged into another, see Location"
+        "404":
+          description: No author with that id
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
   /api/v1/auth/me:
     get:
       tags:
@@ -1872,6 +1954,48 @@ components:
         position:
           type: number
           format: double
+    AuthorSearchDocument:
+      type: object
+      properties:
+        authorId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        surname:
+          type: string
+        aliases:
+          type: array
+          items:
+            type: string
+        photoUrl:
+          type: string
+        bookCount:
+          type: integer
+          format: int32
+        popularityScore:
+          type: number
+          format: double
+        topTitles:
+          type: array
+          items:
+            type: string
+    AuthorSearchResult:
+      type: object
+      properties:
+        hits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuthorSearchDocument"
+        totalHits:
+          type: integer
+          format: int64
+        offset:
+          type: integer
+          format: int32
+        limit:
+          type: integer
+          format: int32
     CommentPage:
       type: object
       properties:
@@ -1988,6 +2112,10 @@ components:
           type: array
           items:
             type: string
+        contributors:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContributorResponse"
         description:
           type: string
         coverUrl:
@@ -2024,6 +2152,16 @@ components:
           type: array
           items:
             type: string
+    ContributorResponse:
+      type: object
+      properties:
+        authorId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        role:
+          type: string
     ShelfCountsResponse:
       type: object
       properties:
@@ -2094,6 +2232,40 @@ components:
         total:
           type: integer
           format: int64
+    AuthorBookResponse:
+      type: object
+      properties:
+        bookId:
+          type: string
+        title:
+          type: string
+        coverUrl:
+          type: string
+        firstPublishYear:
+          type: integer
+          format: int32
+        seriesName:
+          type: string
+        seriesPosition:
+          type: number
+        role:
+          type: string
+    AuthorPageResponse:
+      type: object
+      properties:
+        authorId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        photoUrl:
+          type: string
+        bio:
+          type: string
+        books:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuthorBookResponse"
     ResponseMeta:
       properties:
         total:
