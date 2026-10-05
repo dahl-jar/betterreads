@@ -80,7 +80,7 @@ class AuthorIndexer implements ApplicationRunner {
         }
     }
 
-    @Scheduled(cron = "0 40 3 * * *")
+    @Scheduled(cron = "${betterreads.search.author-reconcile-cron:0 40 3 * * *}")
     public void reconcile() {
         final List<Long> changed = views.authorIdsChangedSince(OffsetDateTime.now(ZoneOffset.UTC).minus(LOOKBACK));
         pages(changed).forEach(this::reindex);

@@ -167,6 +167,8 @@ betterreads:
       max-books-per-run: ${CATALOG_METADATA_CHECK_MAX_BOOKS:100}
   cache:
     book-detail-ttl: ${BOOK_DETAIL_CACHE_TTL:PT24H}
+  search:
+    author-reconcile-cron: ${SEARCH_AUTHOR_RECONCILE_CRON:0 40 3 * * *}
 
 openlibrary:
   base-url: ${OPENLIBRARY_BASE_URL:https://openlibrary.org}
