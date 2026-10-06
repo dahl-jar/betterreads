@@ -125,7 +125,7 @@ class CreditBackfillServiceIntegrationTest extends ContainerizedTest {
     void shouldKeepVerifiedAuthorNames() {
         final long bookId = seed();
         upserts.applyVerified(bookId, new VerifiedMetadata(
-            null, List.of(SIMONETTI, ROTHFUSS), null, null, null, null, null, null));
+            null, List.of(SIMONETTI, ROTHFUSS), null, null, null, null, null, null), 1);
         when(hardcover.fetchByHardcoverId(HARDCOVER_ID)).thenReturn(Optional.of(nameOfTheWind(List.of(
             SourceAuthor.ofName(ROTHFUSS),
             SourceAuthor.withRole(SIMONETTI, CreditRole.ILLUSTRATOR),

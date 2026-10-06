@@ -13,11 +13,13 @@ class WebSearchArgsTest {
 
     private static final String SEARCH = "WebSearch";
 
+    private static final String COMIC_SITE = "viz.com";
+
     private static final WebSearchProperties PROPERTIES = WebSearchSamples.properties("claude", Duration.ofMinutes(5));
 
     @Test
     void shouldLockDownTools() {
-        final List<String> argv = WebSearchArgs.argv(PROPERTIES, SCHEMA);
+        final List<String> argv = WebSearchArgs.argv(PROPERTIES, SCHEMA, WebSearchSamples.DOMAINS);
 
         assertThat(argv)
             .containsSequence("--tools", "WebSearch,WebFetch")
@@ -27,7 +29,7 @@ class WebSearchArgsTest {
 
     @Test
     void shouldNotFetchSearchOnlyDomain() {
-        final List<String> argv = WebSearchArgs.argv(PROPERTIES, SCHEMA);
+        final List<String> argv = WebSearchArgs.argv(PROPERTIES, SCHEMA, WebSearchSamples.DOMAINS);
 
         assertThat(argv)
             .containsSequence("--allowedTools", SEARCH, "WebFetch(domain:en.wikipedia.org)")
@@ -35,15 +37,23 @@ class WebSearchArgsTest {
     }
 
     @Test
+    void shouldAllowFetchOnlyForTheGroupDomains() {
+        final List<String> argv = WebSearchArgs.argv(PROPERTIES, SCHEMA, List.of(COMIC_SITE));
+
+        assertThat(argv.stream().filter(arg -> arg.startsWith("WebFetch(")))
+            .containsExactly("WebFetch(domain:" + COMIC_SITE + ")");
+    }
+
+    @Test
     void shouldAskForSchemaOutput() {
-        final List<String> argv = WebSearchArgs.argv(PROPERTIES, SCHEMA);
+        final List<String> argv = WebSearchArgs.argv(PROPERTIES, SCHEMA, WebSearchSamples.DOMAINS);
 
         assertThat(argv).containsSequence("--output-format", "json", "--json-schema", SCHEMA);
     }
 
     @Test
     void shouldHookEverySearch() {
-        final List<String> argv = WebSearchArgs.argv(PROPERTIES, SCHEMA);
+        final List<String> argv = WebSearchArgs.argv(PROPERTIES, SCHEMA, WebSearchSamples.DOMAINS);
 
         final String settings = argv.get(argv.indexOf("--settings") + 1);
         assertThat(settings)

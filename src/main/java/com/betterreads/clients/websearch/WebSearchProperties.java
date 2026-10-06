@@ -1,7 +1,11 @@
 package com.betterreads.clients.websearch;
 
 import java.time.Duration;
+import java.util.Collections;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Stream;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -21,16 +25,35 @@ public record WebSearchProperties(
     @Positive int maxTurns,
     @NotNull Duration timeout,
     @Pattern(regexp = "[A-Za-z0-9_./-]+") String hookScript,
-    @NotEmpty List<@Pattern(regexp = "[a-z0-9-]+(\\.[a-z0-9-]+)+") String> allowedDomains,
-    @NotNull List<String> searchOnlyDomains
+    @NotEmpty Map<SourceGroup, List<@Pattern(regexp = DOMAIN) String>> groupDomains,
+    @NotEmpty List<@Pattern(regexp = DOMAIN) String> sharedDomains,
+    @NotNull List<String> searchOnlyDomains,
+    @Positive int pageConnectTimeout,
+    @Positive int pageReadTimeout,
+    @Positive int pageMaxBytes,
+    @NotEmpty List<String> pageSchemes
 ) {
 
+    private static final String DOMAIN = "[a-z0-9-]+(\\.[a-z0-9-]+)+";
+
     public WebSearchProperties {
-        allowedDomains = List.copyOf(allowedDomains);
+        final Map<SourceGroup, List<String>> groups = new EnumMap<>(SourceGroup.class);
+        groupDomains.forEach((group, domains) -> groups.put(group, List.copyOf(domains)));
+        groupDomains = Collections.unmodifiableMap(groups);
+        sharedDomains = List.copyOf(sharedDomains);
         searchOnlyDomains = List.copyOf(searchOnlyDomains);
+        pageSchemes = List.copyOf(pageSchemes);
     }
 
-    public List<String> fetchDomains() {
-        return allowedDomains.stream().filter(domain -> !searchOnlyDomains.contains(domain)).toList();
+    public List<String> allowedDomains() {
+        return Stream.concat(groupDomains.values().stream().flatMap(List::stream), sharedDomains.stream())
+            .distinct()
+            .toList();
+    }
+
+    public List<String> domains(final SourceGroup group) {
+        return Stream.concat(groupDomains.getOrDefault(group, List.of()).stream(), sharedDomains.stream())
+            .distinct()
+            .toList();
     }
 }

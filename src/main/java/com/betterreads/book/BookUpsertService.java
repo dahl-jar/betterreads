@@ -1,5 +1,6 @@
 package com.betterreads.book;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 
 import com.betterreads.booksource.MergedBook;
@@ -20,7 +21,9 @@ public interface BookUpsertService {
     /** The series replaces the stored one, including a clear, only when Hardcover resolved on the collect. */
     Book upsertFromSource(MergedBook merged);
 
-    Book applyVerified(long bookId, VerifiedMetadata metadata);
+    Book applyVerified(long bookId, VerifiedMetadata metadata, int checkVersion);
+
+    boolean deferMetadataCheck(long bookId, OffsetDateTime retryAt, int maxAttempts);
 
     Book applyCredits(long bookId, List<SourceAuthor> credits);
 }

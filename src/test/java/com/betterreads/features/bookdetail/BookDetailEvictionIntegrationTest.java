@@ -96,7 +96,7 @@ class BookDetailEvictionIntegrationTest extends ContainerizedTest {
         bookDetailService.findByKey(ISBN);
 
         final VerifiedMetadata verified = new VerifiedMetadata(REVISED_TITLE, null, null, null, null, null, null, null);
-        bookUpsertService.applyVerified(bookId, verified);
+        bookUpsertService.applyVerified(bookId, verified, 1);
 
         assertServesRevisedTitle();
     }

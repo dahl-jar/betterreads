@@ -2,12 +2,15 @@ package com.betterreads.features.metadatacheck;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.stream.IntStream;
 
 import com.betterreads.book.Author;
 import com.betterreads.book.AuthorRepository;
 import com.betterreads.book.Book;
+import com.betterreads.book.BookSubject;
 import com.betterreads.book.BookUpsertService;
 import com.betterreads.book.VerifiedMetadata;
 import com.betterreads.booksource.BookFieldSource;
@@ -18,6 +21,7 @@ import com.betterreads.booksource.SourceBook;
 import com.betterreads.clients.websearch.MetadataJson;
 import com.betterreads.testsupport.ContainerizedTest;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -57,6 +61,8 @@ class MetadataCheckRepositoryTest extends ContainerizedTest {
 
     private static final String BOOK_KEY_PREFIX = "book-";
 
+    private static final String FANTASY = "Fantasy";
+
     private static final String REQUESTED_SQL =
         "UPDATE book SET metadata_check_requested_at = now() - make_interval(days => ?) WHERE book_id = ?";
 
@@ -78,87 +84,119 @@ class MetadataCheckRepositoryTest extends ContainerizedTest {
         authors.deleteAll();
     }
 
-    @Test
-    void shouldReturnTheLongestWaitingBooksFirst() {
-        final long addedToday = save("light-bringer");
-        final long queuedLastWeek = save(RED_RISING_KEY);
-        final long addedYesterday = save(GOLDEN_SON_KEY);
-        jdbc.update(REQUESTED_SQL, DAYS_IN_A_WEEK, queuedLastWeek);
-        jdbc.update("UPDATE book SET created_at = now() - interval '30 days' WHERE book_id = ?", queuedLastWeek);
-        jdbc.update(REQUESTED_SQL, 1, addedYesterday);
-
-        final List<Book> found = books.findDueForCheck(PageRequest.ofSize(PAGE_SIZE));
-
-        assertThat(found).extracting(Book::getBookId).containsExactly(queuedLastWeek, addedYesterday, addedToday);
+    private List<Book> due() {
+        return books.findDueForCheck(OffsetDateTime.now(ZoneOffset.UTC), PageRequest.ofSize(PAGE_SIZE));
     }
 
-    @Test
-    void shouldLeaveOutACheckedBook() {
-        final long waiting = save(RED_RISING_KEY);
-        final long checked = save(GOLDEN_SON_KEY);
-        upsert.applyVerified(checked, VerifiedMetadata.NONE);
+    @Nested
+    class Queue {
 
-        final List<Book> found = books.findDueForCheck(PageRequest.ofSize(PAGE_SIZE));
+        @Test
+        void shouldReturnTheLongestWaitingBooksFirst() {
+            final long addedToday = save("light-bringer");
+            final long queuedLastWeek = save(RED_RISING_KEY);
+            final long addedYesterday = save(GOLDEN_SON_KEY);
+            jdbc.update(REQUESTED_SQL, DAYS_IN_A_WEEK, queuedLastWeek);
+            jdbc.update("UPDATE book SET created_at = now() - interval '30 days' WHERE book_id = ?", queuedLastWeek);
+            jdbc.update(REQUESTED_SQL, 1, addedYesterday);
 
-        assertThat(found).extracting(Book::getBookId).containsExactly(waiting);
+            final List<Book> found = due();
+
+            assertThat(found).extracting(Book::getBookId).containsExactly(queuedLastWeek, addedYesterday, addedToday);
+        }
+
+        @Test
+        void shouldLeaveOutACheckedBook() {
+            final long waiting = save(RED_RISING_KEY);
+            final long checked = save(GOLDEN_SON_KEY);
+            upsert.applyVerified(checked, VerifiedMetadata.NONE, 1);
+
+            final List<Book> found = due();
+
+            assertThat(found).extracting(Book::getBookId).containsExactly(waiting);
+        }
+
+        @Test
+        void shouldLeaveOutABookNotYetDue() {
+            final long due = save(RED_RISING_KEY);
+            final long retryTomorrow = save(GOLDEN_SON_KEY);
+            jdbc.update(REQUESTED_SQL, -1, retryTomorrow);
+
+            final List<Book> found = due();
+
+            assertThat(found).extracting(Book::getBookId).containsExactly(due);
+        }
+
+        @Test
+        void shouldLoadAuthors() {
+            upsert.upsertFromSource(redRising().build());
+
+            final List<Book> found = due();
+
+            assertThat(found.getFirst().getAuthors()).extracting(Author::getName).containsExactly(AUTHOR);
+        }
+
+        @Test
+        void shouldLoadSeries() {
+            final List<SeriesEntry> series = List.of(new SeriesEntry(SAGA, 1), new SeriesEntry(UNIVERSE, 1));
+            upsert.upsertFromSource(redRising().series(series).build());
+
+            final List<Book> found = due();
+
+            assertThat(found.getFirst().getSeries()).isEqualTo(series);
+        }
+
+        @Test
+        void shouldLoadSubjects() {
+            upsert.upsertFromSource(redRising().rawSubjects(List.of(FANTASY)).build());
+
+            final List<Book> found = due();
+
+            assertThat(found.getFirst().getSubjects()).extracting(BookSubject::getSubject).contains(FANTASY);
+        }
     }
 
-    @Test
-    void shouldLoadAuthors() {
-        upsert.upsertFromSource(redRising().build());
+    @Nested
+    class Series {
 
-        final List<Book> found = books.findDueForCheck(PageRequest.ofSize(PAGE_SIZE));
+        @Test
+        void shouldListTheNamesOfEverySeries() {
+            final SourceBook book =
+                redRising().series(List.of(new SeriesEntry(SAGA, 1), new SeriesEntry(UNIVERSE, 1))).build();
+            upsert.upsertFromSource(book);
 
-        assertThat(found.getFirst().getAuthors()).extracting(Author::getName).containsExactly(AUTHOR);
-    }
+            final List<String> names = books.findSeriesNames();
 
-    @Test
-    void shouldLoadSeries() {
-        final List<SeriesEntry> series = List.of(new SeriesEntry(SAGA, 1), new SeriesEntry(UNIVERSE, 1));
-        upsert.upsertFromSource(redRising().series(series).build());
+            assertThat(names).containsExactlyInAnyOrder(SAGA, UNIVERSE);
+        }
 
-        final List<Book> found = books.findDueForCheck(PageRequest.ofSize(PAGE_SIZE));
+        @Test
+        void shouldListTheOtherBooksOfASeriesByPosition() {
+            final List<Long> fromLastToFirst = IntStream.iterate(SERIES_LENGTH, position -> position - 1)
+                .limit(SERIES_LENGTH)
+                .mapToObj(MetadataCheckRepositoryTest.this::saveAtPosition)
+                .toList();
+            final long first = fromLastToFirst.getLast();
+            final List<SeriesBook> expected = IntStream.rangeClosed(2, LISTED_BOOKS + 1)
+                .mapToObj(position -> new SeriesBook(BOOK_KEY_PREFIX + position, position))
+                .toList();
 
-        assertThat(found.getFirst().getSeries()).isEqualTo(series);
-    }
+            final List<SeriesBook> found = books.findSeriesBooks(SAGA, first);
 
-    @Test
-    void shouldListTheNamesOfEverySeries() {
-        final SourceBook book =
-            redRising().series(List.of(new SeriesEntry(SAGA, 1), new SeriesEntry(UNIVERSE, 1))).build();
-        upsert.upsertFromSource(book);
+            assertThat(found).containsExactlyElementsOf(expected);
+        }
 
-        final List<String> names = books.findSeriesNames();
+        @Test
+        void shouldLeaveOutBooksOfAnotherSeries() {
+            final long first = saveAtPosition(1);
+            final long other = save(BOOK_KEY_PREFIX + "other");
+            jdbc.update("INSERT INTO book_series (book_id, ordinal, series_name, position) VALUES (?, 0, ?, 2)",
+                other, UNIVERSE);
 
-        assertThat(names).containsExactlyInAnyOrder(SAGA, UNIVERSE);
-    }
+            final List<SeriesBook> found = books.findSeriesBooks(SAGA, first);
 
-    @Test
-    void shouldListTheOtherBooksOfASeriesByPosition() {
-        final List<Long> fromLastToFirst = IntStream.iterate(SERIES_LENGTH, position -> position - 1)
-            .limit(SERIES_LENGTH)
-            .mapToObj(this::saveAtPosition)
-            .toList();
-        final long first = fromLastToFirst.getLast();
-        final List<SeriesBook> expected = IntStream.rangeClosed(2, LISTED_BOOKS + 1)
-            .mapToObj(position -> new SeriesBook(BOOK_KEY_PREFIX + position, position))
-            .toList();
-
-        final List<SeriesBook> found = books.findSeriesBooks(SAGA, first);
-
-        assertThat(found).containsExactlyElementsOf(expected);
-    }
-
-    @Test
-    void shouldLeaveOutBooksOfAnotherSeries() {
-        final long first = saveAtPosition(1);
-        final long other = save(BOOK_KEY_PREFIX + "other");
-        jdbc.update("INSERT INTO book_series (book_id, ordinal, series_name, position) VALUES (?, 0, ?, 2)",
-            other, UNIVERSE);
-
-        final List<SeriesBook> found = books.findSeriesBooks(SAGA, first);
-
-        assertThat(found).isEmpty();
+            assertThat(found).isEmpty();
+        }
     }
 
     private long saveAtPosition(final int position) {

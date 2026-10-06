@@ -2,12 +2,16 @@ package com.betterreads.clients.websearch;
 
 import static com.betterreads.clients.websearch.MetadataJson.metadata;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.time.Year;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -32,8 +36,6 @@ class MetadataCheckMapperTest {
     private static final String GERMAN_ISBN = MetadataJson.GERMAN_ISBN;
 
     private static final String ENGLISH_ISBN = "9780553103540";
-
-    private static final int LOGGED_DESCRIPTION_LENGTH = 200;
 
     private static final String OTHER_SITE = "https://www.goodreads.com/book/1";
 
@@ -60,36 +62,87 @@ class MetadataCheckMapperTest {
     }
 
     private static Map<Long, VerifiedMetadata> map(final JsonNode output, final List<MetadataCheckRequest> asked) {
-        return MetadataCheckMapper.toCheckedBooks(output, asked, WebSearchSamples.DOMAINS).entrySet().stream()
-            .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().metadata()));
+        final CitationCheck citations = citations(metadata().page());
+        final Map<Long, MetadataCheckRequest> byId = asked.stream()
+            .collect(Collectors.toMap(MetadataCheckRequest::bookId, request -> request));
+        return MetadataCheckMapper.toVerdicts(output, asked, WebSearchSamples.DOMAINS).entrySet().stream()
+            .collect(Collectors.toMap(Map.Entry::getKey, entry -> citations
+                .verify(entry.getValue(), Objects.requireNonNull(byId.get(entry.getKey()))).metadata()));
     }
 
-    private static Map<String, FieldOutcome> outcomes(final MetadataJson json) {
-        return check(json, GERMAN_ISBN).outcomes();
+    private static CitationCheck citations(final String page) {
+        final SourcePageFetcher fetcher = mock(SourcePageFetcher.class);
+        when(fetcher.page(anyString())).thenReturn(Optional.of(new SourcePage(MetadataJson.SOURCE, page, page)));
+        return new CitationCheck(fetcher);
+    }
+
+    private static FieldVerdicts verdicts(final MetadataJson json) {
+        final Map<Long, FieldVerdicts> verdicts = MetadataCheckMapper.toVerdicts(
+            json.node(), List.of(MetadataJson.request(MetadataJson.BOOK_ID, GERMAN_ISBN)), WebSearchSamples.DOMAINS);
+        return Objects.requireNonNull(verdicts.get(MetadataJson.BOOK_ID));
+    }
+
+    private static CheckedBook check(final MetadataJson json) {
+        return check(json, GERMAN_ISBN);
     }
 
     private static CheckedBook check(final MetadataJson json, final @Nullable String storedIsbn) {
-        final Map<Long, CheckedBook> books = MetadataCheckMapper.toCheckedBooks(
-            json.node(), List.of(request(MetadataJson.BOOK_ID, storedIsbn)), WebSearchSamples.DOMAINS);
-        return Objects.requireNonNull(books.get(MetadataJson.BOOK_ID));
-    }
-
-    private static MetadataCheckRequest request(final long bookId, final @Nullable String isbn) {
-        return new MetadataCheckRequest(
-            bookId, MetadataJson.TITLE, List.of(), null, null, null, isbn, null, List.of());
+        final MetadataCheckRequest asked = MetadataJson.request(MetadataJson.BOOK_ID, storedIsbn);
+        final Map<Long, FieldVerdicts> verdicts =
+            MetadataCheckMapper.toVerdicts(json.node(), List.of(asked), WebSearchSamples.DOMAINS);
+        final String page = storedIsbn == null ? json.page() : json.page() + " ISBN " + storedIsbn;
+        return citations(page).verify(Objects.requireNonNull(verdicts.get(MetadataJson.BOOK_ID)), asked);
     }
 
     private static List<String> authors(final int count) {
         return IntStream.range(0, count).mapToObj(index -> "Author " + index).toList();
     }
 
-    @Test
-    void shouldConfirmEveryField() {
-        final VerifiedMetadata metadata = map(metadata());
+    @Nested
+    class Verdicts {
 
-        assertThat(metadata).isEqualTo(new VerifiedMetadata(
-            MetadataJson.TITLE, List.of(MetadataJson.AUTHOR), MetadataJson.YEAR,
-            MetadataJson.SERIES, 1.0, MetadataJson.DESCRIPTION, MetadataJson.ISBN, null));
+        @Test
+        void shouldConfirmEveryField() {
+            final MetadataJson json = metadata();
+
+            final VerifiedMetadata metadata = map(json);
+
+            assertThat(metadata).usingRecursiveComparison().ignoringFields("evidence").isEqualTo(new VerifiedMetadata(
+                MetadataJson.TITLE, List.of(MetadataJson.AUTHOR), MetadataJson.YEAR,
+                MetadataJson.SERIES, 1.0, MetadataJson.DESCRIPTION, MetadataJson.ISBN, null));
+        }
+
+        @Test
+        void shouldRejectAClearOnAFieldOtherThanSeries() {
+            final MetadataJson json = metadata().withStatus(MetadataJson.TITLE_FIELD, "clear");
+
+            final FieldVerdicts verdicts = verdicts(json);
+
+            assertThat(verdicts.outcomes()).containsEntry(MetadataJson.TITLE_FIELD, FieldOutcome.VALUE_REJECTED);
+        }
+
+        @Test
+        void shouldDropOnlyTheVerdictFromAHostOffTheList() {
+            final MetadataJson json = metadata().withSource(MetadataJson.YEAR_FIELD, OTHER_SITE);
+
+            final FieldVerdicts verdicts = verdicts(json);
+
+            assertThat(verdicts.fields()).extracting(FieldVerdict::field)
+                .doesNotContain(CheckedField.YEAR)
+                .contains(CheckedField.TITLE);
+            assertThat(verdicts.outcomes()).containsEntry(MetadataJson.YEAR_FIELD, FieldOutcome.SOURCE_NOT_ALLOWED);
+        }
+
+        @Test
+        void shouldDropADescriptionFromAHostOffTheList() {
+            final MetadataJson json = metadata().withSource(MetadataJson.DESCRIPTION_FIELD, OTHER_SITE);
+
+            final FieldVerdicts verdicts = verdicts(json);
+
+            assertThat(verdicts.description().status()).isEqualTo(DescriptionStatus.NOT_FOUND);
+            assertThat(verdicts.outcomes())
+                .containsEntry(MetadataJson.DESCRIPTION_FIELD, FieldOutcome.SOURCE_NOT_ALLOWED);
+        }
     }
 
     @Nested
@@ -124,13 +177,14 @@ class MetadataCheckMapperTest {
         }
 
         @Test
-        void shouldDropAUniverseWithoutASeries() {
+        void shouldRejectAUniverseWithoutASeries() {
             final MetadataJson json = metadata().withSeries(MetadataJson.SERIES, 0)
                 .withUniverse(MetadataJson.UNIVERSE, MetadataJson.UNIVERSE_NUMBER);
 
-            final VerifiedMetadata metadata = map(json);
+            final CheckedBook book = check(json);
 
-            assertThat(metadata.universe()).isNull();
+            assertThat(book.metadata().universe()).isNull();
+            assertThat(book.outcomes()).containsEntry(MetadataJson.UNIVERSE_FIELD, FieldOutcome.VALUE_REJECTED);
         }
     }
 
@@ -140,8 +194,9 @@ class MetadataCheckMapperTest {
         @Test
         void shouldAllowSubdomainInAnyCase() {
             final String source = "https://www.ISFDB.org/cgi-bin/title.cgi";
+            final MetadataJson json = metadata().withSource(MetadataJson.TITLE_FIELD, source);
 
-            final VerifiedMetadata metadata = map(metadata().withSource(MetadataJson.TITLE_FIELD, source));
+            final VerifiedMetadata metadata = map(json);
 
             assertThat(metadata.title()).isEqualTo(MetadataJson.TITLE);
         }
@@ -149,16 +204,21 @@ class MetadataCheckMapperTest {
         @ParameterizedTest
         @ValueSource(strings = {OTHER_SITE, "https://notisfdb.org/1", "not a url", "isfdb.org/title/1"})
         void shouldRejectSource(final String source) {
-            final VerifiedMetadata metadata = map(metadata().withSource(MetadataJson.TITLE_FIELD, source));
+            final MetadataJson json = metadata().withSource(MetadataJson.TITLE_FIELD, source);
+
+            final VerifiedMetadata metadata = map(json);
 
             assertThat(metadata.title()).isNull();
         }
 
         @Test
         void shouldRequireIsbnPageForTitle() {
-            final VerifiedMetadata metadata = map(metadata(), MetadataJson.ISBN);
+            final MetadataJson json = metadata();
 
-            assertThat(metadata.title()).isNull();
+            final CheckedBook book = check(json, MetadataJson.ISBN);
+
+            assertThat(book.metadata().title()).isNull();
+            assertThat(book.outcomes()).containsEntry(MetadataJson.TITLE_FIELD, FieldOutcome.TITLE_SOURCE_WITHOUT_ISBN);
         }
 
         @ParameterizedTest
@@ -167,7 +227,9 @@ class MetadataCheckMapperTest {
             "9780345539786, https://www.isfdb.org/cgi-bin/title.cgi/0-345-53978-8",
             "9780804429573, https://www.isfdb.org/cgi-bin/pl.cgi/080442957x"})
         void shouldAcceptTitleFromIsbnPage(final String storedIsbn, final String source) {
-            final VerifiedMetadata metadata = map(metadata().withSource(MetadataJson.TITLE_FIELD, source), storedIsbn);
+            final MetadataJson json = metadata().withSource(MetadataJson.TITLE_FIELD, source);
+
+            final VerifiedMetadata metadata = map(json, storedIsbn);
 
             assertThat(metadata.title()).isEqualTo(MetadataJson.TITLE);
         }
@@ -178,18 +240,11 @@ class MetadataCheckMapperTest {
             "https://en.wikipedia.org/wiki/Red_Rising#9780345539786",
             "https://en.wikipedia.org/wiki/978/0345539786"})
         void shouldRejectIsbnOutsideThePath(final String source) {
-            final VerifiedMetadata metadata =
-                map(metadata().withSource(MetadataJson.TITLE_FIELD, source), MetadataJson.ISBN);
+            final MetadataJson json = metadata().withSource(MetadataJson.TITLE_FIELD, source);
+
+            final VerifiedMetadata metadata = map(json, MetadataJson.ISBN);
 
             assertThat(metadata.title()).isNull();
-        }
-
-        @Test
-        void shouldRejectOnlyThatField() {
-            final VerifiedMetadata metadata = map(metadata().withSource(MetadataJson.YEAR_FIELD, OTHER_SITE));
-
-            assertThat(metadata.year()).isNull();
-            assertThat(metadata.title()).isEqualTo(MetadataJson.TITLE);
         }
     }
 
@@ -210,7 +265,9 @@ class MetadataCheckMapperTest {
         @ParameterizedTest
         @MethodSource("badTitles")
         void shouldRejectTitle(final String title) {
-            final VerifiedMetadata metadata = map(metadata().with(MetadataJson.TITLE_FIELD, title));
+            final MetadataJson json = metadata().with(MetadataJson.TITLE_FIELD, title);
+
+            final VerifiedMetadata metadata = map(json);
 
             assertThat(metadata.title()).isNull();
         }
@@ -218,45 +275,38 @@ class MetadataCheckMapperTest {
         @ParameterizedTest
         @MethodSource("badAuthors")
         void shouldRejectAuthors(final List<String> authors) {
-            final VerifiedMetadata metadata = map(metadata().with(MetadataJson.AUTHORS_FIELD, authors));
+            final MetadataJson json = metadata().with(MetadataJson.AUTHORS_FIELD, authors);
+
+            final VerifiedMetadata metadata = map(json);
 
             assertThat(metadata.authors()).isNull();
         }
 
         @Test
-        void shouldRejectDescription() {
-            final VerifiedMetadata metadata = map(metadata().with(MetadataJson.DESCRIPTION_FIELD, "Too short."));
-
-            assertThat(metadata.description()).isNull();
-        }
-
-        @Test
-        void shouldCleanDescription() {
-            final String html = "<p>" + MetadataJson.DESCRIPTION + "</p>";
-
-            final VerifiedMetadata metadata = map(metadata().with(MetadataJson.DESCRIPTION_FIELD, html));
-
-            assertThat(metadata.description()).isEqualTo(MetadataJson.DESCRIPTION);
-        }
-
-        @Test
         void shouldAcceptHyphenatedIsbn() {
-            final VerifiedMetadata metadata = map(metadata().with(MetadataJson.ISBN_FIELD, "978-0-345-53978-6"));
+            final MetadataJson json = metadata().with(MetadataJson.ISBN_FIELD, "978-0-345-53978-6");
+
+            final VerifiedMetadata metadata = map(json);
 
             assertThat(metadata.isbn13()).isEqualTo(MetadataJson.ISBN);
         }
 
         @Test
         void shouldKeepStoredEnglishIsbn() {
-            final VerifiedMetadata metadata = map(metadata(), ENGLISH_ISBN);
+            final MetadataJson json = metadata();
 
-            assertThat(metadata.isbn13()).isNull();
+            final CheckedBook book = check(json, ENGLISH_ISBN);
+
+            assertThat(book.metadata().isbn13()).isNull();
+            assertThat(book.outcomes()).containsEntry(MetadataJson.ISBN_FIELD, FieldOutcome.VALUE_REJECTED);
         }
 
         @ParameterizedTest
         @ValueSource(strings = {"9780345539787", "9783453315617"})
         void shouldRejectIsbn(final String isbn) {
-            final VerifiedMetadata metadata = map(metadata().with(MetadataJson.ISBN_FIELD, isbn));
+            final MetadataJson json = metadata().with(MetadataJson.ISBN_FIELD, isbn);
+
+            final VerifiedMetadata metadata = map(json);
 
             assertThat(metadata.isbn13()).isNull();
         }
@@ -266,7 +316,7 @@ class MetadataCheckMapperTest {
     class Limits {
 
         static Stream<Integer> badYears() {
-            return Stream.of(EARLIEST_YEAR - 1, 0, NEXT_YEAR + 1);
+            return Stream.of(EARLIEST_YEAR - 1, NEXT_YEAR + 1);
         }
 
         static Stream<Arguments> badSeries() {
@@ -279,15 +329,20 @@ class MetadataCheckMapperTest {
         @ParameterizedTest
         @MethodSource("badYears")
         void shouldRejectYear(final int year) {
-            final VerifiedMetadata metadata = map(metadata().with(MetadataJson.YEAR_FIELD, year));
+            final MetadataJson json = metadata().with(MetadataJson.YEAR_FIELD, year);
 
-            assertThat(metadata.year()).isNull();
+            final CheckedBook book = check(json);
+
+            assertThat(book.metadata().year()).isNull();
+            assertThat(book.outcomes()).containsEntry(MetadataJson.YEAR_FIELD, FieldOutcome.VALUE_REJECTED);
         }
 
         @ParameterizedTest
         @MethodSource("badSeries")
         void shouldRejectSeries(final String name, final int number) {
-            final VerifiedMetadata metadata = map(metadata().withSeries(name, number));
+            final MetadataJson json = metadata().withSeries(name, number);
+
+            final VerifiedMetadata metadata = map(json);
 
             assertThat(metadata.seriesName()).isNull();
             assertThat(metadata.seriesPosition()).isNull();
@@ -296,7 +351,9 @@ class MetadataCheckMapperTest {
         @ParameterizedTest(name = "number {0} is stored as {1}")
         @CsvSource({"2.5, 2.5", "0.5, 0.5", "1.756, 1.76"})
         void shouldAcceptADecimalSeriesNumber(final double number, final double stored) {
-            final VerifiedMetadata metadata = map(metadata().withSeries(MetadataJson.SERIES, number));
+            final MetadataJson json = metadata().withSeries(MetadataJson.SERIES, number);
+
+            final VerifiedMetadata metadata = map(json);
 
             assertThat(metadata.seriesPosition()).isEqualTo(stored);
         }
@@ -304,9 +361,10 @@ class MetadataCheckMapperTest {
         @Test
         void shouldAcceptUpperLimits() {
             final String longest = "x".repeat(NAME_LIMIT);
+            final MetadataJson json = metadata().withSeries(longest, MAX_POSITION)
+                .with(MetadataJson.YEAR_FIELD, NEXT_YEAR).with(MetadataJson.AUTHORS_FIELD, authors(MAX_AUTHORS));
 
-            final VerifiedMetadata metadata = map(metadata().withSeries(longest, MAX_POSITION)
-                .with(MetadataJson.YEAR_FIELD, NEXT_YEAR).with(MetadataJson.AUTHORS_FIELD, authors(MAX_AUTHORS)));
+            final VerifiedMetadata metadata = map(json);
 
             assertThat(metadata.seriesName()).isEqualTo(longest);
             assertThat(metadata.seriesPosition()).isEqualTo((double) MAX_POSITION);
@@ -316,22 +374,18 @@ class MetadataCheckMapperTest {
 
         @Test
         void shouldAcceptEarliestYear() {
-            final VerifiedMetadata metadata = map(metadata().with(MetadataJson.YEAR_FIELD, EARLIEST_YEAR));
+            final MetadataJson json = metadata().with(MetadataJson.YEAR_FIELD, EARLIEST_YEAR);
+
+            final VerifiedMetadata metadata = map(json);
 
             assertThat(metadata.year()).isEqualTo(EARLIEST_YEAR);
         }
 
-        @ParameterizedTest
-        @ValueSource(doubles = {2014.5})
-        void shouldRejectAYearThatIsNotAWholeNumber(final double year) {
-            final VerifiedMetadata metadata = map(metadata().with(MetadataJson.YEAR_FIELD, year));
-
-            assertThat(metadata.year()).isNull();
-        }
-
         @Test
-        void shouldRejectAMissingYear() {
-            final VerifiedMetadata metadata = map(metadata().with(MetadataJson.YEAR_FIELD, null));
+        void shouldRejectAYearThatIsNotAWholeNumber() {
+            final MetadataJson json = metadata().with(MetadataJson.YEAR_FIELD, 2014.5);
+
+            final VerifiedMetadata metadata = map(json);
 
             assertThat(metadata.year()).isNull();
         }
@@ -341,81 +395,41 @@ class MetadataCheckMapperTest {
     class Outcomes {
 
         @Test
-        void shouldMarkAFieldFromAnUnlistedSiteAsSourceNotAllowed() {
-            final MetadataJson json = metadata().withSource(MetadataJson.YEAR_FIELD, OTHER_SITE);
-
-            final Map<String, FieldOutcome> outcomes = outcomes(json);
-
-            assertThat(outcomes).containsEntry(MetadataJson.YEAR_FIELD, FieldOutcome.SOURCE_NOT_ALLOWED);
-        }
-
-        @Test
-        void shouldMarkAYearOutOfRangeAsValueRejected() {
-            final MetadataJson json = metadata().with(MetadataJson.YEAR_FIELD, NEXT_YEAR + 1);
-
-            final Map<String, FieldOutcome> outcomes = outcomes(json);
-
-            assertThat(outcomes).containsEntry(MetadataJson.YEAR_FIELD, FieldOutcome.VALUE_REJECTED);
-        }
-
-        @Test
-        void shouldRecordAMissingIsbnInTheTitleSource() {
-            final CheckedBook book = check(metadata(), MetadataJson.ISBN);
-
-            assertThat(book.outcomes()).containsEntry(MetadataJson.TITLE_FIELD, FieldOutcome.TITLE_SOURCE_WITHOUT_ISBN);
-        }
-
-        @Test
         void shouldMarkAMissingFieldAsNotAnswered() {
             final MetadataJson json = metadata().without(MetadataJson.YEAR_FIELD);
 
-            final Map<String, FieldOutcome> outcomes = outcomes(json);
+            final CheckedBook book = check(json);
 
-            assertThat(outcomes).containsEntry(MetadataJson.YEAR_FIELD, FieldOutcome.NOT_ANSWERED);
+            assertThat(book.outcomes()).containsEntry(MetadataJson.YEAR_FIELD, FieldOutcome.NOT_ANSWERED);
         }
 
         @Test
         void shouldMarkANullValueAsNotAnswered() {
             final MetadataJson json = metadata().with(MetadataJson.YEAR_FIELD, null);
 
-            final Map<String, FieldOutcome> outcomes = outcomes(json);
+            final CheckedBook book = check(json);
 
-            assertThat(outcomes).containsEntry(MetadataJson.YEAR_FIELD, FieldOutcome.NOT_ANSWERED);
+            assertThat(book.metadata().year()).isNull();
+            assertThat(book.outcomes()).containsEntry(MetadataJson.YEAR_FIELD, FieldOutcome.NOT_ANSWERED);
         }
 
         @Test
-        void shouldMarkANullValueWithoutASourceAsNotAnswered() {
-            final MetadataJson json = metadata().with(MetadataJson.YEAR_FIELD, null)
-                .withSource(MetadataJson.YEAR_FIELD, null);
+        void shouldMarkASeriesWithoutANameAsNotAnswered() {
+            final MetadataJson json = metadata().withSeries("", 1);
 
-            final Map<String, FieldOutcome> outcomes = outcomes(json);
+            final FieldVerdicts verdicts = verdicts(json);
 
-            assertThat(outcomes).containsEntry(MetadataJson.YEAR_FIELD, FieldOutcome.NOT_ANSWERED);
+            assertThat(verdicts.outcomes()).containsEntry(MetadataJson.SERIES_FIELD, FieldOutcome.NOT_ANSWERED);
         }
 
         @Test
-        void shouldMarkAnIsbnForAnEnglishEditionAsValueRejected() {
-            final CheckedBook book = check(metadata(), ENGLISH_ISBN);
+        void shouldMarkAnUnfoundDescriptionFromAnUnlistedHostAsNotAnswered() {
+            final MetadataJson json = metadata().withSource(MetadataJson.DESCRIPTION_FIELD, OTHER_SITE)
+                .without(MetadataJson.DESCRIPTION_FIELD);
 
-            assertThat(book.outcomes()).containsEntry(MetadataJson.ISBN_FIELD, FieldOutcome.VALUE_REJECTED);
-        }
+            final FieldVerdicts verdicts = verdicts(json);
 
-        @Test
-        void shouldMarkAUniverseWithoutASeriesAsValueRejected() {
-            final MetadataJson json = metadata().withSeries(MetadataJson.SERIES, 0)
-                .withUniverse(MetadataJson.UNIVERSE, MetadataJson.UNIVERSE_NUMBER);
-
-            final Map<String, FieldOutcome> outcomes = outcomes(json);
-
-            assertThat(outcomes).containsEntry(MetadataJson.UNIVERSE_FIELD, FieldOutcome.VALUE_REJECTED);
-        }
-
-        @Test
-        void shouldShortenTheDescriptionInTheLoggedAnswer() {
-            final CheckedBook book = check(metadata(), GERMAN_ISBN);
-
-            assertThat(book.answer().at("/description/value").asString())
-                .isEqualTo(MetadataJson.DESCRIPTION.substring(0, LOGGED_DESCRIPTION_LENGTH));
+            assertThat(verdicts.outcomes()).containsEntry(MetadataJson.DESCRIPTION_FIELD, FieldOutcome.NOT_ANSWERED);
         }
     }
 
@@ -424,23 +438,28 @@ class MetadataCheckMapperTest {
 
         @Test
         void shouldLeaveOutABookTheAnswerSkips() {
-            final Map<Long, VerifiedMetadata> metadata =
-                map(metadata().node(), List.of(request(MetadataJson.BOOK_ID, null), request(OTHER_ID, null)));
+            final List<MetadataCheckRequest> asked =
+                List.of(MetadataJson.request(MetadataJson.BOOK_ID, null), MetadataJson.request(OTHER_ID, null));
+
+            final Map<Long, VerifiedMetadata> metadata = map(metadata().node(), asked);
 
             assertThat(metadata).containsOnlyKeys(MetadataJson.BOOK_ID);
         }
 
         @Test
         void shouldDropUnaskedId() {
-            final Map<Long, VerifiedMetadata> metadata = map(metadata().node(), List.of(request(OTHER_ID, null)));
+            final List<MetadataCheckRequest> asked = List.of(MetadataJson.request(OTHER_ID, null));
+
+            final Map<Long, VerifiedMetadata> metadata = map(metadata().node(), asked);
 
             assertThat(metadata).isEmpty();
         }
 
         @Test
         void shouldIgnoreAnAnswerWithoutANumericId() {
-            final Map<Long, VerifiedMetadata> metadata =
-                map(metadata().withId("Red Rising").node(), List.of(request(0, null)));
+            final JsonNode answer = metadata().withId("Red Rising").node();
+
+            final Map<Long, VerifiedMetadata> metadata = map(answer, List.of(MetadataJson.request(0, null)));
 
             assertThat(metadata).isEmpty();
         }
@@ -453,7 +472,8 @@ class MetadataCheckMapperTest {
             ((ObjectNode) repeated.get(MetadataJson.TITLE_FIELD)).put("value", MetadataJson.GOLDEN_SON);
             answered.add(repeated);
 
-            final Map<Long, VerifiedMetadata> metadata = map(answer, List.of(request(MetadataJson.BOOK_ID, null)));
+            final Map<Long, VerifiedMetadata> metadata =
+                map(answer, List.of(MetadataJson.request(MetadataJson.BOOK_ID, null)));
 
             assertThat(metadata.get(MetadataJson.BOOK_ID)).extracting(VerifiedMetadata::title)
                 .isEqualTo(MetadataJson.TITLE);

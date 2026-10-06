@@ -165,6 +165,31 @@
     </Match>
 
     <!--
+      IMPROPER_UNICODE on the metadata check. PageText folds case and compatibility forms so a quote
+      matches the page it was copied from, and the mapper matches a lower-case status word against a
+      fixed enum. Neither is an identity or security check.
+    -->
+    <Match>
+        <Bug pattern="IMPROPER_UNICODE"/>
+        <Or>
+            <Class name="com.betterreads.clients.websearch.PageText$Folded"/>
+            <Class name="com.betterreads.clients.websearch.MetadataCheckMapper"/>
+        </Or>
+    </Match>
+
+    <!--
+      CRLF_INJECTION_LOGS on the metadata check run log. The lines log enum constants, counts and
+      LogSanitizer.forLog output, so no logged value can carry CRLF.
+    -->
+    <Match>
+        <Bug pattern="CRLF_INJECTION_LOGS"/>
+        <Or>
+            <Class name="com.betterreads.features.metadatacheck.MetadataCheckService"/>
+            <Class name="com.betterreads.features.metadatacheck.MetadataCheckService$Summary"/>
+        </Or>
+    </Match>
+
+    <!--
       IMPROPER_UNICODE on the language-code lookup. The input is a source's ISO 639 code, lower-cased
       to look up a fixed ASCII table.
     -->

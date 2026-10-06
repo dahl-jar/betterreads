@@ -39,9 +39,10 @@ import org.jspecify.annotations.Nullable;
 @Entity
 @Table(name = "book")
 // NullAway.Init, PMD.ExcessivePublicCount, PMD.TooManyFields, PMD.CyclomaticComplexity: JPA sets one field per column.
+// PMD.TooManyMethods: each catalog write path (source, series, verified, retry) is its own method.
 @SuppressWarnings({
     "NullAway.Init", "PMD.ExcessivePublicCount", "PMD.TooManyFields",
-    "PMD.CyclomaticComplexity"
+    "PMD.CyclomaticComplexity", "PMD.TooManyMethods"
 })
 public class Book extends Timestamped {
 
@@ -149,6 +150,9 @@ public class Book extends Timestamped {
     @Nullable
     @Column(name = "metadata_check_requested_at")
     private OffsetDateTime metadataCheckRequestedAt = OffsetDateTime.now(ZoneOffset.UTC);
+
+    @Column(name = "metadata_check_attempts", nullable = false)
+    private int metadataCheckAttempts;
 
     @Convert(converter = VerifiedFieldsConverter.class)
     @Column(name = "verified_fields", nullable = false)
@@ -274,16 +278,8 @@ public class Book extends Timestamped {
             this.firstPublishYear = metadata.year();
             verifiedFields.add(VerifiedField.YEAR);
         }
-        if (metadata.seriesName() != null) {
-            this.seriesName = metadata.seriesName();
-            this.seriesPosition = metadata.seriesPosition();
-            replaceSeries(Stream.concat(
-                    SeriesEntry.listOf(metadata.seriesName(), metadata.seriesPosition()).stream(),
-                    Stream.ofNullable(metadata.universe()))
-                .toList());
-            verifiedFields.add(VerifiedField.SERIES);
-        }
-        if (metadata.description() != null) {
+        applyVerifiedSeries(metadata);
+        if (metadata.descriptionCleared() || metadata.description() != null) {
             this.description = metadata.description();
             verifiedFields.add(VerifiedField.DESCRIPTION);
         }
@@ -293,7 +289,32 @@ public class Book extends Timestamped {
             verifiedFields.add(VerifiedField.ISBN);
         }
         this.metadataCheckedAt = checkedAt;
+        this.metadataCheckAttempts = 0;
         setMetadataCheckRequestedAt(null);
+    }
+
+    private void applyVerifiedSeries(final VerifiedMetadata metadata) {
+        if (!metadata.seriesCleared() && metadata.seriesName() == null) {
+            return;
+        }
+        this.seriesName = metadata.seriesName();
+        this.seriesPosition = metadata.seriesPosition();
+        replaceSeries(metadata.seriesCleared() ? List.of() : Stream.concat(
+                SeriesEntry.listOf(metadata.seriesName(), metadata.seriesPosition()).stream(),
+                Stream.ofNullable(metadata.universe()))
+            .toList());
+        verifiedFields.add(VerifiedField.SERIES);
+    }
+
+    public boolean deferMetadataCheck(final OffsetDateTime retryAt, final int maxAttempts, final OffsetDateTime now) {
+        this.metadataCheckAttempts++;
+        if (this.metadataCheckAttempts >= maxAttempts) {
+            this.metadataCheckedAt = now;
+            setMetadataCheckRequestedAt(null);
+            return false;
+        }
+        setMetadataCheckRequestedAt(retryAt);
+        return true;
     }
 
     @Nullable OffsetDateTime getMetadataCheckRequestedAt() {

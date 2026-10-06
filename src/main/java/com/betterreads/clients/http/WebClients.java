@@ -8,7 +8,9 @@ import java.util.function.Supplier;
 
 import com.betterreads.logging.LogSanitizer;
 import io.netty.channel.ChannelOption;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
@@ -36,14 +38,29 @@ public final class WebClients {
         final int connectTimeoutMillis,
         final int readTimeoutMillis
     ) {
-        final HttpClient httpClient = HttpClient.create()
-            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, connectTimeoutMillis)
-            .responseTimeout(Duration.ofMillis(readTimeoutMillis));
-
         return WebClient.builder()
             .baseUrl(baseUrl)
-            .clientConnector(new ReactorClientHttpConnector(httpClient))
+            .clientConnector(new ReactorClientHttpConnector(httpClient(connectTimeoutMillis, readTimeoutMillis)))
             .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(MAX_RESPONSE_BYTES));
+    }
+
+    public static HttpClient httpClient(final int connectTimeoutMillis, final int readTimeoutMillis) {
+        return HttpClient.create()
+            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, connectTimeoutMillis)
+            .responseTimeout(Duration.ofMillis(readTimeoutMillis));
+    }
+
+    public static HttpClient publicHttpClient(
+        final int connectTimeoutMillis, final int readTimeoutMillis, final PublicUrlGuard guard) {
+        return httpClient(connectTimeoutMillis, readTimeoutMillis).resolver(new PublicAddressResolverGroup(guard));
+    }
+
+    public static @Nullable ResponseEntity<byte[]> getBytes(
+        final WebClient client, final String url, final Duration timeout) {
+        return client.get()
+            .uri(URI.create(url))
+            .exchangeToMono(response -> response.toEntity(byte[].class))
+            .block(timeout);
     }
 
     public static Optional<String> getBodyOrEmptyOn4xx(

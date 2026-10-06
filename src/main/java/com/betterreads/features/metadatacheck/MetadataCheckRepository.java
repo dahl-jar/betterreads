@@ -1,5 +1,6 @@
 package com.betterreads.features.metadatacheck;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 
 import com.betterreads.book.Book;
@@ -12,13 +13,14 @@ import org.springframework.data.repository.query.Param;
 
 interface MetadataCheckRepository extends JpaRepository<Book, Long> {
 
-    @EntityGraph(attributePaths = {"credits", "credits.author", "series"})
+    @EntityGraph(attributePaths = {"credits", "credits.author", "series", "subjects"})
     @Query("""
         SELECT b FROM Book b
         WHERE b.metadataCheckRequestedAt IS NOT NULL
+          AND b.metadataCheckRequestedAt <= :now
         ORDER BY b.metadataCheckRequestedAt ASC, b.bookId ASC
         """)
-    List<Book> findDueForCheck(Pageable pageable);
+    List<Book> findDueForCheck(@Param("now") OffsetDateTime now, Pageable pageable);
 
     @Query(value = """
         SELECT series_name FROM book WHERE series_name IS NOT NULL

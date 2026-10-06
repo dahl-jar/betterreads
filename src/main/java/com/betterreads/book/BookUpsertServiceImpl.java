@@ -9,6 +9,7 @@ import com.betterreads.booksource.SourceBook;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -37,17 +38,21 @@ class BookUpsertServiceImpl implements BookUpsertService {
 
     private final SeriesChangeRecorder seriesChanges;
 
+    private final MetadataChangeRecorder metadataChanges;
+
     private final EntityManager entityManager;
 
     BookUpsertServiceImpl(
         final BookRepository bookRepository,
         final AuthorResolver authorResolver,
         final SeriesChangeRecorder seriesChanges,
+        final MetadataChangeRecorder metadataChanges,
         final EntityManager entityManager
     ) {
         this.bookRepository = bookRepository;
         this.authorResolver = authorResolver;
         this.seriesChanges = seriesChanges;
+        this.metadataChanges = metadataChanges;
         this.entityManager = entityManager;
     }
 
@@ -83,8 +88,7 @@ class BookUpsertServiceImpl implements BookUpsertService {
     @Transactional
     @CacheEvict(cacheNames = BookDetailCache.NAME, key = "#result.dedupKey")
     public Book applyCredits(final long bookId, final List<SourceAuthor> credits) {
-        final Book book = bookRepository.findForUpdate(bookId)
-            .orElseThrow(() -> new IllegalArgumentException(NO_BOOK + bookId));
+        final Book book = locked(bookId);
         if (book.isVerified(VerifiedField.AUTHORS)) {
             stampIfChanged(book, book.replaceCredits(Credits.reordered(book.getCredits(), credits)));
         } else {
@@ -96,12 +100,9 @@ class BookUpsertServiceImpl implements BookUpsertService {
     @Override
     @Transactional
     @CacheEvict(cacheNames = BookDetailCache.NAME, key = "#result.dedupKey")
-    public Book applyVerified(final long bookId, final VerifiedMetadata metadata) {
-        final Book book = bookRepository.findForUpdate(bookId)
-            .orElseThrow(() -> new IllegalArgumentException(NO_BOOK + bookId));
-        LOG.info("catalog.metadata-check bookId={} before title={} isbn={} series={} #{}", bookId,
-            LogSanitizer.forLog(book.getTitle()), LogSanitizer.forLog(book.getIsbn()),
-            LogSanitizer.forLog(book.getSeriesName()), book.getSeriesPosition());
+    public Book applyVerified(final long bookId, final VerifiedMetadata metadata, final int checkVersion) {
+        final Book book = locked(bookId);
+        final Map<VerifiedField, @Nullable String> before = BookSnapshot.of(book);
         final List<ResolvedCredit> nonPrimary = book.getCredits().stream()
             .filter(credit -> !credit.getRole().isPrimary())
             .map(credit -> new ResolvedCredit(credit.getAuthor(), credit.getRole()))
@@ -116,11 +117,23 @@ class BookUpsertServiceImpl implements BookUpsertService {
                 stampIfChanged(book, book.replaceCredits(credits));
             }
         }
-        LOG.info("catalog.metadata-check bookId={} verified={} after title={} isbn={} series={} #{}", bookId,
-            LogSanitizer.forLog(book.getVerifiedFields().toString()), LogSanitizer.forLog(book.getTitle()),
-            LogSanitizer.forLog(book.getIsbn()),
-            LogSanitizer.forLog(book.getSeriesName()), book.getSeriesPosition());
+        metadataChanges.record(bookId, before, book, metadata.evidence(), checkVersion);
+        LOG.info("catalog.metadata-check bookId={} verified={}", bookId,
+            LogSanitizer.forLog(book.getVerifiedFields().toString()));
         return bookRepository.save(book);
+    }
+
+    @Override
+    @Transactional
+    public boolean deferMetadataCheck(final long bookId, final OffsetDateTime retryAt, final int maxAttempts) {
+        final Book book = locked(bookId);
+        final boolean retrying = book.deferMetadataCheck(retryAt, maxAttempts, OffsetDateTime.now(ZoneOffset.UTC));
+        bookRepository.save(book);
+        return retrying;
+    }
+
+    private Book locked(final long bookId) {
+        return bookRepository.findForUpdate(bookId).orElseThrow(() -> new IllegalArgumentException(NO_BOOK + bookId));
     }
 
     /**

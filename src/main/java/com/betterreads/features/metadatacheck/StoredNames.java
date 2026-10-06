@@ -28,7 +28,7 @@ final class StoredNames {
 
     StoredNames(final List<String> seriesNames, final List<String> authorNames) {
         this.series = byKey(seriesNames, StoredNames::seriesKey);
-        this.authors = byKey(authorNames, StoredNames::authorKey);
+        this.authors = byKey(authorNames, AuthorNames::key);
     }
 
     VerifiedMetadata withStoredSpelling(final VerifiedMetadata metadata, final String storedTitle) {
@@ -36,13 +36,16 @@ final class StoredNames {
         final List<String> names = metadata.authors();
         return new VerifiedMetadata(
             title(metadata.title(), storedTitle),
-            names == null ? null : names.stream().map(name -> stored(authors, authorKey(name), name)).toList(),
+            names == null ? null : names.stream().map(name -> stored(authors, AuthorNames.key(name), name)).toList(),
             metadata.year(),
             seriesName == null ? null : storedSeries(seriesName),
             metadata.seriesPosition(),
             metadata.description(),
             metadata.isbn13(),
-            storedUniverse(seriesName, metadata.universe()));
+            storedUniverse(seriesName, metadata.universe()),
+            metadata.seriesCleared(),
+            metadata.descriptionCleared(),
+            metadata.evidence());
     }
 
     private @Nullable SeriesEntry storedUniverse(
@@ -69,12 +72,12 @@ final class StoredNames {
         final String verifiedKey = key(verified);
         final String storedKey = key(stored);
         final boolean sameBook = verifiedKey.equals(storedKey)
-            || key(coreTitle(verified)).equals(storedKey)
-            || verifiedKey.equals(key(coreTitle(stored)));
+            || key(beforeSubtitle(verified)).equals(storedKey)
+            || verifiedKey.equals(key(beforeSubtitle(stored)));
         return sameBook && !verifiedKey.isEmpty() ? stored : verified;
     }
 
-    private static String coreTitle(final String title) {
+    private static String beforeSubtitle(final String title) {
         return SUBTITLE_SEPARATOR.split(title, 2)[0];
     }
 
@@ -87,10 +90,6 @@ final class StoredNames {
 
     private static String seriesKey(final String name) {
         return key(LEADING_ARTICLE.matcher(name.strip()).replaceFirst(""));
-    }
-
-    private static String authorKey(final String name) {
-        return AuthorNames.key(name);
     }
 
     private static String key(final String text) {

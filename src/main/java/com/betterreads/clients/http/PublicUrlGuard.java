@@ -1,4 +1,4 @@
-package com.betterreads.clients.coverfetch;
+package com.betterreads.clients.http;
 
 import java.net.InetAddress;
 import java.net.URI;
@@ -12,14 +12,13 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * Decides whether a cover URL is safe to fetch server-side.
+ * Decides whether a URL from an external response is safe to fetch server-side.
  *
- * <p>Cover URLs come from external catalog responses, so a compromised source could point one at an
- * internal service or a cloud metadata endpoint. Only http(s) URLs whose host resolves entirely to
- * public addresses pass. A host that fails to resolve is rejected.
+ * <p>URLs from external responses can point at an internal service or a cloud metadata endpoint, so only
+ * http(s) URLs whose host resolves entirely to public addresses pass. A host that fails to resolve is rejected.
  */
 @Component
-class CoverUrlGuard {
+public class PublicUrlGuard {
 
     private static final Set<String> ALLOWED_SCHEMES = Set.of("http", "https");
 
@@ -41,15 +40,15 @@ class CoverUrlGuard {
 
     private final HostResolver resolver;
 
-    CoverUrlGuard() {
+    public PublicUrlGuard() {
         this(InetAddress::getAllByName);
     }
 
-    CoverUrlGuard(final HostResolver resolver) {
+    public PublicUrlGuard(final HostResolver resolver) {
         this.resolver = resolver;
     }
 
-    boolean isAllowed(final String url) {
+    public boolean isAllowed(final String url) {
         final URI uri = parse(url);
         if (uri == null) {
             return false;
@@ -72,10 +71,18 @@ class CoverUrlGuard {
 
     private boolean resolvesToPublicOnly(final String host) {
         try {
-            return Arrays.stream(resolver.resolve(host)).noneMatch(CoverUrlGuard::isNonPublic);
+            return arePublic(addressesOf(host));
         } catch (UnknownHostException ex) {
             return false;
         }
+    }
+
+    public InetAddress[] addressesOf(final String host) throws UnknownHostException {
+        return resolver.resolve(host);
+    }
+
+    public boolean arePublic(final InetAddress... addresses) {
+        return addresses.length > 0 && Arrays.stream(addresses).noneMatch(PublicUrlGuard::isNonPublic);
     }
 
     private static boolean isNonPublic(final InetAddress address) {
@@ -103,7 +110,7 @@ class CoverUrlGuard {
     }
 
     @FunctionalInterface
-    interface HostResolver {
+    public interface HostResolver {
         InetAddress[] resolve(String host) throws UnknownHostException;
     }
 }

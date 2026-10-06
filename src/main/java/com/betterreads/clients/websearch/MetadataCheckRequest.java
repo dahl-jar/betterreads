@@ -14,7 +14,8 @@ public record MetadataCheckRequest(
     @Nullable Double seriesPosition,
     @Nullable String isbn13,
     @Nullable SeriesEntry universe,
-    List<SeriesBook> seriesBooks
+    List<SeriesBook> seriesBooks,
+    @Nullable String description
 ) {
 
     public MetadataCheckRequest {

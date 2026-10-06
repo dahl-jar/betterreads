@@ -19,7 +19,8 @@ final class WebSearchArgs {
     private WebSearchArgs() {
     }
 
-    static List<String> argv(final WebSearchProperties properties, final String jsonSchema) {
+    static List<String> argv(
+        final WebSearchProperties properties, final String jsonSchema, final List<String> domains) {
         return Stream.of(
                 Stream.of(
                     properties.bin(), "-p",
@@ -30,7 +31,9 @@ final class WebSearchArgs {
                     "--settings", settings(properties.hookScript()),
                     "--tools", SEARCH + ",WebFetch",
                     "--allowedTools", SEARCH),
-                properties.fetchDomains().stream().map(domain -> "WebFetch(domain:" + domain + ")"),
+                domains.stream()
+                    .filter(domain -> !properties.searchOnlyDomains().contains(domain))
+                    .map(domain -> "WebFetch(domain:" + domain + ")"),
                 Stream.of(
                     "--permission-mode", "dontAsk",
                     "--max-turns", String.valueOf(properties.maxTurns()),

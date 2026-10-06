@@ -107,7 +107,7 @@ class BookSeriesPersistenceIntegrationTest extends ContainerizedTest {
     void shouldFindAVerifiedSeriesByHardcoverId() {
         final Book book = bookUpsertService.upsertFromSource(wordsOfRadiance(List.of(STORMLIGHT)));
         bookUpsertService.applyVerified(book.getBookId(),
-            new VerifiedMetadata(null, null, null, STORMLIGHT.name(), STORMLIGHT.position(), null, null, null));
+            new VerifiedMetadata(null, null, null, STORMLIGHT.name(), STORMLIGHT.position(), null, null, null), 1);
 
         final boolean verified = bookRepository.existsSeriesVerifiedByHardcoverId(HARDCOVER_ID);
 

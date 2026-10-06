@@ -77,7 +77,7 @@ class BookSeriesChangeIntegrationTest extends ContainerizedTest {
     @Test
     void shouldQueueTheChangedBookForTheCheck() {
         final Book book = bookUpsertService.upsertFromSource(wordsOfRadiance(List.of(COSMERE)));
-        bookUpsertService.applyVerified(book.getBookId(), VerifiedMetadata.NONE);
+        bookUpsertService.applyVerified(book.getBookId(), VerifiedMetadata.NONE, 1);
 
         bookUpsertService.upsertFromSource(wordsOfRadiance(List.of(STORMLIGHT, COSMERE)));
 

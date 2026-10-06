@@ -9,6 +9,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.Optional;
 
 import com.betterreads.clients.WireMockFixture;
+import com.betterreads.clients.http.PublicUrlGuard;
+import com.betterreads.clients.http.UrlGuards;
 import com.betterreads.images.Image;
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder;
 import org.junit.jupiter.api.DisplayName;
@@ -25,6 +27,10 @@ class CoverFetchClientWireMockTest extends WireMockFixture {
     private static final int OVER_LIMIT_BYTES = MAX_FETCH_BYTES + 1;
 
     private static final int HTTP_OK = 200;
+
+    private static final int SHORT_READ_MS = 1000;
+
+    private static final int TRICKLE_MS = 3000;
 
     private static final int HTTP_FOUND = 302;
 
@@ -48,19 +54,13 @@ class CoverFetchClientWireMockTest extends WireMockFixture {
 
     private static final byte[] JPEG = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x00};
 
-    private final WebClient webClient = new CoverFetchWebClientConfig(
-        new CoverFetchProperties(CONNECT_TIMEOUT_MS, READ_TIMEOUT_MS, MAX_FETCH_BYTES)).coverFetchWebClient();
+    private final CoverFetchProperties properties =
+        new CoverFetchProperties(CONNECT_TIMEOUT_MS, READ_TIMEOUT_MS, MAX_FETCH_BYTES);
 
-    private final CoverFetchClient client = new CoverFetchClient(webClient, allowAllGuard());
+    private final WebClient webClient =
+        new CoverFetchWebClientConfig(properties, UrlGuards.allowing(true)).coverFetchWebClient();
 
-    private static CoverUrlGuard allowAllGuard() {
-        return new CoverUrlGuard() {
-            @Override
-            public boolean isAllowed(final String url) {
-                return true;
-            }
-        };
-    }
+    private final CoverFetchClient client = new CoverFetchClient(webClient, UrlGuards.allowing(true), properties);
 
     private static ResponseDefinitionBuilder jpegResponse(final byte[] body) {
         return aResponse().withStatus(HTTP_OK).withHeader(CONTENT_TYPE_HEADER, JPEG_TYPE).withBody(body);
@@ -134,6 +134,21 @@ class CoverFetchClientWireMockTest extends WireMockFixture {
             .isEmpty();
     }
 
+    @Test
+    void shouldGiveUpOnACoverThatKeepsTrickling() {
+        WIREMOCK.stubFor(get(urlPathEqualTo(COVER_PATH))
+            .willReturn(jpegResponse(JPEG).withChunkedDribbleDelay(JPEG.length, TRICKLE_MS)));
+        final CoverFetchProperties impatient =
+            new CoverFetchProperties(CONNECT_TIMEOUT_MS, SHORT_READ_MS, MAX_FETCH_BYTES);
+        final CoverFetchClient slow = new CoverFetchClient(
+            new CoverFetchWebClientConfig(impatient, UrlGuards.allowing(true)).coverFetchWebClient(),
+            UrlGuards.allowing(true), impatient);
+
+        final Optional<Image> fetched = slow.fetch(baseUrl() + COVER_PATH);
+
+        assertThat(fetched).isEmpty();
+    }
+
     @Nested
     @DisplayName("redirects")
     class Redirects {
@@ -152,12 +167,12 @@ class CoverFetchClientWireMockTest extends WireMockFixture {
         @DisplayName("a redirect to a target the guard refuses resolves to empty")
         void redirectToRefusedTargetIsEmpty() {
             stubRedirectToCover();
-            final CoverFetchClient guarded = new CoverFetchClient(webClient, new CoverUrlGuard() {
+            final CoverFetchClient guarded = new CoverFetchClient(webClient, new PublicUrlGuard() {
                 @Override
                 public boolean isAllowed(final String url) {
                     return !url.endsWith(REDIRECT_PATH);
                 }
-            });
+            }, properties);
 
             final Optional<Image> fetched = guarded.fetch(baseUrl() + COVER_PATH);
 

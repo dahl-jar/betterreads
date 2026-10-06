@@ -165,6 +165,10 @@ betterreads:
       enabled: ${CATALOG_METADATA_CHECK_ENABLED:false}
       batch-size: ${CATALOG_METADATA_CHECK_BATCH_SIZE:10}
       max-books-per-run: ${CATALOG_METADATA_CHECK_MAX_BOOKS:100}
+      retry-after-failure: ${CATALOG_METADATA_CHECK_RETRY_AFTER_FAILURE:P1D}
+      retry-after-unconfirmed: ${CATALOG_METADATA_CHECK_RETRY_AFTER_UNCONFIRMED:P7D}
+      max-attempts: ${CATALOG_METADATA_CHECK_MAX_ATTEMPTS:3}
+      check-version: 2
   cache:
     book-detail-ttl: ${BOOK_DETAIL_CACHE_TTL:PT24H}
   search:
@@ -201,21 +205,56 @@ wikidata:
 web-search:
   bin: ${WEB_SEARCH_BIN:claude}
   model: ${WEB_SEARCH_MODEL:claude-sonnet-5-5}
-  effort: ${WEB_SEARCH_EFFORT:low}
-  max-turns: ${WEB_SEARCH_MAX_TURNS:40}
-  timeout: ${WEB_SEARCH_TIMEOUT:PT5M}
+  effort: ${WEB_SEARCH_EFFORT:medium}
+  max-turns: ${WEB_SEARCH_MAX_TURNS:80}
+  timeout: ${WEB_SEARCH_TIMEOUT:PT10M}
   hook-script: ${WEB_SEARCH_HOOK_SCRIPT:/opt/websearch/restrict-search.mjs}
-  allowed-domains:
-    - isfdb.org
+  group-domains:
+    "[SFF]":
+      - isfdb.org
+      - bookseriesinorder.com
+      - baen.com
+      - store.gollancz.co.uk
+    "[COMIC]":
+      - idwpublishing.com
+      - viz.com
+      - yenpress.com
+      - abramsbooks.com
+    "[YOUNG_ADULT]":
+      - scholastic.com
+      - abramsbooks.com
+      - bookseriesinorder.com
+    "[GENERAL]":
+      - bookseriesinorder.com
+      - abramsbooks.com
+      - kensingtonbooks.com
+  shared-domains:
     - en.wikipedia.org
-    - fantasticfiction.com
-    - bookseriesinorder.com
+    - openlibrary.org
+    - books.google.com
+    - goodreads.com
+    - fictiondb.com
+    - kirkusreviews.com
+    - isbnsearch.org
+    - barnesandnoble.com
+    - thriftbooks.com
+    - books.apple.com
+    - target.com
+    - indigo.ca
     - penguinrandomhouse.com
-    - macmillan.com
+    - penguin.co.uk
+    - us.macmillan.com
+    - panmacmillan.com
     - hachettebookgroup.com
-    - simonandschuster.com
+    - headline.co.uk
+    - littlebrown.co.uk
   search-only-domains:
     - isfdb.org
+  page-connect-timeout: ${WEB_SEARCH_PAGE_CONNECT_TIMEOUT:5000}
+  page-read-timeout: ${WEB_SEARCH_PAGE_READ_TIMEOUT:15000}
+  page-max-bytes: ${WEB_SEARCH_PAGE_MAX_BYTES:2097152}
+  page-schemes:
+    - https
 
 wikipedia:
   base-url: ${WIKIPEDIA_BASE_URL:https://en.wikipedia.org}

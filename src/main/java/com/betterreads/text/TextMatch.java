@@ -44,7 +44,7 @@ public final class TextMatch {
         return coreTitle(first).equals(coreTitle(second));
     }
 
-    private static String coreTitle(final String title) {
+    public static String coreTitle(final String title) {
         return SUBTITLE_TAIL.matcher(title).replaceAll("").trim().toLowerCase(Locale.ROOT);
     }
 }

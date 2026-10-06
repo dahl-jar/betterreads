@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 
 import com.betterreads.booksource.BookFieldSource;
 import com.betterreads.booksource.CreditRole;
@@ -372,6 +373,83 @@ class BookTest {
 
             assertThat(book.getIsbn()).isEqualTo(ENGLISH_ISBN);
             assertThat(book.getLanguage()).isEqualTo("en");
+        }
+    }
+
+    @Nested
+    class Retry {
+
+        private static final int MAX_ATTEMPTS = RetrySamples.MAX_ATTEMPTS;
+
+        private static final OffsetDateTime NOW = OffsetDateTime.now(ZoneOffset.UTC);
+
+        private static final OffsetDateTime RETRY_AT = NOW.plusDays(RetrySamples.RETRY_DAYS);
+
+        @Test
+        void shouldScheduleARetryUnderTheAttemptCap() {
+            final Book book = new Book();
+
+            book.deferMetadataCheck(RETRY_AT, MAX_ATTEMPTS, NOW);
+
+            assertThat(book.getMetadataCheckRequestedAt()).isEqualTo(RETRY_AT);
+        }
+
+        @Test
+        void shouldStopRetryingAtTheAttemptCap() {
+            final Book book = new Book();
+            book.deferMetadataCheck(RETRY_AT, MAX_ATTEMPTS, NOW);
+            book.deferMetadataCheck(RETRY_AT, MAX_ATTEMPTS, NOW);
+
+            final boolean retrying = book.deferMetadataCheck(RETRY_AT, MAX_ATTEMPTS, NOW);
+
+            assertThat(retrying).isFalse();
+            assertThat(book.getMetadataCheckRequestedAt()).isNull();
+        }
+
+        @Test
+        void shouldResetAttemptsWhenAFieldIsVerified() {
+            final Book book = new Book();
+            book.deferMetadataCheck(RETRY_AT, MAX_ATTEMPTS, NOW);
+            book.deferMetadataCheck(RETRY_AT, MAX_ATTEMPTS, NOW);
+            book.applyVerified(new VerifiedMetadata(A_TITLE, null, null, null, null, null, null, null), NOW);
+
+            book.deferMetadataCheck(RETRY_AT, MAX_ATTEMPTS, NOW);
+
+            assertThat(book.getMetadataCheckRequestedAt()).isEqualTo(RETRY_AT);
+        }
+    }
+
+    @Nested
+    class Clears {
+
+        private static final OffsetDateTime NOW = OffsetDateTime.now(ZoneOffset.UTC);
+
+        private static final String SERIES = "Sons of Ares";
+
+        @Test
+        void shouldClearTheSeriesOnAClearVerdict() {
+            final Book book = new Book();
+            book.applySeries(List.of(new SeriesEntry(SERIES, 1)), true);
+            final VerifiedMetadata clear = new VerifiedMetadata(
+                null, null, null, null, null, null, null, null, true, false, Map.of());
+
+            book.applyVerified(clear, NOW);
+
+            assertThat(book.getSeriesName()).isNull();
+            assertThat(book.getSeries()).isEmpty();
+        }
+
+        @Test
+        void shouldClearTheDescriptionOnAClearVerdict() {
+            final Book book = new Book();
+            book.setDescription("A blurb for another book entirely, copied from the wrong edition page.");
+            final VerifiedMetadata clear = new VerifiedMetadata(
+                null, null, null, null, null, null, null, null, false, true, Map.of());
+
+            book.applyVerified(clear, NOW);
+
+            assertThat(book.getDescription()).isNull();
+            assertThat(book.getVerifiedFields()).contains(VerifiedField.DESCRIPTION);
         }
     }
 

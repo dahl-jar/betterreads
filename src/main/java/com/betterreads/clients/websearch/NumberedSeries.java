@@ -17,7 +17,7 @@ final class NumberedSeries {
     static @Nullable SeriesEntry from(final JsonNode field) {
         final String name = field.path("name").asString("").strip();
         return SeriesNumber.of(field.path("number").asDouble(0))
-            .filter(number -> number <= MAX_POSITION && MetadataCheckMapper.isText(name, MAX_NAME_LENGTH))
+            .filter(number -> number <= MAX_POSITION && FieldValues.isText(name, MAX_NAME_LENGTH))
             .map(number -> new SeriesEntry(name, number))
             .orElse(null);
     }

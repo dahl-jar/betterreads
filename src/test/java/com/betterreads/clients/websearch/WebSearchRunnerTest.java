@@ -11,11 +11,16 @@ import java.util.Arrays;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -40,18 +45,21 @@ class WebSearchRunnerTest {
     private Path dir;
 
     private Optional<JsonNode> runStub(final String script) throws IOException {
-        return runStubForResult(script, HOOK).map(WebSearchResult::answer);
+        return answer(runStubForResult(script, HOOK));
     }
 
-    private Optional<WebSearchResult> runStubForResult(final String script, final String hookName)
-        throws IOException {
+    private static Optional<JsonNode> answer(final SearchAttempt attempt) {
+        return attempt instanceof SearchAttempt.Answered answered ? Optional.of(answered.answer()) : Optional.empty();
+    }
+
+    private SearchAttempt runStubForResult(final String script, final String hookName) throws IOException {
         Files.writeString(dir.resolve(HOOK), "");
         final Path stub = dir.resolve("stub.sh");
         Files.writeString(stub, "#!/bin/sh\n" + script + "\n");
         Files.setPosixFilePermissions(stub, PosixFilePermissions.fromString("rwx------"));
         final WebSearchProperties properties =
             WebSearchSamples.properties(stub.toString(), TIMEOUT, dir.resolve(hookName).toString());
-        return new WebSearchRunner(properties).run(PROMPT, SCHEMA);
+        return new WebSearchRunner(properties).run(PROMPT, SCHEMA, WebSearchSamples.DOMAINS);
     }
 
     private static String echoOutput(final String structuredOutput) {
@@ -74,10 +82,10 @@ class WebSearchRunnerTest {
                 + "\"num_turns\":1,\"total_cost_usd\":0.0221228,\"duration_ms\":1611,"
                 + "\"permission_denials\":[{\"tool_name\":\"WebFetch\"}]}'";
 
-            final Optional<WebSearchResult> result = runStubForResult(script, HOOK);
+            final SearchAttempt result = runStubForResult(script, HOOK);
 
-            assertThat(result).get()
-                .isEqualTo(new WebSearchResult(new JsonMapper().createObjectNode(), WebSearchSamples.USAGE));
+            assertThat(result)
+                .isEqualTo(new SearchAttempt.Answered(new JsonMapper().createObjectNode(), WebSearchSamples.USAGE));
         }
 
         @Test
@@ -125,25 +133,24 @@ class WebSearchRunnerTest {
             "cat > /dev/null; echo '{\"is_error\":true,\"structured_output\":{}}'",
             "cat > /dev/null; echo '{\"is_error\":false}'",
             "cat > /dev/null; echo oops"})
-        void shouldReturnEmptyOnBadRun(final String script) throws IOException {
-            final Optional<JsonNode> output = runStub(script);
+        void shouldFailOnBadRun(final String script) throws IOException {
+            final SearchAttempt attempt = runStubForResult(script, HOOK);
 
-            assertThat(output).isEmpty();
+            assertThat(attempt).isInstanceOf(SearchAttempt.Failed.class);
         }
 
         @Test
-        void shouldReturnEmptyWithoutHook() throws IOException {
-            final Optional<WebSearchResult> output =
-                runStubForResult(echoOutput("{}"), "missing.mjs");
+        void shouldFailWithoutHook() throws IOException {
+            final SearchAttempt attempt = runStubForResult(echoOutput("{}"), "missing.mjs");
 
-            assertThat(output).isEmpty();
+            assertThat(attempt).isInstanceOf(SearchAttempt.Failed.class);
         }
 
         @Test
-        void shouldReturnEmptyOnTimeout() throws IOException {
-            final Optional<JsonNode> output = runStub(SLOW_STUB);
+        void shouldFailOnTimeout() throws IOException {
+            final SearchAttempt attempt = runStubForResult(SLOW_STUB, HOOK);
 
-            assertThat(output).isEmpty();
+            assertThat(attempt).isInstanceOf(SearchAttempt.Failed.class);
         }
 
         @Test
@@ -164,10 +171,85 @@ class WebSearchRunnerTest {
         void shouldKeepTheInterruptFlagWhenInterrupted() throws IOException {
             Thread.currentThread().interrupt();
 
-            final Optional<JsonNode> output = runStub(SLOW_STUB);
+            final SearchAttempt attempt = runStubForResult(SLOW_STUB, HOOK);
 
             assertThat(Thread.interrupted()).isTrue();
-            assertThat(output).isEmpty();
+            assertThat(attempt).isEqualTo(new SearchAttempt.Failed("interrupted"));
+        }
+
+        @Test
+        void shouldFailWhenTheCommandCannotStart() throws IOException {
+            Files.writeString(dir.resolve(HOOK), "");
+            final WebSearchProperties properties = WebSearchSamples.properties(
+                dir.resolve("absent").toString(), TIMEOUT, dir.resolve(HOOK).toString());
+
+            final SearchAttempt attempt = new WebSearchRunner(properties).run(PROMPT, SCHEMA, WebSearchSamples.DOMAINS);
+
+            assertThat(attempt).isEqualTo(new SearchAttempt.Failed("IOException"));
+        }
+
+        @Test
+        void shouldNameTheSubtypeInTheFailureReason() {
+            final JsonNode result = new JsonMapper().readTree("{\"is_error\":true,\"subtype\":\"error_max_turns\"}");
+
+            final SearchAttempt attempt = WebSearchRunner.classify(1, result, "");
+
+            assertThat(attempt).isInstanceOfSatisfying(SearchAttempt.Failed.class,
+                failed -> assertThat(failed.reason()).contains("exit 1 subtype=error_max_turns"));
+        }
+    }
+
+    @Nested
+    @ExtendWith(OutputCaptureExtension.class)
+    class Halts {
+
+        @Test
+        void shouldHaltOnAUsageLimitReportedAsSuccess() throws IOException {
+            final String script = "cat > /dev/null; echo '{\"type\":\"result\",\"subtype\":\"success\","
+                + "\"is_error\":true,\"result\":\"You have hit your session limit, resets 3:45pm\"}'";
+
+            final SearchAttempt attempt = runStubForResult(script, HOOK);
+
+            assertThat(attempt).isInstanceOf(SearchAttempt.Halted.class);
+        }
+
+        @ParameterizedTest
+        @CsvSource(delimiter = '|', value = {
+            "{\"is_error\":true,\"result\":\"API Error\",\"api_error_status\":401}|",
+            "{\"is_error\":true,\"result\":\"Failed to authenticate. Token expired\"}|",
+            "|Failed to authenticate: OAuth token revoked"})
+        void shouldHaltOnAnAuthFailure(final @Nullable String stdout, final @Nullable String stderr) {
+            final JsonNode result = stdout == null ? null : new JsonMapper().readTree(stdout);
+
+            final SearchAttempt attempt = WebSearchRunner.classify(1, result, stderr == null ? "" : stderr);
+
+            assertThat(attempt).isInstanceOf(SearchAttempt.Halted.class);
+        }
+
+        @Test
+        void shouldHaltWithTheStderrReasonWhenThereIsNoOutput() {
+            final String stderr = "Failed to authenticate: OAuth token revoked";
+
+            final SearchAttempt attempt = WebSearchRunner.classify(1, null, stderr);
+
+            assertThat(attempt).isEqualTo(new SearchAttempt.Halted(stderr));
+        }
+
+        @Test
+        void shouldFailOnlyTheBatchWhenTheModelWritesALimitPhrase() {
+            final JsonNode result = new JsonMapper().readTree(
+                "{\"subtype\":\"success\",\"is_error\":false,\"result\":\"I hit your daily limit of lookups\"}");
+
+            final SearchAttempt attempt = WebSearchRunner.classify(0, result, "");
+
+            assertThat(attempt).isInstanceOf(SearchAttempt.Failed.class);
+        }
+
+        @Test
+        void shouldLogTheStderrTailOnFailure(final CapturedOutput output) throws IOException {
+            runStubForResult("cat > /dev/null; echo 'node: config unreadable' >&2; exit 3", HOOK);
+
+            assertThat(output.getOut()).contains("node: config unreadable");
         }
     }
 }

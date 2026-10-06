@@ -172,7 +172,7 @@ class CatalogWikidataPersistenceIntegrationTest extends ContainerizedTest {
             final Book stored = bookUpsertService.upsertFromSource(redRising(List.of()));
             final long bookId = stored.getBookId();
 
-            bookUpsertService.applyVerified(bookId, verifiedAuthor(OTHER_AUTHOR_NAME));
+            bookUpsertService.applyVerified(bookId, verifiedAuthor(OTHER_AUTHOR_NAME), 1);
 
             assertThat(storedAuthorNames()).containsExactly(OTHER_AUTHOR_NAME);
         }
@@ -181,7 +181,7 @@ class CatalogWikidataPersistenceIntegrationTest extends ContainerizedTest {
         void shouldKeepVerifiedAuthorsOnRefresh() {
             final Book stored = bookUpsertService.upsertFromSource(redRising(List.of()));
             final long bookId = stored.getBookId();
-            bookUpsertService.applyVerified(bookId, verifiedAuthor(OTHER_AUTHOR_NAME));
+            bookUpsertService.applyVerified(bookId, verifiedAuthor(OTHER_AUTHOR_NAME), 1);
 
             bookUpsertService.upsertFromSource(redRising(List.of()));
 
@@ -298,7 +298,7 @@ class CatalogWikidataPersistenceIntegrationTest extends ContainerizedTest {
             final Book stored = bookUpsertService.upsertFromSource(source);
             final long bookId = stored.getBookId();
 
-            bookUpsertService.applyVerified(bookId, verifiedAuthor(OTHER_AUTHOR_NAME));
+            bookUpsertService.applyVerified(bookId, verifiedAuthor(OTHER_AUTHOR_NAME), 1);
 
             assertThat(storedCredits()).containsExactly(
                 OTHER_AUTHOR_NAME + AS_AUTHOR, SIMONETTI + AS_ILLUSTRATOR);

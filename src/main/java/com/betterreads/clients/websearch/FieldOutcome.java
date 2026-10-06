@@ -1,9 +1,19 @@
 package com.betterreads.clients.websearch;
 
 public enum FieldOutcome {
-    CONFIRMED,
+    ACCEPTED,
+    KEPT,
     NOT_ANSWERED,
     SOURCE_NOT_ALLOWED,
     VALUE_REJECTED,
-    TITLE_SOURCE_WITHOUT_ISBN
+    TITLE_SOURCE_WITHOUT_ISBN,
+    PAGE_UNREACHABLE,
+    QUOTE_NOT_ON_PAGE,
+    VALUE_NOT_IN_QUOTE,
+    QUOTE_IN_URL,
+    QUOTE_NOT_STORED,
+    QUOTE_TOO_SHORT,
+    TITLE_NOT_ON_PAGE,
+    ANCHOR_NOT_FOUND,
+    CUT_REJECTED
 }

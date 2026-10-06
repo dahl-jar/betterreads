@@ -77,7 +77,7 @@ class SeriesRefreshRepositoryTest extends ContainerizedTest {
     void shouldLeaveOutASeriesWhoseBooksAreAllVerified() {
         final Book verified = saveBookIn(RED_RISING);
         upsert.applyVerified(verified.getBookId(),
-            new VerifiedMetadata(null, null, null, RED_RISING, 1.0, null, null, null));
+            new VerifiedMetadata(null, null, null, RED_RISING, 1.0, null, null, null), 1);
         saveBookIn(SUN_EATER);
 
         final List<String> due = seriesRefreshes.findSeriesDueForRefresh();

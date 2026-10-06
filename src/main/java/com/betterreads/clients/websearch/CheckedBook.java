@@ -2,6 +2,7 @@ package com.betterreads.clients.websearch;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import com.betterreads.book.VerifiedMetadata;
@@ -13,7 +14,10 @@ public record CheckedBook(VerifiedMetadata metadata, Map<String, FieldOutcome> o
         outcomes = Collections.unmodifiableMap(new LinkedHashMap<>(outcomes));
     }
 
-    public boolean confirmed() {
-        return outcomes.containsValue(FieldOutcome.CONFIRMED);
+    public List<String> unreachableHosts() {
+        return outcomes.entrySet().stream()
+            .filter(outcome -> outcome.getValue() == FieldOutcome.PAGE_UNREACHABLE)
+            .flatMap(outcome -> SourceHosts.hostOf(answer.path(outcome.getKey()).path("source").asString("")).stream())
+            .toList();
     }
 }
