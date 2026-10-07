@@ -26,11 +26,17 @@ import static com.betterreads.features.bookstaging.NoNetworkSources.OPEN_LIBRARY
 import static com.betterreads.features.bookstaging.NoNetworkSources.WIKIDATA_RESPONSE;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -70,6 +76,9 @@ class PendingBookServiceIntegrationTest extends ContainerizedTest {
 
     @Autowired
     private PendingBookMapper pendingBookMapper;
+
+    @Autowired
+    private PendingBookPromoter promoter;
 
     @BeforeEach
     void clearCatalog() {
@@ -249,6 +258,34 @@ class PendingBookServiceIntegrationTest extends ContainerizedTest {
     private void rePromote() {
         final PendingBook row = pendingBooks.findByIsbn13(ISBN).orElseThrow();
         final MergedBook collected = sourceCollector.collectFor(pendingBookMapper.toSourceBook(row));
-        pendingBookService.promoteNow(ISBN, collected);
+        promoter.promote(ISBN, collected);
+    }
+
+    @Nested
+    class Backoff {
+
+        @ParameterizedTest(name = "{0} attempts, {1} min ago -> {2}")
+        @CsvSource({
+            "0, 16, PROMOTED", "1, 14, PENDING", "1, 16, PROMOTED", "2, 50, PENDING", "2, 61, PROMOTED",
+            "3, 300, PENDING", "3, 361, PROMOTED", "4, 420, PENDING", "4, 1441, PROMOTED"})
+        void shouldRetryAfterTheBackoffForItsAttemptCount(
+            final int attempts, final long minutesAgo, final String expected) {
+            staged(attempts, Duration.ofMinutes(minutesAgo));
+            OPEN_LIBRARY_RESPONSE.set(DuneBooks.openLibraryCompleteDune());
+
+            pendingBookService.promoteReady();
+
+            assertThat(pendingBooks.findByIsbn13(ISBN))
+                .get()
+                .satisfies(row -> assertThat(row.getStatus()).isEqualTo(expected));
+        }
+
+        private void staged(final int attempts, final Duration lastAttemptAgo) {
+            pendingBookService.stage(merger.merge(null, List.of(DuneBooks.sparseDune())));
+            final PendingBook row = pendingBooks.findByIsbn13(ISBN).orElseThrow();
+            row.setAttemptCount(attempts);
+            row.setLastAttemptAt(OffsetDateTime.now(ZoneOffset.UTC).minus(lastAttemptAgo));
+            pendingBooks.save(row);
+        }
     }
 }

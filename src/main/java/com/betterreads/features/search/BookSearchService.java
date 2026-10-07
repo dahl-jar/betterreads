@@ -2,6 +2,7 @@ package com.betterreads.features.search;
 
 import java.util.Collection;
 import java.util.Optional;
+import java.util.Set;
 
 /** Full-text search over the book catalog. */
 interface BookSearchService {
@@ -12,4 +13,8 @@ interface BookSearchService {
 
     /** Upserts by bookId. */
     void index(Collection<BookSearchDocument> documents);
+
+    Set<String> indexedIds(int pageSize);
+
+    void deleteAll(Collection<String> ids);
 }

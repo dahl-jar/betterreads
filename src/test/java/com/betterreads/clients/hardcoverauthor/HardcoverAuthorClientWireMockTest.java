@@ -37,6 +37,8 @@ class HardcoverAuthorClientWireMockTest extends HardcoverWireMock {
 
     private static final String QUERY = "Brandon Sanderson";
 
+    private static final String CO_AUTHORS = "Dan Wells, Brandon Sanderson";
+
     private static final String MISTBORN = "Mistborn: The Final Empire";
 
     private static final String COMPANION = "The World of Mistborn";
@@ -119,10 +121,37 @@ class HardcoverAuthorClientWireMockTest extends HardcoverWireMock {
             stubGraphQl(SEARCH_MARKER, authorSearch().withoutName());
             stubBooks();
 
-            final Optional<SourceAuthorWorks> works = client.fetchAuthorWorks(QUERY);
+            final Optional<SourceAuthorWorks> works = client.fetchAuthorWorks(CO_AUTHORS);
 
-            assertThat(works).get().extracting(SourceAuthorWorks::authorName)
-                .isEqualTo("Dan Wells, Brandon Sanderson");
+            assertThat(works).get().extracting(SourceAuthorWorks::authorName).isEqualTo(CO_AUTHORS);
+        }
+
+        @Test
+        void shouldSkipAnAuthorWhoseNameIsNotInTheQuery() {
+            stubSearchAndBooks();
+
+            final Optional<SourceAuthorWorks> works = client.fetchAuthorWorks("Truth Matters");
+
+            assertThat(works).isEmpty();
+        }
+
+        @Test
+        void shouldPickAMatchingAuthorOverOneWithMoreBooks() {
+            stubGraphQl(SEARCH_MARKER, authorSearch().withName("Phil Johnson"));
+            stubBooks();
+
+            final Optional<SourceAuthorWorks> works = client.fetchAuthorWorks(CO_AUTHORS);
+
+            assertThat(works).get().extracting(SourceAuthorWorks::authorName).isEqualTo(CO_AUTHORS);
+        }
+
+        @Test
+        void shouldFindAnAuthorNamedInALongerQuery() {
+            stubSearchAndBooks();
+
+            final Optional<SourceAuthorWorks> works = client.fetchAuthorWorks("mistborn brandon sanderson");
+
+            assertThat(works).get().extracting(SourceAuthorWorks::authorName).isEqualTo(QUERY);
         }
 
         @Test

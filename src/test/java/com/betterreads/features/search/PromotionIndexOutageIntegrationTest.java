@@ -13,6 +13,7 @@ import com.betterreads.testsupport.ContainerizedTest;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -85,8 +86,12 @@ class PromotionIndexOutageIntegrationTest extends ContainerizedTest {
         }
     }
 
-    /** index throws like Meilisearch does when it is down, search returns nothing */
+    /** index calls throw like Meilisearch does when it is down, search returns nothing */
     private static final class OutageSearchService implements BookSearchService {
+
+        private static SearchIndexException outage() {
+            return new SearchIndexException("simulated Meilisearch outage", new IllegalStateException());
+        }
 
         @Override
         public SearchOutcome search(final String query, final int offset, final int limit) {
@@ -100,7 +105,17 @@ class PromotionIndexOutageIntegrationTest extends ContainerizedTest {
 
         @Override
         public void index(final Collection<BookSearchDocument> documents) {
-            throw new SearchIndexException("simulated Meilisearch outage", new IllegalStateException());
+            throw outage();
+        }
+
+        @Override
+        public Set<String> indexedIds(final int pageSize) {
+            throw outage();
+        }
+
+        @Override
+        public void deleteAll(final Collection<String> ids) {
+            throw outage();
         }
     }
 }

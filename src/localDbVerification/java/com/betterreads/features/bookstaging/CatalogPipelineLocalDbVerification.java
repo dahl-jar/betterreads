@@ -65,6 +65,9 @@ class CatalogPipelineLocalDbVerification {
     private PendingBookService pendingBookService;
 
     @Autowired
+    private PendingBookPromoter promoter;
+
+    @Autowired
     private PendingBookRepository pendingBooks;
 
     @Autowired
@@ -190,6 +193,6 @@ class CatalogPipelineLocalDbVerification {
         final String dedupKey = Objects.requireNonNull(
             merged.book().dedupKey(), "merged seed has a dedup key");
         pendingBookService.stage(merged);
-        pendingBookService.promoteNow(dedupKey, merged);
+        promoter.promote(dedupKey, merged);
     }
 }

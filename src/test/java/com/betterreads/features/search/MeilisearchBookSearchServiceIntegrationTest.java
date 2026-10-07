@@ -2,7 +2,11 @@ package com.betterreads.features.search;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.betterreads.book.Author;
+import com.betterreads.book.AuthorRepository;
+import com.betterreads.book.BookRepository;
 import com.betterreads.booksource.SeriesEntry;
+import com.betterreads.testsupport.Books;
 import com.betterreads.testsupport.ContainerizedTest;
 import com.meilisearch.sdk.Client;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -11,6 +15,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import java.util.List;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -75,6 +80,10 @@ class MeilisearchBookSearchServiceIntegrationTest extends ContainerizedTest {
 
     private static final int COSMERE_VOLUME = 11;
 
+    private static final String EDGEDANCER_KEY = "edgedancer";
+
+    private static final String EDGEDANCER = "Edgedancer";
+
     @Autowired
     private BookSearchService searchService;
 
@@ -83,6 +92,12 @@ class MeilisearchBookSearchServiceIntegrationTest extends ContainerizedTest {
 
     @Autowired
     private Client client;
+
+    @Autowired
+    private BookRepository books;
+
+    @Autowired
+    private AuthorRepository authors;
 
     @DynamicPropertySource
     static void overrideProps(final DynamicPropertyRegistry registry) {
@@ -106,7 +121,7 @@ class MeilisearchBookSearchServiceIntegrationTest extends ContainerizedTest {
         @Test
         @DisplayName("finds a book by its title")
         void findsByTitle() {
-            final BookSearchResult result = searchService.search(HOBBIT_QUERY, 0, FULL_PAGE).result();
+            final BookSearchResult result = search(HOBBIT_QUERY, 0, FULL_PAGE);
 
             assertThat(result.hits())
                 .extracting(BookSearchDocument::bookId)
@@ -116,7 +131,7 @@ class MeilisearchBookSearchServiceIntegrationTest extends ContainerizedTest {
         @Test
         @DisplayName("matches despite a typo in the query")
         void toleratesTypos() {
-            final BookSearchResult result = searchService.search("hobbt", 0, FULL_PAGE).result();
+            final BookSearchResult result = search("hobbt", 0, FULL_PAGE);
 
             assertThat(result.hits())
                 .extracting(BookSearchDocument::title)
@@ -126,7 +141,7 @@ class MeilisearchBookSearchServiceIntegrationTest extends ContainerizedTest {
         @Test
         @DisplayName("finds a series' volumes by the series name")
         void findsBySeriesName() {
-            final BookSearchResult result = searchService.search(SERIES_QUERY, 0, FULL_PAGE).result();
+            final BookSearchResult result = search(SERIES_QUERY, 0, FULL_PAGE);
 
             assertThat(result.hits())
                 .hasSize(LOTR_VOLUMES)
@@ -145,7 +160,7 @@ class MeilisearchBookSearchServiceIntegrationTest extends ContainerizedTest {
                 .build();
             searchService.index(List.of(wayOfKings));
             try {
-                final BookSearchResult result = searchService.search("cosmere", 0, FULL_PAGE).result();
+                final BookSearchResult result = search("cosmere", 0, FULL_PAGE);
 
                 assertThat(result.hits()).extracting(BookSearchDocument::bookId).containsExactly(wayOfKingsId);
             } finally {
@@ -159,7 +174,7 @@ class MeilisearchBookSearchServiceIntegrationTest extends ContainerizedTest {
                 [{"bookId": "elantris", "title": "Elantris", "authors": [], "subjects": [], "popularityScore": 0}]
                 """);
             try {
-                final BookSearchResult result = searchService.search(ELANTRIS, 0, FULL_PAGE).result();
+                final BookSearchResult result = search(ELANTRIS, 0, FULL_PAGE);
 
                 assertThat(result.hits()).extracting(BookSearchDocument::series).containsExactly(List.of());
             } finally {
@@ -170,7 +185,7 @@ class MeilisearchBookSearchServiceIntegrationTest extends ContainerizedTest {
         @Test
         @DisplayName("a multi-word query needs every word, so a book sharing only a common word is not returned")
         void requiresEveryQueryWord() {
-            final BookSearchResult result = searchService.search("the hobbit dragons", 0, FULL_PAGE).result();
+            final BookSearchResult result = search("the hobbit dragons", 0, FULL_PAGE);
 
             assertThat(result.hits())
                 .as("'The Hobbit' has 'the' and 'hobbit' but not 'dragons', and the all-words "
@@ -186,7 +201,7 @@ class MeilisearchBookSearchServiceIntegrationTest extends ContainerizedTest {
                 doc(sandersonId, "Mistborn", SANDERSON, null),
                 doc(ANDERSON_ID, ANDERSON_TITLE, ANDERSON, null)));
             try {
-                final BookSearchResult result = searchService.search(SANDERSON_QUERY, 0, FULL_PAGE).result();
+                final BookSearchResult result = search(SANDERSON_QUERY, 0, FULL_PAGE);
 
                 assertThat(result.hits())
                     .as("'sanderson' fuzzy-matches 'Anderson', but that hit scores below the "
@@ -202,9 +217,9 @@ class MeilisearchBookSearchServiceIntegrationTest extends ContainerizedTest {
         @Test
         @DisplayName("slices the hits by offset and limit with the full total")
         void pages() {
-            final BookSearchResult firstPage = searchService.search(COMMON_QUERY, 0, PAGE_SIZE).result();
+            final BookSearchResult firstPage = search(COMMON_QUERY, 0, PAGE_SIZE);
             final BookSearchResult secondPage =
-                searchService.search(COMMON_QUERY, PAGE_SIZE, PAGE_SIZE).result();
+                search(COMMON_QUERY, PAGE_SIZE, PAGE_SIZE);
 
             final List<String> firstPageIds = firstPage.hits().stream().map(BookSearchDocument::bookId).toList();
             assertThat(firstPage.hits()).hasSize(PAGE_SIZE);
@@ -245,6 +260,79 @@ class MeilisearchBookSearchServiceIntegrationTest extends ContainerizedTest {
                 removeFromIndex(ANDERSON_ID);
             }
         }
+    }
+
+    @Nested
+    @DisplayName("catalog fallback")
+    class Fallback {
+
+        private Author sanderson;
+
+        @BeforeEach
+        void saveUnindexedBook() {
+            sanderson = authors.save(Books.author(SANDERSON));
+            save(EDGEDANCER_KEY, EDGEDANCER);
+        }
+
+        private void save(final String key, final String title) {
+            books.save(Books.promoted(key, title, sanderson));
+        }
+
+        @AfterEach
+        void clearCatalog() {
+            removeFromIndex(EDGEDANCER_KEY);
+            books.deleteAll();
+            authors.deleteAll();
+        }
+
+        @Test
+        void shouldReturnFallbackBooksWhenTheIndexHasNone() {
+            final BookSearchResult result = search(EDGEDANCER, 0, FULL_PAGE);
+
+            assertThat(result.hits()).extracting(BookSearchDocument::bookId).containsExactly(EDGEDANCER_KEY);
+        }
+
+        @Test
+        void shouldIndexFallbackBooks() {
+            searchService.search(EDGEDANCER, 0, FULL_PAGE);
+
+            assertThat(searchService.hitFor(EDGEDANCER, EDGEDANCER_KEY)).isPresent();
+        }
+
+        @Test
+        void shouldKeepIndexHitsWhenTheIndexHasAny() {
+            save("hobbit-pg", HOBBIT_QUERY);
+
+            final BookSearchResult result = search(HOBBIT_QUERY, 0, FULL_PAGE);
+
+            assertThat(result.hits()).extracting(BookSearchDocument::bookId).containsExactly("1");
+        }
+
+        @Test
+        void shouldCutFallbackBooksToTheLimit() {
+            final List<String> copies = List.of("edgedancer-2", "edgedancer-3");
+            copies.forEach(key -> save(key, EDGEDANCER));
+            try {
+                final BookSearchResult result = search(EDGEDANCER, 0, PAGE_SIZE);
+
+                assertThat(result.hits()).hasSize(PAGE_SIZE);
+                assertThat(result.totalHits()).isEqualTo(PAGE_SIZE + 1);
+            } finally {
+                copies.forEach(MeilisearchBookSearchServiceIntegrationTest.this::removeFromIndex);
+            }
+        }
+
+        @Test
+        void shouldNotUseTheFallbackPastPageOne() {
+            final BookSearchResult result = search(EDGEDANCER, FULL_PAGE, FULL_PAGE);
+
+            assertThat(result.hits()).isEmpty();
+        }
+    }
+
+    private BookSearchResult search(final String query, final int offset, final int limit) {
+        final SearchOutcome outcome = searchService.search(query, offset, limit);
+        return outcome.result();
     }
 
     private void removeFromIndex(final String bookId) {

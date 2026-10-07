@@ -47,6 +47,12 @@ public final class Books {
         return book;
     }
 
+    public static Book dune(final String key) {
+        final Book dune = book(key, DUNE_TITLE);
+        dune.setIsbn(DUNE_ISBN);
+        return dune;
+    }
+
     public static Book seedBook(final BookRepository books, final String key, final String title) {
         return books.save(book(key, title));
     }

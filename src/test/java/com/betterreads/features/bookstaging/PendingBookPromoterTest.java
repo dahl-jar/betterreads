@@ -18,8 +18,12 @@ import com.betterreads.pendingbook.PendingBookRepository;
 import com.betterreads.pendingbook.PendingBookStatus;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
+@ExtendWith(OutputCaptureExtension.class)
 class PendingBookPromoterTest {
 
     private static final String DEDUP_KEY = DuneBooks.ISBN;
@@ -73,6 +77,16 @@ class PendingBookPromoterTest {
             assertThat(attempted.getPublisher()).isEqualTo(PUBLISHER);
             assertThat(attempted.getMissingFields()).isEqualTo("author\ncover\ndescription\nyear");
         });
+    }
+
+    @Test
+    void shouldLogTheMissingFieldsWhenNotPromoted(final CapturedOutput output) {
+        when(pendingBooks.findByDedupKey(DEDUP_KEY)).thenReturn(Optional.of(pendingRow(0)));
+
+        promoter.promote(DEDUP_KEY, incompleteDune());
+
+        assertThat(output).contains("catalog.staging not promoted dedupKey=" + DEDUP_KEY
+            + " missing=author,cover,description,year");
     }
 
     @Test

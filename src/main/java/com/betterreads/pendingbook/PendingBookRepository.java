@@ -27,7 +27,11 @@ public interface PendingBookRepository extends JpaRepository<PendingBook, Long> 
     Optional<PendingBook> findByOpenLibraryWorkKey(String openLibraryWorkKey);
 
     /** Oldest first. */
-    @Query("SELECT p FROM PendingBook p WHERE p.status = 'PENDING' "
-        + "AND (p.lastAttemptAt IS NULL OR p.lastAttemptAt < :cutoff) ORDER BY p.firstSeenAt ASC")
-    List<PendingBook> findDue(@Param("cutoff") OffsetDateTime cutoff);
+    @Query(value = "SELECT * FROM pending_book WHERE status = 'PENDING' AND (last_attempt_at IS NULL "
+        + "OR last_attempt_at < CAST(:now AS timestamptz) - CASE "
+        + "WHEN attempt_count <= 1 THEN INTERVAL '15 minutes' "
+        + "WHEN attempt_count = 2 THEN INTERVAL '1 hour' "
+        + "WHEN attempt_count = 3 THEN INTERVAL '6 hours' "
+        + "ELSE INTERVAL '24 hours' END) ORDER BY first_seen_at ASC", nativeQuery = true)
+    List<PendingBook> findDue(@Param("now") OffsetDateTime now);
 }

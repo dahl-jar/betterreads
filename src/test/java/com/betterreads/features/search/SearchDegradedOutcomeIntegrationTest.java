@@ -6,16 +6,23 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.betterreads.book.BookRepository;
+import com.betterreads.testsupport.Books;
 import com.betterreads.testsupport.ContainerizedTest;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.interceptor.SimpleKey;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.MediaType;
@@ -49,11 +56,25 @@ class SearchDegradedOutcomeIntegrationTest extends ContainerizedTest {
 
     private static final int OVERSIZED_QUERY_LENGTH = 201;
 
+    private static final int PAGE = 20;
+
+    @Autowired
+    @Qualifier("searchCacheManager")
+    private CacheManager searchCacheManager;
+
     @Autowired
     private BookSearchService searchService;
 
     @Autowired
     private WebApplicationContext webApplicationContext;
+
+    @Autowired
+    private BookRepository books;
+
+    @BeforeEach
+    void clearCatalog() {
+        books.deleteAll();
+    }
 
     @Test
     @DisplayName("flags the empty result as degraded when Meilisearch is unreachable")
@@ -63,6 +84,26 @@ class SearchDegradedOutcomeIntegrationTest extends ContainerizedTest {
         assertThat(outcome.degraded()).isTrue();
         assertThat(outcome.result().totalHits()).isZero();
         assertThat(outcome.result().hits()).isEmpty();
+    }
+
+    @Test
+    void shouldAnswerFromPostgresWhenMeilisearchIsDown() {
+        books.save(Books.dune(Books.DUNE_KEY));
+
+        final SearchOutcome outcome = searchService.search(Books.DUNE_ISBN, 0, PAGE);
+
+        assertThat(outcome.degraded()).isTrue();
+        assertThat(outcome.result().hits()).extracting(BookSearchDocument::bookId).containsExactly(Books.DUNE_KEY);
+    }
+
+    @Test
+    void shouldNotCacheAnAnswerFromPostgres() {
+        books.save(Books.dune(Books.DUNE_KEY));
+
+        searchService.search(Books.DUNE_ISBN, 0, PAGE);
+
+        final Cache cache = searchCacheManager.getCache(SearchResultsCache.NAME);
+        assertThat(cache.get(new SimpleKey(Books.DUNE_ISBN, 0, PAGE))).isNull();
     }
 
     @Test

@@ -85,7 +85,6 @@ class BookChangedIndexListenerTest {
     }
 
     private static BookIndexView indexView() {
-        return new BookIndexView(DEDUP_KEY, "The Eye of the World", null, "The Wheel of Time", 1.0, List.of(),
-            List.of("Robert Jordan"), List.of(), "en", null, null, null, null);
+        return BookIndexViews.titled(DEDUP_KEY, "The Eye of the World");
     }
 }

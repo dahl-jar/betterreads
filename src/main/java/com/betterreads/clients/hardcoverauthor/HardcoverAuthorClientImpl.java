@@ -10,6 +10,7 @@ import com.betterreads.clients.hardcover.HardcoverBookNode;
 import com.betterreads.clients.hardcover.HardcoverGraphQlRequest;
 import com.betterreads.clients.hardcover.HardcoverGraphQl;
 import com.betterreads.clients.hardcover.TypesenseSearchResponse;
+import com.betterreads.text.TextMatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
@@ -79,7 +80,7 @@ class HardcoverAuthorClientImpl implements HardcoverAuthorClient {
 
     private Optional<AuthorSearchDocument> bestCandidate(final String query) {
         return HardcoverGraphQl.search(hardcoverWebClient, LOG, SEARCH_QUERY, query, AUTHOR_HITS).stream()
-            .filter(document -> document.name() != null)
+            .filter(document -> document.name() != null && TextMatch.titleWithinQuery(document.name(), query))
             .max(BY_BOOKS);
     }
 

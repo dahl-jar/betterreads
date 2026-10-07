@@ -8,7 +8,6 @@ import com.betterreads.pendingbook.PendingBookMapper;
 import com.betterreads.pendingbook.PendingBookRepository;
 import com.betterreads.pendingbook.PendingBookStatus;
 
-import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -24,8 +23,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class PendingBookService {
 
     private static final Logger LOG = LoggerFactory.getLogger(PendingBookService.class);
-
-    private static final Duration RETRY_INTERVAL = Duration.ofHours(24);
 
     private final PendingBookRepository pendingBooks;
 
@@ -74,14 +71,6 @@ public class PendingBookService {
     }
 
     /**
-     * Promotes an already collected merge without waiting for the poll or fetching the sources again.
-     * It runs after the staging transaction commits, so the after-commit event sees the row.
-     */
-    public void promoteNow(final String dedupKey, final MergedBook merged) {
-        promoter.promote(dedupKey, merged);
-    }
-
-    /**
      * Source fetches are slow external calls, so each candidate's write gets its own transaction and
      * no connection stays open across them.
      */
@@ -90,8 +79,7 @@ public class PendingBookService {
     }
 
     private List<String> pendingKeys() {
-        final OffsetDateTime cutoff = OffsetDateTime.now(ZoneOffset.UTC).minus(RETRY_INTERVAL);
-        return pendingBooks.findDue(cutoff).stream()
+        return pendingBooks.findDue(OffsetDateTime.now(ZoneOffset.UTC)).stream()
             .map(PendingBook::getDedupKey)
             .toList();
     }

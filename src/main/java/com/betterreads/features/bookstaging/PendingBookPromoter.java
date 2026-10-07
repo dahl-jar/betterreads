@@ -9,11 +9,14 @@ import com.betterreads.book.BookPromotedEvent;
 import com.betterreads.book.BookUpsertService;
 import com.betterreads.booksource.MergedBook;
 import com.betterreads.features.bookstaging.RequiredFieldsCheck.MissingFields;
+import com.betterreads.logging.LogSanitizer;
 import com.betterreads.pendingbook.PendingBook;
 import com.betterreads.pendingbook.PendingBookMapper;
 import com.betterreads.pendingbook.PendingBookRepository;
 import com.betterreads.pendingbook.PendingBookStatus;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
 class PendingBookPromoter {
 
     static final int MAX_ATTEMPTS = 30;
+
+    private static final Logger LOG = LoggerFactory.getLogger(PendingBookPromoter.class);
 
     private final PendingBookRepository pendingBooks;
 
@@ -72,6 +77,8 @@ class PendingBookPromoter {
                 row.setStatus(PendingBookStatus.PROMOTED);
                 events.publishEvent(new BookPromotedEvent(promoted.getDedupKey()));
             } else {
+                LOG.info("catalog.staging not promoted dedupKey={} missing={}",
+                    LogSanitizer.forLog(dedupKey), LogSanitizer.forLog(String.join(",", missing.missing())));
                 row.setMissingFields(mapper.join(missing.missing()));
                 recordAttempt(row);
             }

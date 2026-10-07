@@ -3,7 +3,6 @@ package com.betterreads.features.search;
 import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import com.betterreads.clients.meilisearch.MeilisearchProperties;
 import com.betterreads.logging.LogSanitizer;
@@ -11,21 +10,18 @@ import com.meilisearch.sdk.Client;
 import com.meilisearch.sdk.Index;
 import com.meilisearch.sdk.SearchRequest;
 import com.meilisearch.sdk.exceptions.MeilisearchException;
-import com.meilisearch.sdk.model.DocumentsQuery;
-import com.meilisearch.sdk.model.MatchingStrategy;
 import com.meilisearch.sdk.model.SearchResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 @Service
 class MeilisearchAuthorSearchService implements AuthorSearchService {
 
     private static final Logger LOG = LoggerFactory.getLogger(MeilisearchAuthorSearchService.class);
-
-    private static final double RANKING_SCORE_THRESHOLD = 0.4;
 
     private static final int ID_PAGE_SIZE = 1000;
 
@@ -47,9 +43,7 @@ class MeilisearchAuthorSearchService implements AuthorSearchService {
         unless = "#result.totalHits() == 0")
     public AuthorSearchResult search(final String query, final int offset, final int limit) {
         try {
-            final SearchRequest request = new SearchRequest(query)
-                .setMatchingStrategy(MatchingStrategy.ALL)
-                .setRankingScoreThreshold(RANKING_SCORE_THRESHOLD)
+            final SearchRequest request = RankedSearch.request(query)
                 .setOffset(offset)
                 .setLimit(limit);
             final SearchResult result = (SearchResult) authorsIndex().search(request);
@@ -105,25 +99,12 @@ class MeilisearchAuthorSearchService implements AuthorSearchService {
     @Override
     public List<Long> indexedIds() {
         try {
-            final Index index = authorsIndex();
-            return Stream.iterate(0, offset -> offset + ID_PAGE_SIZE)
-                .map(offset -> idPage(index, offset))
-                .takeWhile(page -> !page.isEmpty())
-                .flatMap(List::stream)
+            return IndexIds.all(authorsIndex(), objectMapper, AuthorSearchDocument.PRIMARY_KEY, ID_PAGE_SIZE)
+                .map(JsonNode::asLong)
                 .toList();
         } catch (MeilisearchException ex) {
             throw new SearchIndexException("reading the authors index ids failed", ex);
         }
-    }
-
-    private List<Long> idPage(final Index index, final int offset) {
-        final String json = index.getRawDocuments(new DocumentsQuery()
-            .setOffset(offset)
-            .setLimit(ID_PAGE_SIZE)
-            .setFields(new String[] {AuthorSearchDocument.PRIMARY_KEY}));
-        return objectMapper.readTree(json).path("results").valueStream()
-            .map(document -> document.path(AuthorSearchDocument.PRIMARY_KEY).asLong())
-            .toList();
     }
 
     private Index authorsIndex() {

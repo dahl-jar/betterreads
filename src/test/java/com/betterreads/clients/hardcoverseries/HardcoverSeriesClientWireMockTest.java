@@ -20,10 +20,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.assertj.core.api.InstanceOfAssertFactories.list;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.IntStream;
 
 import org.assertj.core.api.ListAssert;
+import org.assertj.core.groups.Tuple;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -82,6 +84,10 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
 
     private static final String COSMERE_QUERY = "cosmere";
 
+    private static final String PARODY_QUERY = "wheel of time";
+
+    private static final String UNRELATED_NAME = "Truth Matters";
+
     @Autowired
     private HardcoverSeriesClientImpl client;
 
@@ -89,9 +95,23 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
         stub(seriesSearch(), seriesBooks());
     }
 
+    private static SeriesSearchJson unrelatedSearch() {
+        return seriesSearch().withSeries(UNRELATED_NAME, "Phil Johnson");
+    }
+
     private void stub(final SeriesSearchJson search, final SeriesBooksJson books) {
         stubGraphQl(SEARCH_MARKER, search);
         stubGraphQl(BOOKS_MARKER, books);
+    }
+
+    private static List<Tuple> volumes(final Optional<SourceSeries> series) {
+        return series.orElseThrow().volumes().stream()
+            .map(volume -> tuple(volume.position(), volume.book().title()))
+            .toList();
+    }
+
+    private static List<String> titles(final Optional<SourceSeries> series) {
+        return series.orElseThrow().volumes().stream().map(volume -> volume.book().title()).toList();
     }
 
     @Nested
@@ -127,7 +147,7 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
         void shouldSkipAHitWithoutAName() {
             stub(seriesSearch().withoutName(), seriesBooks());
 
-            final Optional<SourceSeries> series = client.fetchSeries(QUERY);
+            final Optional<SourceSeries> series = client.fetchSeries(PARODY_QUERY);
 
             assertThat(series).get().extracting(SourceSeries::name).isEqualTo(PARODY_NAME);
         }
@@ -136,7 +156,7 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
         void shouldSkipOneBookHit() {
             stub(seriesSearch().withPrimaryBooksCount(1), seriesBooks());
 
-            final Optional<SourceSeries> series = client.fetchSeries(QUERY);
+            final Optional<SourceSeries> series = client.fetchSeries(PARODY_QUERY);
 
             assertThat(series).get().extracting(SourceSeries::name).isEqualTo(PARODY_NAME);
         }
@@ -148,6 +168,33 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
             final Optional<SourceSeries> series = client.fetchSeries(QUERY);
 
             assertThat(series).get().extracting(SourceSeries::name).isEqualTo(SERIES_NAME);
+        }
+
+        @Test
+        void shouldSkipASeriesWhoseNameIsNotInTheQuery() {
+            stub(unrelatedSearch(), seriesBooks());
+
+            final Optional<SourceSeries> series = client.fetchSeries(QUERY);
+
+            assertThat(series).isEmpty();
+        }
+
+        @Test
+        void shouldFindASeriesNamedInALongerQuery() {
+            stubSearchAndBooks();
+
+            final Optional<SourceSeries> series = client.fetchSeries("the wheel of time robert jordan");
+
+            assertThat(series).get().extracting(SourceSeries::name).isEqualTo(SERIES_NAME);
+        }
+
+        @Test
+        void shouldPickAMatchingSeriesOverAMoreReadOne() {
+            stub(unrelatedSearch(), seriesBooks());
+
+            final Optional<SourceSeries> series = client.fetchSeries(PARODY_NAME);
+
+            assertThat(series).get().extracting(SourceSeries::name).isEqualTo(PARODY_NAME);
         }
 
         @Test
@@ -180,9 +227,7 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
 
             final Optional<SourceSeries> series = client.fetchSeries(QUERY);
 
-            assertThat(series).get()
-                .extracting(SourceSeries::volumes, list(SourceSeriesVolume.class))
-                .extracting(SourceSeriesVolume::position, volume -> volume.book().title())
+            assertThat(volumes(series))
                 .contains(tuple(PREQUEL_POSITION, "New Spring"));
         }
 
@@ -192,9 +237,7 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
 
             final Optional<SourceSeries> series = client.fetchSeries(QUERY);
 
-            assertThat(series).get()
-                .extracting(SourceSeries::volumes, list(SourceSeriesVolume.class))
-                .extracting(volume -> volume.book().title())
+            assertThat(titles(series))
                 .doesNotContain("A Crown of Swords");
         }
 
@@ -207,9 +250,7 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
 
             final Optional<SourceSeries> series = client.fetchSeries(QUERY);
 
-            assertThat(series).get()
-                .extracting(SourceSeries::volumes, list(SourceSeriesVolume.class))
-                .extracting(SourceSeriesVolume::position, volume -> volume.book().title())
+            assertThat(volumes(series))
                 .containsExactly(tuple(position, novella), tuple(THIRD_POSITION, GREAT_HUNT));
         }
 
@@ -221,9 +262,7 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
 
             final Optional<SourceSeries> series = client.fetchSeries(QUERY);
 
-            assertThat(series).get()
-                .extracting(SourceSeries::volumes, list(SourceSeriesVolume.class))
-                .extracting(volume -> volume.book().title())
+            assertThat(titles(series))
                 .containsExactly(GREAT_HUNT);
         }
 
@@ -233,9 +272,7 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
 
             final Optional<SourceSeries> series = client.fetchSeries(QUERY);
 
-            assertThat(series).get()
-                .extracting(SourceSeries::volumes, list(SourceSeriesVolume.class))
-                .extracting(SourceSeriesVolume::position, volume -> volume.book().title())
+            assertThat(volumes(series))
                 .contains(
                     tuple(FIRST_POSITION, "The Eye of the World"),
                     tuple(SECOND_POSITION, GREAT_HUNT));
@@ -253,9 +290,7 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
 
             final Optional<SourceSeries> series = client.fetchSeries(GRAPHIC_NOVEL_QUERY);
 
-            assertThat(series).get()
-                .extracting(SourceSeries::volumes, list(SourceSeriesVolume.class))
-                .extracting(volume -> volume.book().title())
+            assertThat(titles(series))
                 .containsExactly(collected);
         }
 
