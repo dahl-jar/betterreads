@@ -92,7 +92,7 @@ public class SourceCollector {
             .toList();
         final List<SourceBook> found = Stream.concat(
                 Stream.of(seed),
-                fetched.stream().flatMap(result -> Optional.ofNullable(result.book()).stream()))
+                fetched.stream().map(Fetched::book))
             .toList();
         final Set<BookFieldSource> resolved = EnumSet.of(seed.source());
         fetched.forEach(result -> resolved.add(result.source()));
@@ -132,8 +132,7 @@ public class SourceCollector {
         if (!call.isDone() || call.isCompletedExceptionally()) {
             return Stream.empty();
         }
-        final Fetched fetched = call.getNow(null);
-        return fetched == null ? Stream.empty() : Stream.of(fetched);
+        return Stream.ofNullable(call.getNow(null));
     }
 
     private static List<BookSourceClient> order(final List<BookSourceClient> clients) {
@@ -147,10 +146,10 @@ public class SourceCollector {
         return index < 0 ? FETCH_ORDER.size() : index;
     }
 
-    /** Null when the source failed, so it does not count as resolved. A Fetched with no book is a clean miss. */
+    /** Null when the source failed or found no book, so neither counts as resolved. */
     private static @Nullable Fetched fetch(final BookSourceClient client, final SourceBook seed) {
         try {
-            return new Fetched(client.source(), match(client, seed).orElse(null));
+            return match(client, seed).map(book -> new Fetched(client.source(), book)).orElse(null);
         } catch (WebClientException ex) {
             LOG.warn("catalog.collect source {} failed ({}), skipping it for this book",
                 client.source(), ex.getClass().getSimpleName());
@@ -174,6 +173,6 @@ public class SourceCollector {
         return client.fetchByTitleAuthor(title, authors.get(0));
     }
 
-    private record Fetched(BookFieldSource source, @Nullable SourceBook book) {
+    private record Fetched(BookFieldSource source, SourceBook book) {
     }
 }

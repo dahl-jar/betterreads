@@ -23,6 +23,7 @@ import static com.betterreads.features.bookstaging.DuneBooks.SERIES_POSITION;
 import static com.betterreads.features.bookstaging.DuneBooks.TITLE;
 import static com.betterreads.features.bookstaging.NoNetworkSources.HARDCOVER_RESPONSE;
 import static com.betterreads.features.bookstaging.NoNetworkSources.OPEN_LIBRARY_RESPONSE;
+import static com.betterreads.features.bookstaging.NoNetworkSources.WIKIDATA_RESPONSE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
@@ -126,26 +127,22 @@ class PendingBookServiceIntegrationTest extends ContainerizedTest {
     }
 
     @Test
-    @DisplayName("re-promotion clears a stale series when the Hardcover source now reports none")
-    void rePromotionClearsStaleSeriesWhenSourceHasNone() {
+    void shouldKeepSeriesAfterAHardcoverMiss() {
         HARDCOVER_RESPONSE.set(DuneBooks.hardcoverDune());
         pendingBookService.stage(merger.merge(null, List.of(DuneBooks.completeDune())));
         pendingBookService.promoteReady();
+        HARDCOVER_RESPONSE.set(DuneBooks.hardcoverDune().toBuilder().isbn13(SEQUEL_ISBN).build());
+        WIKIDATA_RESPONSE.set(DuneBooks.wikidataDuneChronicles());
 
-        HARDCOVER_RESPONSE.set(DuneBooks.hardcoverDuneWithoutSeries());
         rePromote();
 
         assertThat(books.findByOpenLibraryWorkKey(OL_KEY))
-            .as("Hardcover resolved and reported no series, so the stale label is cleared")
             .get()
-            .satisfies(book -> {
-                assertThat(book.getSeriesName()).isNull();
-                assertThat(book.getSeriesPosition()).isNull();
-            });
+            .satisfies(book -> assertThat(book.getSeriesName()).isEqualTo(TITLE));
     }
 
     @Test
-    @DisplayName("re-promotion keeps a real series when Hardcover fails, even though Wikidata resolves empty")
+    @DisplayName("re-promotion keeps a real series when Hardcover fails")
     void rePromotionKeepsSeriesWhenHardcoverFails() {
         HARDCOVER_RESPONSE.set(DuneBooks.hardcoverDune());
         pendingBookService.stage(merger.merge(null, List.of(DuneBooks.completeDune())));

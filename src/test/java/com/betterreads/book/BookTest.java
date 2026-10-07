@@ -128,33 +128,37 @@ class BookTest {
         }
 
         @Test
-        @DisplayName("a resolved authority with no series clears an existing label")
-        void resolvedEmptyClearsExisting() {
+        void shouldKeepTheSeriesWhenTheSourceListIsEmpty() {
             final Book book = new Book();
             book.applySeries(List.of(new SeriesEntry(SERIES, 1)), true);
 
             book.applySeries(List.of(), true);
 
             assertThat(book).satisfies(applied -> {
-                assertThat(applied.getSeriesName())
-                    .as("the authority resolved and reported no volume, so the stale label is cleared")
-                    .isNull();
-                assertThat(applied.getSeriesPosition()).isNull();
-                assertThat(applied.getSeries()).isEmpty();
+                assertThat(applied.getSeriesName()).isEqualTo(SERIES);
+                assertThat(applied.getSeries()).containsExactly(new SeriesEntry(SERIES, 1));
             });
         }
 
         @Test
-        @DisplayName("an unresolved authority keeps the existing label, so a transient miss does not wipe it")
-        void unresolvedEmptyKeepsExisting() {
+        void shouldReplaceTheSeriesWithANonEmptyList() {
+            final Book book = new Book();
+            book.applySeries(List.of(new SeriesEntry(SERIES, 1)), true);
+
+            book.applySeries(List.of(new SeriesEntry(UMBRELLA, UMBRELLA_VOLUME)), true);
+
+            assertThat(book.getSeries()).containsExactly(new SeriesEntry(UMBRELLA, UMBRELLA_VOLUME));
+        }
+
+        @Test
+        void shouldKeepTheSeriesWithoutAuthority() {
             final Book book = new Book();
             book.applySeries(List.of(new SeriesEntry(SERIES, 2)), true);
 
-            book.applySeries(List.of(), false);
+            book.applySeries(List.of(new SeriesEntry(UMBRELLA, UMBRELLA_VOLUME)), false);
 
             assertThat(book).satisfies(applied -> {
                 assertThat(applied.getSeriesName())
-                    .as("no series authority resolved this run, so the existing series is kept")
                     .isEqualTo(SERIES);
                 assertThat(applied.getSeriesPosition()).isEqualTo(2);
             });

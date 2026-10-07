@@ -27,6 +27,8 @@ import org.assertj.core.api.ListAssert;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -54,15 +56,23 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
 
     private static final String QUERY = "the wheel of time";
 
-    private static final int FIRST_POSITION = 1;
+    private static final double FIRST_POSITION = 1;
 
-    private static final int SECOND_POSITION = 2;
+    private static final double SECOND_POSITION = 2;
 
-    private static final int THIRD_POSITION = 3;
+    private static final double THIRD_POSITION = 3;
 
-    private static final double NOVELLA_POSITION = 1.5;
+    private static final double PREQUEL_POSITION = 0;
+
+    private static final double NEGATIVE_POSITION = -1;
+
+    private static final String NEGATIVE_TITLE = "The World of Robert Jordan's The Wheel of Time";
+
+    private static final String NOVELLA_PLOT = "The age of legends before the breaking.";
 
     private static final String GREAT_HUNT = "The Great Hunt";
+
+    private static final String GREAT_HUNT_PLOT = "Rand rides after the Horn of Valere.";
 
     private static final String SERIES_NAME = "The Wheel of Time";
 
@@ -165,31 +175,19 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
     class VolumeCollapse {
 
         @Test
-        void shouldDropThePrequelAtPositionZero() {
-            assertVolumeDropped("New Spring");
-        }
-
-        @Test
-        void shouldDropVolumesPastThePrimaryBookCount() {
-            assertVolumeDropped("A Crown of Swords");
-        }
-
-        @Test
-        void shouldLeaveOutAFractionalVolume() {
-            final String novella = "The Strike at Shayol Ghul";
-            stub(seriesSearch(), seriesBooks().withoutVolumes()
-                .withVolume(THIRD_POSITION, GREAT_HUNT, "Rand rides after the Horn of Valere.")
-                .withVolume(NOVELLA_POSITION, novella, "A short history of the war."));
+        void shouldKeepThePrequelAtPositionZero() {
+            stubSearchAndBooks();
 
             final Optional<SourceSeries> series = client.fetchSeries(QUERY);
 
             assertThat(series).get()
                 .extracting(SourceSeries::volumes, list(SourceSeriesVolume.class))
-                .extracting(volume -> volume.book().title())
-                .containsExactly(GREAT_HUNT);
+                .extracting(SourceSeriesVolume::position, volume -> volume.book().title())
+                .contains(tuple(PREQUEL_POSITION, "New Spring"));
         }
 
-        private void assertVolumeDropped(final String title) {
+        @Test
+        void shouldDropVolumesPastThePrimaryBookCount() {
             stubSearchAndBooks();
 
             final Optional<SourceSeries> series = client.fetchSeries(QUERY);
@@ -197,7 +195,36 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
             assertThat(series).get()
                 .extracting(SourceSeries::volumes, list(SourceSeriesVolume.class))
                 .extracting(volume -> volume.book().title())
-                .doesNotContain(title);
+                .doesNotContain("A Crown of Swords");
+        }
+
+        @ParameterizedTest
+        @CsvSource({"0.5, Origins", "1.5, The Strike at Shayol Ghul"})
+        void shouldKeepAFractionalVolume(final double position, final String novella) {
+            stub(seriesSearch(), seriesBooks().withoutVolumes()
+                .withVolume(THIRD_POSITION, GREAT_HUNT, GREAT_HUNT_PLOT)
+                .withVolume(position, novella, NOVELLA_PLOT));
+
+            final Optional<SourceSeries> series = client.fetchSeries(QUERY);
+
+            assertThat(series).get()
+                .extracting(SourceSeries::volumes, list(SourceSeriesVolume.class))
+                .extracting(SourceSeriesVolume::position, volume -> volume.book().title())
+                .containsExactly(tuple(position, novella), tuple(THIRD_POSITION, GREAT_HUNT));
+        }
+
+        @Test
+        void shouldLeaveOutANegativeVolume() {
+            stub(seriesSearch(), seriesBooks().withoutVolumes()
+                .withVolume(THIRD_POSITION, GREAT_HUNT, GREAT_HUNT_PLOT)
+                .withVolume(NEGATIVE_POSITION, NEGATIVE_TITLE, NOVELLA_PLOT));
+
+            final Optional<SourceSeries> series = client.fetchSeries(QUERY);
+
+            assertThat(series).get()
+                .extracting(SourceSeries::volumes, list(SourceSeriesVolume.class))
+                .extracting(volume -> volume.book().title())
+                .containsExactly(GREAT_HUNT);
         }
 
         @Test

@@ -2,7 +2,6 @@ package com.betterreads.bookindex;
 
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Optional;
 
 import com.betterreads.book.Author;
 import com.betterreads.book.Book;
@@ -23,11 +22,6 @@ public class BookIndexViewReader {
     public BookIndexViewReader(final BookRepository books, final CoverImages coverImages) {
         this.books = books;
         this.coverImages = coverImages;
-    }
-
-    @Transactional(readOnly = true)
-    public Optional<BookIndexView> indexViewByKey(final String dedupKey) {
-        return books.findByDedupKey(dedupKey).map(this::toIndexView);
     }
 
     @Transactional(readOnly = true)

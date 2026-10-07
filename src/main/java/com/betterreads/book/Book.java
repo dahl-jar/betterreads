@@ -24,7 +24,6 @@ import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -242,16 +241,16 @@ public class Book extends Timestamped {
     }
 
     /**
-     * A clear is trusted only when the series authority resolved, so a failed or timed-out collect
-     * does not wipe a real series. A verified series is kept.
+     * A source miss is no proof the book left its series, so an empty list keeps the stored one. A
+     * verified series is kept.
      */
-    public void applySeries(final List<SeriesEntry> entries, final boolean authorityResolved) {
-        if (!authorityResolved || isVerified(VerifiedField.SERIES)) {
+    public void applySeries(final List<SeriesEntry> entries, final boolean authority) {
+        if (!authority || entries.isEmpty() || isVerified(VerifiedField.SERIES)) {
             return;
         }
-        final Optional<SeriesEntry> primary = entries.stream().findFirst();
-        this.seriesName = primary.map(SeriesEntry::name).orElse(null);
-        this.seriesPosition = primary.map(SeriesEntry::position).orElse(null);
+        final SeriesEntry primary = entries.getFirst();
+        this.seriesName = primary.name();
+        this.seriesPosition = primary.position();
         replaceSeries(entries);
     }
 

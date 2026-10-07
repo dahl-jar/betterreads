@@ -28,8 +28,9 @@ public record MergedBook(
         return fieldSources.get(field);
     }
 
-    public boolean resolved(final BookFieldSource source) {
-        return resolvedSources.contains(source);
+    public boolean hasSeriesAuthority(final @Nullable String storedHardcoverId) {
+        return resolvedSources.contains(BookFieldSource.HARDCOVER)
+            && (storedHardcoverId == null || storedHardcoverId.equals(book.hardcoverId()));
     }
 
     public MergedBook withBook(final SourceBook replacement) {
@@ -43,7 +44,6 @@ public record MergedBook(
         return new MergedBook(replacement, updated, subjectSources, resolvedSources);
     }
 
-    /** a source that answered with nothing adds no book, so the merge can't tell it resolved */
     public MergedBook withResolvedSources(final Set<BookFieldSource> sources) {
         return new MergedBook(book, fieldSources, subjectSources, sources);
     }

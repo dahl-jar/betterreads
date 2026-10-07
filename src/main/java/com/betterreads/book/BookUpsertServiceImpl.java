@@ -1,6 +1,5 @@
 package com.betterreads.book;
 
-import com.betterreads.booksource.BookFieldSource;
 import com.betterreads.booksource.MergedBook;
 import com.betterreads.booksource.SeriesEntry;
 import com.betterreads.booksource.SourceAuthor;
@@ -12,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 import jakarta.persistence.EntityManager;
@@ -20,11 +20,11 @@ import com.betterreads.logging.LogSanitizer;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Matches an existing book on its source id columns and evicts its cached detail on write. */
+/** Matches an existing book on its source id columns and announces each catalog write. */
 @Service
 class BookUpsertServiceImpl implements BookUpsertService {
 
@@ -42,51 +42,68 @@ class BookUpsertServiceImpl implements BookUpsertService {
 
     private final EntityManager entityManager;
 
+    private final ApplicationEventPublisher events;
+
+    private final List<SourceIdentityLookup> identityLookups;
+
+    // PMD.ExcessiveParameterList: six injected collaborators, the constructor is Spring's injection point.
+    @SuppressWarnings("PMD.ExcessiveParameterList")
     BookUpsertServiceImpl(
         final BookRepository bookRepository,
         final AuthorResolver authorResolver,
         final SeriesChangeRecorder seriesChanges,
         final MetadataChangeRecorder metadataChanges,
-        final EntityManager entityManager
+        final EntityManager entityManager,
+        final ApplicationEventPublisher events
     ) {
         this.bookRepository = bookRepository;
         this.authorResolver = authorResolver;
         this.seriesChanges = seriesChanges;
         this.metadataChanges = metadataChanges;
         this.entityManager = entityManager;
+        this.events = events;
+        this.identityLookups = List.of(
+            new SourceIdentityLookup(
+                SourceBook::googleBooksVolumeId, bookRepository::findByGoogleBooksVolumeId),
+            new SourceIdentityLookup(
+                SourceBook::openLibraryWorkKey, bookRepository::findByOpenLibraryWorkKey),
+            new SourceIdentityLookup(
+                SourceBook::hardcoverId, bookRepository::findByHardcoverId),
+            new SourceIdentityLookup(
+                SourceBook::locLccn, bookRepository::findByLocLccn),
+            new SourceIdentityLookup(
+                SourceBook::wikidataQid, bookRepository::findByWikidataQid));
     }
 
     @Override
     @Transactional
-    @CacheEvict(cacheNames = BookDetailCache.NAME, key = "#result.dedupKey")
     public Book upsertFromSource(final SourceBook source) {
-        return upsert(source, true);
+        return upsert(source, stored -> source.hardcoverId() != null);
     }
 
     @Override
     @Transactional
-    @CacheEvict(cacheNames = BookDetailCache.NAME, key = "#result.dedupKey")
     public Book upsertFromSource(final MergedBook merged) {
-        return upsert(merged.book(), merged.resolved(BookFieldSource.HARDCOVER));
+        return upsert(merged.book(), merged::hasSeriesAuthority);
     }
 
-    private Book upsert(final SourceBook source, final boolean seriesAuthorityResolved) {
+    private Book upsert(final SourceBook source, final Predicate<@Nullable String> seriesAuthority) {
         final Book book = findExistingForSource(source)
             .map(this::lockAndRefresh)
             .orElseGet(Book::new);
+        final boolean authority = seriesAuthority.test(book.getHardcoverId());
         book.applyFrom(source);
         final List<SeriesEntry> seriesBefore = book.getSeries();
-        book.applySeries(source.series(), seriesAuthorityResolved);
+        book.applySeries(source.series(), authority);
         seriesChanges.recordAndRequestCheck(book, seriesBefore);
         if (!book.isVerified(VerifiedField.AUTHORS)) {
             replaceCredits(book, source.authors());
         }
-        return bookRepository.save(book);
+        return saveAndAnnounce(book);
     }
 
     @Override
     @Transactional
-    @CacheEvict(cacheNames = BookDetailCache.NAME, key = "#result.dedupKey")
     public Book applyCredits(final long bookId, final List<SourceAuthor> credits) {
         final Book book = locked(bookId);
         if (book.isVerified(VerifiedField.AUTHORS)) {
@@ -94,12 +111,11 @@ class BookUpsertServiceImpl implements BookUpsertService {
         } else {
             replaceCredits(book, credits);
         }
-        return bookRepository.save(book);
+        return saveAndAnnounce(book);
     }
 
     @Override
     @Transactional
-    @CacheEvict(cacheNames = BookDetailCache.NAME, key = "#result.dedupKey")
     public Book applyVerified(final long bookId, final VerifiedMetadata metadata, final int checkVersion) {
         final Book book = locked(bookId);
         final Map<VerifiedField, @Nullable String> before = BookSnapshot.of(book);
@@ -120,7 +136,7 @@ class BookUpsertServiceImpl implements BookUpsertService {
         metadataChanges.record(bookId, before, book, metadata.evidence(), checkVersion);
         LOG.info("catalog.metadata-check bookId={} verified={}", bookId,
             LogSanitizer.forLog(book.getVerifiedFields().toString()));
-        return bookRepository.save(book);
+        return saveAndAnnounce(book);
     }
 
     @Override
@@ -130,6 +146,12 @@ class BookUpsertServiceImpl implements BookUpsertService {
         final boolean retrying = book.deferMetadataCheck(retryAt, maxAttempts, OffsetDateTime.now(ZoneOffset.UTC));
         bookRepository.save(book);
         return retrying;
+    }
+
+    private Book saveAndAnnounce(final Book book) {
+        final Book saved = bookRepository.save(book);
+        events.publishEvent(new BookChangedEvent(saved.getBookId()));
+        return saved;
     }
 
     private Book locked(final long bookId) {
@@ -147,24 +169,10 @@ class BookUpsertServiceImpl implements BookUpsertService {
     }
 
     private Optional<Book> findExistingForSource(final SourceBook source) {
-        return identityLookups().stream()
+        return identityLookups.stream()
             .map(lookup -> lookup.find(source))
             .flatMap(Optional::stream)
             .findFirst();
-    }
-
-    private List<SourceIdentityLookup> identityLookups() {
-        return List.of(
-            new SourceIdentityLookup(
-                SourceBook::googleBooksVolumeId, bookRepository::findByGoogleBooksVolumeId),
-            new SourceIdentityLookup(
-                SourceBook::openLibraryWorkKey, bookRepository::findByOpenLibraryWorkKey),
-            new SourceIdentityLookup(
-                SourceBook::hardcoverId, bookRepository::findByHardcoverId),
-            new SourceIdentityLookup(
-                SourceBook::locLccn, bookRepository::findByLocLccn),
-            new SourceIdentityLookup(
-                SourceBook::wikidataQid, bookRepository::findByWikidataQid));
     }
 
     private record SourceIdentityLookup(

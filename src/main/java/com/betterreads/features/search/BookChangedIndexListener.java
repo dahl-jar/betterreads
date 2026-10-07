@@ -2,30 +2,26 @@ package com.betterreads.features.search;
 
 import java.util.List;
 
-import com.betterreads.book.BookPromotedEvent;
+import com.betterreads.book.BookChangedEvent;
+import com.betterreads.book.BookDetailCache;
 import com.betterreads.bookindex.BookIndexView;
 import com.betterreads.bookindex.BookIndexViewReader;
 import com.betterreads.logging.LogSanitizer;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.CacheManager;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-/**
- * Indexes a book once its promotion commits.
- *
- * <p>After commit, a Meilisearch failure can't roll back the promotion and the new row is visible
- * to the read. A book missed during an outage waits for the nightly reconcile.
- */
 @Component
 @RequiredArgsConstructor
-class BookPromotedIndexListener {
+class BookChangedIndexListener {
 
-    private static final Logger LOG = LoggerFactory.getLogger(BookPromotedIndexListener.class);
+    private static final Logger LOG = LoggerFactory.getLogger(BookChangedIndexListener.class);
 
     private final BookIndexViewReader indexViews;
 
@@ -35,18 +31,27 @@ class BookPromotedIndexListener {
 
     private final ApplicationEventPublisher events;
 
+    private final CacheManager cacheManager;
+
     @TransactionalEventListener
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
-    public void onBookPromoted(final BookPromotedEvent event) {
-        indexViews.indexViewByKey(event.dedupKey())
+    public void onBookChanged(final BookChangedEvent event) {
+        indexViews.indexViewsByIds(List.of(event.bookId())).stream()
+            .findFirst()
             .ifPresentOrElse(
-                this::indexAndAnnounce,
-                () -> LOG.warn("search.index promoted book vanished before indexing key={}",
-                    LogSanitizer.forLog(event.dedupKey())));
+                this::evictAndIndex,
+                () -> LOG.warn("search.index changed book vanished before indexing bookId={}", event.bookId()));
     }
 
-    private void indexAndAnnounce(final BookIndexView book) {
-        searchService.index(List.of(mapper.toDocument(book)));
+    private void evictAndIndex(final BookIndexView book) {
+        BookDetailCache.evict(cacheManager, book.dedupKey());
+        try {
+            searchService.index(List.of(mapper.toDocument(book)));
+        } catch (SearchIndexException ex) {
+            LOG.warn("search.index reindex failed key={} ({}), the nightly reconcile retries it",
+                LogSanitizer.forLog(book.dedupKey()), ex.getClass().getSimpleName());
+            return;
+        }
         events.publishEvent(new BookIndexedEvent(book.dedupKey()));
     }
 }

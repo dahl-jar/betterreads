@@ -11,6 +11,7 @@ import com.betterreads.booksource.SourceBook;
 import static com.betterreads.features.bookstaging.DuneBooks.AUTHOR;
 import static com.betterreads.features.bookstaging.DuneBooks.ISBN;
 import static com.betterreads.features.bookstaging.DuneBooks.TITLE;
+import static com.betterreads.features.bookstaging.StubSourceClients.emptyFor;
 import static com.betterreads.features.bookstaging.StubSourceClients.malformedByIsbn;
 import static com.betterreads.features.bookstaging.StubSourceClients.recordingIsbnCalls;
 import static com.betterreads.features.bookstaging.StubSourceClients.stubByIsbn;
@@ -50,8 +51,6 @@ class SourceCollectorTest {
     private static final Duration SHORT_WAVE_TIMEOUT = Duration.ofMillis(50);
 
     private static final String OL_WORK_KEY = "OL1W";
-
-    private static final String UNMATCHED_ISBN = "other-isbn";
 
     private static final SourceBook ISBN_SEED = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
         .isbn13(ISBN)
@@ -242,18 +241,13 @@ class SourceCollectorTest {
     }
 
     @Test
-    @DisplayName("a source that resolves, hit or clean empty, is recorded as resolved")
-    void recordsResolvedSourcesOnSuccess() {
+    void shouldNotCountACleanHardcoverMissAsResolved() {
         final SourceCollector collector = collectorWith(SAME_THREAD,
-            stubByIsbn(BookFieldSource.HARDCOVER, ISBN, HARDCOVER_RATING_HIT),
-            stubByIsbn(BookFieldSource.GOOGLE_BOOKS, UNMATCHED_ISBN, null));
+            emptyFor(BookFieldSource.HARDCOVER));
 
         final MergedBook merged = collector.collectFor(ISBN_SEED);
 
-        assertThat(merged.resolvedSources())
-            .as("the seed, a source with a hit, and a source with a clean empty all resolved")
-            .contains(BookFieldSource.OPEN_LIBRARY, BookFieldSource.HARDCOVER,
-                BookFieldSource.GOOGLE_BOOKS);
+        assertThat(merged.resolvedSources()).doesNotContain(BookFieldSource.HARDCOVER);
     }
 
     private static @Nullable List<String> awardsFromWikidataTitleAuthorHit(final SourceBook seed) {

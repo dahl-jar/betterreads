@@ -97,11 +97,12 @@ final class DuneBooks {
             .build();
     }
 
-    static SourceBook hardcoverDuneWithoutSeries() {
-        return SourceBook.builder(BookFieldSource.HARDCOVER)
+    static SourceBook wikidataDuneChronicles() {
+        return SourceBook.builder(BookFieldSource.WIKIDATA)
             .isbn13(ISBN)
             .title(TITLE)
-            .averageRating(RATING)
+            .seriesName("Dune Chronicles")
+            .seriesPosition(SERIES_POSITION)
             .build();
     }
 

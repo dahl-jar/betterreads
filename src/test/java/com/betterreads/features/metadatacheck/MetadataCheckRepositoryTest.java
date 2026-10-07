@@ -63,6 +63,8 @@ class MetadataCheckRepositoryTest extends ContainerizedTest {
 
     private static final String FANTASY = "Fantasy";
 
+    private static final String HARDCOVER_ID = "hc-1";
+
     private static final String REQUESTED_SQL =
         "UPDATE book SET metadata_check_requested_at = now() - make_interval(days => ?) WHERE book_id = ?";
 
@@ -139,7 +141,7 @@ class MetadataCheckRepositoryTest extends ContainerizedTest {
         @Test
         void shouldLoadSeries() {
             final List<SeriesEntry> series = List.of(new SeriesEntry(SAGA, 1), new SeriesEntry(UNIVERSE, 1));
-            upsert.upsertFromSource(redRising().series(series).build());
+            upsert.upsertFromSource(redRising().hardcoverId(HARDCOVER_ID).series(series).build());
 
             final List<Book> found = due();
 
@@ -161,8 +163,8 @@ class MetadataCheckRepositoryTest extends ContainerizedTest {
 
         @Test
         void shouldListTheNamesOfEverySeries() {
-            final SourceBook book =
-                redRising().series(List.of(new SeriesEntry(SAGA, 1), new SeriesEntry(UNIVERSE, 1))).build();
+            final List<SeriesEntry> series = List.of(new SeriesEntry(SAGA, 1), new SeriesEntry(UNIVERSE, 1));
+            final SourceBook book = redRising().hardcoverId(HARDCOVER_ID).series(series).build();
             upsert.upsertFromSource(book);
 
             final List<String> names = books.findSeriesNames();
