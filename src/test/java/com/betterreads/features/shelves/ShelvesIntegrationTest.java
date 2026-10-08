@@ -79,7 +79,15 @@ class ShelvesIntegrationTest extends ShelfApiTest {
 
     private static final String JSON_ADDED_AT = "$.data.addedAt";
 
-    private static final String JSON_AVERAGE_RATING = "$.data.averageRating";
+    private static final int TOP_RATING = 5;
+
+    private static final int TWO_READERS = 2;
+
+    private static final double READERS_AVERAGE = 4.5;
+
+    private static final String JSON_FIRST_COMMUNITY_AVERAGE = "$.data[0].communityAverage";
+
+    private static final String JSON_FIRST_COMMUNITY_COUNT = "$.data[0].communityCount";
 
     private static final String JSON_MY_RATING = "$.data.myRating";
 
@@ -455,14 +463,32 @@ class ShelvesIntegrationTest extends ShelfApiTest {
         }
 
         @Test
-        void averageRatingCarriesTheBooksSourceRating() throws Exception {
-            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
+        void shouldShowTheBetterReadsRating() throws Exception {
+            final String userToken = registerAndLogin(USER, Accounts.USER_EMAIL);
+            final String otherUserToken = registerAndLogin(OTHER_USER, Accounts.OTHER_USER_EMAIL);
+            rateBook(userToken, RATED_KEY, TOP_RATING);
+            rateBook(otherUserToken, RATED_KEY, GIVEN_RATING);
+            putStatus(userToken, RATED_KEY, WANT_TO_READ);
 
-            final ResultActions response = putStatus(token, RATED_KEY, WANT_TO_READ);
+            final ResultActions shelf = getShelf(userToken, null);
 
-            response
+            shelf
                 .andExpect(status().isOk())
-                .andExpect(jsonPath(JSON_AVERAGE_RATING).value(RATED_AVERAGE.doubleValue()));
+                .andExpect(jsonPath(JSON_FIRST_COMMUNITY_AVERAGE).value(READERS_AVERAGE))
+                .andExpect(jsonPath(JSON_FIRST_COMMUNITY_COUNT).value(TWO_READERS));
+        }
+
+        @Test
+        void shouldShowNoRatingWithoutReaderRatings() throws Exception {
+            final String token = registerAndLogin(USER, Accounts.USER_EMAIL);
+            putStatus(token, RATED_KEY, WANT_TO_READ);
+
+            final ResultActions shelf = getShelf(token, null);
+
+            shelf
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_FIRST_COMMUNITY_AVERAGE).doesNotExist())
+                .andExpect(jsonPath(JSON_FIRST_COMMUNITY_COUNT).value(0));
         }
 
         @Test

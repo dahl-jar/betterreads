@@ -46,6 +46,7 @@ public class BookSummaryReader {
             book.getTitle(),
             Author.names(book.getAuthors()),
             coverImages.servedUrl(book),
-            book.getAverageRating());
+            book.getCommunityAverage(),
+            book.getCommunityCount());
     }
 }

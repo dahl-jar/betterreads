@@ -7,8 +7,8 @@ import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A shelved book with its shelf state. averageRating is the source rating, myRating the reader's
- * own 1-5 rating.
+ * A shelved book with its shelf state. communityAverage is the BetterReads readers' average,
+ * communityCount how many rated it, myRating the reader's own 1-5 rating.
  */
 record ShelfEntryResponse(
     String key,
@@ -21,7 +21,8 @@ record ShelfEntryResponse(
     @Nullable LocalDate finishedAt,
     @Nullable String notes,
     LocalDate addedAt,
-    @Nullable BigDecimal averageRating,
+    @Nullable BigDecimal communityAverage,
+    int communityCount,
     @Nullable Integer myRating
 ) {
 

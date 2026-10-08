@@ -22,7 +22,8 @@ class ShelfEntryMapper {
             entry.getFinishedAt(),
             entry.getNotes(),
             entry.getCreatedAt().toLocalDate(),
-            book.averageRating(),
+            book.communityAverage(),
+            book.communityCount(),
             myRating);
     }
 }

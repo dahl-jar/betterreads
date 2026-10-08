@@ -39,7 +39,7 @@ abstract class ShelfApiTest extends RegisteredUserTest {
 
     protected static final String RATED_KEY = "OL27448W";
 
-    protected static final BigDecimal RATED_AVERAGE = new BigDecimal("4.50");
+    private static final BigDecimal SOURCE_AVERAGE = new BigDecimal("4.10");
 
     private static final String HOBBIT_TITLE = "The Hobbit";
 
@@ -63,7 +63,7 @@ abstract class ShelfApiTest extends RegisteredUserTest {
         resetToDune();
         Books.seedBook(bookRepository, HOBBIT_KEY, HOBBIT_TITLE);
         final Book rated = Books.book(RATED_KEY, RATED_TITLE);
-        rated.setAverageRating(RATED_AVERAGE);
+        rated.setAverageRating(SOURCE_AVERAGE);
         bookRepository.save(rated);
     }
 

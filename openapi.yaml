@@ -1626,8 +1626,11 @@ components:
         addedAt:
           type: string
           format: date
-        averageRating:
+        communityAverage:
           type: number
+        communityCount:
+          type: integer
+          format: int32
         myRating:
           type: integer
           format: int32

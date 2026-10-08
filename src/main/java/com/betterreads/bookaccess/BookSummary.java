@@ -11,7 +11,7 @@ import org.jspecify.annotations.Nullable;
  * @param dedupKey the public lookup key
  * @param authors sorted by name
  * @param servedCoverUrl the cover URL the API serves, null when the book has no cover
- * @param averageRating the source average rating, null when no source supplied one
+ * @param communityAverage the BetterReads readers' average, null when nobody rated the book
  */
 public record BookSummary(
     long bookId,
@@ -19,7 +19,8 @@ public record BookSummary(
     String title,
     List<String> authors,
     @Nullable String servedCoverUrl,
-    @Nullable BigDecimal averageRating
+    @Nullable BigDecimal communityAverage,
+    int communityCount
 ) {
 
     public BookSummary {
