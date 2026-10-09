@@ -161,6 +161,16 @@ betterreads:
     cover-backfill:
       enabled: ${CATALOG_COVER_BACKFILL_ENABLED:true}
       full-sweep: ${CATALOG_COVER_FULL_SWEEP:false}
+    cover-upgrade:
+      enabled: ${CATALOG_COVER_UPGRADE_ENABLED:false}
+      batch-size: ${CATALOG_COVER_UPGRADE_BATCH_SIZE:500}
+      search-again-after: ${CATALOG_COVER_UPGRADE_SEARCH_AGAIN_AFTER:P30D}
+      cron: ${CATALOG_COVER_UPGRADE_CRON:0 30 0 * * *}
+    cover-mirror:
+      max-concurrent: ${CATALOG_COVER_MIRROR_MAX_CONCURRENT:4}
+      retry-after: ${CATALOG_COVER_MIRROR_RETRY_AFTER:PT10M}
+      max-wait: ${CATALOG_COVER_MIRROR_MAX_WAIT:PT15S}
+      max-waiters: ${CATALOG_COVER_MIRROR_MAX_WAITERS:32}
     metadata-check:
       enabled: ${CATALOG_METADATA_CHECK_ENABLED:false}
       batch-size: ${CATALOG_METADATA_CHECK_BATCH_SIZE:10}

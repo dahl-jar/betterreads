@@ -1,5 +1,8 @@
 package com.betterreads.features.coverimages;
 
+import static com.betterreads.features.coverimages.CoverImageFixtures.COVER_URL;
+import static com.betterreads.features.coverimages.CoverImageFixtures.KEY;
+import static com.betterreads.features.coverimages.CoverImageFixtures.book;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -10,17 +13,12 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
-import com.betterreads.book.Book;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.data.domain.Pageable;
 
 class CoverBackfillServiceTest {
-
-    static final String KEY = "OL1W";
-
-    static final String COVER_URL = "https://covers.example.org/1.jpg";
 
     static final String OBJECT_KEY = "covers/OL1W";
 
@@ -85,13 +83,5 @@ class CoverBackfillServiceTest {
 
         verify(books).markCoverMirrored(eq(BOOK_ID), eq(OBJECT_KEY), any(OffsetDateTime.class));
         verify(books).markCoverMirrored(eq(OTHER_ID), eq(OBJECT_KEY), any(OffsetDateTime.class));
-    }
-
-    static Book book(final long bookId) {
-        final Book book = new Book();
-        book.setBookId(bookId);
-        book.setDedupKey(KEY);
-        book.setCoverUrl(COVER_URL);
-        return book;
     }
 }

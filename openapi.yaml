@@ -2123,6 +2123,8 @@ components:
           type: string
         coverUrl:
           type: string
+        appleBooksUrl:
+          type: string
         firstPublishYear:
           type: integer
           format: int32

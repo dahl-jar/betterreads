@@ -64,6 +64,8 @@ class SourceMergerTest {
 
     private static final String COVER_URL = "https://covers.example.test/1-L.jpg";
 
+    private static final String OTHER_COVER_URL = "https://covers.example.test/2-L.jpg";
+
     private static final String HUGO = "Hugo Award";
 
     private static final String NEBULA = "Nebula Award";
@@ -273,20 +275,34 @@ class SourceMergerTest {
         }
 
         @Test
-        @DisplayName("cover comes from Google's edition before OpenLibrary's work-level cover")
-        void coverPrefersGoogleOverOpenLibrary() {
+        void shouldPreferOpenLibraryOverGoogleForTheCover() {
             final SourceBook google = titled(BookFieldSource.GOOGLE_BOOKS)
-                .coverUrl(COVER_URL)
+                .coverUrl(OTHER_COVER_URL)
                 .build();
             final SourceBook openLibrary = titled(BookFieldSource.OPEN_LIBRARY)
-                .coverUrl("https://covers.example.test/2-L.jpg")
+                .coverUrl(COVER_URL)
                 .build();
 
-            final MergedBook merged = merger.merge(null, List.of(openLibrary, google));
+            final MergedBook merged = merger.merge(null, List.of(google, openLibrary));
 
-            assertThat(merged.book().coverUrl())
-                .as("should take Google's cover because it matches the edition's language")
-                .isEqualTo(COVER_URL);
+            assertThat(merged.book().coverUrl()).isEqualTo(COVER_URL);
+        }
+
+        @Test
+        void shouldPreferHardcoverForTheCover() {
+            final SourceBook google = titled(BookFieldSource.GOOGLE_BOOKS)
+                .coverUrl(OTHER_COVER_URL)
+                .build();
+            final SourceBook openLibrary = titled(BookFieldSource.OPEN_LIBRARY)
+                .coverUrl(OTHER_COVER_URL)
+                .build();
+            final SourceBook hardcover = titled(BookFieldSource.HARDCOVER)
+                .coverUrl(COVER_URL)
+                .build();
+
+            final MergedBook merged = merger.merge(null, List.of(google, openLibrary, hardcover));
+
+            assertThat(merged.book().coverUrl()).isEqualTo(COVER_URL);
         }
 
         @Test

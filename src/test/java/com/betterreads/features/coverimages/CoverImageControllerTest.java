@@ -1,6 +1,6 @@
 package com.betterreads.features.coverimages;
 
-import static com.betterreads.features.coverimages.CoverBackfillServiceTest.KEY;
+import static com.betterreads.features.coverimages.CoverImageFixtures.KEY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;

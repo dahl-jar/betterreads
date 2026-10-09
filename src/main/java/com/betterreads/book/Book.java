@@ -6,6 +6,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -27,6 +29,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import com.betterreads.booksource.CoverSource;
 import com.betterreads.booksource.SeriesEntry;
 import com.betterreads.booksource.SourceBook;
 import com.betterreads.db.Timestamped;
@@ -97,6 +100,19 @@ public class Book extends Timestamped {
     @Nullable
     @Column(name = "cover_checked_at")
     private OffsetDateTime coverCheckedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "cover_source", length = 20)
+    @Nullable
+    private CoverSource coverSource;
+
+    @Column(name = "cover_store_url")
+    @Nullable
+    private String coverStoreUrl;
+
+    @Nullable
+    @Column(name = "cover_searched_at")
+    private OffsetDateTime coverSearchedAt;
 
     @Column(name = "first_publish_year")
     @Nullable
@@ -178,8 +194,8 @@ public class Book extends Timestamped {
     private final List<BookSeries> series = new ArrayList<>();
 
     /**
-     * Overwrites the descriptive fields, null included. Source ids, ratings, subjects and awards
-     * change only when the source has them.
+     * Overwrites the descriptive fields, null included, except a cover already searched.
+     * Source ids, ratings, subjects and awards change only when the source has them.
      *
      * @throws IllegalArgumentException if the source has no title or no source id
      */
@@ -191,8 +207,10 @@ public class Book extends Timestamped {
         this.title = isVerified(VerifiedField.TITLE) ? this.title : sourceTitle;
         this.subtitle = source.subtitle();
         this.description = isVerified(VerifiedField.DESCRIPTION) ? this.description : source.description();
-        invalidateMirrorIfCoverChanged(source.coverUrl());
-        this.coverUrl = source.coverUrl();
+        if (this.coverSearchedAt == null) {
+            resetCoverIfChanged(source.coverUrl());
+            this.coverUrl = source.coverUrl();
+        }
         this.firstPublishYear = isVerified(VerifiedField.YEAR) ? this.firstPublishYear : source.publicationYear();
         this.isbn = isVerified(VerifiedField.ISBN) ? this.isbn : source.isbn13();
         this.pageCount = source.pageCount();
@@ -203,13 +221,14 @@ public class Book extends Timestamped {
         assignDedupKey();
     }
 
-    /** A changed cover URL clears the mirrored copy, so the image stored for the old URL is not served. */
-    // PMD.NullAssignment: nulling the mirror-state columns is how "not mirrored" is recorded
+    /** A changed cover URL clears the mirrored copy and its source, so the old URL's image is not served. */
+    // PMD.NullAssignment: nulling the cover columns is how "not mirrored, source unknown" is recorded
     @SuppressWarnings("PMD.NullAssignment")
-    private void invalidateMirrorIfCoverChanged(final @Nullable String newCoverUrl) {
+    private void resetCoverIfChanged(final @Nullable String newCoverUrl) {
         if (!Objects.equals(this.coverUrl, newCoverUrl)) {
             this.coverObjectKey = null;
             this.coverCheckedAt = null;
+            this.coverSource = null;
         }
     }
 
@@ -446,6 +465,21 @@ public class Book extends Timestamped {
 
     public void setCoverUrl(@Nullable final String coverUrl) {
         this.coverUrl = coverUrl;
+    }
+
+    @Nullable
+    public CoverSource getCoverSource() {
+        return coverSource;
+    }
+
+    @Nullable
+    public String getCoverStoreUrl() {
+        return coverStoreUrl;
+    }
+
+    @Nullable
+    public OffsetDateTime getCoverSearchedAt() {
+        return coverSearchedAt;
     }
 
     @Nullable

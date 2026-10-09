@@ -35,7 +35,7 @@ public class SourceMerger {
         BookFieldSource.HARDCOVER, BookFieldSource.LOC, BookFieldSource.STAGED);
 
     private static final List<BookFieldSource> COVER_CHAIN = List.of(
-        BookFieldSource.GOOGLE_BOOKS, BookFieldSource.HARDCOVER, BookFieldSource.OPEN_LIBRARY,
+        BookFieldSource.HARDCOVER, BookFieldSource.OPEN_LIBRARY, BookFieldSource.GOOGLE_BOOKS,
         BookFieldSource.STAGED);
 
     private static final List<BookFieldSource> YEAR_CHAIN = List.of(

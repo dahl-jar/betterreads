@@ -7,6 +7,7 @@ import com.betterreads.book.Author;
 import com.betterreads.book.Book;
 import com.betterreads.book.BookAward;
 import com.betterreads.book.BookSubject;
+import com.betterreads.booksource.CoverSource;
 import com.betterreads.booksource.SourceBook;
 import com.betterreads.images.CoverImages;
 import com.betterreads.pendingbook.PendingBook;
@@ -38,6 +39,7 @@ class BookDetailMapper {
                 .toList())
             .description(book.getDescription())
             .coverUrl(coverImages.servedUrl(book))
+            .appleBooksUrl(book.getCoverSource() == CoverSource.APPLE_BOOKS ? book.getCoverStoreUrl() : null)
             .firstPublishYear(book.getFirstPublishYear())
             .isbn(book.getIsbn())
             .pageCount(book.getPageCount())

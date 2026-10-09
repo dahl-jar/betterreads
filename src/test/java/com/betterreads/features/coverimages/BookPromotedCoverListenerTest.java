@@ -1,9 +1,9 @@
 package com.betterreads.features.coverimages;
 
-import static com.betterreads.features.coverimages.CoverBackfillServiceTest.COVER_URL;
-import static com.betterreads.features.coverimages.CoverBackfillServiceTest.KEY;
+import static com.betterreads.features.coverimages.CoverImageFixtures.COVER_URL;
+import static com.betterreads.features.coverimages.CoverImageFixtures.KEY;
 import static com.betterreads.features.coverimages.CoverBackfillServiceTest.OBJECT_KEY;
-import static com.betterreads.features.coverimages.CoverBackfillServiceTest.book;
+import static com.betterreads.features.coverimages.CoverImageFixtures.book;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;

@@ -23,6 +23,7 @@ public record BookDetailResponse(
     @JsonSetter(nulls = Nulls.AS_EMPTY) List<ContributorResponse> contributors,
     @Nullable String description,
     @Nullable String coverUrl,
+    @Nullable String appleBooksUrl,
     @Nullable Integer firstPublishYear,
     @Nullable String isbn,
     @Nullable Integer pageCount,
@@ -64,7 +65,7 @@ public record BookDetailResponse(
     }
 
     /**
-     * Builds the response by field name. The record has nineteen components and
+     * Builds the response by field name. The record has many components and
      * several share a type, so positional construction swaps two of them unnoticed.
      */
     // PMD.TooManyMethods, PMD.TooManyFields, PMD.AvoidFieldNameMatchingMethodName: one setter per record field.
@@ -79,6 +80,7 @@ public record BookDetailResponse(
         private List<ContributorResponse> contributors = List.of();
         private @Nullable String description;
         private @Nullable String coverUrl;
+        private @Nullable String appleBooksUrl;
         private @Nullable Integer firstPublishYear;
         private @Nullable String isbn;
         private @Nullable Integer pageCount;
@@ -123,6 +125,11 @@ public record BookDetailResponse(
 
         public Builder coverUrl(final @Nullable String value) {
             this.coverUrl = value;
+            return this;
+        }
+
+        public Builder appleBooksUrl(final @Nullable String value) {
+            this.appleBooksUrl = value;
             return this;
         }
 
@@ -183,7 +190,8 @@ public record BookDetailResponse(
 
         public BookDetailResponse build() {
             return new BookDetailResponse(
-                key, complete, title, subtitle, authors, contributors, description, coverUrl, firstPublishYear,
+                key, complete, title, subtitle, authors, contributors, description, coverUrl, appleBooksUrl,
+                firstPublishYear,
                 isbn, pageCount, language, averageRating, ratingCount, seriesName, seriesPosition,
                 series, subjects, awards);
         }

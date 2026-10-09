@@ -1,59 +1,58 @@
 package com.betterreads.features.coverimages;
 
 import java.util.Optional;
+import java.util.Set;
 
-import com.betterreads.book.Book;
 import com.betterreads.images.Image;
 import com.betterreads.images.ImageStore;
 import com.betterreads.pendingbook.PendingBook;
 import com.betterreads.pendingbook.PendingBookRepository;
-import org.jspecify.annotations.Nullable;
+import com.betterreads.pendingbook.PendingBookStatus;
 import org.springframework.stereotype.Service;
 
-/**
- * Loads a book's cover bytes, mirroring on a miss.
- *
- * <p>A book still in staging takes its cover URL from the seed, so a seed served before promotion
- * still gets a cover.
- */
+/** Loads a book's cover bytes, mirroring a missing one when the gate allows. */
 @Service
 class CoverImageService {
+
+    private static final Set<String> MERGED = Set.of(PendingBookStatus.PROMOTED, PendingBookStatus.DUPLICATE);
 
     private final BookCoverRepository books;
 
     private final PendingBookRepository pendingBooks;
 
+    private final CoverBlockRepository blocks;
+
     private final ImageStore imageStore;
 
-    private final CoverMirrorService coverMirror;
+    private final CoverMirrorGate mirrorGate;
 
     CoverImageService(
         final BookCoverRepository books,
         final PendingBookRepository pendingBooks,
+        final CoverBlockRepository blocks,
         final ImageStore imageStore,
-        final CoverMirrorService coverMirror
+        final CoverMirrorGate mirrorGate
     ) {
         this.books = books;
         this.pendingBooks = pendingBooks;
+        this.blocks = blocks;
         this.imageStore = imageStore;
-        this.coverMirror = coverMirror;
+        this.mirrorGate = mirrorGate;
     }
 
     /** The object key comes from the current cover URL, so a changed cover misses and re-mirrors. */
     public Optional<Image> loadCover(final String key) {
-        final String coverUrl = sourceCoverUrl(key);
-        if (coverUrl == null || coverUrl.isBlank()) {
-            return Optional.empty();
-        }
-        return imageStore.get(CoverMirrorService.objectKey(key, coverUrl))
-            .or(() -> coverMirror.mirror(key, coverUrl).flatMap(imageStore::get));
+        return sourceCoverUrl(key)
+            .filter(url -> !url.isBlank() && !blocks.isBlocked(url))
+            .flatMap(url -> imageStore.get(CoverMirrorService.objectKey(key, url))
+                .or(() -> mirrorGate.mirror(key, url).flatMap(imageStore::get)));
     }
 
-    private @Nullable String sourceCoverUrl(final String key) {
+    private Optional<String> sourceCoverUrl(final String key) {
         return books.findByDedupKey(key)
-            .map(Book::getCoverUrl)
+            .map(book -> Optional.ofNullable(book.getCoverUrl()))
             .orElseGet(() -> pendingBooks.findByDedupKey(key)
-                .map(PendingBook::getCoverUrl)
-                .orElse(null));
+                .filter(seed -> !MERGED.contains(seed.getStatus()))
+                .map(PendingBook::getCoverUrl));
     }
 }

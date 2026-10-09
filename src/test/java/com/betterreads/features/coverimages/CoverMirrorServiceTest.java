@@ -1,6 +1,6 @@
 package com.betterreads.features.coverimages;
 
-import static com.betterreads.features.coverimages.CoverBackfillServiceTest.KEY;
+import static com.betterreads.features.coverimages.CoverImageFixtures.KEY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -30,7 +30,7 @@ class CoverMirrorServiceTest {
 
     private static final String PNG_TYPE = "image/png";
 
-    private static final byte[] PNG = CoverImageProcessorTest.pngOf(IMAGE_DIMENSION, IMAGE_DIMENSION);
+    private static final byte[] PNG = CoverImageFixtures.blank(IMAGE_DIMENSION, IMAGE_DIMENSION);
 
     private final RecordingImageStore store = new RecordingImageStore();
 
@@ -53,6 +53,16 @@ class CoverMirrorServiceTest {
 
         assertThat(key).contains(expectedKey);
         assertThat(store.saved.get(expectedKey).contentType()).isEqualTo(MediaType.IMAGE_JPEG_VALUE);
+    }
+
+    @Test
+    void shouldStoreAnImageTheCallerFetched() {
+        final String expectedKey = CoverMirrorService.objectKey(KEY, COVER_URL);
+
+        final Optional<String> key = service.mirror(KEY, COVER_URL, new Image(PNG, PNG_TYPE));
+
+        assertThat(key).contains(expectedKey);
+        assertThat(store.saved).containsKey(expectedKey);
     }
 
     @Test
@@ -83,7 +93,7 @@ class CoverMirrorServiceTest {
     @DisplayName("bytes that do not decode as an image are rejected and nothing is stored")
     void rejectsNonImage() {
         fetchResult = Optional.of(
-            new Image("<html>404</html>".getBytes(StandardCharsets.UTF_8), "text/html"));
+            new Image(CoverImageFixtures.notImage(), "text/html"));
 
         final Optional<String> key = service.mirror(KEY, COVER_URL);
 

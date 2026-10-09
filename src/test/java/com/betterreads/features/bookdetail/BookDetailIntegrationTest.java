@@ -110,6 +110,13 @@ class BookDetailIntegrationTest extends ContainerizedTest {
 
     private static final String ILLUSTRATOR = "ILLUSTRATOR";
 
+    private static final String APPLE_STORE = "https://books.apple.com/us/book/the-way-of-kings/id1";
+
+    private static final String APPLE_PATH = "$.data.appleBooksUrl";
+
+    private static final String STORE_SQL =
+        "UPDATE book SET cover_source = ?, cover_store_url = ? WHERE hardcover_id = ?";
+
     @Autowired
     private TransactionTemplate transactionTemplate;
 
@@ -247,6 +254,26 @@ class BookDetailIntegrationTest extends ContainerizedTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(AUTHORS_PATH).value(ORULLIAN))
                 .andExpect(jsonPath(SECOND_AUTHOR_PATH).value(AUTHOR));
+        }
+
+        @Test
+        void shouldSendTheAppleLinkForAnAppleCover() throws Exception {
+            saveCompleteBook(HARDCOVER_KEY);
+            jdbcTemplate.update(STORE_SQL, "APPLE_BOOKS", APPLE_STORE, HARDCOVER_KEY);
+
+            mockMvc.perform(get(BOOK_PATH, HARDCOVER_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(APPLE_PATH).value(APPLE_STORE));
+        }
+
+        @Test
+        void shouldOmitTheAppleLinkForOtherCovers() throws Exception {
+            saveCompleteBook(HARDCOVER_KEY);
+            jdbcTemplate.update(STORE_SQL, "HARDCOVER", APPLE_STORE, HARDCOVER_KEY);
+
+            mockMvc.perform(get(BOOK_PATH, HARDCOVER_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(APPLE_PATH).doesNotExist());
         }
 
         @Test

@@ -1,13 +1,12 @@
 package com.betterreads.features.coverimages;
 
+import static com.betterreads.features.coverimages.CoverImageFixtures.blank;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Optional;
 
@@ -39,7 +38,7 @@ class CoverImageProcessorTest {
     @Test
     @DisplayName("an oversized image is re-encoded as jpeg with its longest side at the max dimension")
     void resizesLargeImage() {
-        final byte[] large = pngOf(LARGE_WIDTH, LARGE_HEIGHT);
+        final byte[] large = blank(LARGE_WIDTH, LARGE_HEIGHT);
 
         final Optional<byte[]> jpeg = processor.toCleanJpeg(large);
 
@@ -63,7 +62,7 @@ class CoverImageProcessorTest {
     @Test
     @DisplayName("an image cut off after its header is rejected")
     void shouldRejectTruncatedImage() {
-        final byte[] truncated = Arrays.copyOf(pngOf(SMALL_DIMENSION, SMALL_DIMENSION), TRUNCATED_LENGTH);
+        final byte[] truncated = Arrays.copyOf(blank(SMALL_DIMENSION, SMALL_DIMENSION), TRUNCATED_LENGTH);
 
         final Optional<byte[]> jpeg = processor.toCleanJpeg(truncated);
 
@@ -73,7 +72,7 @@ class CoverImageProcessorTest {
     @Test
     @DisplayName("a small image keeps its size")
     void keepsSmallImage() {
-        final byte[] small = pngOf(SMALL_DIMENSION, SMALL_DIMENSION);
+        final byte[] small = blank(SMALL_DIMENSION, SMALL_DIMENSION);
 
         final Optional<byte[]> jpeg = processor.toCleanJpeg(small);
 
@@ -85,29 +84,15 @@ class CoverImageProcessorTest {
     @Test
     @DisplayName("bytes that do not decode as an image are rejected")
     void rejectsNonImage() {
-        final byte[] notAnImage = "<html>this is not an image</html>".getBytes(StandardCharsets.UTF_8);
+        final byte[] notAnImage = CoverImageFixtures.notImage();
 
         final Optional<byte[]> jpeg = processor.toCleanJpeg(notAnImage);
 
         assertThat(jpeg).isEmpty();
     }
 
-    static byte[] pngOf(final int width, final int height) {
-        return png(new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB));
-    }
-
     private static byte[] binaryPngOf(final int width, final int height) {
-        return png(new BufferedImage(width, height, BufferedImage.TYPE_BYTE_BINARY));
-    }
-
-    private static byte[] png(final BufferedImage image) {
-        final ByteArrayOutputStream out = new ByteArrayOutputStream();
-        try {
-            ImageIO.write(image, "png", out);
-        } catch (IOException ex) {
-            throw new UncheckedIOException(ex);
-        }
-        return out.toByteArray();
+        return CoverImageFixtures.png(new BufferedImage(width, height, BufferedImage.TYPE_BYTE_BINARY));
     }
 
     private static BufferedImage read(final byte[] bytes) {
