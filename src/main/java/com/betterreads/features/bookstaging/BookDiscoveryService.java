@@ -3,16 +3,17 @@ package com.betterreads.features.bookstaging;
 import com.betterreads.bookdiscovery.BookDiscovery;
 import com.betterreads.booksource.SingleBookFilter;
 import com.betterreads.booksource.SourceBook;
+import com.betterreads.booksource.SourceSeries;
 import com.betterreads.clients.hardcoverauthor.HardcoverAuthorClient;
 import com.betterreads.clients.hardcoverseries.HardcoverSeriesClient;
 import com.betterreads.clients.openlibrary.OpenLibraryClient;
 import com.betterreads.text.TextMatch;
 
 import java.util.Comparator;
+import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
-/** Turns a user search into staged candidates. */
 @Service
 class BookDiscoveryService implements BookDiscovery {
 
@@ -38,16 +39,20 @@ class BookDiscoveryService implements BookDiscovery {
         this.stager = stager;
     }
 
-    /** Tries series, then author, then one OpenLibrary title hit, so a standalone book still stages. */
     @Override
     public void searchAndStage(final String query) {
         seriesClient.fetchSeries(query).ifPresentOrElse(
-            series -> series.volumes().forEach(volume -> stager.stage(volume.book())),
+            this::stageSeries,
             () -> {
                 if (!stageAuthor(query)) {
                     stageStandalone(query);
                 }
             });
+    }
+
+    private void stageSeries(final SourceSeries series) {
+        series.volumes().forEach(volume -> stager.stage(volume.book()));
+        Optional.ofNullable(series.titleBook()).ifPresent(stager::stage);
     }
 
     @Override

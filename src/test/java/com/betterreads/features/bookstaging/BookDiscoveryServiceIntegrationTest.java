@@ -1,11 +1,6 @@
 package com.betterreads.features.bookstaging;
 
 import com.betterreads.booksource.BookFieldSource;
-import com.betterreads.booksource.SourceAuthor;
-import com.betterreads.booksource.SourceAuthorWorks;
-import com.betterreads.booksource.SourceBook;
-import com.betterreads.booksource.SourceSeries;
-import com.betterreads.booksource.SourceSeriesVolume;
 import com.betterreads.clients.googlebooks.GoogleBooksClient;
 import com.betterreads.clients.hardcoverauthor.HardcoverAuthorClient;
 import com.betterreads.clients.hardcoverbook.HardcoverClient;
@@ -29,7 +24,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -41,75 +35,34 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/**
- * Catalog search staging against a real Postgres. The source clients are mocked so the test stays off
- * the network and each volume stages under a known OpenLibrary work key.
- */
 @SpringBootTest
 @Testcontainers
 @TestPropertySource(properties = {
     "betterreads.catalog.staging.poll-enabled=false"
 })
-// PMD.TooManyMethods: one test per discovery route plus the shared source stubs.
-@SuppressWarnings("PMD.TooManyMethods")
 class BookDiscoveryServiceIntegrationTest extends ContainerizedTest {
 
     @Container
     @ServiceConnection
     static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
 
-    private static final String SERIES_QUERY = "The Wheel of Time";
+    private static final String SERIES_QUERY = DiscoverySamples.WHEEL_OF_TIME;
 
-    private static final String AUTHOR = "Robert Jordan";
+    private static final String GAPPED_SERIES_QUERY = DiscoverySamples.GAPPED_WHEEL_OF_TIME;
 
-    private static final String SANDERSON = "Brandon Sanderson";
+    private static final String TITLE_BOOK_QUERY = "The Wheel of Time, with its title book";
 
-    private static final String GAPPED_SERIES_QUERY = "The Wheel of Time, gapped";
-
-    private static final String UNKNOWN_VOLUME = "A Volume No Source Knows";
+    private static final String AUTHOR_QUERY = DiscoverySamples.SANDERSON;
 
     private static final String NO_MATCH = "a title hardcover has no series for";
 
     private static final String STANDALONE_QUERY = "nineteen eighty-four orwell";
 
-    private static final String CANONICAL_TITLE = "Nineteen Eighty-Four";
-
-    private static final String CANONICAL_KEY = "OL1168083W";
-
-    private static final int CANONICAL_YEAR = 1949;
-
-    private static final int LATER_EDITION_YEAR = 2003;
-
     private static final int FALLBACK_SEARCH_LIMIT = 5;
-
-    private static final int FIRST_POSITION = 1;
-
-    private static final int SECOND_POSITION = 2;
-
-    private static final int THIRD_POSITION = 3;
 
     private static final long VOLUME_COUNT = 3L;
 
     private static final long AUTHOR_BOOK_COUNT = 2L;
-
-    private static final String SECOND_VOLUME_KEY = "OL2W";
-
-    private static final String EYE = "The Eye of the World";
-
-    private static final String GREAT_HUNT = "The Great Hunt";
-
-    private static final String DRAGON_REBORN = "The Dragon Reborn";
-
-    private static final String MISTBORN = "Mistborn: The Final Empire";
-
-    private static final String WAY_OF_KINGS = "The Way of Kings";
-
-    private static final Map<String, String> WORK_KEYS_BY_TITLE = Map.of(
-        EYE, "OL1W",
-        GREAT_HUNT, SECOND_VOLUME_KEY,
-        DRAGON_REBORN, "OL3W",
-        MISTBORN, "OL10W",
-        WAY_OF_KINGS, "OL11W");
 
     @MockitoBean
     private HardcoverSeriesClient seriesClient;
@@ -141,13 +94,16 @@ class BookDiscoveryServiceIntegrationTest extends ContainerizedTest {
     @BeforeEach
     void stubSources() {
         pendingBooks.deleteAll();
-        when(seriesClient.fetchSeries(SERIES_QUERY)).thenReturn(Optional.of(wheelOfTime()));
-        when(seriesClient.fetchSeries(GAPPED_SERIES_QUERY)).thenReturn(Optional.of(gappedWheelOfTime()));
+        when(seriesClient.fetchSeries(SERIES_QUERY)).thenReturn(Optional.of(DiscoverySamples.wheelOfTime()));
+        when(seriesClient.fetchSeries(GAPPED_SERIES_QUERY))
+            .thenReturn(Optional.of(DiscoverySamples.gappedWheelOfTime()));
+        when(seriesClient.fetchSeries(TITLE_BOOK_QUERY))
+            .thenReturn(Optional.of(DiscoverySamples.titledWheelOfTime()));
         when(seriesClient.fetchSeries(NO_MATCH)).thenReturn(Optional.empty());
-        when(authorClient.fetchAuthorWorks(SANDERSON)).thenReturn(Optional.of(sandersonWorks()));
+        when(authorClient.fetchAuthorWorks(AUTHOR_QUERY)).thenReturn(Optional.of(DiscoverySamples.sandersonWorks()));
         when(openLibraryClient.source()).thenReturn(BookFieldSource.OPEN_LIBRARY);
         when(openLibraryClient.fetchByTitleAuthor(anyString(), anyString()))
-            .thenAnswer(invocation -> openLibraryHit(invocation.getArgument(0)));
+            .thenAnswer(invocation -> DiscoverySamples.openLibraryHit(invocation.getArgument(0)));
         when(openLibraryClient.search(anyString(), anyInt())).thenReturn(List.of());
         when(hardcoverClient.source()).thenReturn(BookFieldSource.HARDCOVER);
         when(hardcoverClient.fetchByTitleAuthor(anyString(), anyString())).thenReturn(Optional.empty());
@@ -159,71 +115,6 @@ class BookDiscoveryServiceIntegrationTest extends ContainerizedTest {
         when(locClient.fetchByTitleAuthor(anyString(), anyString())).thenReturn(Optional.empty());
     }
 
-    private static SourceSeries wheelOfTime() {
-        return new SourceSeries(SERIES_QUERY, AUTHOR, List.of(
-            new SourceSeriesVolume(FIRST_POSITION, volume(EYE, FIRST_POSITION)),
-            new SourceSeriesVolume(SECOND_POSITION, volume(GREAT_HUNT, SECOND_POSITION)),
-            new SourceSeriesVolume(THIRD_POSITION, volume(DRAGON_REBORN, THIRD_POSITION))));
-    }
-
-    private static SourceSeries gappedWheelOfTime() {
-        return new SourceSeries(GAPPED_SERIES_QUERY, AUTHOR, List.of(
-            new SourceSeriesVolume(FIRST_POSITION, volume(EYE, FIRST_POSITION)),
-            new SourceSeriesVolume(SECOND_POSITION, volume(UNKNOWN_VOLUME, SECOND_POSITION)),
-            new SourceSeriesVolume(THIRD_POSITION, volume(DRAGON_REBORN, THIRD_POSITION))));
-    }
-
-    private static SourceAuthorWorks sandersonWorks() {
-        return new SourceAuthorWorks(SANDERSON, List.of(
-            authorBook(MISTBORN), authorBook(WAY_OF_KINGS)));
-    }
-
-    private static SourceBook volume(final String title, final double position) {
-        return SourceBook.builder(BookFieldSource.HARDCOVER)
-            .title(title)
-            .authors(SourceAuthor.ofNames(List.of(AUTHOR)))
-            .seriesName(SERIES_QUERY)
-            .seriesPosition(position)
-            .build();
-    }
-
-    private static SourceBook authorBook(final String title) {
-        return SourceBook.builder(BookFieldSource.HARDCOVER)
-            .title(title)
-            .authors(SourceAuthor.ofNames(List.of(SANDERSON)))
-            .build();
-    }
-
-    private static List<SourceBook> noisyStandaloneHits() {
-        return List.of(
-            standaloneHit("SparkNotes for 1984", "OLsparkW", LATER_EDITION_YEAR),
-            standaloneHit("1984 (adaptation)", "OLadaptW", LATER_EDITION_YEAR),
-            standaloneHit("Animal Farm / Nineteen Eighty-Four", "OLcomboW", LATER_EDITION_YEAR),
-            standaloneHit(CANONICAL_TITLE, "OLreprintW", LATER_EDITION_YEAR),
-            standaloneHit(CANONICAL_TITLE, CANONICAL_KEY, CANONICAL_YEAR));
-    }
-
-    private static SourceBook standaloneHit(final String title, final String key, final int year) {
-        return SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
-            .openLibraryWorkKey(key)
-            .title(title)
-            .publicationYear(year)
-            .authors(SourceAuthor.ofNames(List.of("George Orwell")))
-            .build();
-    }
-
-    private static Optional<SourceBook> openLibraryHit(final String title) {
-        final String workKey = WORK_KEYS_BY_TITLE.get(title);
-        if (workKey == null) {
-            return Optional.empty();
-        }
-        return Optional.of(SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
-            .openLibraryWorkKey(workKey)
-            .title(title)
-            .authors(SourceAuthor.ofNames(List.of(AUTHOR)))
-            .build());
-    }
-
     @Test
     @DisplayName("a series query stages one candidate per volume under its own work key")
     void seriesQueryStagesOneCandidatePerVolume() {
@@ -232,11 +123,11 @@ class BookDiscoveryServiceIntegrationTest extends ContainerizedTest {
         assertThat(pendingBooks.count())
             .as("each of the three volumes stages as its own candidate")
             .isEqualTo(VOLUME_COUNT);
-        assertThat(pendingBooks.findByOpenLibraryWorkKey(SECOND_VOLUME_KEY))
+        assertThat(pendingBooks.findByOpenLibraryWorkKey(DiscoverySamples.SECOND_VOLUME_KEY))
             .as("a middle volume stages under its own key, carrying its series position")
             .get()
             .extracting(PendingBook::getSeriesPosition)
-            .isEqualTo((double) SECOND_POSITION);
+            .isEqualTo((double) DiscoverySamples.SECOND_POSITION);
     }
 
     @Test
@@ -246,13 +137,24 @@ class BookDiscoveryServiceIntegrationTest extends ContainerizedTest {
 
         assertThat(pendingBooks.findAll())
             .extracting(PendingBook::getTitle)
-            .containsExactlyInAnyOrder(EYE, DRAGON_REBORN);
+            .containsExactlyInAnyOrder(DiscoverySamples.EYE, DiscoverySamples.DRAGON_REBORN);
+    }
+
+    @Test
+    void shouldStageTheTitleBookWithTheVolumes() {
+        bookDiscovery.searchAndStage(TITLE_BOOK_QUERY);
+
+        assertThat(pendingBooks.findAll())
+            .extracting(PendingBook::getTitle)
+            .containsExactlyInAnyOrder(DiscoverySamples.EYE, DiscoverySamples.GREAT_HUNT,
+                DiscoverySamples.DRAGON_REBORN, DiscoverySamples.WHEEL_OF_TIME);
     }
 
     @Test
     @DisplayName("a query whose OpenLibrary hits do not match the title stages nothing")
     void noSeriesMatchStagesNothing() {
-        when(openLibraryClient.search(NO_MATCH, FALLBACK_SEARCH_LIMIT)).thenReturn(noisyStandaloneHits());
+        when(openLibraryClient.search(NO_MATCH, FALLBACK_SEARCH_LIMIT))
+            .thenReturn(DiscoverySamples.noisyStandaloneHits());
 
         bookDiscovery.searchAndStage(NO_MATCH);
 
@@ -264,7 +166,7 @@ class BookDiscoveryServiceIntegrationTest extends ContainerizedTest {
     @Test
     @DisplayName("an author query stages one candidate per book of the matching author")
     void authorQueryStagesOneCandidatePerBook() {
-        bookDiscovery.searchAuthorAndStage(SANDERSON);
+        bookDiscovery.searchAuthorAndStage(AUTHOR_QUERY);
 
         assertThat(pendingBooks.count())
             .as("each of the author's books stages as its own candidate")
@@ -274,7 +176,7 @@ class BookDiscoveryServiceIntegrationTest extends ContainerizedTest {
     @Test
     @DisplayName("a search that matches an author stages the author's books and skips the title search")
     void shouldStageAuthorBooksWithoutTitleSearch() {
-        bookDiscovery.searchAndStage(SANDERSON);
+        bookDiscovery.searchAndStage(AUTHOR_QUERY);
 
         assertThat(pendingBooks.count()).isEqualTo(AUTHOR_BOOK_COUNT);
         verify(openLibraryClient, never()).search(anyString(), anyInt());
@@ -284,7 +186,7 @@ class BookDiscoveryServiceIntegrationTest extends ContainerizedTest {
     @DisplayName("a free-form query longer than the title still stages the canonical work")
     void standaloneFallbackStagesCanonicalWork() {
         when(openLibraryClient.search(STANDALONE_QUERY, FALLBACK_SEARCH_LIMIT))
-            .thenReturn(noisyStandaloneHits());
+            .thenReturn(DiscoverySamples.noisyStandaloneHits());
 
         bookDiscovery.searchAndStage(STANDALONE_QUERY);
 
@@ -292,8 +194,8 @@ class BookDiscoveryServiceIntegrationTest extends ContainerizedTest {
             .as("the study guide, adaptation, and combo are filtered out and the reprint loses on year")
             .singleElement()
             .satisfies(staged -> {
-                assertThat(staged.getOpenLibraryWorkKey()).isEqualTo(CANONICAL_KEY);
-                assertThat(staged.getFirstPublishYear()).isEqualTo(CANONICAL_YEAR);
+                assertThat(staged.getOpenLibraryWorkKey()).isEqualTo(DiscoverySamples.CANONICAL_KEY);
+                assertThat(staged.getFirstPublishYear()).isEqualTo(DiscoverySamples.CANONICAL_YEAR);
             });
     }
 }

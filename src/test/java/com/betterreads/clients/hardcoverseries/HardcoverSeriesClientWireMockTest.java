@@ -6,6 +6,7 @@ import com.betterreads.booksource.SourceSeriesVolume;
 import com.betterreads.clients.hardcover.HardcoverProperties;
 import com.betterreads.clients.hardcover.HardcoverWebClientConfig;
 import com.betterreads.clients.hardcover.HardcoverWireMock;
+import com.betterreads.clients.hardcover.SeriesBookJson;
 import com.betterreads.clients.hardcover.SeriesBooksJson;
 import com.betterreads.clients.hardcover.SeriesSearchJson;
 import static com.betterreads.clients.hardcover.BookByIdJson.COSMERE;
@@ -75,6 +76,14 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
     private static final String GREAT_HUNT = "The Great Hunt";
 
     private static final String GREAT_HUNT_PLOT = "Rand rides after the Horn of Valere.";
+
+    private static final long GREAT_HUNT_ID = 41L;
+
+    private static final int GREAT_HUNT_READERS = 7_000;
+
+    private static final int COPY_READERS = 99_000;
+
+    private static final int ISSUE_READERS = 900;
 
     private static final String SERIES_NAME = "The Wheel of Time";
 
@@ -279,14 +288,27 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
         }
 
         @Test
+        void shouldSkipANonCanonicalCopyAtAPosition() {
+            stub(seriesSearch(), seriesBooks().withoutVolumes()
+                .with(SeriesBookJson.book(SECOND_POSITION, GREAT_HUNT).id(GREAT_HUNT_ID).readers(GREAT_HUNT_READERS))
+                .with(SeriesBookJson.book(SECOND_POSITION, "The Great Hunt: Collector's Copy")
+                    .readers(COPY_READERS).copyOf(GREAT_HUNT_ID)));
+
+            final Optional<SourceSeries> series = client.fetchSeries(QUERY);
+
+            assertThat(titles(series))
+                .containsExactly(GREAT_HUNT);
+        }
+
+        @Test
         @DisplayName("a single graphic-novel issue is dropped for the collected volume")
         void dropsSingleComicIssueForCollectedVolume() {
             final String sandman = "The Sandman";
             final String collected = "The Sandman, Vol. 1: Preludes & Nocturnes";
             stub(seriesSearch().withSeries(sandman, "Neil Gaiman"),
                 seriesBooks().withName(sandman).withBookCount(1).withoutVolumes()
-                    .withComicVolume("The Sandman #1: Sleep of the Just", false)
-                    .withComicVolume(collected, true));
+                    .with(SeriesBookJson.book(1, "The Sandman #1: Sleep of the Just").comic().readers(ISSUE_READERS))
+                    .with(SeriesBookJson.book(1, collected).comic().compilation()));
 
             final Optional<SourceSeries> series = client.fetchSeries(GRAPHIC_NOVEL_QUERY);
 

@@ -42,7 +42,7 @@ class SeriesRefreshServiceTest {
         final SourceBook eye = volume("The Eye of the World", EYE_ID);
         final SourceBook greatHunt = volume("The Great Hunt", GREAT_HUNT_ID);
         final SourceSeries series = new SourceSeries(WHEEL_OF_TIME, "Robert Jordan",
-            List.of(new SourceSeriesVolume(1, eye), new SourceSeriesVolume(2, greatHunt)));
+            List.of(new SourceSeriesVolume(1, eye), new SourceSeriesVolume(2, greatHunt)), null);
         when(seriesClient.fetchSeries(WHEEL_OF_TIME)).thenReturn(Optional.of(series));
         when(books.existsSeriesVerifiedByHardcoverId(EYE_ID)).thenReturn(true);
 

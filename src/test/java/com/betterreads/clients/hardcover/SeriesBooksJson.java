@@ -18,8 +18,6 @@ public final class SeriesBooksJson {
 
     private static final String PRIMARY_BOOKS_COUNT = "primary_books_count";
 
-    private static final int GRAPHIC_NOVEL_CATEGORY = 4;
-
     private final ObjectNode json = Fixtures.parse("""
         {"data": {"series": [{
           "id": 1097, "name": "The Wheel of Time", "primary_books_count": 3,
@@ -100,9 +98,7 @@ public final class SeriesBooksJson {
     }
 
     public SeriesBooksJson withVolume(final double position, final String title, final String description) {
-        final ObjectNode volume = template.deepCopy().put(POSITION, position);
-        volume.withObject(BOOK).put(TITLE, title).put("description", description);
-        volumes().add(volume);
+        addBook(position).put(TITLE, title).put("description", description);
         return this;
     }
 
@@ -114,12 +110,13 @@ public final class SeriesBooksJson {
         return this;
     }
 
-    public SeriesBooksJson withComicVolume(final String title, final boolean compilation) {
-        final ObjectNode volume = template.deepCopy().put(POSITION, 1);
-        volume.withObject(BOOK).put(TITLE, title)
-            .put("book_category_id", GRAPHIC_NOVEL_CATEGORY).put("compilation", compilation);
-        volumes().add(volume);
+    public SeriesBooksJson with(final SeriesBookJson book) {
+        addBook(book.position()).setAll(book.fields());
         return this;
+    }
+
+    public <T> T as(final Class<T> type) {
+        return Fixtures.convert(json, type);
     }
 
     @Override
@@ -133,5 +130,11 @@ public final class SeriesBooksJson {
 
     private ArrayNode volumes() {
         return series().withArray(BOOK_SERIES);
+    }
+
+    private ObjectNode addBook(final double position) {
+        final ObjectNode volume = template.deepCopy().put(POSITION, position);
+        volumes().add(volume);
+        return volume.withObject(BOOK);
     }
 }

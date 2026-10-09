@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
@@ -15,25 +16,20 @@ import com.betterreads.booksource.SourceSeries;
 import com.betterreads.booksource.SourceSeriesVolume;
 import com.betterreads.clients.hardcover.HardcoverBookNode;
 import com.betterreads.clients.hardcover.HardcoverBookNodeMapper;
+import com.betterreads.text.TextMatch;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
-/**
- * Maps a Hardcover series hit and its volume list to a series.
- *
- * <p>Hardcover lists every edition and translation at each position, so each position from 0 to the
- * primary book count, prequels at 0 and novellas like 2.5 included, keeps its most-read English canonical
- * single book. Positions with no such book are dropped.
- */
 @Component
 class HardcoverSeriesMapper {
 
     private static final double PREQUEL_VOLUME = 0;
 
-    /**
-     * Returns the series, or null when the hit has no name or author, the series lists zero books,
-     * or no volume survives.
-     */
+    private static final double MIN_TITLE_BOOK_SHARE = 0.2;
+
+    private static final Comparator<HardcoverBookNode> BY_READERS =
+        Comparator.comparingInt(HardcoverBookNodeMapper::readers);
+
     public @Nullable SourceSeries toSourceSeries(
         final SeriesSearchDocument hit,
         final SeriesEnumerationResponse.Series enumerated
@@ -43,26 +39,57 @@ class HardcoverSeriesMapper {
         if (name == null || author == null || isEmptyContainer(enumerated)) {
             return null;
         }
-        final List<SourceSeriesVolume> volumes = collapse(enumerated);
-        return volumes.isEmpty() ? null : new SourceSeries(name, author, volumes);
+        final List<Candidate> volumes = collapse(enumerated);
+        if (volumes.isEmpty()) {
+            return null;
+        }
+        return new SourceSeries(name, author,
+            volumes.stream().map(candidate -> new SourceSeriesVolume(candidate.position(), candidate.book())).toList(),
+            titleBook(name, enumerated, volumes));
     }
 
     private static boolean isEmptyContainer(final SeriesEnumerationResponse.Series series) {
         return Integer.valueOf(0).equals(series.primaryBooksCount());
     }
 
-    private static List<SourceSeriesVolume> collapse(final SeriesEnumerationResponse.Series series) {
-        final int cap = Objects.requireNonNullElse(series.primaryBooksCount(), Integer.MAX_VALUE);
-        final List<SeriesEnumerationResponse.BookSeries> rows =
-            Objects.requireNonNullElse(series.bookSeries(), List.of());
+    private static List<SeriesEnumerationResponse.BookSeries> rows(final SeriesEnumerationResponse.Series series) {
+        return Objects.requireNonNullElse(series.bookSeries(), List.of());
+    }
 
-        final Map<Double, Candidate> best = rows.stream()
+    private static List<Candidate> collapse(final SeriesEnumerationResponse.Series series) {
+        final int cap = Objects.requireNonNullElse(series.primaryBooksCount(), Integer.MAX_VALUE);
+        final Map<Double, Candidate> best = rows(series).stream()
             .flatMap(row -> candidate(row, cap).stream())
             .collect(Collectors.toMap(Candidate::position, Function.identity(),
                 BinaryOperator.maxBy(Comparator.comparingInt(Candidate::readers)), TreeMap::new));
-        return best.values().stream()
-            .map(candidate -> new SourceSeriesVolume(candidate.position(), candidate.book()))
-            .toList();
+        return List.copyOf(best.values());
+    }
+
+    private static @Nullable SourceBook titleBook(
+        final String name,
+        final SeriesEnumerationResponse.Series series,
+        final List<Candidate> volumes
+    ) {
+        final Set<String> volumeIds = volumes.stream()
+            .map(candidate -> candidate.book().hardcoverId())
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+        final int topReaders = volumes.stream().mapToInt(Candidate::readers).max().orElse(0);
+        return rows(series).stream()
+            .map(SeriesEnumerationResponse.BookSeries::book)
+            .filter(Objects::nonNull)
+            .filter(node -> node.title() != null && TextMatch.canonicalTitleMatches(node.title(), name))
+            .filter(node -> isWellRead(node, topReaders))
+            .sorted(BY_READERS.reversed())
+            .flatMap(node -> HardcoverBookNodeMapper.toTitleBook(node).stream())
+            .findFirst()
+            .filter(book -> !volumeIds.contains(book.hardcoverId()))
+            .orElse(null);
+    }
+
+    private static boolean isWellRead(final HardcoverBookNode node, final int topReaders) {
+        return topReaders > 0
+            && (double) HardcoverBookNodeMapper.readers(node) / topReaders >= MIN_TITLE_BOOK_SHARE;
     }
 
     private static Optional<Candidate> candidate(final SeriesEnumerationResponse.BookSeries row, final int cap) {

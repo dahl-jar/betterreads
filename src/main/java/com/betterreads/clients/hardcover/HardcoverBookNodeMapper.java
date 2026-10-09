@@ -31,11 +31,8 @@ public final class HardcoverBookNodeMapper {
         return node.usersCount() == null ? 0 : node.usersCount();
     }
 
-    private static Optional<SourceBook.Builder> toBuilder(final HardcoverBookNode node) {
-        if (!qualifies(node)) {
-            return Optional.empty();
-        }
-        return Optional.of(SourceBook.builder(BookFieldSource.HARDCOVER)
+    private static SourceBook.Builder toBuilder(final HardcoverBookNode node) {
+        return SourceBook.builder(BookFieldSource.HARDCOVER)
             .hardcoverId(node.id() == null ? null : String.valueOf(node.id()))
             .title(node.title())
             .description(node.description())
@@ -43,16 +40,19 @@ public final class HardcoverBookNodeMapper {
             .coverUrl(coverUrl(node))
             .authors(authors(node))
             .averageRating(node.rating())
-            .ratingCount(node.ratingsCount()));
+            .ratingCount(node.ratingsCount());
     }
 
     private static boolean qualifies(final HardcoverBookNode node) {
+        return !isProseCompilation(node) && qualifiesAllowingCompilation(node);
+    }
+
+    private static boolean qualifiesAllowingCompilation(final HardcoverBookNode node) {
         final String title = node.title();
         return title != null
             && isEnglish(node)
             && !isAudiobook(node)
             && !Boolean.TRUE.equals(node.isPartialBook())
-            && !isProseCompilation(node)
             && !isOmnibus(node)
             && !EDITION_VARIANT.matcher(title).find()
             && SingleBookFilter.isSingleBook(title)
@@ -89,10 +89,15 @@ public final class HardcoverBookNodeMapper {
     }
 
     public static Optional<SourceBook> toSourceBookWithSeries(final @Nullable HardcoverBookNode node) {
-        if (node == null) {
-            return Optional.empty();
-        }
-        return toBuilder(node).map(builder -> HardcoverSeriesVolumes.withSeriesOf(builder, node).build());
+        return Optional.ofNullable(node)
+            .filter(HardcoverBookNodeMapper::qualifies)
+            .map(accepted -> HardcoverSeriesVolumes.withSeriesOf(toBuilder(accepted), accepted).build());
+    }
+
+    public static Optional<SourceBook> toTitleBook(final @Nullable HardcoverBookNode node) {
+        return Optional.ofNullable(node)
+            .filter(HardcoverBookNodeMapper::qualifiesAllowingCompilation)
+            .map(accepted -> toBuilder(accepted).build());
     }
 
     private static boolean isCanonical(final HardcoverBookNode node) {
