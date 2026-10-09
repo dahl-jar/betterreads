@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 import com.betterreads.booksource.SeriesEntry;
 import com.betterreads.booksource.SourceBook;
@@ -13,9 +15,11 @@ import com.betterreads.clients.hardcover.SeriesBookJson;
 import com.betterreads.clients.hardcover.SeriesBooksJson;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.FieldSource;
 
 class HardcoverSeriesMapperTest {
 
@@ -32,6 +36,10 @@ class HardcoverSeriesMapperTest {
     private static final String DUNE = "Dune";
 
     private static final String GERMAN = "German";
+
+    private static final String DEFAULT_EDITION_ISBN = "9780048230911";
+
+    private static final String BAD_CHECK_DIGIT_ISBN = "9780048230912";
 
     private static final long LOTR_ID = 377_938L;
 
@@ -87,6 +95,11 @@ class HardcoverSeriesMapperTest {
 
     private static final double THIRD = 3;
 
+    static final Supplier<Stream<Named<SeriesBookJson>>> RIVAL_TITLE_BOOKS = () -> Stream.of(
+        Named.of("a less-read copy", row(FIRST, LESSER_LOTR_ID, LOTR, LESSER_LOTR_READERS).compilation()),
+        Named.of("a more-read German copy",
+            row(FIRST, GERMAN_LOTR_ID, LOTR, GERMAN_LOTR_READERS).compilation().inLanguage(GERMAN)));
+
     private final HardcoverSeriesMapper mapper = new HardcoverSeriesMapper();
 
     @Test
@@ -102,40 +115,38 @@ class HardcoverSeriesMapperTest {
             .isEmpty();
     }
 
-    @Test
-    void shouldPickTheMostReadTitleBook() {
+    @ParameterizedTest
+    @FieldSource("RIVAL_TITLE_BOOKS")
+    void shouldPickTheMostReadQualifyingTitleBook(final SeriesBookJson rival) {
         final SeriesBooksJson rows = trilogy(FELLOWSHIP_READERS)
-            .with(row(FIRST, LESSER_LOTR_ID, LOTR, LESSER_LOTR_READERS).compilation())
+            .with(rival)
             .with(row(FIRST, LOTR_ID, LOTR, LOTR_READERS).compilation());
 
-        final SourceSeries series = map(LOTR, rows);
+        final Optional<String> picked = titleBookId(rows);
 
-        assertThat(series).extracting(SourceSeries::titleBook)
-            .extracting(SourceBook::hardcoverId)
-            .isEqualTo(String.valueOf(LOTR_ID));
+        assertThat(picked).contains(String.valueOf(LOTR_ID));
     }
 
-    @Test
-    void shouldSkipAMoreReadTitleBookThatDoesNotQualify() {
+    @ParameterizedTest
+    @CsvSource(value = {DEFAULT_EDITION_ISBN + ", " + DEFAULT_EDITION_ISBN, BAD_CHECK_DIGIT_ISBN + ", none"},
+        nullValues = "none")
+    void shouldGiveTheTitleBookItsDefaultEditionIsbnWhenValid(final String isbn, final @Nullable String expected) {
         final SeriesBooksJson rows = trilogy(FELLOWSHIP_READERS)
-            .with(row(FIRST, GERMAN_LOTR_ID, LOTR, GERMAN_LOTR_READERS).compilation().inLanguage(GERMAN))
-            .with(row(FIRST, LOTR_ID, LOTR, LOTR_READERS).compilation());
+            .with(row(FIRST, LOTR_ID, LOTR, LOTR_READERS).compilation().isbn(isbn));
 
-        final SourceSeries series = map(LOTR, rows);
+        final SourceSeries series = Objects.requireNonNull(map(LOTR, rows));
 
-        assertThat(series).extracting(SourceSeries::titleBook)
-            .extracting(SourceBook::hardcoverId)
-            .isEqualTo(String.valueOf(LOTR_ID));
+        assertThat(series.titleBook()).extracting(SourceBook::isbn13).isEqualTo(expected);
     }
 
     @ParameterizedTest
     @CsvSource(value = {FIFTH_OF_TOP_READERS + ", " + LOTR_ID, BELOW_A_FIFTH_READERS + ", none"}, nullValues = "none")
-    void shouldPickATitleBookOnlyFromAFifthOfTheTopReaders(final int readers, final @Nullable String picked) {
+    void shouldPickATitleBookOnlyFromAFifthOfTheTopReaders(final int readers, final @Nullable String expected) {
         final SeriesBooksJson rows = trilogy(TOP_READERS).with(row(FIRST, LOTR_ID, LOTR, readers).compilation());
 
-        final SourceBook titleBook = Objects.requireNonNull(map(LOTR, rows)).titleBook();
+        final Optional<String> picked = titleBookId(rows);
 
-        assertThat(Optional.ofNullable(titleBook).map(SourceBook::hardcoverId)).isEqualTo(Optional.ofNullable(picked));
+        assertThat(picked).isEqualTo(Optional.ofNullable(expected));
     }
 
     @Test
@@ -174,9 +185,9 @@ class HardcoverSeriesMapperTest {
     }
 
     @Test
-    void shouldSkipANonEnglishTitleBook() {
+    void shouldSkipAnAudiobookTitleBook() {
         final SeriesBooksJson rows = trilogy(FELLOWSHIP_READERS)
-            .with(row(FIRST, LOTR_ID, LOTR, LOTR_READERS).compilation().inLanguage(GERMAN));
+            .with(row(FIRST, LOTR_ID, LOTR, LOTR_READERS).compilation().audiobook());
 
         final SourceSeries series = map(LOTR, rows);
 
@@ -192,6 +203,11 @@ class HardcoverSeriesMapperTest {
             .with(row(FIRST, FELLOWSHIP_ID, FELLOWSHIP, fellowshipReaders))
             .with(row(SECOND, TOWERS_ID, TOWERS, TOWERS_READERS))
             .with(row(THIRD, KING_ID, KING, KING_READERS));
+    }
+
+    private Optional<String> titleBookId(final SeriesBooksJson rows) {
+        final SourceSeries series = Objects.requireNonNull(map(LOTR, rows));
+        return Optional.ofNullable(series.titleBook()).map(SourceBook::hardcoverId);
     }
 
     private @Nullable SourceSeries map(final String name, final SeriesBooksJson rows) {

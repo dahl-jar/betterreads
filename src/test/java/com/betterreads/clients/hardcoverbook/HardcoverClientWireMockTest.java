@@ -5,10 +5,15 @@ import com.betterreads.booksource.SeriesEntry;
 import com.betterreads.booksource.SourceBook;
 import com.betterreads.clients.hardcover.BookByIdJson;
 import com.betterreads.clients.hardcover.BookSearchJson;
+import com.betterreads.clients.hardcover.HardcoverCategories;
+import com.betterreads.clients.hardcover.SearchHitFields;
 import com.betterreads.clients.hardcover.HardcoverProperties;
 import com.betterreads.clients.hardcover.HardcoverWebClientConfig;
 import com.betterreads.clients.hardcover.HardcoverWireMock;
 import static com.betterreads.clients.hardcover.BookByIdJson.bookById;
+import static com.betterreads.clients.hardcover.BookSearchJson.HOBBIT_RATING_COUNT;
+import static com.betterreads.clients.hardcover.BookSearchJson.STUB_TITLE;
+import static com.betterreads.clients.hardcover.BookSearchJson.TOLKIEN;
 import static com.betterreads.clients.hardcover.BookSearchJson.bookSearch;
 import static com.github.tomakehurst.wiremock.client.WireMock.containing;
 import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
@@ -37,12 +42,6 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 @EnableConfigurationProperties(HardcoverProperties.class)
 class HardcoverClientWireMockTest extends HardcoverWireMock {
 
-    private static final String HOBBIT_TITLE = "The Hobbit";
-
-    private static final String HOBBIT_AUTHOR = "J.R.R. Tolkien";
-
-    private static final int HOBBIT_CANONICAL_RATING_COUNT = 6394;
-
     private static final String ABSOLUTE_BATMAN_ID = "2235304";
 
     private static final String ABSOLUTE_BATMAN_ISBN = "9781799507505";
@@ -67,7 +66,7 @@ class HardcoverClientWireMockTest extends HardcoverWireMock {
         void picksHighestReadHitNotRankZero() {
             stubGraphQl(bookSearch());
 
-            final Optional<SourceBook> result = client.fetchByTitleAuthor(HOBBIT_TITLE, HOBBIT_AUTHOR);
+            final Optional<SourceBook> result = client.fetchByTitleAuthor(STUB_TITLE, TOLKIEN);
 
             assertThat(result)
                 .get()
@@ -75,7 +74,7 @@ class HardcoverClientWireMockTest extends HardcoverWireMock {
                     assertThat(book.source()).isEqualTo(BookFieldSource.HARDCOVER);
                     assertThat(book.ratingCount())
                         .as("should skip the one-rating stub at rank 0")
-                        .isEqualTo(HOBBIT_CANONICAL_RATING_COUNT);
+                        .isEqualTo(HOBBIT_RATING_COUNT);
                 });
         }
 
@@ -84,7 +83,7 @@ class HardcoverClientWireMockTest extends HardcoverWireMock {
         void titleDriftRejected() {
             stubGraphQl(bookSearch().withTitle("A Completely Different Book"));
 
-            final Optional<SourceBook> book = client.fetchByTitleAuthor(HOBBIT_TITLE, HOBBIT_AUTHOR);
+            final Optional<SourceBook> book = client.fetchByTitleAuthor(STUB_TITLE, TOLKIEN);
 
             assertThat(book)
                 .as("should reject a hit whose title drifted from the query")
@@ -96,7 +95,7 @@ class HardcoverClientWireMockTest extends HardcoverWireMock {
         void authorDriftRejected() {
             stubGraphQl(bookSearch().withAuthors("Some Other Author"));
 
-            final Optional<SourceBook> book = client.fetchByTitleAuthor(HOBBIT_TITLE, HOBBIT_AUTHOR);
+            final Optional<SourceBook> book = client.fetchByTitleAuthor(STUB_TITLE, TOLKIEN);
 
             assertThat(book)
                 .as("should reject a shared title under another author")
@@ -105,7 +104,7 @@ class HardcoverClientWireMockTest extends HardcoverWireMock {
 
         @Test
         void shouldRankHitsByReadsBeforeRatings() {
-            stubGraphQl(bookSearch().withReadCount(0));
+            stubGraphQl(bookSearch().with(SearchHitFields.readCount(0)));
 
             final Optional<SourceBook> book = client.fetchByIsbn(ABSOLUTE_BATMAN_ISBN);
 
@@ -114,29 +113,29 @@ class HardcoverClientWireMockTest extends HardcoverWireMock {
 
         @Test
         void shouldRankByRatingsWhenReadsAreMissing() {
-            stubGraphQl(bookSearch().withoutReadCount());
+            stubGraphQl(bookSearch().with(SearchHitFields.noReadCount()));
 
             final Optional<SourceBook> book = client.fetchByIsbn(ABSOLUTE_BATMAN_ISBN);
 
-            assertThat(book).get().extracting(SourceBook::ratingCount).isEqualTo(HOBBIT_CANONICAL_RATING_COUNT);
+            assertThat(book).get().extracting(SourceBook::ratingCount).isEqualTo(HOBBIT_RATING_COUNT);
         }
 
         @Test
         void shouldRejectAHitWithoutAuthorNames() {
-            stubGraphQl(bookSearch().withoutAuthorNames());
+            stubGraphQl(bookSearch().with(SearchHitFields.noAuthorNames()));
 
-            final Optional<SourceBook> book = client.fetchByTitleAuthor(HOBBIT_TITLE, HOBBIT_AUTHOR);
+            final Optional<SourceBook> book = client.fetchByTitleAuthor(STUB_TITLE, TOLKIEN);
 
             assertThat(book).isEmpty();
         }
 
         @Test
         void shouldSkipAHitWithoutATitle() {
-            stubGraphQl(bookSearch().withoutTitle());
+            stubGraphQl(bookSearch().with(SearchHitFields.noTitle()));
 
             final Optional<SourceBook> book = client.fetchByIsbn(ABSOLUTE_BATMAN_ISBN);
 
-            assertThat(book).get().extracting(SourceBook::title).isEqualTo(HOBBIT_TITLE);
+            assertThat(book).get().extracting(SourceBook::title).isEqualTo(STUB_TITLE);
         }
     }
 
@@ -145,7 +144,7 @@ class HardcoverClientWireMockTest extends HardcoverWireMock {
 
         @Test
         void shouldTakeTheCollectedSeriesWhenTheFeaturedOneIsAnIssueRun() {
-            stubIssueRunSearchAndById(bookById());
+            stub(issueRunSearch(), bookById());
 
             final Optional<SourceBook> book = client.fetchByIsbn(ABSOLUTE_BATMAN_ISBN);
 
@@ -158,7 +157,7 @@ class HardcoverClientWireMockTest extends HardcoverWireMock {
 
         @Test
         void shouldDropTheIssueRunWhenNoOtherSeriesIsNumbered() {
-            stubIssueRunSearchAndById(bookById().withOnlyFeaturedSeries());
+            stub(issueRunSearch(), bookById().withOnlyFeaturedSeries());
 
             final Optional<SourceBook> book = client.fetchByIsbn(ABSOLUTE_BATMAN_ISBN);
 
@@ -170,7 +169,7 @@ class HardcoverClientWireMockTest extends HardcoverWireMock {
 
         @Test
         void shouldKeepTheBookWhenTheByIdLookupFindsNothing() {
-            stubIssueRunSearchAndById(bookById().withoutBooks());
+            stub(issueRunSearch(), bookById().withoutBooks());
 
             final Optional<SourceBook> book = client.fetchByIsbn(ABSOLUTE_BATMAN_ISBN);
 
@@ -195,14 +194,23 @@ class HardcoverClientWireMockTest extends HardcoverWireMock {
             WIREMOCK.verify(1, postRequestedFor(urlPathEqualTo(GRAPHQL_PATH)));
         }
 
-        private void stubIssueRunSearchAndById(final BookByIdJson byId) {
-            stubGraphQl(SEARCH_OPERATION, issueRunSearch().withId(ABSOLUTE_BATMAN_ID));
+        @Test
+        void shouldDropTheSeriesOfAProseCompilationWhenTheFeaturedOneIsAnIssueRun() {
+            stub(issueRunSearch().with(SearchHitFields.compilation(HardcoverCategories.PROSE)), bookById());
+
+            final Optional<SourceBook> book = client.fetchByIsbn(ABSOLUTE_BATMAN_ISBN);
+
+            assertThat(book).get().extracting(SourceBook::seriesName).isNull();
+        }
+
+        private void stub(final BookSearchJson search, final BookByIdJson byId) {
+            stubGraphQl(SEARCH_OPERATION, search);
             stubGraphQl(BY_ID_OPERATION, byId);
         }
 
         private static BookSearchJson issueRunSearch() {
-            return bookSearch().withTitle("Absolute Batman, Vol. 2: Abomination")
-                .withFeaturedSeries("Absolute Batman (2024) (Single Issues)");
+            return bookSearch().withId(ABSOLUTE_BATMAN_ID).withTitle("Absolute Batman, Vol. 2: Abomination")
+                .with(SearchHitFields.featuredSeries("Absolute Batman (2024) (Single Issues)"));
         }
     }
 
@@ -265,17 +273,17 @@ class HardcoverClientWireMockTest extends HardcoverWireMock {
         void unauthorizedIsEmpty() {
             stubStatus(HTTP_UNAUTHORIZED);
 
-            final Optional<SourceBook> book = client.fetchByTitleAuthor(HOBBIT_TITLE, HOBBIT_AUTHOR);
+            final Optional<SourceBook> book = client.fetchByTitleAuthor(STUB_TITLE, TOLKIEN);
 
             assertThat(book).isEmpty();
         }
 
         @Test
-        @DisplayName("a 5xx propagates so a transient outage is not mistaken for 'book not found'")
+        @DisplayName("a 5xx propagates as an exception")
         void serverErrorPropagates() {
             stubStatus(HTTP_SERVER_ERROR);
 
-            assertThatThrownBy(() -> client.fetchByTitleAuthor(HOBBIT_TITLE, HOBBIT_AUTHOR))
+            assertThatThrownBy(() -> client.fetchByTitleAuthor(STUB_TITLE, TOLKIEN))
                 .isInstanceOf(WebClientResponseException.class);
         }
     }

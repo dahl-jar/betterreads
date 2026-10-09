@@ -3,26 +3,38 @@ package com.betterreads.clients.hardcoverbook;
 import com.betterreads.booksource.CreditRole;
 import com.betterreads.booksource.SourceAuthor;
 import com.betterreads.booksource.SourceBook;
+import com.betterreads.clients.hardcover.BookSearchJson;
 import com.betterreads.clients.hardcover.HardcoverBookNode;
 import com.betterreads.clients.hardcover.HardcoverBookNodeMapper;
+import com.betterreads.clients.hardcover.HardcoverCategories;
+import com.betterreads.clients.hardcover.HardcoverCredits;
+import com.betterreads.clients.hardcover.SearchHitFields;
 import static com.betterreads.clients.hardcover.BookByIdJson.LAST_KING;
 import static com.betterreads.clients.hardcover.BookByIdJson.LAST_KING_BOOKS;
 import static com.betterreads.clients.hardcover.BookByIdJson.LETZTE_KOENIG;
 import static com.betterreads.clients.hardcover.BookByIdJson.bookById;
 import static com.betterreads.clients.hardcover.BookSearchJson.bookSearch;
+import static com.betterreads.clients.hardcover.SearchHitFields.compilation;
+import static com.betterreads.clients.hardcover.SearchHitFields.featuredSeries;
+import static com.betterreads.clients.hardcover.SearchHitFields.noGenres;
+import static com.betterreads.clients.hardcover.SearchHitFields.noIsbns;
+import static com.betterreads.clients.hardcover.SearchHitFields.noTitle;
+import static com.betterreads.clients.hardcover.SearchHitFields.unnamedFeaturedSeries;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
 import java.util.Objects;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class HardcoverMapperTest {
-
-    private static final String AUTHOR_ROLE = "Author";
 
     private static final String SNYDER = "Scott Snyder";
 
@@ -35,14 +47,6 @@ class HardcoverMapperTest {
     private static final String ROTHFUSS = "Patrick Rothfuss";
 
     private static final String COMPANIONS = "The Dark Tower Companions";
-
-    private static final double RATING = 4.31;
-
-    private static final int RATING_COUNT = 6394;
-
-    private static final int RELEASE_YEAR = 1937;
-
-    private static final int PAGES = 310;
 
     private static final int BEGINNINGS_VOLUME = 3;
 
@@ -67,7 +71,9 @@ class HardcoverMapperTest {
         @Test
         void shouldPickTheFirstIsbn13OutOfAMixedList() {
             final String isbn13 = "9780792748663";
-            final HardcoverDocument document = bookSearch().withIsbns("0792748662", isbn13, "8385432167").document();
+            final String badCheckDigit = "9780792748662";
+            final HardcoverDocument document =
+                bookSearch().withIsbns("0792748662", badCheckDigit, isbn13, "8385432167").document();
 
             final SourceBook book = map(document);
 
@@ -76,7 +82,7 @@ class HardcoverMapperTest {
 
         @Test
         void shouldReturnNullWhenNoIsbnsAreListed() {
-            final HardcoverDocument document = bookSearch().withoutIsbns().document();
+            final HardcoverDocument document = bookSearch().with(noIsbns()).document();
 
             final SourceBook book = map(document);
 
@@ -93,7 +99,7 @@ class HardcoverMapperTest {
             "2.0, 2.0", "2.5, 2.5", "0.5, 0.5", "1.756, 1.76", "9999.99, 9999.99", "0.0, ", "0.004, ", "10000, "
         })
         void shouldKeepAPositionBetweenZeroAndTenThousand(final double position, final Double kept) {
-            final HardcoverDocument document = bookSearch().withFeaturedSeries(COMPANIONS, position).document();
+            final HardcoverDocument document = bookSearch().with(featuredSeries(COMPANIONS, position)).document();
 
             final SourceBook book = map(document);
 
@@ -102,13 +108,13 @@ class HardcoverMapperTest {
     }
 
     @Nested
-    @DisplayName("toSourceBook from a search document")
+    @DisplayName("book from a search document")
     class FromSearchDocument {
 
         @Test
         void shouldCarryTheDocumentFieldsOntoTheBook() {
-            final String series = "The Lord of the Rings";
-            final HardcoverDocument document = bookSearch().withFeaturedSeries(series).document();
+            final HardcoverDocument document =
+                bookSearch().with(featuredSeries(BookSearchJson.LORD_OF_THE_RINGS)).document();
 
             final SourceBook book = map(document);
 
@@ -116,18 +122,18 @@ class HardcoverMapperTest {
                 .extracting(SourceBook::hardcoverId, SourceBook::isbn13, SourceBook::publicationYear,
                     SourceBook::description, SourceBook::pageCount, SourceBook::averageRating,
                     SourceBook::ratingCount, SourceBook::coverUrl)
-                .containsExactly("9999", "9788578276300", RELEASE_YEAR,
-                    "Bilbo Baggins is swept into a quest for a dragon's hoard.", PAGES, RATING,
-                    RATING_COUNT, "https://covers.example.test/hobbit.jpg");
+                .containsExactly(BookSearchJson.HOBBIT_ID, BookSearchJson.HOBBIT_ISBN, BookSearchJson.HOBBIT_YEAR,
+                    BookSearchJson.HOBBIT_DESCRIPTION, BookSearchJson.HOBBIT_PAGES, BookSearchJson.HOBBIT_RATING,
+                    BookSearchJson.HOBBIT_RATING_COUNT, BookSearchJson.HOBBIT_COVER);
             assertThat(book.rawSubjects()).contains("fantasy", "fiction");
-            assertThat(book.seriesName()).isEqualTo(series);
+            assertThat(book.seriesName()).isEqualTo(BookSearchJson.LORD_OF_THE_RINGS);
             assertThat(book.seriesPosition()).isEqualTo(1);
         }
 
         @Test
         void shouldLeaveTheSeriesUnsetWhenTheFeaturedPositionIsMissing() {
             final HardcoverDocument document =
-                bookSearch().withFeaturedSeries("The World of The Sun Eater", null).document();
+                bookSearch().with(featuredSeries("The World of The Sun Eater", null)).document();
 
             final SourceBook book = map(document);
 
@@ -136,7 +142,7 @@ class HardcoverMapperTest {
 
         @Test
         void shouldLeaveTheSeriesNameUnsetWhenTheFeaturedSeriesIsUnnamed() {
-            final HardcoverDocument document = bookSearch().withUnnamedFeaturedSeries().document();
+            final HardcoverDocument document = bookSearch().with(unnamedFeaturedSeries()).document();
 
             final SourceBook book = map(document);
 
@@ -145,7 +151,7 @@ class HardcoverMapperTest {
 
         @Test
         void shouldReturnNullWhenTheDocumentHasNoTitle() {
-            final HardcoverDocument document = bookSearch().withoutTitle().document();
+            final HardcoverDocument document = bookSearch().with(noTitle()).document();
 
             final SourceBook book = mapper.toSourceBook(document);
 
@@ -154,11 +160,68 @@ class HardcoverMapperTest {
 
         @Test
         void shouldLeaveSubjectsUnsetWhenTheDocumentHasNoGenres() {
-            final HardcoverDocument document = bookSearch().withoutGenres().document();
+            final HardcoverDocument document = bookSearch().with(noGenres()).document();
 
             final SourceBook book = map(document);
 
             assertThat(book.rawSubjects()).isNull();
+        }
+    }
+
+    @Nested
+    @DisplayName("compilation from a search document")
+    class CompilationFromSearchDocument {
+
+        @ParameterizedTest(name = "category {0}")
+        @NullSource
+        @ValueSource(ints = HardcoverCategories.PROSE)
+        void shouldDropTheSeriesOfAProseCompilation(final @Nullable Integer category) {
+            final HardcoverDocument document = compiled(category);
+
+            final SourceBook book = map(document);
+
+            assertThat(book)
+                .extracting(SourceBook::seriesName, SourceBook::seriesPosition, SourceBook::series)
+                .containsExactly(null, null, List.of());
+        }
+
+        @Test
+        void shouldKeepTheSeriesOfAGraphicNovelCompilation() {
+            final HardcoverDocument document = compiled(HardcoverCategories.GRAPHIC_NOVEL);
+
+            final SourceBook book = map(document);
+
+            assertThat(book.seriesName()).isEqualTo(BookSearchJson.LORD_OF_THE_RINGS);
+        }
+
+        @Test
+        void shouldKeepTheSeriesWhenTheCompilationFlagIsMissing() {
+            final HardcoverDocument document = bookSearch().with(featuredSeries(BookSearchJson.LORD_OF_THE_RINGS))
+                .with(SearchHitFields.noCompilationFlag()).document();
+
+            final SourceBook book = map(document);
+
+            assertThat(book.seriesName()).isEqualTo(BookSearchJson.LORD_OF_THE_RINGS);
+        }
+
+        @Test
+        void shouldKeepTheOtherFieldsOfAProseCompilation() {
+            final HardcoverDocument document = compiled(HardcoverCategories.PROSE);
+
+            final SourceBook book = map(document);
+
+            assertThat(book)
+                .extracting(SourceBook::title, SourceBook::coverUrl, SourceBook::description)
+                .containsExactly(BookSearchJson.HOBBIT_TITLE, BookSearchJson.HOBBIT_COVER,
+                    BookSearchJson.HOBBIT_DESCRIPTION);
+            assertThat(book.authors())
+                .extracting(SourceAuthor::name)
+                .containsExactly(BookSearchJson.TOLKIEN, BookSearchJson.ALAN_LEE);
+        }
+
+        private HardcoverDocument compiled(final @Nullable Integer category) {
+            return bookSearch().with(featuredSeries(BookSearchJson.LORD_OF_THE_RINGS))
+                .with(compilation(category)).document();
         }
     }
 
@@ -169,7 +232,7 @@ class HardcoverMapperTest {
         @Test
         void shouldKeepEditorAlongsideAuthorInOrder() {
             final HardcoverDocument document = bookSearch().withoutCredits()
-                .withCredit("Editor", BOOK_EDITOR).withCredit(AUTHOR_ROLE, SNYDER).document();
+                .withCredit("Editor", BOOK_EDITOR).withCredit(HardcoverCredits.AUTHOR, SNYDER).document();
 
             final SourceBook book = map(document);
 
@@ -179,7 +242,7 @@ class HardcoverMapperTest {
         @Test
         void shouldKeepIllustratorWithRole() {
             final HardcoverDocument document =
-                bookSearch().withoutCredits().withCredit("Illustrator", CAPULLO).document();
+                bookSearch().withoutCredits().withCredit(HardcoverCredits.ILLUSTRATOR, CAPULLO).document();
 
             final SourceBook book = map(document);
 
@@ -189,7 +252,7 @@ class HardcoverMapperTest {
         @Test
         void shouldKeepCreditOrder() {
             final HardcoverDocument document = bookSearch().withoutCredits()
-                .withCredit("Cover Artist", SIMONETTI).withCredit(AUTHOR_ROLE, ROTHFUSS).document();
+                .withCredit("Cover Artist", SIMONETTI).withCredit(HardcoverCredits.AUTHOR, ROTHFUSS).document();
 
             final SourceBook book = map(document);
 
@@ -204,12 +267,12 @@ class HardcoverMapperTest {
 
             final SourceBook book = map(document);
 
-            assertThat(book.authorNames()).containsExactly("J.R.R. Tolkien", "Alan Lee");
+            assertThat(book.authorNames()).containsExactly(BookSearchJson.TOLKIEN, BookSearchJson.ALAN_LEE);
         }
     }
 
     @Nested
-    @DisplayName("toSourceBook from a book node")
+    @DisplayName("book from a book node")
     class FromBookNode {
 
         @Test

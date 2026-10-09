@@ -3,9 +3,11 @@ package com.betterreads.clients.hardcover;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.node.ArrayNode;
 
-final class HardcoverCredits {
+public final class HardcoverCredits {
 
-    static final String AUTHOR = "Author";
+    public static final String AUTHOR = "Author";
+
+    public static final String ILLUSTRATOR = "Illustrator";
 
     private HardcoverCredits() {
     }
