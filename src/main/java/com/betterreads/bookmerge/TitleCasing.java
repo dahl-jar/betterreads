@@ -105,7 +105,15 @@ final class TitleCasing {
     }
 
     private static boolean capitalizes(final String[] words, final int index) {
-        return index == 0 || index == words.length - 1 || endsPhrase(words[index - 1]) || !isSmallWord(words[index]);
+        return index == 0 || index == words.length - 1 || followsPhraseEnd(words, index) || !isSmallWord(words[index]);
+    }
+
+    private static boolean followsPhraseEnd(final String[] words, final int index) {
+        return Arrays.stream(words, 0, index)
+            .filter(word -> !word.isEmpty())
+            .reduce((earlier, later) -> later)
+            .filter(TitleCasing::endsPhrase)
+            .isPresent();
     }
 
     private static boolean endsPhrase(final String word) {
@@ -126,7 +134,7 @@ final class TitleCasing {
         }
         final int first = word.codePointAt(start);
         return word.substring(0, start)
-            + new String(Character.toChars(Character.toUpperCase(first)))
+            + Character.toString(Character.toUpperCase(first))
             + word.substring(start + Character.charCount(first));
     }
 }
