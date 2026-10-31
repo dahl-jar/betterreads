@@ -1,8 +1,11 @@
 package com.betterreads.bookmerge;
 
+import java.util.List;
 import java.util.regex.Pattern;
 
 final class TitleCleaner {
+
+    private static final String BYLINE_PREFIX = " by ";
 
     private static final Pattern EDITION_PARENTHETICAL =
         Pattern.compile("\\s*\\([^()]*(?:edition|book\\s+\\d+)[^()]*\\)\\s*$",
@@ -43,5 +46,17 @@ final class TitleCleaner {
         final String withoutVariant = EDITION_VARIANT_PHRASE.matcher(withoutSubtitle).replaceAll("");
         final String withoutSplitPart = SPLIT_PART_SUFFIX.matcher(withoutVariant).replaceAll("");
         return NOVELIZATION_LABEL.matcher(withoutSplitPart).replaceAll("").strip();
+    }
+
+    static boolean isClean(final String title, final List<String> authorNames) {
+        final String cleaned = clean(closePunctuation(title));
+        return !TitleCasing.isAllCaps(cleaned) && !hasByline(cleaned, authorNames);
+    }
+
+    private static boolean hasByline(final String title, final List<String> authorNames) {
+        return authorNames.stream()
+            .map(name -> BYLINE_PREFIX + name.strip())
+            .anyMatch(byline -> title.regionMatches(
+                true, title.length() - byline.length(), byline, 0, byline.length()));
     }
 }

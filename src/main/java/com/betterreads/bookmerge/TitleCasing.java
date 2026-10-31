@@ -18,6 +18,14 @@ final class TitleCasing {
 
     private static final String SPACE = " ";
 
+    private static final int MIN_WORDS = 2;
+
+    private static final char PERIOD = '.';
+
+    private static final Set<String> ROMAN_NUMERALS = Set.of(
+        "ii", "iii", "iv", "vi", "vii", "viii", "ix", "xi", "xii", "xiii", "xiv", "xv", "xvi", "xvii",
+        "xviii", "xix", "xx");
+
     private static final Pattern PUNCTUATION = Pattern.compile("\\p{Punct}");
 
     private static final Pattern PRONOUN_I = Pattern.compile("(?<=\\s)I\\b");
@@ -35,9 +43,44 @@ final class TitleCasing {
             .orElseGet(() -> ENGLISH.equals(language) && !isCased(winner) ? titleCase(winner) : winner);
     }
 
+    static boolean isAllCaps(final String title) {
+        return wordCount(title) >= MIN_WORDS
+            && title.codePoints().anyMatch(Character::isUpperCase)
+            && title.codePoints().noneMatch(Character::isLowerCase);
+    }
+
+    static String fixAllCaps(final String title, final @Nullable String language) {
+        if (!ENGLISH.equals(language) || !isAllCaps(title)) {
+            return title;
+        }
+        return titleCase(Arrays.stream(title.split(SPACE))
+            .map(TitleCasing::lowerWord)
+            .collect(Collectors.joining(SPACE)));
+    }
+
+    private static long wordCount(final String title) {
+        return Arrays.stream(title.split(SPACE)).filter(word -> !word.isEmpty()).count();
+    }
+
+    private static String lowerWord(final String word) {
+        return keepsCapitals(word) ? word : word.toLowerCase(Locale.ROOT);
+    }
+
+    private static boolean keepsCapitals(final String word) {
+        final int period = word.indexOf(PERIOD);
+        final boolean initials = period >= 0 && period + 1 < word.length()
+            && Character.isLetter(word.codePointAt(period + 1));
+        return initials || ROMAN_NUMERALS.contains(bareWord(word));
+    }
+
+    private static String bareWord(final String word) {
+        return PUNCTUATION.matcher(word).replaceAll("").toLowerCase(Locale.ROOT);
+    }
+
     private static Optional<String> betterCasedAlternative(final String winner, final List<String> alternatives) {
         final long winnerCount = capitalizedWordCount(winner);
         return alternatives.stream()
+            .filter(alternative -> !isAllCaps(alternative))
             .filter(alternative -> alternative.equalsIgnoreCase(winner))
             .filter(alternative -> capitalizedWordCount(alternative) > winnerCount)
             .max(Comparator.comparingLong(TitleCasing::capitalizedWordCount));
@@ -65,7 +108,7 @@ final class TitleCasing {
     }
 
     private static boolean isSmallWord(final String word) {
-        return SMALL_WORDS.contains(PUNCTUATION.matcher(word).replaceAll("").toLowerCase(Locale.ROOT));
+        return SMALL_WORDS.contains(bareWord(word));
     }
 
     private static String capitalizeWord(final String word) {

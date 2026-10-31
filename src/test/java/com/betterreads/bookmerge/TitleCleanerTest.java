@@ -2,12 +2,16 @@ package com.betterreads.bookmerge;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import org.junit.jupiter.api.DisplayName;
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class TitleCleanerTest {
+
+    private static final List<String> AUTHOR_NAMES = List.of("Other Author", "J.R.R. Tolkien");
 
     @ParameterizedTest(name = "\"{0}\" cleans to \"{1}\"")
     @CsvSource({
@@ -22,8 +26,7 @@ class TitleCleanerTest {
         "'Rhythm of War Part One',                           'Rhythm of War'",
         "'The Way of Kings, Part 1',                         'The Way of Kings'"
     })
-    @DisplayName("a trailing tag carrying an edition or book-number marker is stripped")
-    void stripsEditionAndBookNumberTags(final String raw, final String expected) {
+    void shouldStripEditionAndBookNumberTags(final String raw, final String expected) {
         assertThat(TitleCleaner.clean(raw)).isEqualTo(expected);
     }
 
@@ -45,14 +48,12 @@ class TitleCleanerTest {
         "'Dune: Messiah'",
         "'The Art of Novelization'"
     })
-    @DisplayName("a title with no edition marker is returned unchanged")
-    void leavesTitleWithoutEditionMarkerUnchanged(final String title) {
+    void shouldKeepTitleWithoutEditionMarker(final String title) {
         assertThat(TitleCleaner.clean(title)).isEqualTo(title);
     }
 
     @Test
-    @DisplayName("surrounding whitespace is trimmed after stripping")
-    void trimsAfterStripping() {
+    void shouldTrimAfterStripping() {
         assertThat(TitleCleaner.clean("  Watchmen (2019 Edition)")).isEqualTo("Watchmen");
     }
 
@@ -72,5 +73,29 @@ class TitleCleanerTest {
     })
     void shouldTurnSemicolonBeforeOrIntoColon(final String raw, final String expected) {
         assertThat(TitleCleaner.closePunctuation(raw)).isEqualTo(expected);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "The Hobbit",
+        "Murder by Agatha Christie",
+        "J.R.R. Tolkien",
+        "By J.R.R. Tolkien",
+        "The Hobbit by J.R.R. Tolkien Again",
+        "Hi"
+    })
+    void shouldTreatTitleAsClean(final String title) {
+        assertThat(TitleCleaner.isClean(title, AUTHOR_NAMES)).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"The Hobbit by J.R.R. Tolkien", "The Hobbit BY J.R.R. TOLKIEN", "RETURN OF THE KING"})
+    void shouldNotTreatTitleAsClean(final String title) {
+        assertThat(TitleCleaner.isClean(title, AUTHOR_NAMES)).isFalse();
+    }
+
+    @Test
+    void shouldIgnoreSpaceAroundCreditName() {
+        assertThat(TitleCleaner.isClean("The Hobbit by J.R.R. Tolkien", List.of(" J.R.R. Tolkien "))).isFalse();
     }
 }

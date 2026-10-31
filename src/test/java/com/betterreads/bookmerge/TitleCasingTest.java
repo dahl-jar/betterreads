@@ -4,9 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
 
+import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class TitleCasingTest {
 
@@ -65,5 +69,79 @@ class TitleCasingTest {
         final String title = "La nuit des hiboux";
 
         assertThat(TitleCasing.capitalize(title, List.of(), FRENCH)).isEqualTo(title);
+    }
+
+    @Test
+    void shouldIgnoreAllCapsAlternative() {
+        final String title = "Return of the King";
+
+        assertThat(TitleCasing.capitalize(title, List.of("RETURN OF THE KING"), FRENCH)).isEqualTo(title);
+    }
+
+    @Nested
+    class AllCaps {
+
+        private static final String LES_MISERABLES = "LES MISÉRABLES";
+
+        @ParameterizedTest
+        @ValueSource(strings = {"RETURN OF THE KING", "STAR TREK 3", "1984 V", "ВОЙНА И МИР", LES_MISERABLES})
+        void shouldDetectAllCapsTitle(final String title) {
+            assertThat(TitleCasing.isAllCaps(title)).isTrue();
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {
+            "IT", "JLA", " JLA", "NOS4A2", "1984", "V", "S.", "1Q84", "The Hobbit", "Война и мир", "新世界 世界",
+            "STRAßE MITTE"
+        })
+        void shouldNotTreatTitleAsAllCaps(final String title) {
+            assertThat(TitleCasing.isAllCaps(title)).isFalse();
+        }
+
+        @ParameterizedTest(name = "\"{0}\" becomes \"{1}\"")
+        @CsvSource(delimiter = '|', value = {
+            "RETURN OF THE KING | Return of the King",
+            "BATMAN: THE LONG HALLOWEEN | Batman: The Long Halloween",
+            "WHAT DREAMS ARE MADE OF | What Dreams Are Made Of",
+            "LES MISÉRABLES | Les Misérables",
+            "V FOR VENDETTA | V for Vendetta",
+            "WHY I WRITE | Why I Write",
+            "STAR TREK 3 | Star Trek 3"
+        })
+        void shouldFixCaseOfAllCapsEnglishTitle(final String title, final String expected) {
+            assertThat(TitleCasing.fixAllCaps(title, ENGLISH)).isEqualTo(expected);
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"IT", "FUBAR", "JLA"})
+        void shouldKeepSingleWordAllCapsTitle(final String title) {
+            assertThat(TitleCasing.fixAllCaps(title, ENGLISH)).isEqualTo(title);
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"iPhone for seniors", "1984 2001"})
+        void shouldKeepTitleThatIsNotAllCaps(final String title) {
+            assertThat(TitleCasing.fixAllCaps(title, ENGLISH)).isEqualTo(title);
+        }
+
+        @ParameterizedTest
+        @NullSource
+        @ValueSource(strings = FRENCH)
+        void shouldKeepAllCapsTitleOutsideEnglish(final @Nullable String language) {
+            assertThat(TitleCasing.fixAllCaps(LES_MISERABLES, language)).isEqualTo(LES_MISERABLES);
+        }
+
+        @ParameterizedTest(name = "\"{0}\" becomes \"{1}\"")
+        @CsvSource(delimiter = '|', value = {
+            "H.P. LOVECRAFT | H.P. Lovecraft",
+            "B.P.R.D.: 1948 | B.P.R.D.: 1948",
+            "MAYFLOWER II | Mayflower II",
+            "NECROSCOPE III: THE SOURCE | Necroscope III: The Source",
+            "BATGIRL VOL. 2: TO THE DEATH | Batgirl Vol. 2: To the Death",
+            "WAIT... WHAT | Wait... What"
+        })
+        void shouldKeepInitialsAndRomanNumeralsInCapitals(final String title, final String expected) {
+            assertThat(TitleCasing.fixAllCaps(title, ENGLISH)).isEqualTo(expected);
+        }
     }
 }
