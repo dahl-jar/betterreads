@@ -15,11 +15,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriBuilder;
 
-/**
- * {@code search.json} has no description or subjects, so a lookup also fetches
- * {@code /works/{key}.json}. The search ranks fuzzily and can return a related work, so a hit whose
- * title drifts from the query is dropped. 4xx resolves to empty, 5xx and network errors propagate.
- */
 @Component
 class OpenLibraryClientImpl implements OpenLibraryClient {
 

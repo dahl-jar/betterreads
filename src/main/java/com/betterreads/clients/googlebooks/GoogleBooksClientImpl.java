@@ -10,14 +10,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
-/**
- * Google Books REST API client.
- *
- * <p>4xx responses resolve to empty, 5xx responses and network failures throw.
- *
- * <p>{@code /volumes} search ranks the latest reprint of a title first, so
- * {@code fetchByTitleAuthor} returns that reprint's date, publisher and ISBN.
- */
 @Component
 class GoogleBooksClientImpl implements GoogleBooksClient {
 
@@ -71,11 +63,6 @@ class GoogleBooksClientImpl implements GoogleBooksClient {
         }, LOG, "Google Books search query=" + query);
     }
 
-    /**
-     * A double quote in a title or author closes the {@code intitle:"..."} phrase early and turns
-     * the rest into query operators, so quotes are stripped, and backslashes too since they can
-     * re-open quoting.
-     */
     private static String stripQuotes(final String input) {
         return input.replace("\\", "").replace("\"", "");
     }

@@ -10,6 +10,7 @@ import com.betterreads.logging.LogSanitizer;
 import io.netty.channel.ChannelOption;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -17,17 +18,11 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import org.springframework.web.util.UriBuilder;
 import reactor.netty.http.client.HttpClient;
 
-/** Builds {@code WebClient} builders with explicit connect and response timeouts, and runs 4xx-tolerant GETs. */
 public final class WebClients {
 
     public static final String USER_AGENT =
         "BetterReads/0.1 (https://betterreadsapp.com; book-tracking-app)";
 
-    /**
-     * A single Hardcover series enumeration or Wikidata entity document runs to a few hundred
-     * kilobytes, past the 256 KB default decode buffer, so the in-memory limit is raised to 4 MB
-     * for every source.
-     */
     private static final int MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
 
     private WebClients() {
@@ -84,7 +79,8 @@ public final class WebClients {
         try {
             return request.get();
         } catch (WebClientResponseException exception) {
-            if (exception.getStatusCode().is4xxClientError()) {
+            if (exception.getStatusCode().is4xxClientError()
+                && !exception.getStatusCode().isSameCodeAs(HttpStatus.TOO_MANY_REQUESTS)) {
                 log.debug("{} returned 4xx status={}",
                     LogSanitizer.forLog(source), exception.getStatusCode().value());
                 return Optional.empty();

@@ -10,12 +10,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Wikipedia REST summary fetch.
- *
- * <p>Only a {@code standard} page yields an extract, so a disambiguation page comes back empty. A 4xx
- * is empty too, 5xx and network failures propagate.
- */
 @Component
 public class WikipediaApi {
 

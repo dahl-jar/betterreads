@@ -14,11 +14,6 @@ import org.springframework.web.util.UriBuilder;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Wikidata entity search and entity fetch.
- *
- * <p>A 4xx resolves to empty, 5xx and network failures propagate.
- */
 @Component
 public class WikidataApi {
 
@@ -50,7 +45,6 @@ public class WikidataApi {
         return body.map(WikidataApi::parseCandidates).orElseGet(List::of);
     }
 
-    /** Returns the node at {@code entities.<qid>}, empty for an unknown id. */
     public Optional<JsonNode> entity(final String qid) {
         return responseBody(builder -> builder.path(ENTITY_PATH + qid + ".json").build())
             .map(body -> JSON.readTree(body).path("entities").path(qid))

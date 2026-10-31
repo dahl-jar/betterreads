@@ -15,15 +15,6 @@ import org.springframework.web.reactive.function.client.WebClientException;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Apple Books search and ISBN lookup over the iTunes Search API.
- *
- * <p>A call waits up to five seconds for a rate permit, so a drained budget does not block the caller
- * for a whole refill window. A search that gets no permit returns empty. A search 5xx or network
- * failure propagates.
- * An ISBN lookup throws ItunesUnavailableException on a missed permit, a 5xx, a network failure or an
- * unreadable reply. A 4xx resolves to empty.
- */
 @Component
 public class ItunesApi {
 

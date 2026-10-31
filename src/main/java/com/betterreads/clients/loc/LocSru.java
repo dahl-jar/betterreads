@@ -8,7 +8,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
-/** Raw SRU {@code searchRetrieve} calls. A 4xx comes back empty, 5xx and network errors are thrown. */
 @Component
 class LocSru {
 

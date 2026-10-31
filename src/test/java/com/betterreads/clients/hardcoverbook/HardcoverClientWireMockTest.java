@@ -278,5 +278,13 @@ class HardcoverClientWireMockTest extends HardcoverWireMock {
             assertThatThrownBy(() -> client.fetchByTitleAuthor(HOBBIT_TITLE, HOBBIT_AUTHOR))
                 .isInstanceOf(WebClientResponseException.class);
         }
+
+        @Test
+        void shouldThrowWhenBookByIdRateLimited() {
+            stubStatus(HTTP_TOO_MANY_REQUESTS);
+
+            assertThatThrownBy(() -> client.fetchByHardcoverId("379217"))
+                .isInstanceOf(WebClientResponseException.TooManyRequests.class);
+        }
     }
 }

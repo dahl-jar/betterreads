@@ -175,6 +175,13 @@ class OpenLibraryClientWireMockTest extends OpenLibraryWireMock {
             assertThat(results).extracting(SourceBook::openLibraryWorkKey).containsExactly(HOBBIT_WORK_KEY);
         }
 
+        @Test
+        void shouldThrowWhenFallbackSearchRateLimited() {
+            stubSearchStatus(HTTP_TOO_MANY_REQUESTS);
+
+            assertThatThrownBy(() -> client.search(HOBBIT_TITLE, SEARCH_LIMIT))
+                .isInstanceOf(WebClientResponseException.TooManyRequests.class);
+        }
     }
 
     @Nested
