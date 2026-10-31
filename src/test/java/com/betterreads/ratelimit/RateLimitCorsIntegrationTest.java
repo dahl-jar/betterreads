@@ -7,6 +7,7 @@ import static com.betterreads.ratelimit.RateLimitFixtures.loginPayload;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.betterreads.testsupport.ContainerizedTest;
+import com.betterreads.testsupport.Origins;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -23,10 +24,7 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.util.TestSocketUtils;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
@@ -37,24 +35,20 @@ import tools.jackson.databind.ObjectMapper;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
 @TestPropertySource(properties = {
-    "app.cors.allowed-origins=" + RateLimitCorsIntegrationTest.ALLOWED_ORIGIN,
-    "mail.outbox.worker-enabled=false"
+    "app.cors.allowed-origins=" + Origins.ALLOWED,
+    "auth.rate-limit.event-stream-capacity=" + RateLimitCorsIntegrationTest.EVENT_STREAM_BURST,
+    "mail.outbox.worker-enabled=false",
+    "management.server.port=0"
 })
 class RateLimitCorsIntegrationTest extends ContainerizedTest {
 
-    static final String ALLOWED_ORIGIN = "https://app.betterreads.example.com";
+    static final int EVENT_STREAM_BURST = 10;
 
     @Container
     @ServiceConnection
     static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
 
-    private static final int MANAGEMENT_PORT = TestSocketUtils.findAvailableTcpPort();
-
-    private static final String DISALLOWED_ORIGIN = "https://evil.example.com";
-
     private static final String DOCS_EVENTS_URL = "/swagger-ui/x/events";
-
-    private static final int EVENT_STREAM_BURST = 10;
 
     @LocalServerPort
     private int port;
@@ -65,11 +59,6 @@ class RateLimitCorsIntegrationTest extends ContainerizedTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @DynamicPropertySource
-    static void managementPort(final DynamicPropertyRegistry registry) {
-        registry.add("management.server.port", () -> MANAGEMENT_PORT);
-    }
-
     @BeforeEach
     void setUp() {
         rateLimitFilter.reset();
@@ -77,25 +66,25 @@ class RateLimitCorsIntegrationTest extends ContainerizedTest {
 
     @Test
     void shouldExposeRetryAfterOnRateLimitedLogin() throws IOException, InterruptedException {
-        final HttpResponse<Void> response = loginOverLimit(ALLOWED_ORIGIN);
+        final HttpResponse<Void> response = loginOverLimit(Origins.ALLOWED);
 
         assertThat(response.statusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
-        assertThat(response.headers().firstValue(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS).orElseThrow())
-            .contains(RETRY_AFTER_HEADER);
+        assertThat(response.headers().firstValue(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS))
+            .hasValueSatisfying(exposed -> assertThat(exposed).contains(RETRY_AFTER_HEADER));
     }
 
     @Test
     void shouldAllowOriginOnRateLimitedLogin() throws IOException, InterruptedException {
-        final HttpResponse<Void> response = loginOverLimit(ALLOWED_ORIGIN);
+        final HttpResponse<Void> response = loginOverLimit(Origins.ALLOWED);
 
         assertThat(response.statusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
         assertThat(response.headers().firstValue(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN))
-            .hasValue(ALLOWED_ORIGIN);
+            .hasValue(Origins.ALLOWED);
     }
 
     @Test
     void shouldAnswer403ToDisallowedOriginOnRateLimitedLogin() throws IOException, InterruptedException {
-        final HttpResponse<Void> response = loginOverLimit(DISALLOWED_ORIGIN);
+        final HttpResponse<Void> response = loginOverLimit(Origins.DISALLOWED);
 
         assertThat(response.statusCode()).isEqualTo(HttpStatus.FORBIDDEN.value());
         assertThat(response.headers().firstValue(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN)).isEmpty();
@@ -115,7 +104,7 @@ class RateLimitCorsIntegrationTest extends ContainerizedTest {
 
     private HttpResponse<Void> loginOverLimit(final String origin) throws IOException, InterruptedException {
         for (int i = 0; i < LOGIN_BURST; i++) {
-            login(ALLOWED_ORIGIN);
+            login(Origins.ALLOWED);
         }
         return login(origin);
     }
