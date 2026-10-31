@@ -99,14 +99,24 @@ class TitleCasingTest {
         }
 
         @ParameterizedTest(name = "\"{0}\" becomes \"{1}\"")
-        @CsvSource(delimiter = '|', value = {
+        @CsvSource(delimiter = '|', quoteCharacter = '`', value = {
             "RETURN OF THE KING | Return of the King",
             "BATMAN: THE LONG HALLOWEEN | Batman: The Long Halloween",
             "WHAT DREAMS ARE MADE OF | What Dreams Are Made Of",
             "LES MISÉRABLES | Les Misérables",
             "V FOR VENDETTA | V for Vendetta",
             "WHY I WRITE | Why I Write",
-            "STAR TREK 3 | Star Trek 3"
+            "STAR TREK 3 | Star Trek 3",
+            "'SALEM'S LOT REVISITED | 'Salem's Lot Revisited",
+            "(THE) LONG WALK | (The) Long Walk",
+            "20TH CENTURY BOYS | 20th Century Boys",
+            "1Q84 VOLUME 2 | 1q84 Volume 2",
+            "BATMAN - THE LONG HALLOWEEN | Batman - The Long Halloween",
+            "WAR -- AND PEACE | War -- And Peace",
+            "BATMAN \u2013 THE LONG HALLOWEEN | Batman \u2013 The Long Halloween",
+            "BATMAN \u2014 THE LONG HALLOWEEN | Batman \u2014 The Long Halloween",
+            "WHO GOES THERE? A NOVEL | Who Goes There? A Novel",
+            "RUN! A NOVEL | Run! A Novel"
         })
         void shouldFixCaseOfAllCapsEnglishTitle(final String title, final String expected) {
             assertThat(TitleCasing.fixAllCaps(title, ENGLISH)).isEqualTo(expected);

@@ -35,6 +35,10 @@ final class TitleCasing {
         "a", "an", "the", "and", "but", "or", "nor", "for", "so", "yet",
         "as", "at", "by", "in", "of", "on", "to", "up", "via", "with");
 
+    private static final Set<String> PHRASE_ENDINGS = Set.of(":", "?", "!");
+
+    private static final Set<String> STANDALONE_DASHES = Set.of("-", "--", "\u2013", "\u2014");
+
     private TitleCasing() {
     }
 
@@ -101,7 +105,11 @@ final class TitleCasing {
     }
 
     private static boolean capitalizes(final String[] words, final int index) {
-        return index == 0 || index == words.length - 1 || words[index - 1].endsWith(":") || !isSmallWord(words[index]);
+        return index == 0 || index == words.length - 1 || endsPhrase(words[index - 1]) || !isSmallWord(words[index]);
+    }
+
+    private static boolean endsPhrase(final String word) {
+        return STANDALONE_DASHES.contains(word) || PHRASE_ENDINGS.stream().anyMatch(word::endsWith);
     }
 
     private static boolean isSmallWord(final String word) {
@@ -109,11 +117,16 @@ final class TitleCasing {
     }
 
     private static String capitalizeWord(final String word) {
-        if (word.isEmpty()) {
+        final int start = IntStream.range(0, word.length())
+            .filter(index -> Character.isLetterOrDigit(word.codePointAt(index)))
+            .findFirst()
+            .orElse(word.length());
+        if (start == word.length()) {
             return word;
         }
-        final int first = word.codePointAt(0);
-        return new String(Character.toChars(Character.toUpperCase(first)))
-            + word.substring(Character.charCount(first));
+        final int first = word.codePointAt(start);
+        return word.substring(0, start)
+            + new String(Character.toChars(Character.toUpperCase(first)))
+            + word.substring(start + Character.charCount(first));
     }
 }
