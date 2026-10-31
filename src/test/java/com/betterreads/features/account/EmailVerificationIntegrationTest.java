@@ -83,8 +83,7 @@ class EmailVerificationIntegrationTest extends AccountMailTest {
 
         @Test
         void shouldQueueNoticeWhenEmailTakenByUnverifiedAccount() throws Exception {
-            final long userId = registerNewUser();
-            final String token = AccountTestFixture.readEnqueuedToken(mailOutboxRepository, objectMapper);
+            registerNewUser();
 
             mockMvc.perform(post(REGISTER_URL)
                     .contentType(MediaType.APPLICATION_JSON)
@@ -95,8 +94,20 @@ class EmailVerificationIntegrationTest extends AccountMailTest {
                 .extracting(MailOutbox::getTemplate)
                 .containsExactlyInAnyOrder(
                     MailOutboxService.TEMPLATE_EMAIL_VERIFICATION, MailOutboxService.TEMPLATE_SIGNUP_ATTEMPT);
+        }
+
+        @Test
+        void shouldKeepVerificationLinkWhenEmailTakenByUnverifiedAccount() throws Exception {
+            final long userId = registerNewUser();
+            final String token = AccountTestFixture.readEnqueuedToken(mailOutboxRepository, objectMapper);
+            mockMvc.perform(post(REGISTER_URL)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(Accounts.registerPayload(objectMapper, OTHER_USER, USER_EMAIL, PASSWORD)))
+                .andExpect(status().isCreated());
+
             verify(token)
                 .andExpect(status().isNoContent());
+
             assertThat(verifiedAt(userId)).isNotNull();
         }
     }

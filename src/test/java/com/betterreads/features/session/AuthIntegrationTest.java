@@ -273,6 +273,18 @@ class AuthIntegrationTest extends ContainerizedTest {
 
         @Test
         void shouldAnswerLikeNewEmailWhenEmailTaken() throws Exception {
+            seedUser();
+
+            AuthRequests.register(mockMvc, takenEmailBody())
+                .andExpect(status().isCreated())
+                .andExpect(header().doesNotExist(SET_COOKIE))
+                .andExpect(content().string(""));
+
+            assertThat(userRepository.count()).isOne();
+        }
+
+        @Test
+        void shouldKeepAccountUnchangedWhenEmailTaken() throws Exception {
             final long userId = seedUser();
             final User seeded = userRepository.findById(userId).orElseThrow();
             final int credentialVersion = seeded.getCredentialVersion();
@@ -280,12 +292,9 @@ class AuthIntegrationTest extends ContainerizedTest {
                 Accounts.registerPayload(objectMapper, Accounts.OTHER_USER, Accounts.USER_EMAIL, WRONG_PASSWORD);
 
             AuthRequests.register(mockMvc, body)
-                .andExpect(status().isCreated())
-                .andExpect(header().doesNotExist(SET_COOKIE))
-                .andExpect(content().string(""));
+                .andExpect(status().isCreated());
 
             final User stored = userRepository.findById(userId).orElseThrow();
-            assertThat(userRepository.count()).isOne();
             assertThat(passwordEncoder.matches(PASSWORD, stored.getPasswordHash())).isTrue();
             assertThat(stored.getUsername()).isEqualTo(Accounts.USER);
             assertThat(stored.getCredentialVersion()).isEqualTo(credentialVersion);

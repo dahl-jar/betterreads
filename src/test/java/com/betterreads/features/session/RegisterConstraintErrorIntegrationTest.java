@@ -2,14 +2,11 @@ package com.betterreads.features.session;
 
 import com.betterreads.testsupport.Accounts;
 import com.betterreads.testsupport.ContainerizedTest;
-import com.betterreads.users.User;
 import com.betterreads.users.UserRepository;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
-
-import java.util.Objects;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,12 +38,9 @@ class RegisterConstraintErrorIntegrationTest extends ContainerizedTest {
     @Test
     void shouldKeepEmailOutOfConstraintError() {
         Accounts.seedUser(userRepository, passwordEncoder, Accounts.USER, Accounts.USER_EMAIL, Accounts.PASSWORD);
-        final User duplicate = new User();
-        duplicate.setUsername(Accounts.OTHER_USER);
-        duplicate.setEmail(Accounts.USER_EMAIL);
-        duplicate.setPasswordHash(Objects.requireNonNull(passwordEncoder.encode(Accounts.PASSWORD)));
 
-        assertThatThrownBy(() -> userRepository.saveAndFlush(duplicate))
+        assertThatThrownBy(() -> Accounts.seedUser(
+                userRepository, passwordEncoder, Accounts.OTHER_USER, Accounts.USER_EMAIL, Accounts.PASSWORD))
             .isInstanceOf(DataIntegrityViolationException.class)
             .hasMessageContaining(EMAIL_CONSTRAINT)
             .hasMessageNotContaining(Accounts.USER_EMAIL);
