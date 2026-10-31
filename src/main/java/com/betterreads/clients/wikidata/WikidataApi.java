@@ -2,6 +2,7 @@ package com.betterreads.clients.wikidata;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -36,12 +37,12 @@ public class WikidataApi {
         final Optional<String> body = responseBody(builder -> builder
             .path(SEARCH_PATH)
             .queryParam("action", "wbsearchentities")
-            .queryParam(SEARCH_FIELD, term)
+            .queryParam(SEARCH_FIELD, "{term}")
             .queryParam("language", "en")
             .queryParam("type", "item")
             .queryParam("format", "json")
             .queryParam("limit", SEARCH_LIMIT)
-            .build());
+            .build(Map.of("term", term)));
         return body.map(WikidataApi::parseCandidates).orElseGet(List::of);
     }
 
@@ -56,7 +57,7 @@ public class WikidataApi {
     }
 
     private Optional<String> responseBody(final Function<UriBuilder, URI> uri) {
-        return WebClients.getBodyOrEmptyOn4xx(wikidataWebClient, uri, LOG, "wikidata.get");
+        return WebClients.getBodyOrEmptyOn4xxExcept429(wikidataWebClient, uri, LOG, "wikidata.get");
     }
 
     private static List<String> parseCandidates(final String body) {

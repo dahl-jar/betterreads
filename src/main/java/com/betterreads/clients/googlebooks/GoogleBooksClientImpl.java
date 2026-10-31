@@ -1,5 +1,6 @@
 package com.betterreads.clients.googlebooks;
 
+import java.util.Map;
 import java.util.Optional;
 
 import com.betterreads.booksource.BookFieldSource;
@@ -47,13 +48,13 @@ class GoogleBooksClientImpl implements GoogleBooksClient {
     }
 
     private Optional<GoogleBooksVolume> search(final String query) {
-        return WebClients.emptyOn4xx(() -> {
+        return WebClients.emptyOn4xxExcept429(() -> {
             final GoogleBooksSearchResponse response = googleBooksWebClient.get()
                 .uri(uriBuilder -> uriBuilder
                     .path(VOLUMES_PATH)
-                    .queryParam("q", query)
+                    .queryParam("q", "{q}")
                     .queryParam("maxResults", 1)
-                    .build())
+                    .build(Map.of("q", query)))
                 .retrieve()
                 .bodyToMono(GoogleBooksSearchResponse.class)
                 .block();

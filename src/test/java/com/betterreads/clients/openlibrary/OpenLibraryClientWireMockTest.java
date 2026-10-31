@@ -21,6 +21,8 @@ import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -175,8 +177,18 @@ class OpenLibraryClientWireMockTest extends OpenLibraryWireMock {
             assertThat(results).extracting(SourceBook::openLibraryWorkKey).containsExactly(HOBBIT_WORK_KEY);
         }
 
+        @ParameterizedTest
+        @ValueSource(strings = {"{x}", "{x\nFORGED LINE}", "{a/\n2026-10-31 12:00:00.000 ERROR forged\n}"})
+        void shouldSendBracesLiterally(final String query) {
+            stubSearch(search());
+
+            client.search(query, SEARCH_LIMIT);
+
+            WIREMOCK.verify(getRequestedFor(urlPathEqualTo(SEARCH_PATH)).withQueryParam("q", equalTo(query)));
+        }
+
         @Test
-        void shouldThrowWhenFallbackSearchRateLimited() {
+        void shouldThrowWhenSearchRateLimited() {
             stubSearchStatus(HTTP_TOO_MANY_REQUESTS);
 
             assertThatThrownBy(() -> client.search(HOBBIT_TITLE, SEARCH_LIMIT))

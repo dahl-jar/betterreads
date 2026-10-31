@@ -1,5 +1,6 @@
 package com.betterreads.clients.loc;
 
+import java.util.Map;
 import java.util.Optional;
 
 import com.betterreads.clients.http.WebClients;
@@ -26,13 +27,13 @@ class LocSru {
     }
 
     Optional<String> searchRetrieve(final String cql) {
-        return WebClients.getBodyOrEmptyOn4xx(locWebClient, builder -> builder
+        return WebClients.getBodyOrEmptyOn4xxExcept429(locWebClient, builder -> builder
             .queryParam("version", VERSION)
             .queryParam("operation", OPERATION)
-            .queryParam("query", cql)
+            .queryParam("query", "{cql}")
             .queryParam("startRecord", FIRST_RECORD)
             .queryParam("maximumRecords", MAX_RECORDS)
             .queryParam("recordSchema", MODS_SCHEMA)
-            .build(), LOG, "loc.searchRetrieve");
+            .build(Map.of("cql", cql)), LOG, "loc.searchRetrieve");
     }
 }

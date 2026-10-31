@@ -11,6 +11,7 @@ import io.netty.channel.ChannelOption;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -58,20 +59,20 @@ public final class WebClients {
             .block(timeout);
     }
 
-    public static Optional<String> getBodyOrEmptyOn4xx(
+    public static Optional<String> getBodyOrEmptyOn4xxExcept429(
         final WebClient client,
         final Function<UriBuilder, URI> uri,
         final Logger log,
         final String source
     ) {
-        return emptyOn4xx(() -> Optional.ofNullable(client.get()
+        return emptyOn4xxExcept429(() -> Optional.ofNullable(client.get()
             .uri(uri)
             .retrieve()
             .bodyToMono(String.class)
             .block()), log, source);
     }
 
-    public static <T> Optional<T> emptyOn4xx(
+    public static <T> Optional<T> emptyOn4xxExcept429(
         final Supplier<Optional<T>> request,
         final Logger log,
         final String source
@@ -79,10 +80,9 @@ public final class WebClients {
         try {
             return request.get();
         } catch (WebClientResponseException exception) {
-            if (exception.getStatusCode().is4xxClientError()
-                && !exception.getStatusCode().isSameCodeAs(HttpStatus.TOO_MANY_REQUESTS)) {
-                log.debug("{} returned 4xx status={}",
-                    LogSanitizer.forLog(source), exception.getStatusCode().value());
+            final HttpStatusCode status = exception.getStatusCode();
+            if (status.is4xxClientError() && !status.isSameCodeAs(HttpStatus.TOO_MANY_REQUESTS)) {
+                log.debug("{} returned 4xx status={}", LogSanitizer.forLog(source), status.value());
                 return Optional.empty();
             }
             throw exception;

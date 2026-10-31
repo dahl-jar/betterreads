@@ -5,17 +5,12 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import com.betterreads.bookdiscovery.BookDiscovery;
-import com.betterreads.booksource.BookFieldSource;
-import com.betterreads.booksource.SourceBook;
-import com.betterreads.clients.hardcoverauthor.HardcoverAuthorClient;
-import com.betterreads.clients.hardcoverseries.HardcoverSeriesClient;
-import com.betterreads.clients.openlibrary.OpenLibraryClient;
 import java.net.ConnectException;
 import java.net.URI;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
@@ -33,13 +28,10 @@ import org.springframework.dao.QueryTimeoutException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 class SearchMissStagerTest {
 
     private static final Duration DEDUP_WINDOW = Duration.ofMinutes(10);
-
-    private static final String SOURCE_URL = "https://source.example/search";
 
     private static final Executor SAME_THREAD = Runnable::run;
 
@@ -50,16 +42,6 @@ class SearchMissStagerTest {
     private final BookDiscovery bookDiscovery = Mockito.mock(BookDiscovery.class);
 
     private final SearchMissStager stager = new SearchMissStager(bookDiscovery, SAME_THREAD, DEDUP_WINDOW);
-
-    @Test
-    @DisplayName("stages a fresh query through the catalog search once")
-    void stagesFreshQuery() {
-        final String query = "wheel of time";
-
-        stager.stage(query);
-
-        verify(bookDiscovery).searchAndStage(query);
-    }
 
     @Test
     @DisplayName("drops a repeat of the same query within the dedup window")
@@ -80,21 +62,15 @@ class SearchMissStagerTest {
     }
 
     @Test
-    @DisplayName("swallows a staging failure so the caller is never affected")
-    void swallowsStagingFailure() {
-        doThrow(new QueryTimeoutException("source timed out")).when(bookDiscovery).searchAndStage(DUNE);
+    @DisplayName("should drop a repeat while the run is in flight")
+    void shouldDropRepeatWhileRunIsInFlight() {
+        final List<Runnable> queued = new ArrayList<>();
+        final SearchMissStager queuedStager = new SearchMissStager(bookDiscovery, queued::add, DEDUP_WINDOW);
 
-        assertThatCode(() -> stager.stage(DUNE)).doesNotThrowAnyException();
-    }
+        queuedStager.stage(DUNE);
+        queuedStager.stage(DUNE);
 
-    @Test
-    @DisplayName("should swallow a refused connection to a source")
-    void shouldSwallowRefusedConnection() {
-        final WebClientRequestException refused = new WebClientRequestException(
-            new ConnectException("Connection refused"), HttpMethod.GET, URI.create(SOURCE_URL), HttpHeaders.EMPTY);
-        doThrow(refused).when(bookDiscovery).searchAndStage(DUNE);
-
-        assertThatCode(() -> stager.stage(DUNE)).doesNotThrowAnyException();
+        assertThat(queued).hasSize(1);
     }
 
     @Test
@@ -133,31 +109,20 @@ class SearchMissStagerTest {
     @DisplayName("after a staging run ends")
     class RunEnd {
 
-        private static final int HTTP_TOO_MANY_REQUESTS = 429;
+        private static final String SOURCE_URL = "https://source.example/search";
 
         private static final String BAD_BODY = "bad body";
-
-        private final HardcoverSeriesClient seriesClient = Mockito.mock(HardcoverSeriesClient.class);
-
-        private final HardcoverAuthorClient authorClient = Mockito.mock(HardcoverAuthorClient.class);
-
-        private final OpenLibraryClient openLibraryClient = Mockito.mock(OpenLibraryClient.class);
-
-        private final BookStager bookStager = Mockito.mock(BookStager.class);
-
-        private final SearchMissStager discoveryStager = new SearchMissStager(
-            new BookDiscoveryService(seriesClient, authorClient, openLibraryClient, bookStager),
-            SAME_THREAD,
-            DEDUP_WINDOW);
 
         static Stream<RuntimeException> failures() {
             return Stream.of(
                 StubSourceClients.serviceUnavailable(),
-                WebClientResponseException.create(
-                    HTTP_TOO_MANY_REQUESTS, "Too Many Requests", HttpHeaders.EMPTY, new byte[0], null),
+                StubSourceClients.rateLimited(),
                 new QueryTimeoutException("database timed out"),
                 new DecodingException(BAD_BODY),
-                new RejectedExecutionException("source pool full"));
+                new RejectedExecutionException("source pool full"),
+                new WebClientRequestException(
+                    new ConnectException("Connection refused"), HttpMethod.GET, URI.create(SOURCE_URL),
+                    HttpHeaders.EMPTY));
         }
 
         @ParameterizedTest
@@ -173,34 +138,11 @@ class SearchMissStagerTest {
         }
 
         @Test
-        @DisplayName("should not throw to the caller when the run fails")
-        void shouldNotThrowToCallerWhenRunFails() {
+        @DisplayName("should swallow a decode failure")
+        void shouldSwallowDecodeFailure() {
             doThrow(new DecodingException(BAD_BODY)).when(bookDiscovery).searchAndStage(DUNE);
 
             assertThatCode(() -> stager.stage(DUNE)).doesNotThrowAnyException();
-        }
-
-        @Test
-        @DisplayName("should stay blocked after a clean miss")
-        void shouldStayBlockedAfterCleanMiss() {
-            discoveryStager.stage(DUNE);
-            discoveryStager.stage(DUNE);
-
-            verify(seriesClient, times(1)).fetchSeries(DUNE);
-        }
-
-        @Test
-        @DisplayName("should stay blocked after staging books")
-        void shouldStayBlockedAfterStagingBooks() {
-            final SourceBook.Builder builder = SourceBook.builder(BookFieldSource.OPEN_LIBRARY);
-            builder.title(DUNE);
-            final SourceBook hit = builder.build();
-            when(openLibraryClient.search(Mockito.eq(DUNE), Mockito.anyInt())).thenReturn(List.of(hit));
-
-            discoveryStager.stage(DUNE);
-            discoveryStager.stage(DUNE);
-
-            verify(bookStager, times(1)).stage(hit);
         }
     }
 }

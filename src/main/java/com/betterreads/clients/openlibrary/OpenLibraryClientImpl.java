@@ -2,8 +2,8 @@ package com.betterreads.clients.openlibrary;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.function.Consumer;
 
 import com.betterreads.booksource.BookFieldSource;
 import com.betterreads.booksource.SourceBook;
@@ -13,7 +13,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.util.UriBuilder;
 
 @Component
 class OpenLibraryClientImpl implements OpenLibraryClient {
@@ -26,6 +25,8 @@ class OpenLibraryClientImpl implements OpenLibraryClient {
 
     private static final String SEARCH_FIELDS =
         "key,title,subtitle,author_name,first_publish_year,cover_i,language";
+
+    private static final String QUERY_PARAM = "q";
 
     private static final String LIMIT_PARAM = "limit";
 
@@ -52,16 +53,14 @@ class OpenLibraryClientImpl implements OpenLibraryClient {
 
     @Override
     public Optional<SourceBook> fetchByIsbn(final String isbn) {
-        return searchDocs(1, builder -> builder.queryParam("q", "isbn:" + isbn)).stream()
+        return searchDocs(1, Map.of(QUERY_PARAM, "isbn:" + isbn)).stream()
             .findFirst()
             .flatMap(this::fetchWithWork);
     }
 
     @Override
     public Optional<SourceBook> fetchByTitleAuthor(final String title, final String author) {
-        return searchDocs(CANDIDATE_LIMIT,
-                builder -> builder.queryParam("title", title).queryParam("author", author))
-            .stream()
+        return searchDocs(CANDIDATE_LIMIT, Map.of("title", title, "author", author)).stream()
             .filter(doc -> titleMatches(doc, title))
             .min(Comparator.comparing(OpenLibrarySearchDoc::firstPublishYear,
                 Comparator.nullsLast(Comparator.naturalOrder())))
@@ -70,7 +69,7 @@ class OpenLibraryClientImpl implements OpenLibraryClient {
 
     @Override
     public List<SourceBook> search(final String query, final int limit) {
-        return searchDocs(limit, builder -> builder.queryParam("q", query)).stream()
+        return searchDocs(limit, Map.of(QUERY_PARAM, query)).stream()
             .map(doc -> mapper.toSourceBook(doc, null))
             .filter(book -> book != null)
             .toList();
@@ -90,14 +89,14 @@ class OpenLibraryClientImpl implements OpenLibraryClient {
         return Optional.ofNullable(mapper.toSourceBook(doc, work));
     }
 
-    private List<OpenLibrarySearchDoc> searchDocs(final int limit, final Consumer<UriBuilder> queryCustomizer) {
-        return WebClients.emptyOn4xx(() -> Optional.ofNullable(openLibraryWebClient.get()
+    private List<OpenLibrarySearchDoc> searchDocs(final int limit, final Map<String, String> params) {
+        return WebClients.emptyOn4xxExcept429(() -> Optional.ofNullable(openLibraryWebClient.get()
                 .uri(builder -> {
                     builder.path(SEARCH_PATH)
                         .queryParam(LIMIT_PARAM, limit)
                         .queryParam(FIELDS_PARAM, SEARCH_FIELDS);
-                    queryCustomizer.accept(builder);
-                    return builder.build();
+                    params.keySet().forEach(name -> builder.queryParam(name, "{" + name + "}"));
+                    return builder.build(params);
                 })
                 .retrieve()
                 .bodyToMono(OpenLibrarySearchResponse.class)
@@ -107,7 +106,7 @@ class OpenLibraryClientImpl implements OpenLibraryClient {
     }
 
     private Optional<OpenLibraryWork> fetchWork(final String workKey) {
-        return WebClients.emptyOn4xx(() -> Optional.ofNullable(openLibraryWebClient.get()
+        return WebClients.emptyOn4xxExcept429(() -> Optional.ofNullable(openLibraryWebClient.get()
                 .uri(WORK_PATH, workKey)
                 .retrieve()
                 .bodyToMono(OpenLibraryWork.class)

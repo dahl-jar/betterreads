@@ -2,6 +2,7 @@ package com.betterreads.clients.itunes;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import com.betterreads.clients.http.WebClients;
@@ -25,6 +26,8 @@ public class ItunesApi {
     private static final String SEARCH_PATH = "/search";
 
     private static final String LOOKUP_PATH = "/lookup";
+
+    private static final String TERM_PARAM = "term";
 
     private static final String RESULTS = "results";
 
@@ -63,7 +66,7 @@ public class ItunesApi {
             throw new ItunesUnavailableException();
         }
         try {
-            return WebClients.getBodyOrEmptyOn4xx(itunesWebClient, builder -> builder
+            return WebClients.getBodyOrEmptyOn4xxExcept429(itunesWebClient, builder -> builder
                     .path(LOOKUP_PATH)
                     .queryParam("isbn", isbn13)
                     .build(), LOG, "itunes.lookup")
@@ -83,11 +86,11 @@ public class ItunesApi {
             LOG.debug("itunes.search skipped, rate budget exhausted");
             return Optional.empty();
         }
-        return WebClients.getBodyOrEmptyOn4xx(itunesWebClient, builder -> builder
+        return WebClients.getBodyOrEmptyOn4xxExcept429(itunesWebClient, builder -> builder
             .path(SEARCH_PATH)
-            .queryParam("term", term)
+            .queryParam(TERM_PARAM, "{term}")
             .queryParam("media", EBOOK)
             .queryParam("limit", SEARCH_LIMIT)
-            .build(), LOG, "itunes.search");
+            .build(Map.of(TERM_PARAM, term)), LOG, "itunes.search");
     }
 }

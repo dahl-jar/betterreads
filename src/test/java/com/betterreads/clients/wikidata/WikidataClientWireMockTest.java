@@ -17,6 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Optional;
 
+import com.github.tomakehurst.wiremock.client.WireMock;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -114,6 +115,17 @@ class WikidataClientWireMockTest extends WikidataWireMock {
             final SourceBook book = client.fetchByTitleAuthor(DUNE_TITLE, MOORE_NAME).orElseThrow();
 
             assertThat(book.authors()).singleElement().extracting(SourceAuthor::photoUrl).isNull();
+        }
+
+        @Test
+        void shouldSendBracesLiterally() {
+            final String title = "{x}";
+            stubSearch(search());
+
+            client.fetchByTitleAuthor(title, HERBERT_NAME);
+
+            WIREMOCK.verify(WireMock.getRequestedFor(WireMock.urlPathEqualTo("/w/api.php"))
+                .withQueryParam("search", WireMock.equalTo(title)));
         }
 
         @Test

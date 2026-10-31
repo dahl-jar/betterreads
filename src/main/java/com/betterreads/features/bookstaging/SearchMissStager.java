@@ -9,7 +9,6 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import org.jspecify.annotations.Nullable;
@@ -71,7 +70,7 @@ class SearchMissStager implements SearchMissSink {
 
     private static Throwable unwrap(final Throwable failure) {
         final Throwable cause = failure.getCause();
-        return failure instanceof CompletionException && cause != null ? cause : failure;
+        return cause == null ? failure : cause;
     }
 
     private static void logFailure(final Throwable cause) {

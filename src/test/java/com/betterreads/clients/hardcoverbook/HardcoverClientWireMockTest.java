@@ -271,7 +271,7 @@ class HardcoverClientWireMockTest extends HardcoverWireMock {
         }
 
         @Test
-        @DisplayName("a 5xx propagates so a transient outage is not mistaken for 'book not found'")
+        @DisplayName("a 5xx propagates")
         void serverErrorPropagates() {
             stubStatus(HTTP_SERVER_ERROR);
 
@@ -283,7 +283,7 @@ class HardcoverClientWireMockTest extends HardcoverWireMock {
         void shouldThrowWhenBookByIdRateLimited() {
             stubStatus(HTTP_TOO_MANY_REQUESTS);
 
-            assertThatThrownBy(() -> client.fetchByHardcoverId("379217"))
+            assertThatThrownBy(() -> client.fetchByHardcoverId(ABSOLUTE_BATMAN_ID))
                 .isInstanceOf(WebClientResponseException.TooManyRequests.class);
         }
     }

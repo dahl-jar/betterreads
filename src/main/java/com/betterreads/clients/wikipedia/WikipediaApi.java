@@ -28,7 +28,7 @@ public class WikipediaApi {
     }
 
     public Optional<String> summaryExtract(final String pageTitle) {
-        return WebClients.getBodyOrEmptyOn4xx(wikipediaWebClient,
+        return WebClients.getBodyOrEmptyOn4xxExcept429(wikipediaWebClient,
                 builder -> builder.path(SUMMARY_PATH).pathSegment(pageTitle).build(), LOG, "wikipedia.get")
             .map(JSON::readTree)
             .filter(WikipediaApi::isStandard)
