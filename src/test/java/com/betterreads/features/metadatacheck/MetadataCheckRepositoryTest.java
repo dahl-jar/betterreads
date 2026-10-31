@@ -11,12 +11,11 @@ import com.betterreads.book.AuthorRepository;
 import com.betterreads.book.Book;
 import com.betterreads.book.BookUpsertService;
 import com.betterreads.book.VerifiedMetadata;
-import com.betterreads.booksource.BookFieldSource;
 import com.betterreads.booksource.SeriesEntry;
 import com.betterreads.clients.websearch.SeriesBook;
-import com.betterreads.booksource.SourceAuthor;
 import com.betterreads.booksource.SourceBook;
 import com.betterreads.clients.websearch.MetadataJson;
+import com.betterreads.testsupport.Books;
 import com.betterreads.testsupport.ContainerizedTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -48,8 +47,6 @@ class MetadataCheckRepositoryTest extends ContainerizedTest {
     private static final String GOLDEN_SON_KEY = "golden-son";
 
     private static final String LIGHT_BRINGER_KEY = "light-bringer";
-
-    private static final String AUTHOR = MetadataJson.AUTHOR;
 
     private static final String SAGA = MetadataJson.SERIES;
 
@@ -150,8 +147,10 @@ class MetadataCheckRepositoryTest extends ContainerizedTest {
         @Test
         void shouldListTheNamesOfEverySeries() {
             final List<SeriesEntry> series = List.of(new SeriesEntry(SAGA, 1), new SeriesEntry(UNIVERSE, 1));
-            final SourceBook book = redRising().hardcoverId(HARDCOVER_ID).series(series).build();
-            upsert.upsertFromSource(book);
+            final SourceBook.Builder book = MetadataCheckSamples.source();
+            book.hardcoverId(HARDCOVER_ID);
+            book.series(series);
+            upsert.upsertFromSource(book.build());
 
             final List<String> names = books.findSeriesNames();
 
@@ -194,17 +193,8 @@ class MetadataCheckRepositoryTest extends ContainerizedTest {
         return bookId;
     }
 
-    private static SourceBook.Builder redRising() {
-        return SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
-            .openLibraryWorkKey("OL1W")
-            .title("Red Rising")
-            .authors(List.of(SourceAuthor.ofName(AUTHOR)));
-    }
-
     private long save(final String dedupKey) {
-        final Book book = new Book();
-        book.setDedupKey(dedupKey);
-        book.setTitle(dedupKey);
-        return books.save(book).getBookId();
+        final Book saved = books.save(Books.book(dedupKey, dedupKey));
+        return saved.getBookId();
     }
 }

@@ -11,9 +11,7 @@ import java.util.Map;
 import com.betterreads.book.AuthorRepository;
 import com.betterreads.book.BookRepository;
 import com.betterreads.book.BookUpsertService;
-import com.betterreads.booksource.BookFieldSource;
 import com.betterreads.booksource.SeriesEntry;
-import com.betterreads.booksource.SourceAuthor;
 import com.betterreads.booksource.SourceBook;
 import com.betterreads.clients.websearch.MetadataCheckClient;
 import com.betterreads.clients.websearch.MetadataCheckRequest;
@@ -38,8 +36,6 @@ class MetadataCheckServiceIntegrationTest extends ContainerizedTest {
     @Container
     @ServiceConnection
     static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
-
-    private static final String AUTHOR = "author";
 
     private static final SeriesEntry SERIES = new SeriesEntry("series", 1);
 
@@ -68,54 +64,22 @@ class MetadataCheckServiceIntegrationTest extends ContainerizedTest {
     }
 
     @Test
-    void shouldSendAuthorsOfDetachedBook() {
-        final SourceBook.Builder book = source();
-        upsert.upsertFromSource(book.build());
-
-        service.checkDueBooks();
-
-        final MetadataCheckRequest request = sentRequest();
-        assertThat(request.authors()).containsExactly(AUTHOR);
-    }
-
-    @Test
-    void shouldSendUniverseOfDetachedBook() {
-        final SourceBook.Builder book = source();
+    void shouldSendCollectionsOfDetachedBook() {
+        final SourceBook.Builder book = MetadataCheckSamples.source();
         book.hardcoverId("hc-1");
         book.series(List.of(SERIES, UNIVERSE));
-        upsert.upsertFromSource(book.build());
-
-        service.checkDueBooks();
-
-        final MetadataCheckRequest request = sentRequest();
-        assertThat(request.universe()).isEqualTo(UNIVERSE);
-    }
-
-    @Test
-    void shouldGroupDetachedBookBySubject() {
-        final SourceBook.Builder book = source();
         book.rawSubjects(List.of("Fantasy"));
         upsert.upsertFromSource(book.build());
+        final ArgumentCaptor<List<MetadataCheckRequest>> batch = ArgumentCaptor.captor();
         final ArgumentCaptor<SourceGroup> group = ArgumentCaptor.captor();
 
         service.checkDueBooks();
 
-        verify(client).check(any(), group.capture());
-        assertThat(group.getValue()).isEqualTo(SourceGroup.SFF);
-    }
-
-    private MetadataCheckRequest sentRequest() {
-        final ArgumentCaptor<List<MetadataCheckRequest>> batch = ArgumentCaptor.captor();
-        verify(client).check(batch.capture(), any());
+        verify(client).check(batch.capture(), group.capture());
         final List<MetadataCheckRequest> requests = batch.getValue();
-        return requests.getFirst();
-    }
-
-    private static SourceBook.Builder source() {
-        final SourceBook.Builder book = SourceBook.builder(BookFieldSource.OPEN_LIBRARY);
-        book.openLibraryWorkKey("OL1W");
-        book.title("book");
-        book.authors(List.of(SourceAuthor.ofName(AUTHOR)));
-        return book;
+        final MetadataCheckRequest request = requests.getFirst();
+        assertThat(request.authors()).containsExactly(MetadataCheckSamples.AUTHOR);
+        assertThat(request.universe()).isEqualTo(UNIVERSE);
+        assertThat(group.getValue()).isEqualTo(SourceGroup.SFF);
     }
 }

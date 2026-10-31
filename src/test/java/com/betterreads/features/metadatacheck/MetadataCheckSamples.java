@@ -15,6 +15,7 @@ import com.betterreads.book.FieldEvidence;
 import com.betterreads.book.VerifiedField;
 import com.betterreads.book.VerifiedMetadata;
 import com.betterreads.booksource.BookFieldSource;
+import com.betterreads.booksource.SourceAuthor;
 import com.betterreads.booksource.SourceBook;
 import com.betterreads.clients.websearch.CheckOutcome;
 import com.betterreads.clients.websearch.CheckRun;
@@ -42,6 +43,8 @@ final class MetadataCheckSamples {
     static final Duration RETRY_AFTER_FAILURE = Duration.ofDays(1);
 
     static final Duration RETRY_AFTER_UNCONFIRMED = Duration.ofDays(7);
+
+    static final String AUTHOR = "author";
 
     private static final SearchUsage USAGE = new SearchUsage(3, 0.25, 35_210, 0);
 
@@ -92,6 +95,14 @@ final class MetadataCheckSamples {
             .collect(Collectors.toMap(Function.identity(), field -> outcome, (first, second) -> first,
                 LinkedHashMap::new));
         return new CheckedBook(metadata, outcomes, MetadataJson.answer());
+    }
+
+    static SourceBook.Builder source() {
+        final SourceBook.Builder book = SourceBook.builder(BookFieldSource.OPEN_LIBRARY);
+        book.openLibraryWorkKey("OL1W");
+        book.title("book");
+        book.authors(List.of(SourceAuthor.ofName(AUTHOR)));
+        return book;
     }
 
     static Book withGenre(final Book book, final String genre) {

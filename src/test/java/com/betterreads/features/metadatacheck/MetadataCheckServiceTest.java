@@ -53,9 +53,9 @@ class MetadataCheckServiceTest {
 
     private static final String TITLE = MetadataJson.TITLE;
 
-    private static final String AUTHOR = MetadataJson.AUTHOR;
+    private static final String AUTHOR = "book author";
 
-    private static final String CO_AUTHOR = "Ann Leckie";
+    private static final String CO_AUTHOR = "other author";
 
     private static final String SERIES = MetadataJson.SERIES;
 
@@ -115,8 +115,9 @@ class MetadataCheckServiceTest {
             service.checkDueBooks();
 
             verify(client, times(2)).check(batches.capture(), any());
-            assertThat(batches.getAllValues()).extracting(List::size)
-                .containsExactly(MetadataCheckSamples.BATCH_SIZE, MetadataCheckSamples.BATCH_SIZE);
+            final List<List<MetadataCheckRequest>> sent = batches.getAllValues();
+            assertThat(sent.getFirst()).hasSize(MetadataCheckSamples.BATCH_SIZE);
+            assertThat(sent.getLast()).hasSize(MetadataCheckSamples.BATCH_SIZE);
         }
 
         @Test
@@ -171,7 +172,8 @@ class MetadataCheckServiceTest {
             service.checkDueBooks();
 
             verify(books).findIdsDueForCheck(any(OffsetDateTime.class), page.capture());
-            assertThat(page.getValue().getPageSize()).isEqualTo(MetadataCheckSamples.MAX_BOOKS);
+            final Pageable requested = page.getValue();
+            assertThat(requested.getPageSize()).isEqualTo(MetadataCheckSamples.MAX_BOOKS);
         }
 
         @Test
@@ -179,13 +181,9 @@ class MetadataCheckServiceTest {
             final List<Long> queue = List.of(OTHER_ID, BOOK_ID);
             when(books.findIdsDueForCheck(any(OffsetDateTime.class), any(Pageable.class))).thenReturn(queue);
             when(catalog.findWithSubjectsByBookIdIn(queue)).thenReturn(List.of(book(BOOK_ID), book(OTHER_ID)));
-            givenAnswers(Map.of());
-            final ArgumentCaptor<List<MetadataCheckRequest>> batch = ArgumentCaptor.captor();
 
-            service.checkDueBooks();
+            final List<MetadataCheckRequest> requests = checkedBatch();
 
-            verify(client).check(batch.capture(), any());
-            final List<MetadataCheckRequest> requests = batch.getValue();
             final MetadataCheckRequest first = requests.getFirst();
             final MetadataCheckRequest last = requests.getLast();
             assertThat(first.bookId()).isEqualTo(OTHER_ID);
@@ -207,13 +205,10 @@ class MetadataCheckServiceTest {
             book.applySeries(List.of(new SeriesEntry(SERIES, 1), UNIVERSE), true);
             givenBooks(List.of(book));
             when(books.findSeriesBooks(SERIES, BOOK_ID)).thenReturn(List.of(new SeriesBook(GOLDEN_SON, 2.0)));
-            givenAnswers(Map.of());
-            final ArgumentCaptor<List<MetadataCheckRequest>> batch = ArgumentCaptor.captor();
 
-            service.checkDueBooks();
+            final List<MetadataCheckRequest> requests = checkedBatch();
 
-            verify(client).check(batch.capture(), any());
-            assertThat(batch.getValue()).containsExactly(new MetadataCheckRequest(
+            assertThat(requests).containsExactly(new MetadataCheckRequest(
                 BOOK_ID, TITLE, List.of(AUTHOR, CO_AUTHOR), YEAR, SERIES, 1.0, ISBN, UNIVERSE,
                 List.of(new SeriesBook(GOLDEN_SON, 2.0)), null));
         }
@@ -243,7 +238,7 @@ class MetadataCheckServiceTest {
             givenBooks(List.of(book(BOOK_ID)));
             when(books.findAuthorNames()).thenReturn(List.of(AUTHOR));
             final VerifiedMetadata found =
-                new VerifiedMetadata(null, List.of("BROWN, Pierce"), null, null, null, null, null, null);
+                new VerifiedMetadata(null, List.of("AUTHOR, Book"), null, null, null, null, null, null);
 
             checkWithAnswer(found);
 
@@ -376,8 +371,9 @@ class MetadataCheckServiceTest {
 
         @Test
         void shouldCutALongAnswerLine(final CapturedOutput output) {
-            final ObjectNode longAnswer = new JsonMapper().createObjectNode()
-                .put("title", "x".repeat(LOGGED_LINE_LIMIT) + END_MARKER);
+            final JsonMapper mapper = new JsonMapper();
+            final ObjectNode longAnswer = mapper.createObjectNode();
+            longAnswer.put("title", "x".repeat(LOGGED_LINE_LIMIT) + END_MARKER);
             givenBooks(List.of(book(BOOK_ID)));
             givenAnswers(Map.of(BOOK_ID, new CheckedBook(CORRECTED, Map.of(), longAnswer)));
 
@@ -459,9 +455,16 @@ class MetadataCheckServiceTest {
         when(client.check(any(), any())).thenReturn(MetadataCheckSamples.outcome(answers));
     }
 
+    private List<MetadataCheckRequest> checkedBatch() {
+        givenAnswers(Map.of());
+        final ArgumentCaptor<List<MetadataCheckRequest>> batch = ArgumentCaptor.captor();
+        service.checkDueBooks();
+        verify(client).check(batch.capture(), any());
+        return batch.getValue();
+    }
+
     private static Book book(final long bookId) {
-        final Book book = new Book();
-        book.setBookId(bookId);
+        final Book book = Books.withId(bookId);
         book.setDedupKey("book-" + bookId);
         book.setTitle(TITLE);
         return book;

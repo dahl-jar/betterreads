@@ -19,6 +19,7 @@ import com.betterreads.testsupport.Books;
 import com.betterreads.testsupport.ContainerizedTest;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -91,44 +92,133 @@ class BookDescriptionRepositoryIntegrationTest extends ContainerizedTest {
         authors.deleteAll();
     }
 
-    @Test
-    void shouldReturnThinKeyedBooksWithTheNeverCheckedFirst() {
-        final long checked = save(RED_RISING_KEY, RED_RISING_ISBN, THIN);
-        books.markDescriptionChecked(checked, OffsetDateTime.now(ZoneOffset.UTC));
-        final long neverChecked = save(GOLDEN_SON_KEY, GOLDEN_SON_ISBN, THIN);
-        save(MORNING_STAR_KEY, MORNING_STAR_ISBN, FULL);
-        save("empire-of-silence", null, THIN);
+    @Nested
+    class ThinDescriptions {
 
-        final List<Long> candidates = books.findIdsWithThinDescription(THIN_LENGTH, PageRequest.ofSize(PAGE_SIZE));
+        @Test
+        void shouldReturnThinKeyedBooksWithTheNeverCheckedFirst() {
+            final long checked = save(RED_RISING_KEY, RED_RISING_ISBN, THIN);
+            books.markDescriptionChecked(checked, OffsetDateTime.now(ZoneOffset.UTC));
+            final long neverChecked = save(GOLDEN_SON_KEY, GOLDEN_SON_ISBN, THIN);
+            save(MORNING_STAR_KEY, MORNING_STAR_ISBN, FULL);
+            save("empire-of-silence", null, THIN);
 
-        assertThat(candidates).containsExactly(neverChecked, checked);
+            final List<Long> candidates = thinBooks();
+
+            assertThat(candidates).containsExactly(neverChecked, checked);
+        }
+
+        @Test
+        void shouldReturnBookWithNoDescription() {
+            final long empty = save(RED_RISING_KEY, RED_RISING_ISBN, null);
+
+            final List<Long> candidates = thinBooks();
+
+            assertThat(candidates).containsExactly(empty);
+        }
+
+        @Test
+        void shouldReturnThinBookKeyedByWikidataOnly() {
+            final long keyed = save(RED_RISING_KEY, null, THIN);
+            jdbc.update("UPDATE book SET wikidata_qid = 'Q1' WHERE book_id = ?", keyed);
+
+            final List<Long> candidates = thinBooks();
+
+            assertThat(candidates).containsExactly(keyed);
+        }
+
+        @Test
+        void shouldPutOldestCheckFirst() {
+            final OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+            final long newer = save(RED_RISING_KEY, RED_RISING_ISBN, THIN);
+            final long older = save(GOLDEN_SON_KEY, GOLDEN_SON_ISBN, THIN);
+            books.markDescriptionChecked(newer, now);
+            books.markDescriptionChecked(older, now.minusDays(1));
+
+            final List<Long> candidates = thinBooks();
+
+            assertThat(candidates).containsExactly(older, newer);
+        }
+
+        @Test
+        void shouldPutOldestUpdateFirstWhenNeverChecked() {
+            final long newer = save(RED_RISING_KEY, RED_RISING_ISBN, THIN);
+            final long older = save(GOLDEN_SON_KEY, GOLDEN_SON_ISBN, THIN);
+            setUpdatedAt(newer, "2026-02-01T00:00:00Z");
+            setUpdatedAt(older, "2026-01-15T00:00:00Z");
+
+            final List<Long> candidates = thinBooks();
+
+            assertThat(candidates).containsExactly(older, newer);
+        }
+
+        @Test
+        void shouldSkipVerifiedDescription() {
+            saveVerified();
+
+            final List<Long> candidates = thinBooks();
+
+            assertThat(candidates).isEmpty();
+        }
+
+        @Test
+        void shouldPutLowerIdFirstWhenThinDescriptionsTie() {
+            final long first = save(RED_RISING_KEY, RED_RISING_ISBN, THIN);
+            final long second = save(GOLDEN_SON_KEY, GOLDEN_SON_ISBN, THIN);
+            final long third = save(MORNING_STAR_KEY, MORNING_STAR_ISBN, THIN);
+            setUpdatedAt(third, SAME_TIME);
+            setUpdatedAt(second, SAME_TIME);
+            setUpdatedAt(first, SAME_TIME);
+
+            final List<Long> candidates = books.findIdsWithThinDescription(THIN_LENGTH, PageRequest.ofSize(2));
+
+            assertThat(candidates).containsExactly(first, second);
+        }
+
+        private List<Long> thinBooks() {
+            return books.findIdsWithThinDescription(THIN_LENGTH, PageRequest.ofSize(PAGE_SIZE));
+        }
+    }
+
+    @Nested
+    class Sweep {
+
+        @Test
+        void shouldSweepPastVerifiedDescription() {
+            saveVerified();
+            final long open = save(GOLDEN_SON_KEY, GOLDEN_SON_ISBN, THIN);
+
+            final List<Long> swept = books.findIdsKeyed(PageRequest.ofSize(PAGE_SIZE));
+
+            assertThat(swept).containsExactly(open);
+        }
+
+        @Test
+        void shouldLeaveKeylessBookOutOfSweep() {
+            save(RED_RISING_KEY, null, THIN);
+            final long keyed = save(GOLDEN_SON_KEY, GOLDEN_SON_ISBN, THIN);
+
+            final List<Long> swept = books.findIdsKeyed(PageRequest.ofSize(PAGE_SIZE));
+
+            assertThat(swept).containsExactly(keyed);
+        }
+
+        @Test
+        void shouldPageKeyedBooksInIdOrder() {
+            final long first = save(RED_RISING_KEY, RED_RISING_ISBN, THIN);
+            final long second = save(GOLDEN_SON_KEY, GOLDEN_SON_ISBN, THIN);
+            final long third = save(MORNING_STAR_KEY, MORNING_STAR_ISBN, THIN);
+
+            final List<Long> firstPage = books.findIdsKeyed(PageRequest.of(0, 2));
+            final List<Long> secondPage = books.findIdsKeyed(PageRequest.of(1, 2));
+
+            assertThat(firstPage).containsExactly(first, second);
+            assertThat(secondPage).containsExactly(third);
+        }
     }
 
     @Test
-    void shouldSkipVerifiedDescription() {
-        saveVerified();
-
-        final List<Long> candidates = books.findIdsWithThinDescription(THIN_LENGTH, PageRequest.ofSize(PAGE_SIZE));
-
-        assertThat(candidates).isEmpty();
-    }
-
-    @Test
-    void shouldPutLowerIdFirstWhenThinDescriptionsTie() {
-        final long first = save(RED_RISING_KEY, RED_RISING_ISBN, THIN);
-        final long second = save(GOLDEN_SON_KEY, GOLDEN_SON_ISBN, THIN);
-        final long third = save(MORNING_STAR_KEY, MORNING_STAR_ISBN, THIN);
-        setUpdatedAt(third);
-        setUpdatedAt(second);
-        setUpdatedAt(first);
-
-        final List<Long> candidates = books.findIdsWithThinDescription(THIN_LENGTH, PageRequest.ofSize(2));
-
-        assertThat(candidates).containsExactly(first, second);
-    }
-
-    @Test
-    void shouldSendFirstAuthorToDescriptionSources() {
+    void shouldSendAuthorOfDetachedBook() {
         final Author author = authors.save(Books.author(AUTHOR));
         final Book book = Books.promoted(RED_RISING_KEY, RED_RISING_KEY, author);
         book.setIsbn(RED_RISING_ISBN);
@@ -144,49 +234,27 @@ class BookDescriptionRepositoryIntegrationTest extends ContainerizedTest {
     }
 
     @Test
-    void shouldSweepPastVerifiedDescription() {
-        saveVerified();
-        final long open = save(GOLDEN_SON_KEY, GOLDEN_SON_ISBN, THIN);
-
-        final List<Long> swept = books.findIdsKeyed(PageRequest.ofSize(PAGE_SIZE));
-
-        assertThat(swept).containsExactly(open);
-    }
-
-    @Test
-    void shouldWalkKeyedBooksAcrossPages() {
-        final long first = save(RED_RISING_KEY, RED_RISING_ISBN, THIN);
-        final long second = save(GOLDEN_SON_KEY, GOLDEN_SON_ISBN, THIN);
-        final long third = save(MORNING_STAR_KEY, MORNING_STAR_ISBN, THIN);
-
-        final List<Long> firstPage = books.findIdsKeyed(PageRequest.of(0, 2));
-        final List<Long> secondPage = books.findIdsKeyed(PageRequest.of(1, 2));
-
-        assertThat(firstPage).containsExactly(first, second);
-        assertThat(secondPage).containsExactly(third);
-    }
-
-    @Test
     void shouldNotOverwriteVerifiedDescription() {
         final long bookId = saveVerified();
 
         books.updateDescription(bookId, STRONG, OffsetDateTime.now(ZoneOffset.UTC));
 
-        assertThat(books.findById(bookId).orElseThrow().getDescription()).isEqualTo(THIN);
+        final Book unchanged = books.findById(bookId).orElseThrow();
+        assertThat(unchanged.getDescription()).isEqualTo(THIN);
     }
 
     private long saveVerified() {
         final Book book = book(RED_RISING_KEY, RED_RISING_ISBN, THIN);
         final VerifiedMetadata verified = new VerifiedMetadata(null, null, null, null, null, THIN, null, null);
         book.applyVerified(verified, OffsetDateTime.now(ZoneOffset.UTC));
-        return books.save(book).getBookId();
+        return save(book);
     }
 
     @Test
     void shouldKeepTheCommunityRatingWhenWritingADescription() {
         final Book book = book(RED_RISING_KEY, RED_RISING_ISBN, THIN);
         book.applyCommunityAggregate(new BigDecimal(COMMUNITY_AVERAGE), COMMUNITY_COUNT);
-        final long bookId = books.save(book).getBookId();
+        final long bookId = save(book);
 
         books.updateDescription(bookId, STRONG, OffsetDateTime.now(ZoneOffset.UTC));
 
@@ -196,18 +264,22 @@ class BookDescriptionRepositoryIntegrationTest extends ContainerizedTest {
         assertThat(updated.getCommunityCount()).isEqualTo(COMMUNITY_COUNT);
     }
 
-    private void setUpdatedAt(final long bookId) {
-        jdbc.update("UPDATE book SET updated_at = ?::timestamptz WHERE book_id = ?", SAME_TIME, bookId);
+    private void setUpdatedAt(final long bookId, final String instant) {
+        jdbc.update("UPDATE book SET updated_at = ?::timestamptz WHERE book_id = ?", instant, bookId);
     }
 
-    private long save(final String dedupKey, final @Nullable String isbn, final String description) {
-        return books.save(book(dedupKey, isbn, description)).getBookId();
+    private long save(final String dedupKey, final @Nullable String isbn, final @Nullable String description) {
+        return save(book(dedupKey, isbn, description));
     }
 
-    private static Book book(final String dedupKey, final @Nullable String isbn, final String description) {
-        final Book book = new Book();
-        book.setDedupKey(dedupKey);
-        book.setTitle(dedupKey);
+    private long save(final Book book) {
+        final Book saved = books.save(book);
+        return saved.getBookId();
+    }
+
+    private static Book book(
+        final String dedupKey, final @Nullable String isbn, final @Nullable String description) {
+        final Book book = Books.book(dedupKey, dedupKey);
         book.setIsbn(isbn);
         book.setDescription(description);
         return book;

@@ -48,6 +48,12 @@ public final class Books {
         return book;
     }
 
+    public static Book withId(final long bookId) {
+        final Book book = new Book();
+        book.setBookId(bookId);
+        return book;
+    }
+
     public static Book dune(final String key) {
         final Book dune = book(key, DUNE_TITLE);
         dune.setIsbn(DUNE_ISBN);

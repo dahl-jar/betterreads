@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
 
+import com.betterreads.testsupport.Books;
 import org.junit.jupiter.api.Test;
 
 class BookOrderTest {
@@ -18,9 +19,9 @@ class BookOrderTest {
 
     @Test
     void shouldFollowIdOrder() {
-        final Book first = book(FIRST_ID);
-        final Book second = book(SECOND_ID);
-        final Book third = book(THIRD_ID);
+        final Book first = Books.withId(FIRST_ID);
+        final Book second = Books.withId(SECOND_ID);
+        final Book third = Books.withId(THIRD_ID);
 
         final List<Book> ordered = BookOrder.byIds(IDS, List.of(first, second, third));
 
@@ -29,17 +30,11 @@ class BookOrderTest {
 
     @Test
     void shouldDropIdWithoutBook() {
-        final Book first = book(FIRST_ID);
-        final Book second = book(SECOND_ID);
+        final Book first = Books.withId(FIRST_ID);
+        final Book second = Books.withId(SECOND_ID);
 
         final List<Book> ordered = BookOrder.byIds(IDS, List.of(first, second));
 
         assertThat(ordered).containsExactly(first, second);
-    }
-
-    private static Book book(final long bookId) {
-        final Book book = new Book();
-        book.setBookId(bookId);
-        return book;
     }
 }

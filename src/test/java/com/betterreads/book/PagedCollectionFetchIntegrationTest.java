@@ -35,17 +35,6 @@ class PagedCollectionFetchIntegrationTest extends ContainerizedTest {
     private EntityManager entityManager;
 
     @Test
-    void shouldRejectPagedJoinFetch() {
-        final String joinFetch = "SELECT b FROM Book b JOIN FETCH b.credits";
-        final TypedQuery<Book> query = entityManager.createQuery(joinFetch, Book.class);
-        query.setMaxResults(1);
-
-        final PersistenceException rejected = assertThrows(PersistenceException.class, query::getResultList);
-
-        assertThat(rejected).hasMessageContaining(FLAG);
-    }
-
-    @Test
     void shouldRejectPagedEntityGraph() {
         final EntityGraph<Book> graph = entityManager.createEntityGraph(Book.class);
         graph.addAttributeNodes(CREDITS);

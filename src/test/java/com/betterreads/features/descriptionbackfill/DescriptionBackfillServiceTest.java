@@ -80,9 +80,8 @@ class DescriptionBackfillServiceTest {
     @DisplayName("writes a stronger description and evicts the cached detail")
     void writesImprovedDescription() {
         final Book book = bookWithId(BOOK_ID);
-        givenThinSlice(List.of(book));
-        when(selector.bestDescription(any(DescriptionLookup.class), any())).thenReturn(Optional.of(STRONG));
-        when(cacheManager.getCache(BookDetailCache.NAME)).thenReturn(bookDetails);
+        stubThinSlice(List.of(book));
+        stubImprovement();
 
         service.backfillSlice();
 
@@ -106,7 +105,7 @@ class DescriptionBackfillServiceTest {
     void oneFailureDoesNotStopTheRest() {
         final Book failing = bookWithId(BOOK_ID);
         final Book ok = bookWithId(OTHER_BOOK_ID);
-        givenThinSlice(List.of(failing, ok));
+        stubThinSlice(List.of(failing, ok));
         when(selector.bestDescription(any(DescriptionLookup.class), any()))
             .thenThrow(new DataAccessResourceFailureException("boom"))
             .thenReturn(Optional.of(STRONG));
@@ -145,10 +144,9 @@ class DescriptionBackfillServiceTest {
     void fullSweepWalksAllPages() {
         final Book first = bookWithId(1L);
         final Book second = bookWithId(2L);
-        givenKeyedPage(0, List.of(1L), List.of(first));
-        givenKeyedPage(1, List.of(2L), List.of(second));
-        when(selector.bestDescription(any(DescriptionLookup.class), any())).thenReturn(Optional.of(STRONG));
-        when(cacheManager.getCache(BookDetailCache.NAME)).thenReturn(bookDetails);
+        stubKeyedPage(0, List.of(1L), List.of(first));
+        stubKeyedPage(1, List.of(2L), List.of(second));
+        stubImprovement();
 
         service.fullSweep();
 
@@ -172,35 +170,38 @@ class DescriptionBackfillServiceTest {
 
     @Test
     void shouldKeepSweepingPastPageOfDeletedBooks() {
-        givenKeyedPage(0, List.of(1L), List.of());
-        givenKeyedPage(1, List.of(2L), List.of(bookWithId(2L)));
-        when(selector.bestDescription(any(DescriptionLookup.class), any())).thenReturn(Optional.of(STRONG));
-        when(cacheManager.getCache(BookDetailCache.NAME)).thenReturn(bookDetails);
+        stubKeyedPage(0, List.of(1L), List.of());
+        stubKeyedPage(1, List.of(2L), List.of(bookWithId(2L)));
+        stubImprovement();
 
         service.fullSweep();
 
         verify(books).updateDescription(eq(2L), eq(STRONG), any(OffsetDateTime.class));
     }
 
-    private void givenThinSlice(final List<Book> slice) {
+    private void stubThinSlice(final List<Book> slice) {
         final List<Long> ids = Books.idsOf(slice);
         when(books.findIdsWithThinDescription(anyInt(), any(Pageable.class))).thenReturn(ids);
         when(catalog.findByBookIdIn(ids)).thenReturn(slice);
     }
 
-    private void givenKeyedPage(final int page, final List<Long> ids, final List<Book> rows) {
+    private void stubKeyedPage(final int page, final List<Long> ids, final List<Book> rows) {
         when(books.findIdsKeyed(PageRequest.of(page, SLICE_SIZE))).thenReturn(ids);
         when(catalog.findByBookIdIn(ids)).thenReturn(rows);
     }
 
+    private void stubImprovement() {
+        when(selector.bestDescription(any(DescriptionLookup.class), any())).thenReturn(Optional.of(STRONG));
+        when(cacheManager.getCache(BookDetailCache.NAME)).thenReturn(bookDetails);
+    }
+
     private void stubThinSliceWithoutImprovement(final Book book) {
-        givenThinSlice(List.of(book));
+        stubThinSlice(List.of(book));
         when(selector.bestDescription(any(DescriptionLookup.class), any())).thenReturn(Optional.empty());
     }
 
     private static Book bookWithId(final long bookId) {
-        final Book book = new Book();
-        book.setBookId(bookId);
+        final Book book = Books.withId(bookId);
         book.setDedupKey(DEDUP_KEY);
         book.setTitle(TITLE);
         book.setDescription(WEAK);
