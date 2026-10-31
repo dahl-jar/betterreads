@@ -51,7 +51,7 @@ public class SseStreams {
         if (streams == null) {
             return;
         }
-        streams.forEach(emitter -> emit(emitter, SseEmitter.event().name(eventName).data(data)));
+        streams.forEach(emitter -> emitOrRemove(key, emitter, SseEmitter.event().name(eventName).data(data)));
     }
 
     public void sendAndComplete(final SseEmitter emitter, final String eventName, final Object data) {
@@ -64,26 +64,32 @@ public class SseStreams {
         }
     }
 
+    private void emitOrRemove(final String key, final SseEmitter emitter, final SseEmitter.SseEventBuilder event) {
+        if (!emit(emitter, event)) {
+            remove(key, emitter);
+        }
+    }
+
     private boolean emit(final SseEmitter emitter, final SseEmitter.SseEventBuilder event) {
         try {
             emitter.send(event);
             return true;
         } catch (IOException | IllegalStateException ex) {
-            if (!isStreamGone(ex)) {
+            if (!isClosedStream(ex)) {
                 emitter.completeWithError(ex);
             }
             return false;
         }
     }
 
-    private static boolean isStreamGone(final Exception failure) {
+    private static boolean isClosedStream(final Exception failure) {
         return DisconnectedClientHelper.isClientDisconnectedException(failure)
             || failure instanceof IllegalStateException && failure.getCause() == null;
     }
 
     public void heartbeat() {
-        byKey.values().forEach(streams ->
-            streams.forEach(emitter -> emit(emitter, SseEmitter.event().comment("keepalive"))));
+        byKey.forEach((key, streams) ->
+            streams.forEach(emitter -> emitOrRemove(key, emitter, SseEmitter.event().comment("keepalive"))));
     }
 
     public Set<String> openKeys() {

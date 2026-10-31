@@ -17,7 +17,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter.SseEventBuilder;
 
@@ -33,13 +32,20 @@ class SseStreamsTest {
 
     private static final String DATA = "Dune";
 
-    private static final String KEEPALIVE = "keepalive";
+    private static final String OTHER_DATA = "Hyperion";
 
-    private static final String BROKEN_PIPE = "Broken pipe";
+    private static final String KEEPALIVE = "keepalive";
 
     private static final String FAILED_TO_SEND = "Failed to send";
 
     private final RecordingSseStreams streams = new RecordingSseStreams();
+
+    @Test
+    void shouldReturnRegisteredStream() {
+        final SseEmitter registered = streams.register(KEY);
+
+        assertThat(registered).isSameAs(streams.lastEmitter());
+    }
 
     @ParameterizedTest
     @MethodSource("disconnects")
@@ -153,9 +159,7 @@ class SseStreamsTest {
 
         @Test
         void shouldStopSendingToClosedStream() {
-            streams.register(KEY);
             final RecordingEmitter closed = registerClosed();
-            streams.register(KEY);
             streams.send(KEY, EVENT, DATA);
             final int attempts = closed.sendAttempts();
 
@@ -164,9 +168,41 @@ class SseStreamsTest {
             assertThat(closed.sendAttempts()).isEqualTo(attempts);
         }
 
+        @Test
+        void shouldKeepSendingToOpenStreamAfterOneCloses() {
+            streams.register(KEY);
+            final RecordingEmitter open = streams.lastEmitter();
+            registerClosed();
+            streams.send(KEY, EVENT, DATA);
+
+            streams.send(KEY, EVENT, OTHER_DATA);
+
+            assertThat(open.sent()).last().asString().contains(OTHER_DATA);
+        }
+
         @ParameterizedTest
-        @MethodSource("goneStreams")
-        void shouldNotCloseWithErrorWhenStreamIsGone(final Exception failure) {
+        @MethodSource("failedSends")
+        void shouldFreeStreamWhenSendFailsWithoutCallback(final Consumer<SseStreams> failedSend) {
+            IntStream.range(1, STREAM_CAP).forEach(ignored -> streams.register(OTHER_KEY));
+            streams.register(KEY);
+            final RecordingEmitter failing = streams.lastEmitter();
+            failing.failSends();
+
+            failedSend.accept(streams);
+
+            assertThat(streams.openKeys()).containsExactly(OTHER_KEY);
+            assertThat(streams.atCapacity()).isFalse();
+        }
+
+        static Stream<Named<Consumer<SseStreams>>> failedSends() {
+            return Stream.of(
+                Named.of("event", target -> target.send(KEY, EVENT, DATA)),
+                Named.of("heartbeat", SseStreams::heartbeat));
+        }
+
+        @ParameterizedTest
+        @MethodSource("closedFailures")
+        void shouldNotCloseWithErrorWhenStreamIsClosed(final Exception failure) {
             streams.register(KEY);
             final RecordingEmitter emitter = streams.lastEmitter();
             emitter.failSendsWith(failure);
@@ -176,11 +212,11 @@ class SseStreamsTest {
             assertThat(emitter.closedWith()).isNull();
         }
 
-        static Stream<Named<Exception>> goneStreams() {
+        static Stream<Named<Exception>> closedFailures() {
             return Stream.of(
-                Named.of("closed client", new AsyncRequestNotUsableException(BROKEN_PIPE)),
+                Named.of("closed client", RecordingSseStreams.CLOSED_CLIENT),
                 Named.of("large event to closed client",
-                    new IllegalStateException(FAILED_TO_SEND, new AsyncRequestNotUsableException(BROKEN_PIPE))),
+                    new IllegalStateException(FAILED_TO_SEND, RecordingSseStreams.CLOSED_CLIENT)),
                 Named.of("already completed", new IllegalStateException("ResponseBodyEmitter has already completed")));
         }
 

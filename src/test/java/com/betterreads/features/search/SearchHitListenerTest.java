@@ -9,6 +9,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -50,7 +52,7 @@ class SearchHitListenerTest {
     @Test
     void shouldPushHitToOtherQueriesWhenHitLookupFails() {
         final BookSearchDocument hit = BookSearchDocuments.eyeOfTheWorld();
-        when(emitters.openQueries()).thenReturn(Set.of(MATCHING_QUERY, OTHER_QUERY));
+        when(emitters.openQueries()).thenReturn(orderedQueries());
         when(searchService.hitFor(MATCHING_QUERY, BOOK_ID)).thenReturn(Optional.of(hit));
         when(searchService.hitFor(OTHER_QUERY, BOOK_ID)).thenThrow(badDocument());
 
@@ -62,7 +64,7 @@ class SearchHitListenerTest {
     @Test
     void shouldPushHitToOtherQueriesWhenPublishFails() {
         final BookSearchDocument hit = BookSearchDocuments.eyeOfTheWorld();
-        when(emitters.openQueries()).thenReturn(Set.of(MATCHING_QUERY, OTHER_QUERY));
+        when(emitters.openQueries()).thenReturn(orderedQueries());
         when(searchService.hitFor(MATCHING_QUERY, BOOK_ID)).thenReturn(Optional.of(hit));
         when(searchService.hitFor(OTHER_QUERY, BOOK_ID)).thenReturn(Optional.of(hit));
         doThrow(new IllegalStateException("async request already completed"))
@@ -80,16 +82,20 @@ class SearchHitListenerTest {
 
         listener.onBookIndexed(new BookIndexedEvent(BOOK_ID));
 
-        assertThat(output).contains("search.hit-push failed");
+        assertThat(output).containsPattern("WARN.*search\\.hit-push failed");
     }
 
     @Test
-    void shouldPropagateUnlistedFailure() {
+    void shouldThrowWhenFailureIsUnexpected() {
         final BookIndexedEvent event = new BookIndexedEvent(BOOK_ID);
         when(emitters.openQueries()).thenReturn(Set.of(OTHER_QUERY));
         when(searchService.hitFor(OTHER_QUERY, BOOK_ID)).thenThrow(new UnsupportedOperationException("a bug"));
 
         assertThrows(UnsupportedOperationException.class, () -> listener.onBookIndexed(event));
+    }
+
+    private static Set<String> orderedQueries() {
+        return new LinkedHashSet<>(List.of(OTHER_QUERY, MATCHING_QUERY));
     }
 
     private static DatabindException badDocument() {

@@ -12,9 +12,7 @@ import org.springframework.http.MediaType;
 
 final class ClosedStreamStatusValve extends ValveBase implements AccessLog {
 
-    static final int CLIENT_CLOSED_STATUS = 499;
-
-    private boolean requestAttributesEnabled;
+    private static final int CLIENT_CLOSED_STATUS = 499;
 
     ClosedStreamStatusValve() {
         super(true);
@@ -35,12 +33,11 @@ final class ClosedStreamStatusValve extends ValveBase implements AccessLog {
 
     @Override
     public void setRequestAttributesEnabled(final boolean enabled) {
-        requestAttributesEnabled = enabled;
     }
 
     @Override
     public boolean getRequestAttributesEnabled() {
-        return requestAttributesEnabled;
+        return false;
     }
 
     private static boolean isClosedStream(final Request request, final org.apache.coyote.Response coyote) {

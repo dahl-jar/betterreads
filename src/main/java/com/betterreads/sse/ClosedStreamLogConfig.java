@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Configuration;
 class ClosedStreamLogConfig {
 
     @Bean
-    WebServerFactoryCustomizer<TomcatServletWebServerFactory> closedStreamStatus() {
+    WebServerFactoryCustomizer<TomcatServletWebServerFactory> closedStreamCustomizer() {
         return factory -> factory.addContextValves(new ClosedStreamStatusValve());
     }
 }

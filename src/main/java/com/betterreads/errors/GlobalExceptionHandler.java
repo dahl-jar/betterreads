@@ -145,7 +145,7 @@ class GlobalExceptionHandler {
     @ExceptionHandler(AsyncRequestNotUsableException.class)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void handleClientClosed(final AsyncRequestNotUsableException exception) {
-        LOG.debug("client closed the stream, closing quietly");
+        LOG.debug("client closed the stream: {}", LogSanitizer.forLog(messageOf(exception, "")));
     }
 
     @ExceptionHandler(Exception.class)

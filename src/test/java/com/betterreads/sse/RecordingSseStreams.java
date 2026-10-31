@@ -15,6 +15,9 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 public class RecordingSseStreams extends SseStreams {
 
+    public static final AsyncRequestNotUsableException CLOSED_CLIENT =
+        new AsyncRequestNotUsableException("Broken pipe");
+
     private @Nullable RecordingEmitter last;
 
     @Override
@@ -100,7 +103,7 @@ public class RecordingSseStreams extends SseStreams {
 
         public void closeClient() {
             clientClosed.set(true);
-            sendFailure.set(new AsyncRequestNotUsableException("Broken pipe"));
+            sendFailure.set(CLOSED_CLIENT);
         }
 
         public int sendAttempts() {

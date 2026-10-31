@@ -67,7 +67,8 @@ class GlobalExceptionHandlerTest {
 
     private static final String UNEXPECTED_ERROR_LOG = "Unexpected error";
 
-    private static final String BROKEN_PIPE = "Broken pipe";
+    private static final AsyncRequestNotUsableException CLOSED_CLIENT =
+            new AsyncRequestNotUsableException("Broken pipe");
 
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
 
@@ -197,6 +198,14 @@ class GlobalExceptionHandlerTest {
 
             assertThat(problem.getStatus()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE.value());
         }
+
+        @Test
+        void shouldReturn415WhenContentTypeIsInvalid() {
+            final ProblemDetail problem = handler.handleMediaTypeNotSupported(
+                    new HttpMediaTypeNotSupportedException("Invalid mime type"));
+
+            assertThat(problem.getStatus()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE.value());
+        }
     }
 
     @Nested
@@ -205,7 +214,7 @@ class GlobalExceptionHandlerTest {
 
         @Test
         void shouldNotLogErrorWhenClientClosedStream(final CapturedOutput output) throws Exception {
-            final MockMvc mockMvc = streamFailingWith(new AsyncRequestNotUsableException(BROKEN_PIPE));
+            final MockMvc mockMvc = failingMvc(CLOSED_CLIENT);
 
             mockMvc.perform(MockMvcRequestBuilders.get(STREAM_PATH));
 
@@ -214,7 +223,7 @@ class GlobalExceptionHandlerTest {
 
         @Test
         void shouldReturnNoContentWhenClientClosedStream() throws Exception {
-            final MockMvc mockMvc = streamFailingWith(new AsyncRequestNotUsableException(BROKEN_PIPE));
+            final MockMvc mockMvc = failingMvc(CLOSED_CLIENT);
 
             final ResultActions result = mockMvc.perform(MockMvcRequestBuilders.get(STREAM_PATH));
 
@@ -222,8 +231,8 @@ class GlobalExceptionHandlerTest {
         }
 
         @Test
-        void shouldLogErrorWhenStreamFailureIsNotClosedClient(final CapturedOutput output) throws Exception {
-            final MockMvc mockMvc = streamFailingWith(new IOException("disk full"));
+        void shouldLogErrorWhenStreamFailsWithClientConnected(final CapturedOutput output) throws Exception {
+            final MockMvc mockMvc = failingMvc(new IOException("disk full"));
 
             final ResultActions result = mockMvc.perform(MockMvcRequestBuilders.get(STREAM_PATH));
 
@@ -231,7 +240,7 @@ class GlobalExceptionHandlerTest {
             assertThat(output).contains(UNEXPECTED_ERROR_LOG);
         }
 
-        private MockMvc streamFailingWith(final IOException failure) {
+        private MockMvc failingMvc(final IOException failure) {
             final StandaloneMockMvcBuilder builder = MockMvcBuilders.standaloneSetup(new FailingStream(failure));
             builder.setControllerAdvice(new GlobalExceptionHandler());
             return builder.build();
