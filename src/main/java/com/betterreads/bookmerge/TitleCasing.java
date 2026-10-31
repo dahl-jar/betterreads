@@ -9,6 +9,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import org.jspecify.annotations.Nullable;
 
@@ -44,7 +45,7 @@ final class TitleCasing {
     }
 
     static boolean isAllCaps(final String title) {
-        return wordCount(title) >= MIN_WORDS
+        return words(title).filter(word -> !word.isEmpty()).count() >= MIN_WORDS
             && title.codePoints().anyMatch(Character::isUpperCase)
             && title.codePoints().noneMatch(Character::isLowerCase);
     }
@@ -53,17 +54,13 @@ final class TitleCasing {
         if (!ENGLISH.equals(language) || !isAllCaps(title)) {
             return title;
         }
-        return titleCase(Arrays.stream(title.split(SPACE))
-            .map(TitleCasing::lowerWord)
+        return titleCase(words(title)
+            .map(word -> keepsCapitals(word) ? word : word.toLowerCase(Locale.ROOT))
             .collect(Collectors.joining(SPACE)));
     }
 
-    private static long wordCount(final String title) {
-        return Arrays.stream(title.split(SPACE)).filter(word -> !word.isEmpty()).count();
-    }
-
-    private static String lowerWord(final String word) {
-        return keepsCapitals(word) ? word : word.toLowerCase(Locale.ROOT);
+    private static Stream<String> words(final String title) {
+        return Arrays.stream(title.split(SPACE));
     }
 
     private static boolean keepsCapitals(final String word) {
@@ -87,7 +84,7 @@ final class TitleCasing {
     }
 
     private static long capitalizedWordCount(final String title) {
-        return Arrays.stream(title.split(SPACE))
+        return words(title)
             .filter(word -> !word.isEmpty() && Character.isUpperCase(word.codePointAt(0)))
             .count();
     }

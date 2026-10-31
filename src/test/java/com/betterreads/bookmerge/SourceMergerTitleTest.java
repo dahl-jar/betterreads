@@ -19,11 +19,11 @@ class SourceMergerTitleTest {
 
     private static final String CLEAN_KING = "Return of the King";
 
-    private static final String TOLKIEN = "J.R.R. Tolkien";
+    private static final String EDITION_TAG = " (Deluxe Edition)";
+
+    private static final String AUTHOR_NAME = "Author Name";
 
     private static final String HOBBIT = "The Hobbit";
-
-    private static final String OTHER_AUTHOR = "Other Author";
 
     private static final String LANGUAGE_ENGLISH = "en";
 
@@ -33,15 +33,32 @@ class SourceMergerTitleTest {
         return SourceBook.builder(source).title(title);
     }
 
+    private static SourceBook.Builder google(final String title) {
+        return titled(BookFieldSource.GOOGLE_BOOKS, title);
+    }
+
+    private MergedBook merge(final SourceBook.Builder top) {
+        return merger.merge(null, List.of(top.build()));
+    }
+
+    private MergedBook merge(final SourceBook.Builder top, final String openLibraryTitle) {
+        return merger.merge(null, List.of(top.build(), titled(BookFieldSource.OPEN_LIBRARY, openLibraryTitle).build()));
+    }
+
     @Nested
     class TitleChoice {
 
         @Test
         void shouldPreferCleanTitleOverAllCapsTopSource() {
-            final SourceBook google = titled(BookFieldSource.GOOGLE_BOOKS, ALL_CAPS_KING).build();
-            final SourceBook openLibrary = titled(BookFieldSource.OPEN_LIBRARY, CLEAN_KING).build();
+            final MergedBook merged = merge(google(ALL_CAPS_KING), CLEAN_KING);
 
-            final MergedBook merged = merger.merge(null, List.of(google, openLibrary));
+            assertThat(merged.book().title()).isEqualTo(CLEAN_KING);
+            assertThat(merged.provenanceOf(BookField.TITLE)).isEqualTo(BookFieldSource.OPEN_LIBRARY);
+        }
+
+        @Test
+        void shouldPreferCleanTitleOverTooLongTopSource() {
+            final MergedBook merged = merge(google("x".repeat(501)), CLEAN_KING);
 
             assertThat(merged.book().title()).isEqualTo(CLEAN_KING);
             assertThat(merged.provenanceOf(BookField.TITLE)).isEqualTo(BookFieldSource.OPEN_LIBRARY);
@@ -49,12 +66,7 @@ class SourceMergerTitleTest {
 
         @Test
         void shouldFixCaseWhenEverySourceIsAllCaps() {
-            final SourceBook google = titled(BookFieldSource.GOOGLE_BOOKS, ALL_CAPS_KING)
-                .language(LANGUAGE_ENGLISH)
-                .build();
-            final SourceBook openLibrary = titled(BookFieldSource.OPEN_LIBRARY, ALL_CAPS_KING).build();
-
-            final MergedBook merged = merger.merge(null, List.of(google, openLibrary));
+            final MergedBook merged = merge(google(ALL_CAPS_KING).language(LANGUAGE_ENGLISH), ALL_CAPS_KING);
 
             assertThat(merged.book().title()).isEqualTo(CLEAN_KING);
             assertThat(merged.provenanceOf(BookField.TITLE)).isEqualTo(BookFieldSource.GOOGLE_BOOKS);
@@ -63,55 +75,32 @@ class SourceMergerTitleTest {
         @Test
         void shouldKeepSingleWordTitleOverOtherCasing() {
             final String singleWord = "JLA";
-            final SourceBook google = titled(BookFieldSource.GOOGLE_BOOKS, singleWord).build();
-            final SourceBook openLibrary = titled(BookFieldSource.OPEN_LIBRARY, "Jla").build();
 
-            final MergedBook merged = merger.merge(null, List.of(google, openLibrary));
+            final MergedBook merged = merge(google(singleWord), "Jla");
 
             assertThat(merged.book().title()).isEqualTo(singleWord);
             assertThat(merged.provenanceOf(BookField.TITLE)).isEqualTo(BookFieldSource.GOOGLE_BOOKS);
         }
 
         @Test
-        void shouldKeepTitleWithoutLettersFromTopSource() {
-            final String dates = "1984 2001";
-            final SourceBook google = titled(BookFieldSource.GOOGLE_BOOKS, dates).build();
-            final SourceBook openLibrary = titled(BookFieldSource.OPEN_LIBRARY, "Two Dates").build();
-
-            final MergedBook merged = merger.merge(null, List.of(google, openLibrary));
-
-            assertThat(merged.book().title()).isEqualTo(dates);
-            assertThat(merged.provenanceOf(BookField.TITLE)).isEqualTo(BookFieldSource.GOOGLE_BOOKS);
-        }
-
-        @Test
-        void shouldPreferCleanCyrillicTitle() {
-            final String cleanTitle = "Война и мир";
-            final SourceBook google = titled(BookFieldSource.GOOGLE_BOOKS, "ВОЙНА И МИР").language("ru").build();
-            final SourceBook openLibrary = titled(BookFieldSource.OPEN_LIBRARY, cleanTitle).build();
-
-            final MergedBook merged = merger.merge(null, List.of(google, openLibrary));
-
-            assertThat(merged.book().title()).isEqualTo(cleanTitle);
-        }
-
-        @Test
         void shouldKeepAllCapsTitleOfFrenchBook() {
             final String frenchTitle = "LES MISÉRABLES";
-            final SourceBook google = titled(BookFieldSource.GOOGLE_BOOKS, frenchTitle).language("fr").build();
 
-            final MergedBook merged = merger.merge(null, List.of(google));
+            final MergedBook merged = merge(google(frenchTitle).language("fr"));
 
             assertThat(merged.book().title()).isEqualTo(frenchTitle);
         }
 
         @Test
         void shouldFixCaseAfterEditionTagIsRemoved() {
-            final SourceBook google = titled(BookFieldSource.GOOGLE_BOOKS, "RETURN OF THE KING (Deluxe Edition)")
-                .language(LANGUAGE_ENGLISH)
-                .build();
+            final MergedBook merged = merge(google(ALL_CAPS_KING + EDITION_TAG).language(LANGUAGE_ENGLISH));
 
-            final MergedBook merged = merger.merge(null, List.of(google));
+            assertThat(merged.book().title()).isEqualTo(CLEAN_KING);
+        }
+
+        @Test
+        void shouldSkipAllCapsTitleBehindEditionTag() {
+            final MergedBook merged = merge(google(ALL_CAPS_KING + EDITION_TAG), CLEAN_KING);
 
             assertThat(merged.book().title()).isEqualTo(CLEAN_KING);
         }
@@ -120,18 +109,13 @@ class SourceMergerTitleTest {
     @Nested
     class Byline {
 
-        private static final String TOLKIEN_BYLINE = "The Hobbit by J.R.R. Tolkien";
+        private static final String AUTHOR_BYLINE = "The Hobbit by Author Name";
 
-        private static final List<SourceAuthor> TOLKIEN_CREDIT = List.of(SourceAuthor.ofName(TOLKIEN));
+        private static final List<SourceAuthor> AUTHOR_CREDIT = List.of(SourceAuthor.ofName(AUTHOR_NAME));
 
         @Test
         void shouldPreferCleanTitleOverOwnAuthorByline() {
-            final SourceBook google = titled(BookFieldSource.GOOGLE_BOOKS, TOLKIEN_BYLINE)
-                .authors(TOLKIEN_CREDIT)
-                .build();
-            final SourceBook openLibrary = titled(BookFieldSource.OPEN_LIBRARY, HOBBIT).build();
-
-            final MergedBook merged = merger.merge(null, List.of(google, openLibrary));
+            final MergedBook merged = merge(google(AUTHOR_BYLINE).authors(AUTHOR_CREDIT), HOBBIT);
 
             assertThat(merged.book().title()).isEqualTo(HOBBIT);
             assertThat(merged.provenanceOf(BookField.TITLE)).isEqualTo(BookFieldSource.OPEN_LIBRARY);
@@ -139,63 +123,34 @@ class SourceMergerTitleTest {
 
         @Test
         void shouldMatchBylineAgainstCreditsOfAnySource() {
-            final SourceBook google = titled(BookFieldSource.GOOGLE_BOOKS, TOLKIEN_BYLINE).build();
-            final SourceBook hardcover = titled(BookFieldSource.HARDCOVER, HOBBIT)
-                .authors(TOLKIEN_CREDIT)
-                .build();
+            final SourceBook hardcover = titled(BookFieldSource.HARDCOVER, HOBBIT).authors(AUTHOR_CREDIT).build();
 
-            final MergedBook merged = merger.merge(null, List.of(google, hardcover));
+            final MergedBook merged = merger.merge(null, List.of(google(AUTHOR_BYLINE).build(), hardcover));
 
             assertThat(merged.book().title()).isEqualTo(HOBBIT);
         }
 
         @Test
-        void shouldKeepBylineOfSomeoneElse() {
-            final String otherByline = "Murder by Agatha Christie";
-            final SourceBook google = titled(BookFieldSource.GOOGLE_BOOKS, otherByline)
-                .authors(SourceAuthor.ofNames(List.of(OTHER_AUTHOR)))
-                .build();
-            final SourceBook openLibrary = titled(BookFieldSource.OPEN_LIBRARY, "Murder").build();
-
-            final MergedBook merged = merger.merge(null, List.of(google, openLibrary));
-
-            assertThat(merged.book().title()).isEqualTo(otherByline);
-        }
-
-        @Test
         void shouldIgnoreIllustratorForByline() {
-            final SourceBook google = titled(BookFieldSource.GOOGLE_BOOKS, TOLKIEN_BYLINE)
-                .authors(List.of(SourceAuthor.withRole(TOLKIEN, CreditRole.ILLUSTRATOR)))
-                .build();
-            final SourceBook openLibrary = titled(BookFieldSource.OPEN_LIBRARY, HOBBIT).build();
+            final List<SourceAuthor> illustrator = List.of(SourceAuthor.withRole(AUTHOR_NAME, CreditRole.ILLUSTRATOR));
 
-            final MergedBook merged = merger.merge(null, List.of(google, openLibrary));
+            final MergedBook merged = merge(google(AUTHOR_BYLINE).authors(illustrator), HOBBIT);
 
-            assertThat(merged.book().title()).isEqualTo(TOLKIEN_BYLINE);
+            assertThat(merged.book().title()).isEqualTo(AUTHOR_BYLINE);
         }
 
         @Test
         void shouldKeepOwnAuthorBylineWhenNoOtherTitle() {
-            final SourceBook google = titled(BookFieldSource.GOOGLE_BOOKS, TOLKIEN_BYLINE)
-                .authors(TOLKIEN_CREDIT)
-                .build();
+            final MergedBook merged = merge(google(AUTHOR_BYLINE).authors(AUTHOR_CREDIT));
 
-            final MergedBook merged = merger.merge(null, List.of(google));
-
-            assertThat(merged.book().title()).isEqualTo(TOLKIEN_BYLINE);
+            assertThat(merged.book().title()).isEqualTo(AUTHOR_BYLINE);
         }
 
         @Test
-        void shouldSkipEditionTitleWithBothIssues() {
-            final SourceBook google =
-                titled(BookFieldSource.GOOGLE_BOOKS, "RETURN OF THE KING BY J.R.R. TOLKIEN (Deluxe Edition)")
-                    .authors(TOLKIEN_CREDIT)
-                    .build();
-            final SourceBook openLibrary = titled(BookFieldSource.OPEN_LIBRARY, CLEAN_KING).build();
+        void shouldSkipBylineBehindEditionTag() {
+            final MergedBook merged = merge(google(AUTHOR_BYLINE + EDITION_TAG).authors(AUTHOR_CREDIT), HOBBIT);
 
-            final MergedBook merged = merger.merge(null, List.of(google, openLibrary));
-
-            assertThat(merged.book().title()).isEqualTo(CLEAN_KING);
+            assertThat(merged.book().title()).isEqualTo(HOBBIT);
         }
     }
 }

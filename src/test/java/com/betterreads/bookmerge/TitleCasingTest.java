@@ -30,7 +30,7 @@ class TitleCasingTest {
 
     @Test
     void shouldKeepTheTitleWhenNoSourceCapitalizesMoreWords() {
-        final String title = TitleCasing.capitalize(NORTHWEST_ANGLE, List.of("NORTHWEST ANGLE"), FRENCH);
+        final String title = TitleCasing.capitalize(NORTHWEST_ANGLE, List.of("Northwest ANGLE"), FRENCH);
 
         assertThat(title).isEqualTo(NORTHWEST_ANGLE);
     }
@@ -91,8 +91,8 @@ class TitleCasingTest {
 
         @ParameterizedTest
         @ValueSource(strings = {
-            "IT", "JLA", " JLA", "NOS4A2", "1984", "V", "S.", "1Q84", "The Hobbit", "Война и мир", "新世界 世界",
-            "STRAßE MITTE"
+            "IT", "JLA", " JLA", "NOS4A2", "1984", "1984 2001", "V", "S.", "1Q84", "The Hobbit", "Война и мир",
+            "新世界 世界", "STRAßE MITTE"
         })
         void shouldNotTreatTitleAsAllCaps(final String title) {
             assertThat(TitleCasing.isAllCaps(title)).isFalse();
@@ -112,15 +112,10 @@ class TitleCasingTest {
             assertThat(TitleCasing.fixAllCaps(title, ENGLISH)).isEqualTo(expected);
         }
 
-        @ParameterizedTest
-        @ValueSource(strings = {"IT", "FUBAR", "JLA"})
-        void shouldKeepSingleWordAllCapsTitle(final String title) {
-            assertThat(TitleCasing.fixAllCaps(title, ENGLISH)).isEqualTo(title);
-        }
+        @Test
+        void shouldKeepTitleThatIsNotAllCaps() {
+            final String title = "iPhone for seniors";
 
-        @ParameterizedTest
-        @ValueSource(strings = {"iPhone for seniors", "1984 2001"})
-        void shouldKeepTitleThatIsNotAllCaps(final String title) {
             assertThat(TitleCasing.fixAllCaps(title, ENGLISH)).isEqualTo(title);
         }
 
@@ -135,12 +130,27 @@ class TitleCasingTest {
         @CsvSource(delimiter = '|', value = {
             "H.P. LOVECRAFT | H.P. Lovecraft",
             "B.P.R.D.: 1948 | B.P.R.D.: 1948",
+            ".NET FOR BEGINNERS | .NET for Beginners"
+        })
+        void shouldKeepInitialsInCapitals(final String title, final String expected) {
+            assertThat(TitleCasing.fixAllCaps(title, ENGLISH)).isEqualTo(expected);
+        }
+
+        @ParameterizedTest(name = "\"{0}\" becomes \"{1}\"")
+        @CsvSource(delimiter = '|', value = {
             "MAYFLOWER II | Mayflower II",
-            "NECROSCOPE III: THE SOURCE | Necroscope III: The Source",
+            "NECROSCOPE III: THE SOURCE | Necroscope III: The Source"
+        })
+        void shouldKeepRomanNumeralInCapitals(final String title, final String expected) {
+            assertThat(TitleCasing.fixAllCaps(title, ENGLISH)).isEqualTo(expected);
+        }
+
+        @ParameterizedTest(name = "\"{0}\" becomes \"{1}\"")
+        @CsvSource(delimiter = '|', value = {
             "BATGIRL VOL. 2: TO THE DEATH | Batgirl Vol. 2: To the Death",
             "WAIT... WHAT | Wait... What"
         })
-        void shouldKeepInitialsAndRomanNumeralsInCapitals(final String title, final String expected) {
+        void shouldLowerWordWithPeriodBeforeNoLetter(final String title, final String expected) {
             assertThat(TitleCasing.fixAllCaps(title, ENGLISH)).isEqualTo(expected);
         }
     }

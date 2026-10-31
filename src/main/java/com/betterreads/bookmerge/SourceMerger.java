@@ -82,10 +82,10 @@ public class SourceMerger {
             .filter(Objects::nonNull)
             .flatMap(List::stream)
             .toList();
-        final Winner<String> clean = pick(bySource, TITLE_CHAIN,
-            value -> usableText(value) && TitleCleaner.isClean(value, authorNames), SourceBook::title);
-        final Winner<String> title = clean != null
-            ? clean
+        final Winner<String> displayable = pick(bySource, TITLE_CHAIN,
+            value -> usableText(value) && TitleCleaner.isDisplayable(value, authorNames), SourceBook::title);
+        final Winner<String> title = displayable != null
+            ? displayable
             : pick(bySource, TITLE_CHAIN, SourceMerger::usableText, SourceBook::title);
         if (title == null) {
             throw new IllegalArgumentException("no source supplied a title");

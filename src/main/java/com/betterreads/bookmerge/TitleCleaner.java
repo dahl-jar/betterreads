@@ -7,6 +7,8 @@ final class TitleCleaner {
 
     private static final String BYLINE_PREFIX = " by ";
 
+    private static final int MAX_TITLE_LENGTH = 500;
+
     private static final Pattern EDITION_PARENTHETICAL =
         Pattern.compile("\\s*\\([^()]*(?:edition|book\\s+\\d+)[^()]*\\)\\s*$",
             Pattern.CASE_INSENSITIVE);
@@ -48,7 +50,10 @@ final class TitleCleaner {
         return NOVELIZATION_LABEL.matcher(withoutSplitPart).replaceAll("").strip();
     }
 
-    static boolean isClean(final String title, final List<String> authorNames) {
+    static boolean isDisplayable(final String title, final List<String> authorNames) {
+        if (title.length() > MAX_TITLE_LENGTH) {
+            return false;
+        }
         final String cleaned = clean(closePunctuation(title));
         return !TitleCasing.isAllCaps(cleaned) && !hasByline(cleaned, authorNames);
     }

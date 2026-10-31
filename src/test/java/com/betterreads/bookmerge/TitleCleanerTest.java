@@ -11,7 +11,11 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 class TitleCleanerTest {
 
-    private static final List<String> AUTHOR_NAMES = List.of("Other Author", "J.R.R. Tolkien");
+    private static final List<String> AUTHOR_NAMES = List.of("Other Author", "Author Name");
+
+    private static final String AUTHOR_BYLINE = "The Hobbit by Author Name";
+
+    private static final int TITLE_COLUMN_LENGTH = 500;
 
     @ParameterizedTest(name = "\"{0}\" cleans to \"{1}\"")
     @CsvSource({
@@ -22,11 +26,18 @@ class TitleCleanerTest {
         "'Sandman (Deluxe Edition)',                         'Sandman'",
         "'The Hobbit: Illustrated Edition',                  'The Hobbit'",
         "'The Sandman: The Deluxe Edition Book Three',       'The Sandman: Book Three'",
-        "'The Sandman: The Deluxe Edition, Book One',        'The Sandman: Book One'",
-        "'Rhythm of War Part One',                           'Rhythm of War'",
-        "'The Way of Kings, Part 1',                         'The Way of Kings'"
+        "'The Sandman: The Deluxe Edition, Book One',        'The Sandman: Book One'"
     })
-    void shouldStripEditionAndBookNumberTags(final String raw, final String expected) {
+    void shouldStripEditionTag(final String raw, final String expected) {
+        assertThat(TitleCleaner.clean(raw)).isEqualTo(expected);
+    }
+
+    @ParameterizedTest(name = "\"{0}\" cleans to \"{1}\"")
+    @CsvSource({
+        "'Rhythm of War Part One',    'Rhythm of War'",
+        "'The Way of Kings, Part 1',  'The Way of Kings'"
+    })
+    void shouldStripSplitPartSuffix(final String raw, final String expected) {
         assertThat(TitleCleaner.clean(raw)).isEqualTo(expected);
     }
 
@@ -78,24 +89,34 @@ class TitleCleanerTest {
     @ParameterizedTest
     @ValueSource(strings = {
         "The Hobbit",
-        "Murder by Agatha Christie",
-        "J.R.R. Tolkien",
-        "By J.R.R. Tolkien",
-        "The Hobbit by J.R.R. Tolkien Again",
-        "Hi"
+        "Murder by Third Author",
+        "Author Name",
+        "By Author Name",
+        "The Hobbit by Author Name Again",
+        "JLA :"
     })
-    void shouldTreatTitleAsClean(final String title) {
-        assertThat(TitleCleaner.isClean(title, AUTHOR_NAMES)).isTrue();
+    void shouldTreatTitleAsDisplayableWithoutOwnAuthorByline(final String title) {
+        assertThat(TitleCleaner.isDisplayable(title, AUTHOR_NAMES)).isTrue();
+    }
+
+    @Test
+    void shouldTreatTitleAtColumnLimitAsDisplayable() {
+        assertThat(TitleCleaner.isDisplayable("x".repeat(TITLE_COLUMN_LENGTH), AUTHOR_NAMES)).isTrue();
+    }
+
+    @Test
+    void shouldNotTreatAllCapsTitleAsDisplayable() {
+        assertThat(TitleCleaner.isDisplayable("RETURN OF THE KING", AUTHOR_NAMES)).isFalse();
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"The Hobbit by J.R.R. Tolkien", "The Hobbit BY J.R.R. TOLKIEN", "RETURN OF THE KING"})
-    void shouldNotTreatTitleAsClean(final String title) {
-        assertThat(TitleCleaner.isClean(title, AUTHOR_NAMES)).isFalse();
+    @ValueSource(strings = {AUTHOR_BYLINE, "The Hobbit BY AUTHOR NAME"})
+    void shouldNotTreatOwnAuthorBylineAsDisplayable(final String title) {
+        assertThat(TitleCleaner.isDisplayable(title, AUTHOR_NAMES)).isFalse();
     }
 
     @Test
     void shouldIgnoreSpaceAroundCreditName() {
-        assertThat(TitleCleaner.isClean("The Hobbit by J.R.R. Tolkien", List.of(" J.R.R. Tolkien "))).isFalse();
+        assertThat(TitleCleaner.isDisplayable(AUTHOR_BYLINE, List.of(" Author Name "))).isFalse();
     }
 }
