@@ -19,6 +19,8 @@ class SourceMergerTitleTest {
 
     private static final String CLEAN_KING = "Return of the King";
 
+    private static final String TOO_LONG_TITLE = "x".repeat(501);
+
     private static final String EDITION_TAG = " (Deluxe Edition)";
 
     private static final String AUTHOR_NAME = "Author Name";
@@ -58,7 +60,7 @@ class SourceMergerTitleTest {
 
         @Test
         void shouldPreferCleanTitleOverTooLongTopSource() {
-            final MergedBook merged = merge(google("x".repeat(501)), CLEAN_KING);
+            final MergedBook merged = merge(google(TOO_LONG_TITLE), CLEAN_KING);
 
             assertThat(merged.book().title()).isEqualTo(CLEAN_KING);
             assertThat(merged.provenanceOf(BookField.TITLE)).isEqualTo(BookFieldSource.OPEN_LIBRARY);

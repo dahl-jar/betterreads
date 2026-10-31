@@ -4,18 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class TitleCleanerTest {
-
-    private static final List<String> AUTHOR_NAMES = List.of("Other Author", "Author Name");
-
-    private static final String AUTHOR_BYLINE = "The Hobbit by Author Name";
-
-    private static final int TITLE_COLUMN_LENGTH = 500;
 
     @ParameterizedTest(name = "\"{0}\" cleans to \"{1}\"")
     @CsvSource({
@@ -86,37 +81,51 @@ class TitleCleanerTest {
         assertThat(TitleCleaner.closePunctuation(raw)).isEqualTo(expected);
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {
-        "The Hobbit",
-        "Murder by Third Author",
-        "Author Name",
-        "By Author Name",
-        "The Hobbit by Author Name Again",
-        "JLA :"
-    })
-    void shouldTreatTitleAsDisplayableWithoutOwnAuthorByline(final String title) {
-        assertThat(TitleCleaner.isDisplayable(title, AUTHOR_NAMES)).isTrue();
-    }
+    @Nested
+    class Displayable {
 
-    @Test
-    void shouldTreatTitleAtColumnLimitAsDisplayable() {
-        assertThat(TitleCleaner.isDisplayable("x".repeat(TITLE_COLUMN_LENGTH), AUTHOR_NAMES)).isTrue();
-    }
+        private static final List<String> AUTHOR_NAMES = List.of("Other Author", "Author Name");
 
-    @Test
-    void shouldNotTreatAllCapsTitleAsDisplayable() {
-        assertThat(TitleCleaner.isDisplayable("RETURN OF THE KING", AUTHOR_NAMES)).isFalse();
-    }
+        private static final String AUTHOR_BYLINE = "The Hobbit by Author Name";
 
-    @ParameterizedTest
-    @ValueSource(strings = {AUTHOR_BYLINE, "The Hobbit BY AUTHOR NAME"})
-    void shouldNotTreatOwnAuthorBylineAsDisplayable(final String title) {
-        assertThat(TitleCleaner.isDisplayable(title, AUTHOR_NAMES)).isFalse();
-    }
+        private static final int TITLE_COLUMN_LENGTH = 500;
 
-    @Test
-    void shouldIgnoreSpaceAroundCreditName() {
-        assertThat(TitleCleaner.isDisplayable(AUTHOR_BYLINE, List.of(" Author Name "))).isFalse();
+        @ParameterizedTest
+        @ValueSource(strings = {
+            "The Hobbit",
+            "Murder by Third Author",
+            "Author Name",
+            "By Author Name",
+            "The Hobbit by Author Name Again"
+        })
+        void shouldTreatTitleAsDisplayableWithoutOwnAuthorByline(final String title) {
+            assertThat(TitleCleaner.isDisplayable(title, AUTHOR_NAMES)).isTrue();
+        }
+
+        @Test
+        void shouldTreatSingleWordBeforeColonAsDisplayable() {
+            assertThat(TitleCleaner.isDisplayable("JLA :", AUTHOR_NAMES)).isTrue();
+        }
+
+        @Test
+        void shouldTreatTitleAtColumnLimitAsDisplayable() {
+            assertThat(TitleCleaner.isDisplayable("x".repeat(TITLE_COLUMN_LENGTH), AUTHOR_NAMES)).isTrue();
+        }
+
+        @Test
+        void shouldNotTreatAllCapsTitleAsDisplayable() {
+            assertThat(TitleCleaner.isDisplayable("RETURN OF THE KING", AUTHOR_NAMES)).isFalse();
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {AUTHOR_BYLINE, "The Hobbit BY AUTHOR NAME"})
+        void shouldNotTreatOwnAuthorBylineAsDisplayable(final String title) {
+            assertThat(TitleCleaner.isDisplayable(title, AUTHOR_NAMES)).isFalse();
+        }
+
+        @Test
+        void shouldIgnoreSpaceAroundCreditName() {
+            assertThat(TitleCleaner.isDisplayable(AUTHOR_BYLINE, List.of(" Author Name "))).isFalse();
+        }
     }
 }
