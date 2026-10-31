@@ -356,7 +356,7 @@ class BookListIntegrationTest extends ContainerizedTest {
 
         @Test
         void shouldListBooksAtTheSamePositionInTheOrderTheyWereAdded() throws Exception {
-            saveFirstTwoVolumes();
+            saveSaga();
             saveInSeries(MORNING_STAR, new SeriesEntry(SAGA, 2));
 
             final ResultActions response = mockMvc.perform(get(SERIES_PATH, RED_RISING));
@@ -368,7 +368,7 @@ class BookListIntegrationTest extends ContainerizedTest {
 
         @Test
         void shouldLeaveTheRequestedBookOutOfItsSeries() throws Exception {
-            saveFirstTwoVolumes();
+            saveSaga();
 
             final ResultActions response = mockMvc.perform(get(SERIES_PATH, RED_RISING));
 
@@ -379,7 +379,7 @@ class BookListIntegrationTest extends ContainerizedTest {
 
         @Test
         void shouldLeaveOutBooksFromAnotherSeries() throws Exception {
-            saveFirstTwoVolumes();
+            saveSaga();
             saveInSeries(EMPIRE_OF_SILENCE, new SeriesEntry(SUN_EATER, 1));
 
             final ResultActions response = mockMvc.perform(get(SERIES_PATH, RED_RISING));
@@ -420,7 +420,7 @@ class BookListIntegrationTest extends ContainerizedTest {
 
         @Test
         void shouldReturnTheCardDetailsOfASeriesBook() throws Exception {
-            saveFirstTwoVolumes();
+            saveSaga();
 
             final ResultActions response = mockMvc.perform(get(SERIES_PATH, RED_RISING));
 
@@ -469,7 +469,7 @@ class BookListIntegrationTest extends ContainerizedTest {
                 .andExpect(jsonPath("$.detail").value(containsString(unknown)));
         }
 
-        private void saveFirstTwoVolumes() {
+        private void saveSaga() {
             saveInSeries(RED_RISING, new SeriesEntry(SAGA, 1));
             saveInSeries(GOLDEN_SON, new SeriesEntry(SAGA, 2));
         }

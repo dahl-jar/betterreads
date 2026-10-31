@@ -58,8 +58,6 @@ class MetadataCheckRepositoryTest extends ContainerizedTest {
 
     private static final String BOOK_KEY_PREFIX = "book-";
 
-    private static final String HARDCOVER_ID = "hc-1";
-
     private static final String REQUESTED_SQL =
         "UPDATE book SET metadata_check_requested_at = now() - make_interval(days => ?) WHERE book_id = ?";
 
@@ -148,7 +146,6 @@ class MetadataCheckRepositoryTest extends ContainerizedTest {
         void shouldListTheNamesOfEverySeries() {
             final List<SeriesEntry> series = List.of(new SeriesEntry(SAGA, 1), new SeriesEntry(UNIVERSE, 1));
             final SourceBook.Builder book = MetadataCheckSamples.source();
-            book.hardcoverId(HARDCOVER_ID);
             book.series(series);
             upsert.upsertFromSource(book.build());
 

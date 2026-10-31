@@ -119,8 +119,7 @@ class BookDescriptionRepositoryIntegrationTest extends ContainerizedTest {
 
         @Test
         void shouldReturnThinBookKeyedByWikidataOnly() {
-            final long keyed = save(RED_RISING_KEY, null, THIN);
-            jdbc.update("UPDATE book SET wikidata_qid = 'Q1' WHERE book_id = ?", keyed);
+            final long keyed = saveWikidataOnly();
 
             final List<Long> candidates = thinBooks();
 
@@ -204,10 +203,20 @@ class BookDescriptionRepositoryIntegrationTest extends ContainerizedTest {
         }
 
         @Test
+        void shouldSweepBookKeyedByWikidataOnly() {
+            final long keyed = saveWikidataOnly();
+
+            final List<Long> swept = books.findIdsKeyed(PageRequest.ofSize(PAGE_SIZE));
+
+            assertThat(swept).containsExactly(keyed);
+        }
+
+        @Test
         void shouldPageKeyedBooksInIdOrder() {
             final long first = save(RED_RISING_KEY, RED_RISING_ISBN, THIN);
             final long second = save(GOLDEN_SON_KEY, GOLDEN_SON_ISBN, THIN);
             final long third = save(MORNING_STAR_KEY, MORNING_STAR_ISBN, THIN);
+            setUpdatedAt(first, SAME_TIME);
 
             final List<Long> firstPage = books.findIdsKeyed(PageRequest.of(0, 2));
             final List<Long> secondPage = books.findIdsKeyed(PageRequest.of(1, 2));
@@ -266,6 +275,12 @@ class BookDescriptionRepositoryIntegrationTest extends ContainerizedTest {
 
     private void setUpdatedAt(final long bookId, final String instant) {
         jdbc.update("UPDATE book SET updated_at = ?::timestamptz WHERE book_id = ?", instant, bookId);
+    }
+
+    private long saveWikidataOnly() {
+        final long bookId = save(RED_RISING_KEY, null, THIN);
+        jdbc.update("UPDATE book SET wikidata_qid = 'Q1' WHERE book_id = ?", bookId);
+        return bookId;
     }
 
     private long save(final String dedupKey, final @Nullable String isbn, final @Nullable String description) {

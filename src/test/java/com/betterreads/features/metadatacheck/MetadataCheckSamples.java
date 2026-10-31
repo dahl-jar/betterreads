@@ -100,17 +100,18 @@ final class MetadataCheckSamples {
     static SourceBook.Builder source() {
         final SourceBook.Builder book = SourceBook.builder(BookFieldSource.OPEN_LIBRARY);
         book.openLibraryWorkKey("OL1W");
+        book.hardcoverId("hc-1");
         book.title("book");
         book.authors(List.of(SourceAuthor.ofName(AUTHOR)));
         return book;
     }
 
     static Book withGenre(final Book book, final String genre) {
-        book.applyFrom(SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
-            .openLibraryWorkKey("OL" + book.getBookId() + "W")
-            .title(book.getTitle())
-            .rawSubjects(List.of(genre))
-            .build());
+        final SourceBook.Builder source = SourceBook.builder(BookFieldSource.OPEN_LIBRARY);
+        source.openLibraryWorkKey("OL" + book.getBookId() + "W");
+        source.title(book.getTitle());
+        source.rawSubjects(List.of(genre));
+        book.applyFrom(source.build());
         return book;
     }
 

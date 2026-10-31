@@ -66,7 +66,6 @@ class MetadataCheckServiceIntegrationTest extends ContainerizedTest {
     @Test
     void shouldSendCollectionsOfDetachedBook() {
         final SourceBook.Builder book = MetadataCheckSamples.source();
-        book.hardcoverId("hc-1");
         book.series(List.of(SERIES, UNIVERSE));
         book.rawSubjects(List.of("Fantasy"));
         upsert.upsertFromSource(book.build());

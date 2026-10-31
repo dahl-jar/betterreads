@@ -92,7 +92,7 @@ class DescriptionBackfillServiceTest {
     @Test
     @DisplayName("stamps a book the sources cannot improve as checked without writing a description")
     void stampsUnimprovableBook() {
-        stubThinSliceWithoutImprovement(bookWithId(BOOK_ID));
+        stubUnimproved(bookWithId(BOOK_ID));
 
         service.backfillSlice();
 
@@ -120,16 +120,16 @@ class DescriptionBackfillServiceTest {
     @DisplayName("the lookup carries the row's identifiers, title and first author")
     void lookupCarriesTheRowsSourceIds() {
         final Book book = bookWithId(BOOK_ID);
-        book.applyFrom(SourceBook.builder(BookFieldSource.WIKIDATA)
-            .title(TITLE)
-            .description(WEAK)
-            .isbn13(ISBN)
-            .wikidataQid(QID)
-            .openLibraryWorkKey(WORK_KEY)
-            .hardcoverId(HARDCOVER_ID)
-            .build());
+        final SourceBook.Builder source = SourceBook.builder(BookFieldSource.WIKIDATA);
+        source.title(TITLE);
+        source.description(WEAK);
+        source.isbn13(ISBN);
+        source.wikidataQid(QID);
+        source.openLibraryWorkKey(WORK_KEY);
+        source.hardcoverId(HARDCOVER_ID);
+        book.applyFrom(source.build());
         book.replaceCredits(List.of(new ResolvedCredit(Books.author(AUTHOR), CreditRole.AUTHOR)));
-        stubThinSliceWithoutImprovement(book);
+        stubUnimproved(book);
 
         service.backfillSlice();
 
@@ -195,7 +195,7 @@ class DescriptionBackfillServiceTest {
         when(cacheManager.getCache(BookDetailCache.NAME)).thenReturn(bookDetails);
     }
 
-    private void stubThinSliceWithoutImprovement(final Book book) {
+    private void stubUnimproved(final Book book) {
         stubThinSlice(List.of(book));
         when(selector.bestDescription(any(DescriptionLookup.class), any())).thenReturn(Optional.empty());
     }
