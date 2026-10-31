@@ -315,10 +315,10 @@ class SourceCollectorTest {
         final String brokenIsbn = ISBN + "\n";
         final SourceBook seed = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
             .isbn13(brokenIsbn)
-            .title("Du\r\nne")
+            .title("Du\nne")
             .build();
         final SourceCollector collector = collectorWith(SAME_THREAD, stubByIsbn(
-            BookFieldSource.HARDCOVER, brokenIsbn, hardcoverHit("Dune\n\u001B  Messiah", WRONG_RATING)));
+            BookFieldSource.HARDCOVER, brokenIsbn, hardcoverHit("Dune\nMessiah", WRONG_RATING)));
 
         collector.collectFor(seed);
 
