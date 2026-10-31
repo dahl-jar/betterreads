@@ -28,13 +28,6 @@ import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.security.web.header.writers.StaticHeadersWriter;
 
-/**
- * Filter chains for the actuator, the API docs, and the API, most specific first.
- *
- * <p>CSRF protection is off because auth is a stateless bearer token. The refresh cookie is scoped
- * to {@code /api/v1/auth} and defaults to {@code SameSite=Strict}, and CORS only admits the listed
- * origins.
- */
 @Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
 final class SecurityConfig {
@@ -89,10 +82,6 @@ final class SecurityConfig {
 
     private final ObjectProvider<JwtDecoder> cloudflareAccessJwtDecoderProvider;
 
-    /**
-     * The Cloudflare Access decoder bean can be absent, so it is looked up when the management
-     * chain is built.
-     */
     SecurityConfig(
         @Value("${management.server.port}") final int managementPort,
         final ObjectProvider<JwtDecoder> cloudflareAccessJwtDecoderProvider
@@ -101,11 +90,6 @@ final class SecurityConfig {
         this.cloudflareAccessJwtDecoderProvider = cloudflareAccessJwtDecoderProvider;
     }
 
-    /**
-     * Actuator endpoints need a Cloudflare Access JWT once a decoder is configured and are open
-     * without one. {@code /actuator/prometheus} and {@code /actuator/health} skip the check
-     * because the management port is not publicly reachable.
-     */
     @Bean
     @Order(0)
     SecurityFilterChain managementSecurityFilterChain(
@@ -133,7 +117,6 @@ final class SecurityConfig {
         return http.build();
     }
 
-    /** Swagger UI loads inline scripts and styles, so the public docs chain gets a looser CSP. */
     @Bean
     @Order(1)
     SecurityFilterChain docsSecurityFilterChain(
@@ -150,7 +133,6 @@ final class SecurityConfig {
         return http.build();
     }
 
-    /** catch-all chain for every request the first two skip */
     @Bean
     @Order(2)
     SecurityFilterChain apiSecurityFilterChain(
@@ -202,10 +184,15 @@ final class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    /**
-     * The security chains already run the request id filter, so the servlet registration is off
-     * to keep it from running twice.
-     */
+    @Bean
+    FilterRegistrationBean<RateLimitFilter> rateLimitFilterRegistration(
+        final RateLimitFilter rateLimitFilter
+    ) {
+        final FilterRegistrationBean<RateLimitFilter> registration = new FilterRegistrationBean<>(rateLimitFilter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
     @Bean
     FilterRegistrationBean<RequestIdFilter> requestIdFilterRegistration(
         final RequestIdFilter requestIdFilter
