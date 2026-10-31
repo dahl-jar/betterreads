@@ -17,7 +17,7 @@ public class MailOutboxService {
 
     public static final String TEMPLATE_SIGNUP_ATTEMPT = "signup_attempt";
 
-    private static final String PAYLOAD_TOKEN = "token";
+    static final String PAYLOAD_TOKEN = "token";
 
     private final MailOutboxRepository repository;
 

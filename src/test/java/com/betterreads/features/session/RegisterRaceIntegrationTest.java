@@ -166,7 +166,7 @@ class RegisterRaceIntegrationTest extends ContainerizedTest {
     }
 
     @Test
-    void shouldRejectSoftDeletedUsernameTakenAfterPreCheck() throws Exception {
+    void shouldRejectUsernameSoftDeletedDuringRegister() throws Exception {
         passwordEncoder.afterEncode.set(insertingDeletedUser(Accounts.USER, Accounts.OTHER_USER_EMAIL));
 
         AuthRequests.register(mockMvc, body(Accounts.USER, Accounts.USER_EMAIL))
@@ -177,7 +177,7 @@ class RegisterRaceIntegrationTest extends ContainerizedTest {
     }
 
     @Test
-    void shouldAnswerCreatedWithoutMailWhenEmailEntersGraceAfterPreCheck() throws Exception {
+    void shouldAnswerCreatedWithoutMailWhenEmailEntersGraceDuringRegister() throws Exception {
         passwordEncoder.afterEncode.set(insertingDeletedUser(Accounts.OTHER_USER, Accounts.USER_EMAIL));
 
         AuthRequests.register(mockMvc, body(Accounts.USER, Accounts.USER_EMAIL))

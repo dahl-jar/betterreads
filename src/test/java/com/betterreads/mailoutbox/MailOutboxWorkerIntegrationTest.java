@@ -304,9 +304,10 @@ class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
         worker.drain();
 
         final MailMessage sent = onlySentMessage();
+        final MailOutbox row = onlyRow();
         assertThat(sent.subject()).isEqualTo(SIGNUP_ATTEMPT_SUBJECT);
         assertThat(sent.text()).isEqualTo(SIGNUP_ATTEMPT_TEXT);
-        assertThat(onlyRow().getSentAt()).isNotNull();
+        assertThat(row.getSentAt()).isNotNull();
     }
 
     private MailOutbox saveRowWithoutToken() {

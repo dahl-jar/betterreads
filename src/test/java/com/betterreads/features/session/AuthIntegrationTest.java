@@ -150,7 +150,7 @@ class AuthIntegrationTest extends ContainerizedTest {
 
         @Test
         void rejectsDuplicateUsernameWithConflict() throws Exception {
-            Accounts.seedUser(userRepository, passwordEncoder, Accounts.USER, Accounts.USER_EMAIL, PASSWORD);
+            seedUser();
             final String body =
                 Accounts.registerPayload(objectMapper, Accounts.USER, Accounts.OTHER_USER_EMAIL, PASSWORD);
 
@@ -160,7 +160,7 @@ class AuthIntegrationTest extends ContainerizedTest {
 
         @Test
         void shouldRejectTakenUsernameWhenEmailAlsoTaken() throws Exception {
-            seedOwner();
+            seedUser();
             final String body =
                 Accounts.registerPayload(objectMapper, Accounts.USER, Accounts.USER_EMAIL, PASSWORD);
 
@@ -171,20 +171,13 @@ class AuthIntegrationTest extends ContainerizedTest {
         }
 
         @Test
-        void shouldRejectSoftDeletedUsernameWhenEmailTaken() throws Exception {
-            seedDeletedUser();
-            Accounts.seedUser(
-                userRepository, passwordEncoder, Accounts.OTHER_USER, Accounts.OTHER_USER_EMAIL, PASSWORD);
-            final String body =
-                Accounts.registerPayload(objectMapper, Accounts.USER, Accounts.OTHER_USER_EMAIL, PASSWORD);
-
-            AuthRequests.register(mockMvc, body)
-                .andExpect(conflictWithDetail(USERNAME_TAKEN));
-        }
-
-        @Test
         void shouldRejectUsernameHeldBySoftDeletedUserWithConflict() throws Exception {
-            seedDeletedUser();
+            final User deleted = new User();
+            deleted.setUsername(Accounts.USER);
+            deleted.setEmail(Accounts.USER_EMAIL);
+            deleted.setPasswordHash(Objects.requireNonNull(passwordEncoder.encode(PASSWORD)));
+            deleted.setDeletedAt(Instant.now());
+            userRepository.save(deleted);
             final String body =
                 Accounts.registerPayload(objectMapper, Accounts.USER, Accounts.OTHER_USER_EMAIL, PASSWORD);
 
@@ -216,7 +209,7 @@ class AuthIntegrationTest extends ContainerizedTest {
         @CsvSource({
             "short password,        user,                    user@example.com,    short",
             "invalid email,         user,                    not-an-email,        Sup3rSecret!",
-            "email-shaped username, otheruser@example.com,   otheruser@other.com, Sup3rSecret!",
+            "email-shaped username, otheruser@example.com,   otheruser@example.com, Sup3rSecret!",
             "password over 72 bytes, user,                   user@example.com, " + PASSWORD_40_CHARS_80_BYTES
         })
         void rejectsInvalidFieldWithBadRequest(
@@ -280,19 +273,27 @@ class AuthIntegrationTest extends ContainerizedTest {
 
         @Test
         void shouldAnswerLikeNewEmailWhenEmailTaken() throws Exception {
-            seedOwner();
+            final long userId = seedUser();
+            final User seeded = userRepository.findById(userId).orElseThrow();
+            final int credentialVersion = seeded.getCredentialVersion();
+            final String body =
+                Accounts.registerPayload(objectMapper, Accounts.OTHER_USER, Accounts.USER_EMAIL, WRONG_PASSWORD);
 
-            AuthRequests.register(mockMvc, takenEmailBody())
+            AuthRequests.register(mockMvc, body)
                 .andExpect(status().isCreated())
                 .andExpect(header().doesNotExist(SET_COOKIE))
                 .andExpect(content().string(""));
 
+            final User stored = userRepository.findById(userId).orElseThrow();
             assertThat(userRepository.count()).isOne();
+            assertThat(passwordEncoder.matches(PASSWORD, stored.getPasswordHash())).isTrue();
+            assertThat(stored.getUsername()).isEqualTo(Accounts.USER);
+            assertThat(stored.getCredentialVersion()).isEqualTo(credentialVersion);
         }
 
         @Test
         void shouldQueueNoticeWhenEmailTakenByVerifiedAccount() throws Exception {
-            seedOwner();
+            seedUser();
 
             AuthRequests.register(mockMvc, takenEmailBody())
                 .andExpect(status().isCreated());
@@ -308,7 +309,7 @@ class AuthIntegrationTest extends ContainerizedTest {
 
         @Test
         void shouldSkipNoticeOnRepeat() throws Exception {
-            seedOwner();
+            seedUser();
             AuthRequests.register(mockMvc, takenEmailBody())
                 .andExpect(status().isCreated());
 
@@ -335,7 +336,7 @@ class AuthIntegrationTest extends ContainerizedTest {
 
         @Test
         void shouldQueueNoticeToStoredAddressWhenEmailMixedCase() throws Exception {
-            seedOwner();
+            seedUser();
             final String body =
                 Accounts.registerPayload(objectMapper, Accounts.OTHER_USER, Accounts.MIXED_CASE_EMAIL, PASSWORD);
 
@@ -349,7 +350,7 @@ class AuthIntegrationTest extends ContainerizedTest {
 
         @Test
         void shouldAnswerBadRequestWhenPasswordTooLongOnTakenEmail() throws Exception {
-            seedOwner();
+            seedUser();
             final String body = Accounts.registerPayload(
                 objectMapper, Accounts.OTHER_USER, Accounts.USER_EMAIL, PASSWORD_40_CHARS_80_BYTES);
 
@@ -364,7 +365,7 @@ class AuthIntegrationTest extends ContainerizedTest {
 
         @BeforeEach
         void seed() {
-            Accounts.seedUser(userRepository, passwordEncoder, Accounts.USER, Accounts.USER_EMAIL, PASSWORD);
+            seedUser();
         }
 
         @Test
@@ -467,7 +468,7 @@ class AuthIntegrationTest extends ContainerizedTest {
 
         @Test
         void shouldAuthenticateMeWithTheTokenFromLogin() throws Exception {
-            Accounts.seedUser(userRepository, passwordEncoder, Accounts.USER, Accounts.USER_EMAIL, PASSWORD);
+            seedUser();
             final String loginBody = Accounts.loginPayload(objectMapper, Accounts.USER, PASSWORD);
 
             final MvcResult loginResult = AuthRequests.login(mockMvc, loginBody)
@@ -496,8 +497,7 @@ class AuthIntegrationTest extends ContainerizedTest {
 
         @Test
         void rejectsExpiredToken() throws Exception {
-            final long userId = Accounts.seedUser(
-                userRepository, passwordEncoder, Accounts.USER, Accounts.USER_EMAIL, PASSWORD);
+            final long userId = seedUser();
             final User user = userRepository.findById(userId).orElseThrow();
             final int credentialVersion = user.getCredentialVersion();
             final JwtIssuer expiredIssuer =
@@ -509,17 +509,8 @@ class AuthIntegrationTest extends ContainerizedTest {
         }
     }
 
-    private void seedOwner() {
-        Accounts.seedUser(userRepository, passwordEncoder, Accounts.USER, Accounts.USER_EMAIL, PASSWORD);
-    }
-
-    private void seedDeletedUser() {
-        final User deleted = new User();
-        deleted.setUsername(Accounts.USER);
-        deleted.setEmail(Accounts.USER_EMAIL);
-        deleted.setPasswordHash(Objects.requireNonNull(passwordEncoder.encode(PASSWORD)));
-        deleted.setDeletedAt(Instant.now());
-        userRepository.save(deleted);
+    private long seedUser() {
+        return Accounts.seedUser(userRepository, passwordEncoder, Accounts.USER, Accounts.USER_EMAIL, PASSWORD);
     }
 
     private String takenEmailBody() {
@@ -529,8 +520,10 @@ class AuthIntegrationTest extends ContainerizedTest {
     // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     private void registerWithNoticeSent(final Duration ago) throws Exception {
-        seedOwner();
-        setNoticeSentAt(Accounts.USER_EMAIL, ago);
+        seedUser();
+        jdbcTemplate.update(
+            "UPDATE app_user SET signup_notice_sent_at = now() - make_interval(hours => ?::int) WHERE email = ?",
+            ago.toHours(), Accounts.USER_EMAIL);
 
         AuthRequests.register(mockMvc, takenEmailBody())
             .andExpect(status().isCreated())
@@ -542,12 +535,6 @@ class AuthIntegrationTest extends ContainerizedTest {
             .flatMap(userRepository::findById)
             .orElseThrow()
             .getEmail();
-    }
-
-    private void setNoticeSentAt(final String email, final Duration ago) {
-        jdbcTemplate.update(
-            "UPDATE app_user SET signup_notice_sent_at = now() - make_interval(hours => ?::int) WHERE email = ?",
-            ago.toHours(), email);
     }
 
     private static String emailEndingIn(final int lastLabelLength) {

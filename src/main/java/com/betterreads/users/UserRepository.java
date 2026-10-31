@@ -22,12 +22,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query(value = """
         SELECT EXISTS (SELECT 1 FROM app_user WHERE lower(username) = lower(:username))
         """, nativeQuery = true)
-    boolean isUsernameHeldByAnyRow(@Param("username") String username);
+    boolean isUsernameTaken(@Param("username") String username);
 
     @Query(value = """
         SELECT EXISTS (SELECT 1 FROM app_user WHERE email = :email)
         """, nativeQuery = true)
-    boolean isEmailHeldByAnyRow(@Param("email") String email);
+    boolean isEmailTaken(@Param("email") String email);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT u FROM User u WHERE u.email = :email")

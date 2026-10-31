@@ -8,6 +8,8 @@ spring:
     password: ${DB_APP_PASSWORD}
     hikari:
       maximum-pool-size: 10
+      data-source-properties:
+        logServerErrorDetail: false
 
   jpa:
     hibernate:

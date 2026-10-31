@@ -40,9 +40,8 @@ class RegistrationWriter {
         this.mailOutbox = mailOutbox;
     }
 
-    @Transactional(readOnly = true)
-    public void rejectHeldUsername(final String username) {
-        if (userRepository.isUsernameHeldByAnyRow(username)) {
+    public void rejectTakenUsername(final String username) {
+        if (userRepository.isUsernameTaken(username)) {
             throw new BusinessRuleException(DUPLICATE_USERNAME);
         }
     }
@@ -56,23 +55,23 @@ class RegistrationWriter {
     }
 
     @Transactional
-    public void answerTakenEmail(final String email) {
+    public void notifyEmailOwner(final String email) {
         userRepository.findByEmailForUpdate(email).ifPresentOrElse(
-            this::notifyOwner,
-            () -> LOG.info("Registration on an email in deletion grace, no mail queued"));
+            this::queueNotice,
+            () -> LOG.info("Registration on an email with no live account, no mail queued"));
     }
 
     @Transactional
     public boolean resolveClash(final String username, final String email) {
-        rejectHeldUsername(username);
-        if (!userRepository.isEmailHeldByAnyRow(email)) {
+        rejectTakenUsername(username);
+        if (!userRepository.isEmailTaken(email)) {
             return false;
         }
-        answerTakenEmail(email);
+        notifyEmailOwner(email);
         return true;
     }
 
-    private void notifyOwner(final User owner) {
+    private void queueNotice(final User owner) {
         final Instant now = Instant.now();
         final Instant lastSent = owner.getSignupNoticeSentAt();
         if (lastSent != null && lastSent.isAfter(now.minus(SIGNUP_NOTICE_WINDOW))) {

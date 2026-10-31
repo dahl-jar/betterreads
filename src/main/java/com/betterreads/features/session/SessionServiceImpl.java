@@ -66,8 +66,8 @@ class SessionServiceImpl implements SessionService {
     @Override
     public void register(final RegisterRequest request) {
         final String normalizedEmail = EmailNormalizer.normalize(request.email());
-        registrationWriter.rejectHeldUsername(request.username());
-        final boolean emailTaken = userRepository.isEmailHeldByAnyRow(normalizedEmail);
+        registrationWriter.rejectTakenUsername(request.username());
+        final boolean emailTaken = userRepository.isEmailTaken(normalizedEmail);
 
         final User user = new User();
         user.setUsername(request.username());
@@ -75,7 +75,7 @@ class SessionServiceImpl implements SessionService {
         userPasswords.setPassword(user, request.password());
 
         if (emailTaken) {
-            registrationWriter.answerTakenEmail(normalizedEmail);
+            registrationWriter.notifyEmailOwner(normalizedEmail);
             return;
         }
         try {
