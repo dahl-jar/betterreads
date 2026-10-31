@@ -149,11 +149,11 @@ public class SourceCollector {
     private static Optional<SourceBook> match(final BookSourceClient client, final SourceBook seed) {
         return Optional.ofNullable(seed.isbn13())
             .flatMap(client::fetchByIsbn)
-            .filter(hit -> keepIsbnHit(client.source(), seed, hit))
+            .filter(hit -> isbnHitMatches(client.source(), seed, hit))
             .or(() -> fetchByTitleAuthor(client, seed));
     }
 
-    private static boolean keepIsbnHit(
+    private static boolean isbnHitMatches(
         final BookFieldSource source, final SourceBook seed, final SourceBook hit) {
         final String seedTitle = seed.title();
         final String hitTitle = hit.title();

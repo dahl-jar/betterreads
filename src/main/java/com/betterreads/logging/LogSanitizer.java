@@ -1,11 +1,12 @@
 package com.betterreads.logging;
 
+import java.util.regex.Pattern;
+
 import org.jspecify.annotations.Nullable;
 
-/**
- * User input with CR/LF can forge log lines (CWE-117), so values are stripped of them before logging.
- */
 public final class LogSanitizer {
+
+    private static final Pattern OTHER_CONTROL_CHARACTERS = Pattern.compile("[\\p{Cc}\\u2028\\u2029&&[^\\r\\n]]");
 
     private LogSanitizer() {
     }
@@ -15,6 +16,6 @@ public final class LogSanitizer {
         if (value == null) {
             return null;
         }
-        return value.replace("\r", "").replace("\n", "");
+        return OTHER_CONTROL_CHARACTERS.matcher(value).replaceAll("").replace("\r", "").replace("\n", "");
     }
 }

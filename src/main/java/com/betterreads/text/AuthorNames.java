@@ -1,9 +1,7 @@
 package com.betterreads.text;
 
-import java.text.Normalizer;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -17,8 +15,6 @@ public final class AuthorNames {
 
     private static final Pattern NAME_SUFFIX = Pattern.compile("(?i)(jr|sr|ii|iii|iv)\\.?");
 
-    private static final Pattern MARKS = Pattern.compile("\\p{M}");
-
     private static final Pattern NOT_LETTER_OR_DIGIT = Pattern.compile("[^\\p{L}\\p{N}]");
 
     private static final Pattern TRAILING_PUNCTUATION = Pattern.compile("[,\\s]+$|(?<=\\p{L}{2})\\.\\s*$");
@@ -30,17 +26,6 @@ public final class AuthorNames {
     private static final Set<String> PARTICLES =
         Set.of("van", "von", "de", "der", "den", "del", "da", "di", "du", "la", "le", "ter");
 
-    private static final Map<Integer, String> UNMARKED_LETTERS = Map.of(
-        (int) 'œ', "oe",
-        (int) 'æ', "ae",
-        (int) 'ø', "o",
-        (int) 'ı', "i",
-        (int) 'ł', "l",
-        (int) 'ß', "ss",
-        (int) 'đ', "d",
-        (int) 'ð', "d",
-        (int) 'þ', "th");
-
     private static final String MC = "mc";
 
     private static final int LAST_FIRST_PARTS = 2;
@@ -49,11 +34,7 @@ public final class AuthorNames {
     }
 
     public static String key(final String name) {
-        final String decomposed = Normalizer.normalize(firstLast(name.strip()), Normalizer.Form.NFKD);
-        final String folded = MARKS.matcher(decomposed).replaceAll("").toLowerCase(Locale.ROOT).codePoints()
-            .mapToObj(letter -> UNMARKED_LETTERS.getOrDefault(letter, Character.toString(letter)))
-            .collect(Collectors.joining());
-        return NOT_LETTER_OR_DIGIT.matcher(folded).replaceAll("");
+        return NOT_LETTER_OR_DIGIT.matcher(TextMatch.fold(firstLast(name.strip()))).replaceAll("");
     }
 
     public static String display(final String name) {

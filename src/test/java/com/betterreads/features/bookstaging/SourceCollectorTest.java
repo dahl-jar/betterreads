@@ -10,6 +10,7 @@ import com.betterreads.booksource.SourceBook;
 
 import static com.betterreads.features.bookstaging.DuneBooks.AUTHOR;
 import static com.betterreads.features.bookstaging.DuneBooks.ISBN;
+import static com.betterreads.features.bookstaging.DuneBooks.SEQUEL_TITLE;
 import static com.betterreads.features.bookstaging.DuneBooks.TITLE;
 import static com.betterreads.features.bookstaging.StubSourceClients.emptyFor;
 import static com.betterreads.features.bookstaging.StubSourceClients.malformedByIsbn;
@@ -17,7 +18,6 @@ import static com.betterreads.features.bookstaging.StubSourceClients.recordingIs
 import static com.betterreads.features.bookstaging.StubSourceClients.stubByIsbn;
 import static com.betterreads.features.bookstaging.StubSourceClients.stubByTitleAuthor;
 import static com.betterreads.features.bookstaging.StubSourceClients.unavailableByIsbn;
-import static com.betterreads.features.bookstaging.StubSourceClients.withIsbnHit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
@@ -74,28 +74,15 @@ class SourceCollectorTest {
         .authors(SourceAuthor.ofNames(List.of(AUTHOR)))
         .build();
 
-    private static final SourceBook HARDCOVER_RATING_HIT = SourceBook.builder(BookFieldSource.HARDCOVER)
-        .isbn13(ISBN)
-        .averageRating(HARDCOVER_RATING)
-        .build();
+    private static final SourceBook HARDCOVER_RATING_HIT = hardcoverHit(TITLE, HARDCOVER_RATING);
 
     @Test
     @DisplayName("fetches every source by ISBN and merges them with the seed")
     void collectsAllSourcesByIsbn() {
-        final SourceBook seed = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
-            .isbn13(ISBN)
-            .title(TITLE)
-            .authors(SourceAuthor.ofNames(List.of(AUTHOR)))
-            .build();
-        final SourceBook hardcoverHit = SourceBook.builder(BookFieldSource.HARDCOVER)
-            .isbn13(ISBN)
-            .title(TITLE)
-            .averageRating(HARDCOVER_RATING)
-            .build();
         final SourceCollector collector =
-            collectorWith(SAME_THREAD, stubByIsbn(BookFieldSource.HARDCOVER, ISBN, hardcoverHit));
+            collectorWith(SAME_THREAD, stubByIsbn(BookFieldSource.HARDCOVER, ISBN, HARDCOVER_RATING_HIT));
 
-        final MergedBook merged = collector.collectFor(seed);
+        final MergedBook merged = collector.collectFor(DuneBooks.openLibraryDune());
 
         assertThat(merged.book().averageRating())
             .as("Hardcover's rating, fetched by the seed's ISBN, must reach the merged book")
@@ -259,9 +246,9 @@ class SourceCollectorTest {
     @Test
     void shouldUseTitleLookupWhenIsbnHitHasAnotherTitle() {
         final BookSourceClient titleLookup =
-            stubByTitleAuthor(BookFieldSource.HARDCOVER, TITLE, AUTHOR, hardcoverHit(TITLE, HARDCOVER_RATING));
+            stubByTitleAuthor(BookFieldSource.HARDCOVER, TITLE, AUTHOR, HARDCOVER_RATING_HIT);
         final SourceCollector collector = collectorWith(SAME_THREAD,
-            withIsbnHit(titleLookup, ISBN, hardcoverHit(DuneBooks.SEQUEL_TITLE, WRONG_RATING)));
+            StubSourceClients.withIsbnHit(titleLookup, ISBN, hardcoverHit(SEQUEL_TITLE, WRONG_RATING)));
 
         final MergedBook merged = collector.collectFor(DuneBooks.openLibraryDune());
 
@@ -269,9 +256,8 @@ class SourceCollectorTest {
     }
 
     @Test
-    void shouldLeaveSourceUnresolvedWhenIsbnHitIsDroppedWithoutAuthor() {
-        final SourceCollector collector = collectorWith(SAME_THREAD, stubByIsbn(
-            BookFieldSource.HARDCOVER, ISBN, hardcoverHit(DuneBooks.SEQUEL_TITLE, WRONG_RATING)));
+    void shouldLeaveSourceUnresolvedWhenDroppedHitHasNoFallback() {
+        final SourceCollector collector = collectorWithIsbnHit(SEQUEL_TITLE, WRONG_RATING);
 
         final MergedBook merged = collector.collectFor(ISBN_SEED);
 
@@ -281,8 +267,7 @@ class SourceCollectorTest {
 
     @Test
     void shouldKeepIsbnHitWithMatchingTitle() {
-        final SourceCollector collector = collectorWith(SAME_THREAD, stubByIsbn(
-            BookFieldSource.HARDCOVER, ISBN, hardcoverHit(DELUXE_TITLE, HARDCOVER_RATING)));
+        final SourceCollector collector = collectorWithIsbnHit(DELUXE_TITLE, HARDCOVER_RATING);
 
         final MergedBook merged = collector.collectFor(ISBN_SEED);
 
@@ -291,8 +276,12 @@ class SourceCollectorTest {
 
     @Test
     void shouldKeepIsbnHitWithNoTitle() {
+        final SourceBook hit = SourceBook.builder(BookFieldSource.HARDCOVER)
+            .isbn13(ISBN)
+            .averageRating(HARDCOVER_RATING)
+            .build();
         final SourceCollector collector =
-            collectorWith(SAME_THREAD, stubByIsbn(BookFieldSource.HARDCOVER, ISBN, HARDCOVER_RATING_HIT));
+            collectorWith(SAME_THREAD, stubByIsbn(BookFieldSource.HARDCOVER, ISBN, hit));
 
         final MergedBook merged = collector.collectFor(ISBN_SEED);
 
@@ -304,8 +293,7 @@ class SourceCollectorTest {
         final SourceBook seed = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
             .isbn13(ISBN)
             .build();
-        final SourceCollector collector = collectorWith(SAME_THREAD, stubByIsbn(
-            BookFieldSource.HARDCOVER, ISBN, hardcoverHit(DuneBooks.SEQUEL_TITLE, HARDCOVER_RATING)));
+        final SourceCollector collector = collectorWithIsbnHit(SEQUEL_TITLE, HARDCOVER_RATING);
 
         final MergedBook merged = collector.collectFor(seed);
 
@@ -315,7 +303,7 @@ class SourceCollectorTest {
     @Test
     void shouldKeepTitleLookupHitWithAnotherTitle() {
         final SourceCollector collector = collectorWith(SAME_THREAD, stubByTitleAuthor(
-            BookFieldSource.HARDCOVER, TITLE, AUTHOR, hardcoverHit(DuneBooks.SEQUEL_TITLE, HARDCOVER_RATING)));
+            BookFieldSource.HARDCOVER, TITLE, AUTHOR, hardcoverHit(SEQUEL_TITLE, HARDCOVER_RATING)));
 
         final MergedBook merged = collector.collectFor(WORK_KEY_SEED);
 
@@ -323,14 +311,14 @@ class SourceCollectorTest {
     }
 
     @Test
-    void shouldWarnWithSourceIsbnAndBothTitlesWhenIsbnHitIsDropped(final CapturedOutput output) {
+    void shouldWarnWhenIsbnHitIsDropped(final CapturedOutput output) {
         final String brokenIsbn = ISBN + "\n";
         final SourceBook seed = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
             .isbn13(brokenIsbn)
-            .title("Du\nne")
+            .title("Du\r\nne")
             .build();
         final SourceCollector collector = collectorWith(SAME_THREAD, stubByIsbn(
-            BookFieldSource.HARDCOVER, brokenIsbn, hardcoverHit("Dune\nMessiah", WRONG_RATING)));
+            BookFieldSource.HARDCOVER, brokenIsbn, hardcoverHit("Dune\n\u001B  Messiah", WRONG_RATING)));
 
         collector.collectFor(seed);
 
@@ -344,8 +332,7 @@ class SourceCollectorTest {
 
     @Test
     void shouldNotWarnWhenIsbnHitHasMatchingTitle(final CapturedOutput output) {
-        final SourceCollector collector = collectorWith(SAME_THREAD, stubByIsbn(
-            BookFieldSource.HARDCOVER, ISBN, hardcoverHit(DELUXE_TITLE, HARDCOVER_RATING)));
+        final SourceCollector collector = collectorWithIsbnHit(DELUXE_TITLE, HARDCOVER_RATING);
 
         collector.collectFor(ISBN_SEED);
 
@@ -358,6 +345,10 @@ class SourceCollectorTest {
             .title(title)
             .averageRating(rating)
             .build();
+    }
+
+    private static SourceCollector collectorWithIsbnHit(final String title, final double rating) {
+        return collectorWith(SAME_THREAD, stubByIsbn(BookFieldSource.HARDCOVER, ISBN, hardcoverHit(title, rating)));
     }
 
     private static @Nullable List<String> awardsFromWikidataTitleAuthorHit(final SourceBook seed) {

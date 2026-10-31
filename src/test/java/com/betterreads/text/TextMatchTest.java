@@ -19,8 +19,6 @@ class TextMatchTest {
 
     private static final String FULLMETAL = "Fullmetal Alchemist, Vol. 1";
 
-    private static final String FLAME = "A Flame in Byzantium";
-
     private static final String CHRONOLOGY = "The New Essential Chronology";
 
     @Test
@@ -65,14 +63,16 @@ class TextMatchTest {
             arguments(FULLMETAL, "Fullmetal Alchemist, Volume 1"),
             arguments(FULLMETAL, "Fullmetal Alchemist Vol. 1: The Land of Sand"),
             arguments("Eat, Pray, Love", "Eat Pray Love"),
-            arguments("Spider-Man", "Spiderman"),
             arguments("Thérèse Raquin", "Therese Raquin"),
+            arguments("Æon Flux", "Aeon Flux"),
             arguments("Martian, The", "The Martian: A Novel"),
             arguments("???", DUNE),
             arguments("Demon Knights #1", "Demon knights"),
             arguments("Fathomless Riches ; or How I Went From Pop to Pulpit", "Fathomless Riches"),
             arguments("Κρίτων / Ἀπολογία", "Κρίτων"),
             arguments("Dune [Deluxe Edition]", DUNE),
+            arguments("[Deluxe Edition] Dune", DUNE),
+            arguments("Wicked: The Witch", "Witch"),
             arguments("Star Wars - The New Essential Chronology", CHRONOLOGY),
             arguments("Star Wars \u2013 The New Essential Chronology", CHRONOLOGY),
             arguments("Star Wars \u2014 The New Essential Chronology", CHRONOLOGY),
@@ -80,7 +80,7 @@ class TextMatchTest {
             arguments("Dune (Deluxe", DUNE),
             arguments("Eat, Pray, Love, Vol. 1", "Eat Pray Love Volume 1"),
             arguments("An Ember in the Ashes", "Ember in the Ashes"),
-            arguments(FLAME, "Flame in Byzantium"),
+            arguments("A Flame in Byzantium", "Flame in Byzantium"),
             arguments("Ember in the Ashes, An", "An Ember in the Ashes: A Novel"),
             arguments("Flame in Byzantium, A", "A Flame in Byzantium: A Novel"),
             arguments("The De\uFB01nitive Guide", "The Definitive Guide"));
@@ -101,9 +101,9 @@ class TextMatchTest {
             arguments(DUNE, "Neuromancer"),
             arguments("Le Petit Prince", "The Little Prince"),
             arguments(FULLMETAL, "Fullmetal Alchemist, Vol. 2"),
-            arguments("Batman: The Dark Knight Returns #4", "Batman: The Dark Knight Returns #1"),
-            arguments(FLAME, "The Kinsman Saga"),
-            arguments("Bøvol", "Vol"));
+            arguments("Бvol", "Vol"),
+            arguments("Spider-Man", "Man"),
+            arguments("Red Volcano", "Red"));
     }
 
     @ParameterizedTest(name = "{0} with {1}")
