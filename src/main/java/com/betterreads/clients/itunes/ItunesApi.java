@@ -2,7 +2,6 @@ package com.betterreads.clients.itunes;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import com.betterreads.clients.http.WebClients;
@@ -26,8 +25,6 @@ public class ItunesApi {
     private static final String SEARCH_PATH = "/search";
 
     private static final String LOOKUP_PATH = "/lookup";
-
-    private static final String TERM_PARAM = "term";
 
     private static final String RESULTS = "results";
 
@@ -88,9 +85,9 @@ public class ItunesApi {
         }
         return WebClients.getBodyOrEmptyOn4xxExcept429(itunesWebClient, builder -> builder
             .path(SEARCH_PATH)
-            .queryParam(TERM_PARAM, "{term}")
+            .queryParam("term", "{term}")
             .queryParam("media", EBOOK)
             .queryParam("limit", SEARCH_LIMIT)
-            .build(Map.of(TERM_PARAM, term)), LOG, "itunes.search");
+            .build(term), LOG, "itunes.search");
     }
 }

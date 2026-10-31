@@ -124,7 +124,7 @@ class WikidataClientWireMockTest extends WikidataWireMock {
 
             client.fetchByTitleAuthor(title, HERBERT_NAME);
 
-            WIREMOCK.verify(WireMock.getRequestedFor(WireMock.urlPathEqualTo("/w/api.php"))
+            WIREMOCK.verify(WireMock.getRequestedFor(WireMock.urlPathEqualTo(SEARCH_PATH))
                 .withQueryParam("search", WireMock.equalTo(title)));
         }
 

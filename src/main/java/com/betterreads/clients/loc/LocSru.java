@@ -1,6 +1,5 @@
 package com.betterreads.clients.loc;
 
-import java.util.Map;
 import java.util.Optional;
 
 import com.betterreads.clients.http.WebClients;
@@ -34,6 +33,6 @@ class LocSru {
             .queryParam("startRecord", FIRST_RECORD)
             .queryParam("maximumRecords", MAX_RECORDS)
             .queryParam("recordSchema", MODS_SCHEMA)
-            .build(Map.of("cql", cql)), LOG, "loc.searchRetrieve");
+            .build(cql), LOG, "loc.searchRetrieve");
     }
 }

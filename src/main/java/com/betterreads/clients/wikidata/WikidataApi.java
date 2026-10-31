@@ -2,7 +2,6 @@ package com.betterreads.clients.wikidata;
 
 import java.net.URI;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -42,7 +41,7 @@ public class WikidataApi {
             .queryParam("type", "item")
             .queryParam("format", "json")
             .queryParam("limit", SEARCH_LIMIT)
-            .build(Map.of("term", term)));
+            .build(term));
         return body.map(WikidataApi::parseCandidates).orElseGet(List::of);
     }
 

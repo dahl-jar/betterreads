@@ -1,6 +1,5 @@
 package com.betterreads.clients.googlebooks;
 
-import java.util.Map;
 import java.util.Optional;
 
 import com.betterreads.booksource.BookFieldSource;
@@ -54,7 +53,7 @@ class GoogleBooksClientImpl implements GoogleBooksClient {
                     .path(VOLUMES_PATH)
                     .queryParam("q", "{q}")
                     .queryParam("maxResults", 1)
-                    .build(Map.of("q", query)))
+                    .build(query))
                 .retrieve()
                 .bodyToMono(GoogleBooksSearchResponse.class)
                 .block();

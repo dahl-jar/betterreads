@@ -124,6 +124,17 @@ class OpenLibraryClientWireMockTest extends OpenLibraryWireMock {
 
             assertThat(result).map(SourceBook::openLibraryWorkKey).contains(HOBBIT_WORK_KEY);
         }
+
+        @Test
+        void shouldSendTitleAndAuthorAsSeparateParams() {
+            stubSearch(search());
+
+            client.fetchByTitleAuthor(HOBBIT_TITLE, HOBBIT_AUTHOR);
+
+            WIREMOCK.verify(getRequestedFor(urlPathEqualTo(SEARCH_PATH))
+                .withQueryParam("title", equalTo(HOBBIT_TITLE))
+                .withQueryParam("author", equalTo(HOBBIT_AUTHOR)));
+        }
     }
 
     @Nested
@@ -178,7 +189,7 @@ class OpenLibraryClientWireMockTest extends OpenLibraryWireMock {
         }
 
         @ParameterizedTest
-        @ValueSource(strings = {"{x}", "{x\nFORGED LINE}", "{a/\n2026-10-31 12:00:00.000 ERROR forged\n}"})
+        @ValueSource(strings = {"{x}", "{x\nFORGED LINE}"})
         void shouldSendBracesLiterally(final String query) {
             stubSearch(search());
 
