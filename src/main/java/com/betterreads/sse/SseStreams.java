@@ -6,6 +6,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.web.util.DisconnectedClientHelper;
 
 public class SseStreams {
 
@@ -68,9 +69,16 @@ public class SseStreams {
             emitter.send(event);
             return true;
         } catch (IOException | IllegalStateException ex) {
-            emitter.completeWithError(ex);
+            if (!isStreamGone(ex)) {
+                emitter.completeWithError(ex);
+            }
             return false;
         }
+    }
+
+    private static boolean isStreamGone(final Exception failure) {
+        return DisconnectedClientHelper.isClientDisconnectedException(failure)
+            || failure instanceof IllegalStateException && failure.getCause() == null;
     }
 
     public void heartbeat() {

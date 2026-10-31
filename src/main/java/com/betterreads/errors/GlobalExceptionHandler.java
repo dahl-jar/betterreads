@@ -17,6 +17,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -29,12 +30,6 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Maps exceptions to RFC 9457 problem+json responses.
- * every problem gets a {@code timestamp} to match it with the logs, a validation failure also lists
- * the bad fields under {@code errors}
- */
-// PMD.TooManyMethods: one handler per exception type is inherent to an exception-mapping advice.
 @SuppressWarnings("PMD.TooManyMethods")
 @RestControllerAdvice
 class GlobalExceptionHandler {
@@ -54,7 +49,6 @@ class GlobalExceptionHandler {
         return warnedProblem(HttpStatus.NOT_FOUND, "Resource not found", exception);
     }
 
-    /** scanners probe unknown paths all day, so a miss logs at debug */
     @ExceptionHandler(NoResourceFoundException.class)
     public ProblemDetail handleNoResource(final NoResourceFoundException exception) {
         LOG.debug("No endpoint for path={}", LogSanitizer.forLog(exception.getResourcePath()));
@@ -99,21 +93,18 @@ class GlobalExceptionHandler {
         return problem(HttpStatus.BAD_REQUEST, MALFORMED_BODY);
     }
 
-    /** a {@code limit=0} would divide by zero in paging, so a {@code @Min}/{@code @Max} miss is a 400 */
     @ExceptionHandler(ConstraintViolationException.class)
     public ProblemDetail handleParameterValidation(final ConstraintViolationException exception) {
         LOG.warn("Request parameter validation failed");
         return problem(HttpStatus.BAD_REQUEST, INVALID_PARAMETER);
     }
 
-    /** an unparseable enum or number like {@code ?status=UNKNOWN} would otherwise hit the catch-all 500 */
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ProblemDetail handleTypeMismatch(final MethodArgumentTypeMismatchException exception) {
         LOG.warn("Parameter type mismatch: name={}", LogSanitizer.forLog(exception.getName()));
         return problem(HttpStatus.BAD_REQUEST, INVALID_PARAMETER);
     }
 
-    /** the exception's own headers send Allow as one comma-joined value, so each method is added separately */
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ProblemDetail> handleMethodNotSupported(
             final HttpRequestMethodNotSupportedException exception) {
@@ -145,11 +136,16 @@ class GlobalExceptionHandler {
         return problem(HttpStatus.UNAUTHORIZED, "Invalid credentials");
     }
 
-    /** a timed-out SSE response is already committed as text/event-stream, so writing an error body would fail */
     @ExceptionHandler(AsyncRequestTimeoutException.class)
     @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
     public void handleAsyncTimeout(final AsyncRequestTimeoutException exception) {
         LOG.debug("async stream timed out, closing quietly");
+    }
+
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void handleClientClosed(final AsyncRequestNotUsableException exception) {
+        LOG.debug("client closed the stream, closing quietly");
     }
 
     @ExceptionHandler(Exception.class)
