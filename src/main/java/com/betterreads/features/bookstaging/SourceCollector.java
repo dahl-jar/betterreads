@@ -6,6 +6,8 @@ import com.betterreads.booksource.BookFieldSource;
 import com.betterreads.booksource.BookSourceClient;
 import com.betterreads.booksource.MergedBook;
 import com.betterreads.booksource.SourceBook;
+import com.betterreads.logging.LogSanitizer;
+import com.betterreads.text.TextMatch;
 
 import java.time.Duration;
 import java.util.Comparator;
@@ -28,12 +30,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClientException;
 
-/**
- * Fetches the other sources for a staged book and merges them into one.
- *
- * <p>A source that fails (5xx, network error, timeout, or an exception while parsing its response)
- * is dropped for this book and the merge goes on with the rest.
- */
 @Component
 public class SourceCollector {
 
@@ -81,11 +77,6 @@ public class SourceCollector {
         this.waveTimeout = waveTimeout;
     }
 
-    /**
-     * Both waves run even for a seed that could already show, because rating, awards, full genre,
-     * page count and author identity sit outside the show bar. Description-only sources go last and
-     * replace the merged description when they score higher.
-     */
     public MergedBook collectFor(final SourceBook seed) {
         final List<Fetched> fetched = WAVES.stream()
             .flatMap(wave -> fetchWave(wave, seed).stream())
@@ -111,7 +102,6 @@ public class SourceCollector {
             .toList();
     }
 
-    /** A source still running at the timeout is cancelled, so it counts as unresolved and the rest still merge. */
     // PMD.DoNotUseThreads: the catch has to restore the interrupt flag on the current thread
     @SuppressWarnings("PMD.DoNotUseThreads")
     private void awaitWave(final List<CompletableFuture<Fetched>> calls) {
@@ -146,7 +136,6 @@ public class SourceCollector {
         return index < 0 ? FETCH_ORDER.size() : index;
     }
 
-    /** Null when the source failed or found no book, so neither counts as resolved. */
     private static @Nullable Fetched fetch(final BookSourceClient client, final SourceBook seed) {
         try {
             return match(client, seed).map(book -> new Fetched(client.source(), book)).orElse(null);
@@ -160,7 +149,21 @@ public class SourceCollector {
     private static Optional<SourceBook> match(final BookSourceClient client, final SourceBook seed) {
         return Optional.ofNullable(seed.isbn13())
             .flatMap(client::fetchByIsbn)
+            .filter(hit -> keepIsbnHit(client.source(), seed, hit))
             .or(() -> fetchByTitleAuthor(client, seed));
+    }
+
+    private static boolean keepIsbnHit(
+        final BookFieldSource source, final SourceBook seed, final SourceBook hit) {
+        final String seedTitle = seed.title();
+        final String hitTitle = hit.title();
+        if (seedTitle == null || hitTitle == null || TextMatch.sameBookTitle(seedTitle, hitTitle)) {
+            return true;
+        }
+        LOG.warn(
+            "catalog.collect dropped ISBN hit with another title source={} isbn={} seedTitle=\"{}\" hitTitle=\"{}\"",
+            source, LogSanitizer.forLog(seed.isbn13()), LogSanitizer.forLog(seedTitle), LogSanitizer.forLog(hitTitle));
+        return false;
     }
 
     private static Optional<SourceBook> fetchByTitleAuthor(
