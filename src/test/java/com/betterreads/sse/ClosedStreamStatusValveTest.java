@@ -6,7 +6,6 @@ import static org.mockito.Mockito.when;
 
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletException;
-import java.io.IOException;
 import java.util.stream.Stream;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
@@ -27,14 +26,12 @@ class ClosedStreamStatusValveTest {
 
     private static final String EVENT_STREAM = MediaType.TEXT_EVENT_STREAM_VALUE;
 
-    private static final Exception CLOSED_CLIENT = new IOException("Broken pipe");
-
     private final ClosedStreamStatusValve valve = new ClosedStreamStatusValve();
 
     @Test
     void shouldLogClosedStreamAs499() {
         final org.apache.coyote.Response coyote = coyoteResponse(SERVER_ERROR, EVENT_STREAM);
-        final Request request = failedRequest(CLOSED_CLIENT);
+        final Request request = failedRequest(RecordingSseStreams.CLOSED_CLIENT);
 
         valve.log(request, responseWrapping(coyote), 0L);
 
@@ -57,9 +54,11 @@ class ClosedStreamStatusValveTest {
         return Stream.of(
             Arguments.of(Named.of("failure from the app", new ServletException("no converter")),
                 EVENT_STREAM, SERVER_ERROR),
-            Arguments.of(Named.of("json response", CLOSED_CLIENT), MediaType.APPLICATION_JSON_VALUE, SERVER_ERROR),
-            Arguments.of(Named.of("no content type", CLOSED_CLIENT), null, SERVER_ERROR),
-            Arguments.of(Named.of("status 200", CLOSED_CLIENT), EVENT_STREAM, HttpStatus.OK.value()));
+            Arguments.of(Named.of("json response", RecordingSseStreams.CLOSED_CLIENT),
+                MediaType.APPLICATION_JSON_VALUE, SERVER_ERROR),
+            Arguments.of(Named.of("no content type", RecordingSseStreams.CLOSED_CLIENT), null, SERVER_ERROR),
+            Arguments.of(Named.of("status 200", RecordingSseStreams.CLOSED_CLIENT),
+                EVENT_STREAM, HttpStatus.OK.value()));
     }
 
     @Test

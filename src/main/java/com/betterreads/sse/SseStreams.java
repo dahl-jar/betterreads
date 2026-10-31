@@ -25,7 +25,11 @@ public class SseStreams {
     public SseEmitter register(final String key) {
         final SseEmitter emitter = newEmitter();
         openStreams.incrementAndGet();
-        byKey.computeIfAbsent(key, ignored -> ConcurrentHashMap.newKeySet()).add(emitter);
+        byKey.compute(key, (ignored, streams) -> {
+            final Set<SseEmitter> open = streams == null ? ConcurrentHashMap.newKeySet() : streams;
+            open.add(emitter);
+            return open;
+        });
         emitter.onCompletion(() -> remove(key, emitter));
         emitter.onTimeout(() -> remove(key, emitter));
         emitter.onError(ignored -> remove(key, emitter));

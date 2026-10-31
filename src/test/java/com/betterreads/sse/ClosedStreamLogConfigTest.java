@@ -39,7 +39,7 @@ class ClosedStreamLogConfigTest {
 
     private final RecordingAccessLog accessLog = new RecordingAccessLog();
 
-    private final WebServer server = closedStreamServer();
+    private final WebServer server = newServer();
 
     @BeforeEach
     void setUp() {
@@ -62,7 +62,7 @@ class ClosedStreamLogConfigTest {
         assertThat(logged).isEqualTo(CLIENT_CLOSED);
     }
 
-    private WebServer closedStreamServer() {
+    private WebServer newServer() {
         final TomcatServletWebServerFactory factory = new TomcatServletWebServerFactory(RANDOM_PORT);
         final WebServerFactoryCustomizer<TomcatServletWebServerFactory> customizer =
             new ClosedStreamLogConfig().closedStreamCustomizer();
@@ -90,7 +90,7 @@ class ClosedStreamLogConfigTest {
         protected void doGet(final HttpServletRequest request, final HttpServletResponse response) throws IOException {
             response.setStatus(HttpStatus.INTERNAL_SERVER_ERROR.value());
             response.setContentType(MediaType.TEXT_EVENT_STREAM_VALUE);
-            request.setAttribute(RequestDispatcher.ERROR_EXCEPTION, new IOException("Broken pipe"));
+            request.setAttribute(RequestDispatcher.ERROR_EXCEPTION, RecordingSseStreams.CLOSED_CLIENT);
             response.flushBuffer();
         }
     }

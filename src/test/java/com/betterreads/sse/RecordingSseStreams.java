@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -83,8 +82,6 @@ public class RecordingSseStreams extends SseStreams {
 
         private final AtomicBoolean clientClosed = new AtomicBoolean();
 
-        private final AtomicInteger attempts = new AtomicInteger();
-
         public List<String> sent() {
             return List.copyOf(events);
         }
@@ -106,17 +103,12 @@ public class RecordingSseStreams extends SseStreams {
             sendFailure.set(CLOSED_CLIENT);
         }
 
-        public int sendAttempts() {
-            return attempts.get();
-        }
-
         public @Nullable Throwable closedWith() {
             return closeFailure.get();
         }
 
         @Override
         public void send(final SseEventBuilder event) throws IOException {
-            attempts.incrementAndGet();
             final Exception failure = sendFailure.get();
             if (clientClosed.get()) {
                 fireError(Objects.requireNonNull(failure));

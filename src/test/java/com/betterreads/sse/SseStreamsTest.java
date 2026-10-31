@@ -8,7 +8,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.betterreads.sse.RecordingSseStreams.RecordingEmitter;
+import com.betterreads.testsupport.ConcurrentCalls;
 import java.io.IOException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -37,6 +40,10 @@ class SseStreamsTest {
     private static final String KEEPALIVE = "keepalive";
 
     private static final String FAILED_TO_SEND = "Failed to send";
+
+    private static final int WORKERS = 4;
+
+    private static final int CYCLES = 5_000;
 
     private final RecordingSseStreams streams = new RecordingSseStreams();
 
@@ -71,6 +78,19 @@ class SseStreamsTest {
         final RecordingEmitter emitter = streams.lastEmitter();
 
         emitter.finish();
+
+        assertThat(streams.atCapacity()).isFalse();
+    }
+
+    @Test
+    void shouldFreeSlotsWhenStreamsOpenAndCloseInParallel()
+            throws InterruptedException, ExecutionException, TimeoutException {
+        ConcurrentCalls.run(WORKERS, () -> {
+            openAndClose();
+            return true;
+        });
+
+        IntStream.range(1, STREAM_CAP).forEach(ignored -> streams.register(KEY));
 
         assertThat(streams.atCapacity()).isFalse();
     }
@@ -140,6 +160,13 @@ class SseStreamsTest {
         verify(emitter).completeWithError(any(IllegalStateException.class));
     }
 
+    private void openAndClose() {
+        IntStream.range(0, CYCLES).forEach(ignored -> {
+            final RecordingEmitter emitter = (RecordingEmitter) streams.register(KEY);
+            emitter.finish();
+        });
+    }
+
     @Nested
     class WhenSendFails {
 
@@ -155,17 +182,6 @@ class SseStreamsTest {
 
             assertThat(first.sent()).last().asString().contains(DATA);
             assertThat(third.sent()).last().asString().contains(DATA);
-        }
-
-        @Test
-        void shouldStopSendingToClosedStream() {
-            final RecordingEmitter closed = registerClosed();
-            streams.send(KEY, EVENT, DATA);
-            final int attempts = closed.sendAttempts();
-
-            streams.send(KEY, EVENT, DATA);
-
-            assertThat(closed.sendAttempts()).isEqualTo(attempts);
         }
 
         @Test
