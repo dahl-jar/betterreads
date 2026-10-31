@@ -1,5 +1,6 @@
 package com.betterreads.features.account;
 
+import com.betterreads.mailoutbox.MailOutbox;
 import com.betterreads.mailoutbox.MailOutboxService;
 import com.betterreads.testsupport.Accounts;
 import com.betterreads.testsupport.ConcurrentCalls;
@@ -25,6 +26,7 @@ import static com.betterreads.features.account.AccountTestFixture.FIELD_TOKEN;
 import static com.betterreads.features.account.AccountTestFixture.UNKNOWN_EMAIL;
 import static com.betterreads.features.account.AccountTestFixture.UNKNOWN_TOKEN;
 import static com.betterreads.testsupport.Accounts.MIXED_CASE_EMAIL;
+import static com.betterreads.testsupport.Accounts.OTHER_USER;
 import static com.betterreads.testsupport.Accounts.PASSWORD;
 import static com.betterreads.testsupport.Accounts.REGISTER_URL;
 import static com.betterreads.testsupport.Accounts.USER;
@@ -33,7 +35,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** Covers issuing, consuming, and resending email-verification tokens. */
 @TestPropertySource(properties = {
     "auth.rate-limit.resend-verification-capacity=1000",
     "auth.rate-limit.resend-verification-refill-tokens=1000",
@@ -78,6 +79,23 @@ class EmailVerificationIntegrationTest extends AccountMailTest {
                 .hasSize(1)
                 .first()
                 .satisfies(t -> assertThat(t.getConsumedAt()).isNull());
+        }
+
+        @Test
+        void shouldQueueNoticeWhenEmailTakenByUnverifiedAccount() throws Exception {
+            final long userId = registerNewUser();
+
+            mockMvc.perform(post(REGISTER_URL)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(Accounts.registerPayload(objectMapper, OTHER_USER, USER_EMAIL, PASSWORD)))
+                .andExpect(status().isCreated());
+
+            assertThat(mailOutboxRepository.findAll())
+                .extracting(MailOutbox::getTemplate)
+                .containsExactlyInAnyOrder(
+                    MailOutboxService.TEMPLATE_EMAIL_VERIFICATION, MailOutboxService.TEMPLATE_SIGNUP_ATTEMPT);
+            assertThat(emailTokenRepository.findActive(userId, EmailToken.Purpose.EMAIL_VERIFICATION))
+                .hasSize(1);
         }
     }
 
@@ -144,12 +162,6 @@ class EmailVerificationIntegrationTest extends AccountMailTest {
                 .andExpect(status().isBadRequest());
         }
 
-        /**
-         * A resend before the original link is clicked marks the prior token consumed.
-         * Presenting that superseded token has to fail: the user is unverified, and a 204 would
-         * leave the frontend showing a verified state while {@code email_verified_at} stays
-         * null. Only a token consumed by a real verification qualifies for the replay 204.
-         */
         @Test
         void rejectsSupersededTokenWhenUserStillUnverified() throws Exception {
             final long userId = registerNewUser();
@@ -234,11 +246,6 @@ class EmailVerificationIntegrationTest extends AccountMailTest {
                 .hasSize(1);
         }
 
-        /**
-         * Concurrent resends contend for the partial unique index on
-         * {@code (user_id) WHERE consumed_at IS NULL}. The write lock on the user row serializes
-         * them, so every call succeeds and one active token survives.
-         */
         @Test
         void concurrentResendLeavesOneActiveToken() throws Exception {
             final long userId = registerNewUser();

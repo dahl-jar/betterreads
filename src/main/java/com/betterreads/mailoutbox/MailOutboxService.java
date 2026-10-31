@@ -8,18 +8,16 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Queues outbound email. The enqueue joins the caller's transaction, so the row commits or
- * rolls back with the state the email refers to.
- */
 @Service
 public class MailOutboxService {
 
-    /** Must match the {@code mail_outbox.template} CHECK constraint. */
     public static final String TEMPLATE_PASSWORD_RESET = "password_reset";
 
-    /** Must match the {@code mail_outbox.template} CHECK constraint. */
     public static final String TEMPLATE_EMAIL_VERIFICATION = "email_verification";
+
+    public static final String TEMPLATE_SIGNUP_ATTEMPT = "signup_attempt";
+
+    private static final String PAYLOAD_TOKEN = "token";
 
     private final MailOutboxRepository repository;
 
@@ -32,19 +30,24 @@ public class MailOutboxService {
 
     @Transactional
     public void enqueuePasswordReset(final String recipient, final String plaintextToken) {
-        enqueue(TEMPLATE_PASSWORD_RESET, recipient, plaintextToken);
+        enqueue(TEMPLATE_PASSWORD_RESET, recipient, Map.of(PAYLOAD_TOKEN, plaintextToken));
     }
 
     @Transactional
     public void enqueueEmailVerification(final String recipient, final String plaintextToken) {
-        enqueue(TEMPLATE_EMAIL_VERIFICATION, recipient, plaintextToken);
+        enqueue(TEMPLATE_EMAIL_VERIFICATION, recipient, Map.of(PAYLOAD_TOKEN, plaintextToken));
     }
 
-    private void enqueue(final String template, final String recipient, final String plaintextToken) {
+    @Transactional
+    public void enqueueSignupAttempt(final String recipient) {
+        enqueue(TEMPLATE_SIGNUP_ATTEMPT, recipient, Map.of());
+    }
+
+    private void enqueue(final String template, final String recipient, final Map<String, Object> payload) {
         final MailOutbox row = new MailOutbox();
         row.setTemplate(template);
         row.setRecipient(recipient);
-        row.setPayload(serialize(Map.of("token", plaintextToken)));
+        row.setPayload(serialize(payload));
         final Instant now = Instant.now();
         row.setCreatedAt(now);
         row.setNextAttemptAt(now);

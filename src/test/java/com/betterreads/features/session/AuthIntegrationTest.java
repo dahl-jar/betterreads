@@ -1,6 +1,7 @@
 package com.betterreads.features.session;
 
 import com.betterreads.mailoutbox.MailOutboxRepository;
+import com.betterreads.mailoutbox.MailOutboxService;
 import com.betterreads.ratelimit.RateLimitFilter;
 import com.betterreads.security.JwtIssuer;
 import com.betterreads.security.JwtProperties;
@@ -79,6 +80,20 @@ class AuthIntegrationTest extends ContainerizedTest {
 
     private static final String USERNAME_TAKEN = "Username already taken";
 
+    private static final String EMPTY_PAYLOAD = "{}";
+
+    private static final Duration INSIDE_NOTICE_WINDOW = Duration.ofHours(23);
+
+    private static final Duration AFTER_NOTICE_WINDOW = Duration.ofHours(25);
+
+    private static final int LABEL_LENGTH_OVER_LIMIT = 58;
+
+    private static final int LABEL_LENGTH_AT_LIMIT = 57;
+
+    private static final int LOCAL_PART_LENGTH = 64;
+
+    private static final int DOMAIN_LABEL_LENGTH = 63;
+
     @Autowired
     private UserRepository userRepository;
 
@@ -144,28 +159,57 @@ class AuthIntegrationTest extends ContainerizedTest {
         }
 
         @Test
-        void rejectsDuplicateEmailWithConflict() throws Exception {
-            Accounts.seedUser(userRepository, passwordEncoder, Accounts.USER, Accounts.USER_EMAIL, PASSWORD);
+        void shouldRejectTakenUsernameWhenEmailAlsoTaken() throws Exception {
+            seedOwner();
             final String body =
-                Accounts.registerPayload(objectMapper, Accounts.OTHER_USER, Accounts.USER_EMAIL, PASSWORD);
+                Accounts.registerPayload(objectMapper, Accounts.USER, Accounts.USER_EMAIL, PASSWORD);
 
             AuthRequests.register(mockMvc, body)
-                .andExpect(conflictWithDetail("Email already registered"));
+                .andExpect(conflictWithDetail(USERNAME_TAKEN));
+
+            assertThat(mailOutboxRepository.findAll()).isEmpty();
         }
 
         @Test
-        void shouldRejectUsernameHeldBySoftDeletedUserWithConflict() throws Exception {
-            final User deleted = new User();
-            deleted.setUsername(Accounts.USER);
-            deleted.setEmail(Accounts.USER_EMAIL);
-            deleted.setPasswordHash(Objects.requireNonNull(passwordEncoder.encode(PASSWORD)));
-            deleted.setDeletedAt(Instant.now());
-            userRepository.save(deleted);
+        void shouldRejectSoftDeletedUsernameWhenEmailTaken() throws Exception {
+            seedDeletedUser();
+            Accounts.seedUser(
+                userRepository, passwordEncoder, Accounts.OTHER_USER, Accounts.OTHER_USER_EMAIL, PASSWORD);
             final String body =
                 Accounts.registerPayload(objectMapper, Accounts.USER, Accounts.OTHER_USER_EMAIL, PASSWORD);
 
             AuthRequests.register(mockMvc, body)
-                .andExpect(conflictWithDetail("Username or email already registered"));
+                .andExpect(conflictWithDetail(USERNAME_TAKEN));
+        }
+
+        @Test
+        void shouldRejectUsernameHeldBySoftDeletedUserWithConflict() throws Exception {
+            seedDeletedUser();
+            final String body =
+                Accounts.registerPayload(objectMapper, Accounts.USER, Accounts.OTHER_USER_EMAIL, PASSWORD);
+
+            AuthRequests.register(mockMvc, body)
+                .andExpect(conflictWithDetail(USERNAME_TAKEN));
+        }
+
+        @Test
+        void shouldRejectEmailOverStoredLimit() throws Exception {
+            final String body = Accounts.registerPayload(
+                objectMapper, Accounts.USER, emailEndingIn(LABEL_LENGTH_OVER_LIMIT), PASSWORD);
+
+            AuthRequests.register(mockMvc, body)
+                .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        void shouldAcceptEmailAtStoredLimit() throws Exception {
+            final String email = emailEndingIn(LABEL_LENGTH_AT_LIMIT);
+            final String body = Accounts.registerPayload(objectMapper, Accounts.USER, email, PASSWORD);
+
+            AuthRequests.register(mockMvc, body)
+                .andExpect(status().isCreated());
+
+            assertThat(storedEmail()).isEqualTo(email);
         }
 
         @ParameterizedTest(name = "rejects invalid {0} with 400")
@@ -195,10 +239,7 @@ class AuthIntegrationTest extends ContainerizedTest {
             AuthRequests.register(mockMvc, body)
                 .andExpect(status().isCreated());
 
-            assertThat(userRepository.findIdByUsername(Accounts.USER).flatMap(userRepository::findById))
-                .get()
-                .extracting(User::getEmail)
-                .isEqualTo(Accounts.USER_EMAIL);
+            assertThat(storedEmail()).isEqualTo(Accounts.USER_EMAIL);
         }
 
         @Test
@@ -230,6 +271,90 @@ class AuthIntegrationTest extends ContainerizedTest {
             AuthRequests.register(mockMvc, "{\"username\": \"user\"")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath(JSON_DETAIL).value("Malformed request body"));
+        }
+    }
+
+    @Nested
+    @DisplayName("POST /auth/register with a taken email")
+    class RegisterTakenEmail {
+
+        @Test
+        void shouldAnswerLikeNewEmailWhenEmailTaken() throws Exception {
+            seedOwner();
+
+            AuthRequests.register(mockMvc, takenEmailBody())
+                .andExpect(status().isCreated())
+                .andExpect(header().doesNotExist(SET_COOKIE))
+                .andExpect(content().string(""));
+
+            assertThat(userRepository.count()).isOne();
+        }
+
+        @Test
+        void shouldQueueNoticeWhenEmailTakenByVerifiedAccount() throws Exception {
+            seedOwner();
+
+            AuthRequests.register(mockMvc, takenEmailBody())
+                .andExpect(status().isCreated());
+
+            assertThat(mailOutboxRepository.findAll())
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.getTemplate()).isEqualTo(MailOutboxService.TEMPLATE_SIGNUP_ATTEMPT);
+                    assertThat(row.getRecipient()).isEqualTo(Accounts.USER_EMAIL);
+                    assertThat(row.getPayload()).isEqualTo(EMPTY_PAYLOAD);
+                });
+        }
+
+        @Test
+        void shouldSkipNoticeOnRepeat() throws Exception {
+            seedOwner();
+            AuthRequests.register(mockMvc, takenEmailBody())
+                .andExpect(status().isCreated());
+
+            AuthRequests.register(mockMvc, takenEmailBody())
+                .andExpect(status().isCreated())
+                .andExpect(content().string(""));
+
+            assertThat(mailOutboxRepository.findAll()).hasSize(1);
+        }
+
+        @Test
+        void shouldSkipNoticeInsideWindow() throws Exception {
+            registerWithNoticeSent(INSIDE_NOTICE_WINDOW);
+
+            assertThat(mailOutboxRepository.findAll()).isEmpty();
+        }
+
+        @Test
+        void shouldQueueNoticeAfterWindow() throws Exception {
+            registerWithNoticeSent(AFTER_NOTICE_WINDOW);
+
+            assertThat(mailOutboxRepository.findAll()).hasSize(1);
+        }
+
+        @Test
+        void shouldQueueNoticeToStoredAddressWhenEmailMixedCase() throws Exception {
+            seedOwner();
+            final String body =
+                Accounts.registerPayload(objectMapper, Accounts.OTHER_USER, Accounts.MIXED_CASE_EMAIL, PASSWORD);
+
+            AuthRequests.register(mockMvc, body)
+                .andExpect(status().isCreated());
+
+            assertThat(mailOutboxRepository.findAll())
+                .singleElement()
+                .satisfies(row -> assertThat(row.getRecipient()).isEqualTo(Accounts.USER_EMAIL));
+        }
+
+        @Test
+        void shouldAnswerBadRequestWhenPasswordTooLongOnTakenEmail() throws Exception {
+            seedOwner();
+            final String body = Accounts.registerPayload(
+                objectMapper, Accounts.OTHER_USER, Accounts.USER_EMAIL, PASSWORD_40_CHARS_80_BYTES);
+
+            AuthRequests.register(mockMvc, body)
+                .andExpect(status().isBadRequest());
         }
     }
 
@@ -382,6 +507,52 @@ class AuthIntegrationTest extends ContainerizedTest {
             mockMvc.perform(get(Accounts.ME_URL).header(Accounts.AUTH_HEADER, Accounts.BEARER_PREFIX + expiredToken))
                 .andExpect(status().isUnauthorized());
         }
+    }
+
+    private void seedOwner() {
+        Accounts.seedUser(userRepository, passwordEncoder, Accounts.USER, Accounts.USER_EMAIL, PASSWORD);
+    }
+
+    private void seedDeletedUser() {
+        final User deleted = new User();
+        deleted.setUsername(Accounts.USER);
+        deleted.setEmail(Accounts.USER_EMAIL);
+        deleted.setPasswordHash(Objects.requireNonNull(passwordEncoder.encode(PASSWORD)));
+        deleted.setDeletedAt(Instant.now());
+        userRepository.save(deleted);
+    }
+
+    private String takenEmailBody() {
+        return Accounts.registerPayload(objectMapper, Accounts.OTHER_USER, Accounts.USER_EMAIL, PASSWORD);
+    }
+
+    // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
+    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
+    private void registerWithNoticeSent(final Duration ago) throws Exception {
+        seedOwner();
+        setNoticeSentAt(Accounts.USER_EMAIL, ago);
+
+        AuthRequests.register(mockMvc, takenEmailBody())
+            .andExpect(status().isCreated())
+            .andExpect(content().string(""));
+    }
+
+    private String storedEmail() {
+        return userRepository.findIdByUsername(Accounts.USER)
+            .flatMap(userRepository::findById)
+            .orElseThrow()
+            .getEmail();
+    }
+
+    private void setNoticeSentAt(final String email, final Duration ago) {
+        jdbcTemplate.update(
+            "UPDATE app_user SET signup_notice_sent_at = now() - make_interval(hours => ?::int) WHERE email = ?",
+            ago.toHours(), email);
+    }
+
+    private static String emailEndingIn(final int lastLabelLength) {
+        return "a".repeat(LOCAL_PART_LENGTH) + "@" + "b".repeat(DOMAIN_LABEL_LENGTH) + "."
+            + "b".repeat(DOMAIN_LABEL_LENGTH) + "." + "b".repeat(lastLabelLength) + ".com";
     }
 
     private static ResultMatcher conflictWithDetail(final String detail) {

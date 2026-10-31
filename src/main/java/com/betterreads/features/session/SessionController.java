@@ -27,7 +27,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Session endpoints. {@code me} needs an access JWT, the rest are public. */
 @RestController
 @RequestMapping(RefreshCookies.COOKIE_PATH)
 @Tag(name = "Authentication", description = "Register, log in, and look up the current user")
@@ -45,10 +44,10 @@ class SessionController {
     @PostMapping("/register")
     @Operation(summary = "Register a new user")
     @SecurityRequirements
-    @ApiResponse(responseCode = "201", description = "Account created")
+    @ApiResponse(responseCode = "201", description = "Registration accepted")
     @ApiResponse(responseCode = "400", description = "Validation failed",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-    @ApiResponse(responseCode = "409", description = "Username or email already taken",
+    @ApiResponse(responseCode = "409", description = "Username already taken",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @RateLimitedResponse
     public ResponseEntity<Void> register(@Valid @RequestBody final RegisterRequest request) {

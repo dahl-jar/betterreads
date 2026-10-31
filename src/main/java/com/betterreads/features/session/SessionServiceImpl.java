@@ -1,11 +1,9 @@
 package com.betterreads.features.session;
 
-import com.betterreads.errors.BusinessRuleException;
 import com.betterreads.errors.ForbiddenException;
 import com.betterreads.logging.LogSanitizer;
 import com.betterreads.security.JwtIssuer;
 import com.betterreads.users.EmailNormalizer;
-import com.betterreads.users.EmailVerificationIssuer;
 import com.betterreads.users.User;
 import com.betterreads.users.UserLookup;
 import com.betterreads.users.UserMapper;
@@ -25,12 +23,6 @@ class SessionServiceImpl implements SessionService {
 
     private static final Logger LOG = LoggerFactory.getLogger(SessionServiceImpl.class);
 
-    private static final String DUPLICATE_USERNAME = "Username already taken";
-
-    private static final String DUPLICATE_EMAIL = "Email already registered";
-
-    private static final String DUPLICATE_USERNAME_OR_EMAIL = "Username or email already registered";
-
     private static final String INVALID_CREDENTIALS = "Invalid credentials";
 
     private static final String EMAIL_NOT_VERIFIED = "Verify your email to log in";
@@ -49,7 +41,7 @@ class SessionServiceImpl implements SessionService {
 
     private final RefreshTokenService refreshTokenService;
 
-    private final EmailVerificationIssuer emailVerificationIssuer;
+    private final RegistrationWriter registrationWriter;
 
     // PMD.ExcessiveParameterList: register, login, current user and refresh each need a different mix of beans.
     @SuppressWarnings("PMD.ExcessiveParameterList")
@@ -60,7 +52,7 @@ class SessionServiceImpl implements SessionService {
         final JwtIssuer jwtIssuer,
         final UserMapper userMapper,
         final RefreshTokenService refreshTokenService,
-        final EmailVerificationIssuer emailVerificationIssuer
+        final RegistrationWriter registrationWriter
     ) {
         this.userRepository = userRepository;
         this.userPasswords = userPasswords;
@@ -68,37 +60,33 @@ class SessionServiceImpl implements SessionService {
         this.jwtIssuer = jwtIssuer;
         this.userMapper = userMapper;
         this.refreshTokenService = refreshTokenService;
-        this.emailVerificationIssuer = emailVerificationIssuer;
+        this.registrationWriter = registrationWriter;
     }
 
     @Override
-    @Transactional
     public void register(final RegisterRequest request) {
         final String normalizedEmail = EmailNormalizer.normalize(request.email());
-
-        if (userRepository.existsByUsername(request.username())) {
-            throw new BusinessRuleException(DUPLICATE_USERNAME);
-        }
-        if (userRepository.existsByEmail(normalizedEmail)) {
-            throw new BusinessRuleException(DUPLICATE_EMAIL);
-        }
+        registrationWriter.rejectHeldUsername(request.username());
+        final boolean emailTaken = userRepository.isEmailHeldByAnyRow(normalizedEmail);
 
         final User user = new User();
         user.setUsername(request.username());
         user.setEmail(normalizedEmail);
         userPasswords.setPassword(user, request.password());
 
-        final User saved;
-        try {
-            saved = userRepository.saveAndFlush(user);
-        } catch (final DataIntegrityViolationException ex) {
-            LOG.warn("Registration conflicted with existing username or email username={}",
-                LogSanitizer.forLog(request.username()));
-            throw new BusinessRuleException(DUPLICATE_USERNAME_OR_EMAIL, ex);
+        if (emailTaken) {
+            registrationWriter.answerTakenEmail(normalizedEmail);
+            return;
         }
-        emailVerificationIssuer.issueVerification(saved.getUserId(), saved.getEmail());
-        LOG.info("Registered new user userId={} username={}",
-            saved.getUserId(), LogSanitizer.forLog(saved.getUsername()));
+        try {
+            registrationWriter.create(user);
+        } catch (final DataIntegrityViolationException ex) {
+            LOG.warn("Registration insert failed on a constraint username={}",
+                LogSanitizer.forLog(request.username()));
+            if (!registrationWriter.resolveClash(request.username(), normalizedEmail)) {
+                throw ex;
+            }
+        }
     }
 
     @Override
