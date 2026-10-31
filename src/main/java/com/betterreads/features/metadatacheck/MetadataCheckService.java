@@ -13,6 +13,8 @@ import java.util.stream.IntStream;
 
 import com.betterreads.book.Author;
 import com.betterreads.book.Book;
+import com.betterreads.book.BookOrder;
+import com.betterreads.book.BookRepository;
 import com.betterreads.book.BookSubject;
 import com.betterreads.book.BookUpsertService;
 import com.betterreads.book.VerifiedMetadata;
@@ -42,6 +44,8 @@ class MetadataCheckService {
 
     private final MetadataCheckRepository books;
 
+    private final BookRepository catalog;
+
     private final MetadataCheckClient client;
 
     private final BookUpsertService upsert;
@@ -50,11 +54,13 @@ class MetadataCheckService {
 
     MetadataCheckService(
         final MetadataCheckRepository books,
+        final BookRepository catalog,
         final MetadataCheckClient client,
         final BookUpsertService upsert,
         final MetadataCheckProperties properties
     ) {
         this.books = books;
+        this.catalog = catalog;
         this.client = client;
         this.upsert = upsert;
         this.properties = properties;
@@ -62,7 +68,8 @@ class MetadataCheckService {
 
     public void checkDueBooks() {
         final OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        final List<Book> due = books.findDueForCheck(now, PageRequest.ofSize(properties.maxBooksPerRun()));
+        final List<Long> ids = books.findIdsDueForCheck(now, PageRequest.ofSize(properties.maxBooksPerRun()));
+        final List<Book> due = BookOrder.byIds(ids, catalog.findWithSubjectsByBookIdIn(ids));
         LOG.info("catalog.metadata-check checking books={}", due.size());
         if (due.isEmpty()) {
             return;

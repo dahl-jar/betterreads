@@ -6,6 +6,7 @@ import com.betterreads.book.ResolvedCredit;
 import com.betterreads.booksource.CreditRole;
 import com.betterreads.book.BookRepository;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public final class Books {
@@ -64,5 +65,13 @@ public final class Books {
         book.setFirstPublishYear(PUBLISH_YEAR);
         book.replaceCredits(List.of(new ResolvedCredit(author, CreditRole.AUTHOR)));
         return book;
+    }
+
+    public static List<Long> idsOf(final List<Book> books) {
+        final List<Long> ids = new ArrayList<>();
+        for (final Book book : books) {
+            ids.add(book.getBookId());
+        }
+        return ids;
     }
 }

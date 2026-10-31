@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.stream.LongStream;
 
 import com.betterreads.book.Book;
+import com.betterreads.book.BookRepository;
 import com.betterreads.book.ResolvedCredit;
 import com.betterreads.booksource.CreditRole;
 import com.betterreads.book.BookUpsertService;
@@ -83,15 +84,19 @@ class MetadataCheckServiceTest {
 
     private final MetadataCheckRepository books = mock(MetadataCheckRepository.class);
 
+    private final BookRepository catalog = mock(BookRepository.class);
+
     private final MetadataCheckClient client = mock(MetadataCheckClient.class);
 
     private final BookUpsertService upsert = mock(BookUpsertService.class);
 
     private final MetadataCheckService service =
-        new MetadataCheckService(books, client, upsert, MetadataCheckSamples.properties(true));
+        new MetadataCheckService(books, catalog, client, upsert, MetadataCheckSamples.properties(true));
 
     private void givenBooks(final List<Book> found) {
-        when(books.findDueForCheck(any(OffsetDateTime.class), any(Pageable.class))).thenReturn(found);
+        final List<Long> ids = Books.idsOf(found);
+        when(books.findIdsDueForCheck(any(OffsetDateTime.class), any(Pageable.class))).thenReturn(ids);
+        when(catalog.findWithSubjectsByBookIdIn(ids)).thenReturn(found);
     }
 
     private static List<Book> booksNumbered(final int count) {
@@ -165,8 +170,26 @@ class MetadataCheckServiceTest {
 
             service.checkDueBooks();
 
-            verify(books).findDueForCheck(any(OffsetDateTime.class), page.capture());
+            verify(books).findIdsDueForCheck(any(OffsetDateTime.class), page.capture());
             assertThat(page.getValue().getPageSize()).isEqualTo(MetadataCheckSamples.MAX_BOOKS);
+        }
+
+        @Test
+        void shouldCheckBooksInQueueOrder() {
+            final List<Long> queue = List.of(OTHER_ID, BOOK_ID);
+            when(books.findIdsDueForCheck(any(OffsetDateTime.class), any(Pageable.class))).thenReturn(queue);
+            when(catalog.findWithSubjectsByBookIdIn(queue)).thenReturn(List.of(book(BOOK_ID), book(OTHER_ID)));
+            givenAnswers(Map.of());
+            final ArgumentCaptor<List<MetadataCheckRequest>> batch = ArgumentCaptor.captor();
+
+            service.checkDueBooks();
+
+            verify(client).check(batch.capture(), any());
+            final List<MetadataCheckRequest> requests = batch.getValue();
+            final MetadataCheckRequest first = requests.getFirst();
+            final MetadataCheckRequest last = requests.getLast();
+            assertThat(first.bookId()).isEqualTo(OTHER_ID);
+            assertThat(last.bookId()).isEqualTo(BOOK_ID);
         }
     }
 
