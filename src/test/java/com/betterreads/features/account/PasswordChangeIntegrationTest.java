@@ -321,6 +321,7 @@ class PasswordChangeIntegrationTest extends AccountMailTest {
         }
     }
 
+    // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     private ResultActions changePasswordSendingCookie(final MvcResult session, final @Nullable String cookieValue)
         throws Exception {
@@ -332,11 +333,13 @@ class PasswordChangeIntegrationTest extends AccountMailTest {
         return mockMvc.perform(request);
     }
 
+    // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     private MvcResult login(final String password) throws Exception {
         return AccountTestFixture.login(mockMvc, objectMapper, USER, password);
     }
 
+    // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     private ResultActions changePassword(final MvcResult session, final String currentPassword,
         final String newPassword) throws Exception {
@@ -345,6 +348,7 @@ class PasswordChangeIntegrationTest extends AccountMailTest {
             .cookie(new Cookie(RefreshCookies.COOKIE_NAME, Accounts.refreshCookie(session))));
     }
 
+    // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     private ResultActions refresh(final String cookieValue) throws Exception {
         return mockMvc.perform(post(REFRESH_URL)
@@ -352,6 +356,7 @@ class PasswordChangeIntegrationTest extends AccountMailTest {
             .cookie(new Cookie(RefreshCookies.COOKIE_NAME, cookieValue)));
     }
 
+    // PMD.SignatureDeclareThrowsException: MockMvc.perform declares throws Exception.
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     private ResultActions currentUser(final String accessToken) throws Exception {
         return mockMvc.perform(get(Accounts.ME_URL).header(AUTH_HEADER, BEARER_PREFIX + accessToken));
