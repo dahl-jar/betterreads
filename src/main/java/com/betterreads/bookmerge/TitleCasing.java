@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
+import java.util.StringJoiner;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -99,21 +100,15 @@ final class TitleCasing {
 
     private static String titleCase(final String title) {
         final String[] words = title.split(SPACE);
-        return IntStream.range(0, words.length)
-            .mapToObj(index -> capitalizes(words, index) ? capitalizeWord(words[index]) : words[index])
-            .collect(Collectors.joining(SPACE));
-    }
-
-    private static boolean capitalizes(final String[] words, final int index) {
-        return index == 0 || index == words.length - 1 || followsPhraseEnd(words, index) || !isSmallWord(words[index]);
-    }
-
-    private static boolean followsPhraseEnd(final String[] words, final int index) {
-        return Arrays.stream(words, 0, index)
-            .filter(word -> !word.isEmpty())
-            .reduce((earlier, later) -> later)
-            .filter(TitleCasing::endsPhrase)
-            .isPresent();
+        final StringJoiner cased = new StringJoiner(SPACE);
+        String lastWord = "";
+        for (int index = 0; index < words.length; index++) {
+            final String word = words[index];
+            final boolean firstOrLast = index == 0 || index == words.length - 1;
+            cased.add(firstOrLast || endsPhrase(lastWord) || !isSmallWord(word) ? capitalizeWord(word) : word);
+            lastWord = word.isEmpty() ? lastWord : word;
+        }
+        return cased.toString();
     }
 
     private static boolean endsPhrase(final String word) {
