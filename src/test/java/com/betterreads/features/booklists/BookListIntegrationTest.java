@@ -277,6 +277,17 @@ class BookListIntegrationTest extends ContainerizedTest {
         }
 
         @Test
+        void shouldPutUnratedBookAfterRatedBook() throws Exception {
+            saveBook(FIRST, FIRST, FOUR_POINT_ZERO, WELL_RATED_COUNT);
+            saveBook(SECOND, SECOND, null, WELL_RATED_COUNT);
+
+            final ResultActions response = mockMvc.perform(get(LIST_WITH_LIMIT, TOP_RATED, LIMIT));
+
+            response.andExpect(jsonPath(FIRST_KEY).value(FIRST));
+            response.andExpect(jsonPath(SECOND_KEY).value(SECOND));
+        }
+
+        @Test
         void shouldLoadOnlyLimitBooks() throws Exception {
             saveThreeBooks();
             final Statistics statistics = sessionFactory.getStatistics();

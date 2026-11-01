@@ -18,7 +18,7 @@ interface BookListRepository extends JpaRepository<Book, Long> {
     @Query("""
         SELECT b.bookId FROM Book b
         WHERE b.ratingCount > :ratingFloor
-        ORDER BY b.averageRating DESC, b.bookId DESC
+        ORDER BY b.averageRating DESC NULLS LAST, b.bookId DESC
         """)
     List<Long> findIdsTopRated(@Param("ratingFloor") int ratingFloor, Pageable pageable);
 
