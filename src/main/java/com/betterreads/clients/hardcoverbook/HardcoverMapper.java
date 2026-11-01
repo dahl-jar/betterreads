@@ -38,6 +38,7 @@ class HardcoverMapper {
             .ratingCount(document.ratingsCount())
             .seriesName(position == null ? null : seriesName(series))
             .seriesPosition(position)
+            .proseCompilation(document.isProseCompilation())
             .build();
     }
 

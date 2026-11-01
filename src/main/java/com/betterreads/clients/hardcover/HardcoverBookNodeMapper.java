@@ -105,7 +105,10 @@ public final class HardcoverBookNodeMapper {
     public static Optional<SourceBook> toTitleBook(final @Nullable HardcoverBookNode node) {
         return Optional.ofNullable(node)
             .filter(HardcoverBookNodeMapper::qualifiesAllowingCompilation)
-            .map(accepted -> toBuilder(accepted).isbn13(defaultEditionIsbn(accepted)).build());
+            .map(accepted -> toBuilder(accepted)
+                .isbn13(defaultEditionIsbn(accepted))
+                .proseCompilation(isProseCompilation(accepted.compilation(), accepted.bookCategoryId()))
+                .build());
     }
 
     private static @Nullable String defaultEditionIsbn(final HardcoverBookNode node) {

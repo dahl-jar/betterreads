@@ -1,5 +1,6 @@
 package com.betterreads.features.bookstaging;
 
+import com.betterreads.book.Book;
 import com.betterreads.book.BookRepository;
 import com.betterreads.bookmerge.SourceMerger;
 import com.betterreads.booksource.MergedBook;
@@ -17,6 +18,8 @@ import static com.betterreads.features.bookstaging.DuneBooks.OL_KEY;
 import static com.betterreads.features.bookstaging.DuneBooks.TITLE;
 import static com.betterreads.features.bookstaging.DuneBooks.completeDune;
 import static com.betterreads.features.bookstaging.DuneBooks.sparseDune;
+import static com.betterreads.features.bookstaging.NoNetworkSources.HARDCOVER_RESPONSE;
+import static com.betterreads.features.bookstaging.NoNetworkSources.WIKIDATA_RESPONSE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
@@ -60,6 +63,9 @@ class PendingBookStagingIntegrationTest extends ContainerizedTest {
 
     @Autowired
     private BookRepository books;
+
+    @Autowired
+    private BookStager stager;
 
     @BeforeEach
     void clearCatalog() {
@@ -151,5 +157,39 @@ class PendingBookStagingIntegrationTest extends ContainerizedTest {
         assertThat(books.findByOpenLibraryWorkKey(OL_KEY))
             .as("a re-discovered candidate must rejoin the poll and promote")
             .isPresent();
+    }
+
+    @Test
+    void shouldStoreNoSeriesForAStagedCompilationWhenWikidataHasOne() {
+        WIKIDATA_RESPONSE.set(DuneBooks.wikidataDuneChronicles());
+
+        stager.stage(DuneBooks.compiledDune());
+
+        assertNoSeries();
+    }
+
+    @Test
+    void shouldStoreNoSeriesOnThePollWhenHardcoverMarksACompilation() {
+        pendingBookService.stage(merger.merge(null, List.of(completeDune())));
+        HARDCOVER_RESPONSE.set(DuneBooks.compiledDune());
+        WIKIDATA_RESPONSE.set(DuneBooks.wikidataDuneChronicles());
+
+        pendingBookService.promoteReady();
+
+        assertNoSeries();
+    }
+
+    private void assertNoSeries() {
+        final Book promoted = books.findByDedupKey(ISBN).orElseThrow();
+
+        final List<Book> stored = books.findWithSubjectsByBookIdIn(List.of(promoted.getBookId()));
+
+        assertThat(stored)
+            .singleElement()
+            .satisfies(book -> {
+                assertThat(book.getSeriesName()).isNull();
+                assertThat(book.getSeriesPosition()).isNull();
+                assertThat(book.getSeries()).isEmpty();
+            });
     }
 }

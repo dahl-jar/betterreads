@@ -97,6 +97,20 @@ final class DuneBooks {
             .build();
     }
 
+    static SourceBook compiledDune() {
+        final SourceBook dune = completeDune();
+        return SourceBook.builder(BookFieldSource.HARDCOVER)
+            .isbn13(dune.isbn13())
+            .title(dune.title())
+            .description(dune.description())
+            .coverUrl(dune.coverUrl())
+            .publicationYear(dune.publicationYear())
+            .authors(dune.authors())
+            .rawSubjects(dune.rawSubjects())
+            .proseCompilation(true)
+            .build();
+    }
+
     static SourceBook wikidataDuneChronicles() {
         return SourceBook.builder(BookFieldSource.WIKIDATA)
             .isbn13(ISBN)

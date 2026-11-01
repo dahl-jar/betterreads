@@ -186,6 +186,9 @@ public class SourceMerger {
 
     private static Optional<SourceBook> pickSeries(
         final Map<BookFieldSource, SourceBook> bySource, final String bookTitle) {
+        if (bySource.values().stream().anyMatch(SourceBook::proseCompilation)) {
+            return Optional.empty();
+        }
         return SERIES_CHAIN.stream()
             .map(bySource::get)
             .filter(book -> book != null

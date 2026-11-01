@@ -15,7 +15,9 @@ import com.betterreads.clients.hardcover.SeriesBookJson;
 import com.betterreads.clients.hardcover.SeriesBooksJson;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Named;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -113,6 +115,35 @@ class HardcoverSeriesMapperTest {
         assertThat(series).extracting(SourceSeries::titleBook)
             .extracting(SourceBook::series, InstanceOfAssertFactories.list(SeriesEntry.class))
             .isEmpty();
+    }
+
+    @Nested
+    @DisplayName("compilation mark on the title book")
+    class CompilationMark {
+
+        @Test
+        void shouldMarkAProseCompilationTitleBook() {
+            final SeriesBooksJson rows = trilogy(FELLOWSHIP_READERS)
+                .with(row(FIRST, LOTR_ID, LOTR, LOTR_READERS).compilation());
+
+            final SourceSeries series = map(LOTR, rows);
+
+            assertThat(series).extracting(SourceSeries::titleBook)
+                .extracting(SourceBook::proseCompilation)
+                .isEqualTo(true);
+        }
+
+        @Test
+        void shouldLeaveAGraphicNovelCompilationTitleBookUnmarked() {
+            final SeriesBooksJson rows = trilogy(FELLOWSHIP_READERS)
+                .with(row(FIRST, LOTR_ID, LOTR, LOTR_READERS).compilation().comic());
+
+            final SourceSeries series = map(LOTR, rows);
+
+            assertThat(series).extracting(SourceSeries::titleBook)
+                .extracting(SourceBook::proseCompilation)
+                .isEqualTo(false);
+        }
     }
 
     @ParameterizedTest

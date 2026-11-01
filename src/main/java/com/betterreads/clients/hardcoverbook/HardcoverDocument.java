@@ -63,8 +63,12 @@ public record HardcoverDocument(
         return NullableLists.copyOf(genres);
     }
 
+    public boolean isProseCompilation() {
+        return HardcoverBookNodeMapper.isProseCompilation(compilation, bookCategoryId);
+    }
+
     public @Nullable FeaturedSeries storySeries() {
-        return HardcoverBookNodeMapper.isProseCompilation(compilation, bookCategoryId) ? null : featuredSeries;
+        return isProseCompilation() ? null : featuredSeries;
     }
 
     public @Nullable String firstIsbn13() {

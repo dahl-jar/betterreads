@@ -219,6 +219,26 @@ class HardcoverMapperTest {
                 .containsExactly(BookSearchJson.TOLKIEN, BookSearchJson.ALAN_LEE);
         }
 
+        @ParameterizedTest(name = "category {0}")
+        @NullSource
+        @ValueSource(ints = HardcoverCategories.PROSE)
+        void shouldMarkAProseCompilation(final @Nullable Integer category) {
+            final HardcoverDocument document = compiled(category);
+
+            final SourceBook book = map(document);
+
+            assertThat(book.proseCompilation()).isTrue();
+        }
+
+        @Test
+        void shouldLeaveAGraphicNovelCompilationUnmarked() {
+            final HardcoverDocument document = compiled(HardcoverCategories.GRAPHIC_NOVEL);
+
+            final SourceBook book = map(document);
+
+            assertThat(book.proseCompilation()).isFalse();
+        }
+
         private HardcoverDocument compiled(final @Nullable Integer category) {
             return bookSearch().with(featuredSeries(BookSearchJson.LORD_OF_THE_RINGS))
                 .with(compilation(category)).document();
