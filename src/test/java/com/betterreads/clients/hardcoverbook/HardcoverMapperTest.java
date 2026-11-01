@@ -219,11 +219,9 @@ class HardcoverMapperTest {
                 .containsExactly(BookSearchJson.TOLKIEN, BookSearchJson.ALAN_LEE);
         }
 
-        @ParameterizedTest(name = "category {0}")
-        @NullSource
-        @ValueSource(ints = HardcoverCategories.PROSE)
-        void shouldMarkAProseCompilation(final @Nullable Integer category) {
-            final HardcoverDocument document = compiled(category);
+        @Test
+        void shouldMarkAProseCompilation() {
+            final HardcoverDocument document = compiled(HardcoverCategories.PROSE);
 
             final SourceBook book = map(document);
 

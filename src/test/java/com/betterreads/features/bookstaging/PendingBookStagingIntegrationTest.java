@@ -90,7 +90,7 @@ class PendingBookStagingIntegrationTest extends ContainerizedTest {
     }
 
     @Test
-    @DisplayName("staging the same book twice updates the row rather than inserting a second")
+    @DisplayName("staging the same book twice keeps one row")
     void stagingTwiceUpdatesInPlace() {
         pendingBookService.stage(merger.merge(null, List.of(sparseDune())));
 
@@ -119,7 +119,7 @@ class PendingBookStagingIntegrationTest extends ContainerizedTest {
         }
 
         assertThat(races)
-            .as("the staging reserve must absorb the race, not surface a duplicate-key error")
+            .as("the staging reserve absorbs the race with no duplicate-key error")
             .isEmpty();
         assertThat(pendingBooks.count())
             .as("the dedup key must collapse the concurrent stages to one row")

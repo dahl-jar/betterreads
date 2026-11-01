@@ -111,7 +111,7 @@ public record SourceBook(
     }
 
     // PMD.TooManyFields, PMD.TooManyMethods, PMD.ExcessivePublicCount,
-    // PMD.AvoidFieldNameMatchingMethodName: one nullable field and setter per record component.
+    // PMD.AvoidFieldNameMatchingMethodName: one field and setter per record component.
     @SuppressWarnings({
         "PMD.TooManyFields", "PMD.TooManyMethods", "PMD.ExcessivePublicCount",
         "PMD.AvoidFieldNameMatchingMethodName"
