@@ -8,7 +8,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 class LogSanitizerTest {
 
     @ParameterizedTest
-    @ValueSource(strings = {"\r", "\n", "\u001B", " ", " "})
+    @ValueSource(strings = {"\r", "\n", "\u001B", " ", " ", "\u202E"})
     void shouldRemoveControlCharacters(final String character) {
         final String value = "Du" + character + "ne";
 

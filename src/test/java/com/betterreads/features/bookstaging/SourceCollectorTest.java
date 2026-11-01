@@ -28,6 +28,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiFunction;
 import java.util.stream.Stream;
 
 import org.jspecify.annotations.Nullable;
@@ -62,6 +63,16 @@ class SourceCollectorTest {
     private static final Duration SHORT_WAVE_TIMEOUT = Duration.ofMillis(50);
 
     private static final String OL_WORK_KEY = "OL1W";
+
+    private static final String STORED_TITLE = "Hollow Crown: The Life and Times of a King";
+
+    private static final String HIT_TITLE = "Hollow Crown: Book One of the Wars";
+
+    private static final String RECORD_ID = "1041";
+
+    private static final String OTHER_RECORD_ID = "1042";
+
+    private static final int MAX_LOGGED_TITLE = 200;
 
     private static final SourceBook ISBN_SEED = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
         .isbn13(ISBN)
@@ -310,24 +321,78 @@ class SourceCollectorTest {
         assertThat(merged.book().averageRating()).isEqualTo(HARDCOVER_RATING);
     }
 
+    static Stream<Arguments> sameRecords() {
+        return Stream.of(
+            sameRecord(BookFieldSource.HARDCOVER, SourceBook.Builder::hardcoverId),
+            sameRecord(BookFieldSource.GOOGLE_BOOKS, SourceBook.Builder::googleBooksVolumeId),
+            sameRecord(BookFieldSource.OPEN_LIBRARY, SourceBook.Builder::openLibraryWorkKey),
+            sameRecord(BookFieldSource.LOC, SourceBook.Builder::locLccn),
+            sameRecord(BookFieldSource.WIKIDATA, SourceBook.Builder::wikidataQid));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("sameRecords")
+    void shouldKeepIsbnHitWithSameRecord(
+        final BookFieldSource source, final SourceBook seed, final SourceBook hit) {
+        final SourceCollector collector = collectorWith(SAME_THREAD, stubByIsbn(source, ISBN, hit));
+
+        final MergedBook merged = collector.collectFor(seed);
+
+        assertThat(merged.resolvedSources()).contains(source);
+    }
+
+    static Stream<Arguments> otherRecords() {
+        return Stream.of(
+            arguments("another id", stagedSeed().hardcoverId(OTHER_RECORD_ID).build()),
+            arguments("no id", stagedSeed().build()));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("otherRecords")
+    void shouldDropIsbnHitWithOtherRecord(final String row, final SourceBook seed) {
+        final SourceBook hit = SourceBook.builder(BookFieldSource.HARDCOVER)
+            .isbn13(ISBN)
+            .hardcoverId(RECORD_ID)
+            .title(SEQUEL_TITLE)
+            .build();
+        final SourceCollector collector = collectorWith(SAME_THREAD, stubByIsbn(BookFieldSource.HARDCOVER, ISBN, hit));
+
+        final MergedBook merged = collector.collectFor(seed);
+
+        assertThat(merged.resolvedSources()).as(row).doesNotContain(BookFieldSource.HARDCOVER);
+    }
+
     @Test
     void shouldWarnWhenIsbnHitIsDropped(final CapturedOutput output) {
         final String brokenIsbn = ISBN + "\n";
         final SourceBook seed = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
             .isbn13(brokenIsbn)
-            .title("Du\nne")
+            .title("Du\"\nne")
             .build();
         final SourceCollector collector = collectorWith(SAME_THREAD, stubByIsbn(
-            BookFieldSource.HARDCOVER, brokenIsbn, hardcoverHit("Dune\nMessiah", WRONG_RATING)));
+            BookFieldSource.HARDCOVER, brokenIsbn, hardcoverHit("Dune\"\nMessiah", WRONG_RATING)));
 
         collector.collectFor(seed);
 
-        assertThat(output.getOut().lines())
-            .filteredOn(line -> line.contains(DROPPED_HIT))
-            .singleElement()
-            .asString()
+        assertThat(droppedHitLine(output))
             .contains(" WARN ", DROPPED_HIT + " source=HARDCOVER isbn=" + ISBN
-                + " seedTitle=\"Dune\" hitTitle=\"DuneMessiah\"");
+                + " seedTitle=\"Du\\\"ne\" hitTitle=\"Dune\\\"Messiah\"");
+    }
+
+    @Test
+    void shouldCutLongTitlesInWarning(final CapturedOutput output) {
+        final String seedKeep = "s".repeat(MAX_LOGGED_TITLE);
+        final String hitKeep = "h".repeat(MAX_LOGGED_TITLE);
+        final SourceBook seed = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+            .isbn13(ISBN)
+            .title(seedKeep + "s")
+            .build();
+        final SourceCollector collector = collectorWithIsbnHit(hitKeep + "h", WRONG_RATING);
+
+        collector.collectFor(seed);
+
+        assertThat(droppedHitLine(output))
+            .contains("seedTitle=\"" + seedKeep + "\" hitTitle=\"" + hitKeep + "\"");
     }
 
     @Test
@@ -337,6 +402,23 @@ class SourceCollectorTest {
         collector.collectFor(ISBN_SEED);
 
         assertThat(output.getOut()).doesNotContain(DROPPED_HIT);
+    }
+
+    private static String droppedHitLine(final CapturedOutput output) {
+        final List<String> lines = output.getOut().lines().filter(line -> line.contains(DROPPED_HIT)).toList();
+        assertThat(lines).hasSize(1);
+        return lines.getFirst();
+    }
+
+    private static Arguments sameRecord(
+        final BookFieldSource source, final BiFunction<SourceBook.Builder, String, SourceBook.Builder> withId) {
+        final SourceBook seed = withId.apply(stagedSeed(), RECORD_ID).build();
+        final SourceBook.Builder hit = SourceBook.builder(source).isbn13(ISBN).title(HIT_TITLE);
+        return arguments(source, seed, withId.apply(hit, RECORD_ID).build());
+    }
+
+    private static SourceBook.Builder stagedSeed() {
+        return SourceBook.builder(BookFieldSource.STAGED).isbn13(ISBN).title(STORED_TITLE);
     }
 
     private static SourceBook hardcoverHit(final String title, final double rating) {

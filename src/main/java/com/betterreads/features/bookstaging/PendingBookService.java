@@ -18,7 +18,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Holds incomplete books in {@code pending_book} and promotes them into {@code book} once complete. */
 @Service
 public class PendingBookService {
 
@@ -44,10 +43,6 @@ public class PendingBookService {
         this.promoter = promoter;
     }
 
-    /**
-     * Reserves the row by dedup key before filling it, so two concurrent stages of the same book end
-     * on one row with no duplicate-key error.
-     */
     @Transactional
     public void stage(final MergedBook merged) {
         final String dedupKey = merged.book().dedupKey();
@@ -70,10 +65,6 @@ public class PendingBookService {
         }
     }
 
-    /**
-     * Source fetches are slow external calls, so each candidate's write gets its own transaction and
-     * no connection stays open across them.
-     */
     public void promoteReady() {
         pendingKeys().forEach(this::collectAndPromote);
     }
@@ -84,11 +75,6 @@ public class PendingBookService {
             .toList();
     }
 
-    /**
-     * An integrity violation means the candidate resolves a source id another row already owns, which
-     * no retry changes, so it is retired as a duplicate. Any other failure counts as an attempt and
-     * retries after the backoff.
-     */
     // Checkstyle.IllegalCatch + PMD.AvoidCatchingGenericException: one candidate must not stop the poll
     @SuppressWarnings({"checkstyle:IllegalCatch", "PMD.AvoidCatchingGenericException"})
     private void collectAndPromote(final String dedupKey) {
@@ -98,7 +84,7 @@ public class PendingBookService {
                 final MergedBook collected = sourceCollector.collectFor(staged);
                 promoter.promote(dedupKey, keepStagedRating(collected, staged));
             } catch (DataIntegrityViolationException collision) {
-                LOG.warn("catalog.staging candidate duplicates an existing row, retired dedupKey={}",
+                LOG.warn("catalog.staging candidate key collides with an existing row, retired dedupKey={}",
                     LogSanitizer.forLog(dedupKey));
                 promoter.markDuplicate(dedupKey);
             } catch (RuntimeException ex) {
@@ -109,10 +95,6 @@ public class PendingBookService {
         });
     }
 
-    /**
-     * The merger takes the rating only from Hardcover, so a re-promotion with no Hardcover match would
-     * lose it.
-     */
     private static MergedBook keepStagedRating(final MergedBook collected, final SourceBook staged) {
         final SourceBook book = collected.book();
         final SourceBook restored = book.toBuilder()

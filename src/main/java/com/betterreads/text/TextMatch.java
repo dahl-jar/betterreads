@@ -13,10 +13,29 @@ public final class TextMatch {
 
     private static final Pattern PARENTHETICAL = Pattern.compile("\\([^)]*");
 
-    private static final Pattern VOLUME_WORD =
-        Pattern.compile("\\bvol(?:ume)?\\b", Pattern.UNICODE_CHARACTER_CLASS);
+    private static final Pattern VOLUME_WITH_NUMBER =
+        Pattern.compile("\\bvol(?:ume)?\\b[.\\s]*([\\p{L}\\p{N}]*)", Pattern.UNICODE_CHARACTER_CLASS);
 
-    private static final Pattern SEGMENT_BREAK = Pattern.compile("[:;,/#\\[\\]]|--|\\s[-\\u2013\\u2014]\\s");
+    private static final Pattern LEADING_ZEROS = Pattern.compile("^0+(?=\\p{N})");
+
+    private static final Map<String, String> VOLUME_NUMBERS = Map.ofEntries(
+        Map.entry("one", "1"), Map.entry("i", "1"),
+        Map.entry("two", "2"), Map.entry("ii", "2"),
+        Map.entry("three", "3"), Map.entry("iii", "3"),
+        Map.entry("four", "4"), Map.entry("iv", "4"),
+        Map.entry("five", "5"), Map.entry("v", "5"),
+        Map.entry("six", "6"), Map.entry("vi", "6"),
+        Map.entry("seven", "7"), Map.entry("vii", "7"),
+        Map.entry("eight", "8"), Map.entry("viii", "8"),
+        Map.entry("nine", "9"), Map.entry("ix", "9"),
+        Map.entry("ten", "10"), Map.entry("x", "10"),
+        Map.entry("eleven", "11"), Map.entry("xi", "11"),
+        Map.entry("twelve", "12"), Map.entry("xii", "12"));
+
+    private static final String TRADEMARK_SIGN = "\u2122";
+
+    private static final Pattern SEGMENT_BREAK =
+        Pattern.compile("[:;,/#\\[\\]]|--|\\s-\\s|(?<=\\D)[\\u2013\\u2014](?=\\D)");
 
     private static final Pattern NOT_WORD = Pattern.compile("[^\\p{L}\\p{N}]+");
 
@@ -69,29 +88,37 @@ public final class TextMatch {
     }
 
     public static boolean sameBookTitle(final String first, final String second) {
-        if (wholeKey(first).equals(wholeKey(second))) {
-            return true;
-        }
         final Set<String> firstSegments = segmentKeys(first);
         final Set<String> secondSegments = segmentKeys(second);
-        return firstSegments.containsAll(secondSegments) || secondSegments.containsAll(firstSegments);
+        if (firstSegments.isEmpty() || secondSegments.isEmpty()) {
+            return false;
+        }
+        return wholeKey(first).equals(wholeKey(second))
+            || firstSegments.containsAll(secondSegments)
+            || secondSegments.containsAll(firstSegments);
     }
 
     private static String wholeKey(final String title) {
-        return wordKey(VOLUME_WORD.matcher(foldTitle(title)).replaceAll("vol"));
+        return wordKey(markVolumes(foldTitle(title), "vol"));
     }
 
     private static Set<String> segmentKeys(final String title) {
         final String bare = PARENTHETICAL.matcher(foldTitle(title)).replaceAll(" ");
-        final String volumeSplit = VOLUME_WORD.matcher(bare).replaceAll(", vol");
-        return SEGMENT_BREAK.splitAsStream(volumeSplit)
+        return SEGMENT_BREAK.splitAsStream(markVolumes(bare, ", vol"))
             .map(TextMatch::wordKey)
             .filter(key -> !key.isEmpty())
             .collect(Collectors.toSet());
     }
 
+    private static String markVolumes(final String title, final String mark) {
+        return VOLUME_WITH_NUMBER.matcher(title).replaceAll(volume -> {
+            final String number = LEADING_ZEROS.matcher(volume.group(1)).replaceFirst("");
+            return mark + VOLUME_NUMBERS.getOrDefault(number, number);
+        });
+    }
+
     private static String foldTitle(final String title) {
-        return fold(title).replace("&", " and ");
+        return fold(title.replace(TRADEMARK_SIGN, "")).replace("&", " and ");
     }
 
     private static String wordKey(final String text) {

@@ -20,6 +20,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 import org.jspecify.annotations.Nullable;
@@ -37,11 +38,20 @@ public class SourceCollector {
 
     private static final Duration WAVE_TIMEOUT = Duration.ofSeconds(30);
 
+    private static final int MAX_LOGGED_TITLE = 200;
+
     private static final List<List<BookFieldSource>> WAVES = List.of(
         List.of(BookFieldSource.GOOGLE_BOOKS, BookFieldSource.OPEN_LIBRARY),
         List.of(BookFieldSource.HARDCOVER, BookFieldSource.LOC, BookFieldSource.WIKIDATA));
 
     private static final List<BookFieldSource> FETCH_ORDER = WAVES.stream().flatMap(List::stream).toList();
+
+    private static final List<Function<SourceBook, @Nullable String>> RECORD_IDS = List.of(
+        SourceBook::hardcoverId,
+        SourceBook::googleBooksVolumeId,
+        SourceBook::openLibraryWorkKey,
+        SourceBook::locLccn,
+        SourceBook::wikidataQid);
 
     private final SourceMerger merger;
 
@@ -157,13 +167,26 @@ public class SourceCollector {
         final BookFieldSource source, final SourceBook seed, final SourceBook hit) {
         final String seedTitle = seed.title();
         final String hitTitle = hit.title();
-        if (seedTitle == null || hitTitle == null || TextMatch.sameBookTitle(seedTitle, hitTitle)) {
+        if (seedTitle == null || hitTitle == null || sameRecord(seed, hit)
+            || TextMatch.sameBookTitle(seedTitle, hitTitle)) {
             return true;
         }
         LOG.warn(
             "catalog.collect dropped ISBN hit with another title source={} isbn={} seedTitle=\"{}\" hitTitle=\"{}\"",
-            source, LogSanitizer.forLog(seed.isbn13()), LogSanitizer.forLog(seedTitle), LogSanitizer.forLog(hitTitle));
+            source, LogSanitizer.forLog(seed.isbn13()), titleForLog(seedTitle), titleForLog(hitTitle));
         return false;
+    }
+
+    private static @Nullable String titleForLog(final String title) {
+        final String cut = title.substring(0, Math.min(title.length(), MAX_LOGGED_TITLE));
+        return LogSanitizer.forLog(cut.replace("\"", "\\\""));
+    }
+
+    private static boolean sameRecord(final SourceBook seed, final SourceBook hit) {
+        return RECORD_IDS.stream().anyMatch(recordId -> {
+            final String seedId = recordId.apply(seed);
+            return seedId != null && seedId.equals(recordId.apply(hit));
+        });
     }
 
     private static Optional<SourceBook> fetchByTitleAuthor(
