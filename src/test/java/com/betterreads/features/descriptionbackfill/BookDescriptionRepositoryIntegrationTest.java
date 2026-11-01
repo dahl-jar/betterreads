@@ -216,7 +216,7 @@ class BookDescriptionRepositoryIntegrationTest extends ContainerizedTest {
             final long first = save(RED_RISING_KEY, RED_RISING_ISBN, THIN);
             final long second = save(GOLDEN_SON_KEY, GOLDEN_SON_ISBN, THIN);
             final long third = save(MORNING_STAR_KEY, MORNING_STAR_ISBN, THIN);
-            setUpdatedAt(first, SAME_TIME);
+            rewriteRow(first);
 
             final List<Long> firstPage = books.findIdsKeyed(PageRequest.of(0, 2));
             final List<Long> secondPage = books.findIdsKeyed(PageRequest.of(1, 2));
@@ -275,6 +275,10 @@ class BookDescriptionRepositoryIntegrationTest extends ContainerizedTest {
 
     private void setUpdatedAt(final long bookId, final String instant) {
         jdbc.update("UPDATE book SET updated_at = ?::timestamptz WHERE book_id = ?", instant, bookId);
+    }
+
+    private void rewriteRow(final long bookId) {
+        setUpdatedAt(bookId, SAME_TIME);
     }
 
     private long saveWikidataOnly() {

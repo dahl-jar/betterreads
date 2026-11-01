@@ -165,10 +165,11 @@ class BookListIntegrationTest extends ContainerizedTest {
             final String unrated = "unrated";
             saveBook(unrated, "Brand New", null, 0);
 
-            mockMvc.perform(get(LIST_PATH).param(LIST_PARAM, RECENTLY_ADDED))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath(DATA_LENGTH).value(1))
-                .andExpect(jsonPath(FIRST_KEY).value(unrated));
+            final ResultActions response = mockMvc.perform(get(LIST_PATH).param(LIST_PARAM, RECENTLY_ADDED));
+
+            response.andExpect(status().isOk());
+            response.andExpect(jsonPath(DATA_LENGTH).value(1));
+            response.andExpect(jsonPath(FIRST_KEY).value(unrated));
         }
 
         @Test
@@ -176,14 +177,15 @@ class BookListIntegrationTest extends ContainerizedTest {
             final String dune = "dune";
             saveBook(dune, DUNE_TITLE, DUNE_AVERAGE, WELL_RATED_COUNT);
 
-            mockMvc.perform(get(LIST_PATH).param(LIST_PARAM, RECENTLY_ADDED))
-                .andExpect(jsonPath(FIRST_KEY).value(dune))
-                .andExpect(jsonPath(FIRST_TITLE).value(DUNE_TITLE))
-                .andExpect(jsonPath("$.data[0].coverUrl").value(containsString(COVER_PATH + dune)))
-                .andExpect(jsonPath("$.data[0].firstPublishYear").value(Books.PUBLISH_YEAR))
-                .andExpect(jsonPath(FIRST_AUTHOR).value("Author of dune"))
-                .andExpect(jsonPath("$.data[0].averageRating").value(DUNE_AVERAGE.doubleValue()))
-                .andExpect(jsonPath("$.data[0].ratingCount").value(WELL_RATED_COUNT));
+            final ResultActions response = mockMvc.perform(get(LIST_PATH).param(LIST_PARAM, RECENTLY_ADDED));
+
+            response.andExpect(jsonPath(FIRST_KEY).value(dune));
+            response.andExpect(jsonPath(FIRST_TITLE).value(DUNE_TITLE));
+            response.andExpect(jsonPath("$.data[0].coverUrl").value(containsString(COVER_PATH + dune)));
+            response.andExpect(jsonPath("$.data[0].firstPublishYear").value(Books.PUBLISH_YEAR));
+            response.andExpect(jsonPath(FIRST_AUTHOR).value("Author of dune"));
+            response.andExpect(jsonPath("$.data[0].averageRating").value(DUNE_AVERAGE.doubleValue()));
+            response.andExpect(jsonPath("$.data[0].ratingCount").value(WELL_RATED_COUNT));
         }
     }
 
@@ -197,10 +199,11 @@ class BookListIntegrationTest extends ContainerizedTest {
             saveBook("fluke", "Fluke Five Star", new BigDecimal("5.00"), BARELY_RATED_COUNT);
             saveBook(classic, "Beloved Classic", FOUR_POINT_THREE, WELL_RATED_COUNT);
 
-            mockMvc.perform(get(LIST_PATH).param(LIST_PARAM, TOP_RATED))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath(DATA_LENGTH).value(1))
-                .andExpect(jsonPath(FIRST_KEY).value(classic));
+            final ResultActions response = mockMvc.perform(get(LIST_PATH).param(LIST_PARAM, TOP_RATED));
+
+            response.andExpect(status().isOk());
+            response.andExpect(jsonPath(DATA_LENGTH).value(1));
+            response.andExpect(jsonPath(FIRST_KEY).value(classic));
         }
     }
 
@@ -210,20 +213,25 @@ class BookListIntegrationTest extends ContainerizedTest {
 
         @Test
         void rejectsAnUnknownListWith400() throws Exception {
-            mockMvc.perform(get(LIST_PATH).param(LIST_PARAM, "BESTSELLERS"))
-                .andExpect(status().isBadRequest());
+            final ResultActions response = mockMvc.perform(get(LIST_PATH).param(LIST_PARAM, "BESTSELLERS"));
+
+            response.andExpect(status().isBadRequest());
         }
 
         @Test
         void rejectsALimitOverTheCapWith400() throws Exception {
-            mockMvc.perform(get(LIST_PATH).param(LIST_PARAM, TOP_RATED).param(LIMIT_PARAM, "9999"))
-                .andExpect(status().isBadRequest());
+            final ResultActions response =
+                mockMvc.perform(get(LIST_PATH).param(LIST_PARAM, TOP_RATED).param(LIMIT_PARAM, "9999"));
+
+            response.andExpect(status().isBadRequest());
         }
 
         @Test
         void shouldReturn400WhenLimitIsZero() throws Exception {
-            mockMvc.perform(get(LIST_PATH).param(LIST_PARAM, TOP_RATED).param(LIMIT_PARAM, "0"))
-                .andExpect(status().isBadRequest());
+            final ResultActions response =
+                mockMvc.perform(get(LIST_PATH).param(LIST_PARAM, TOP_RATED).param(LIMIT_PARAM, "0"));
+
+            response.andExpect(status().isBadRequest());
         }
     }
 
@@ -325,9 +333,10 @@ class BookListIntegrationTest extends ContainerizedTest {
             saveBook(RED_RISING, "Red Rising", FOUR_POINT_ZERO, WELL_RATED_COUNT);
             saveBook(GOLDEN_SON, "Golden Son", null, 0);
 
-            mockMvc.perform(get(LIST_PATH + "/count"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.total").value(2));
+            final ResultActions response = mockMvc.perform(get(LIST_PATH + "/count"));
+
+            response.andExpect(status().isOk());
+            response.andExpect(jsonPath("$.data.total").value(2));
         }
     }
 
