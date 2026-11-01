@@ -3,10 +3,12 @@ package com.betterreads.bookmerge;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullSource;
@@ -82,6 +84,10 @@ class TitleCasingTest {
     class AllCaps {
 
         private static final String LES_MISERABLES = "LES MISÉRABLES";
+
+        private static final int WORDS = 100_000;
+
+        private static final long LIMIT_SECONDS = 10;
 
         @ParameterizedTest
         @ValueSource(strings = {"RETURN OF THE KING", "STAR TREK 3", "1984 V", "ВОЙНА И МИР", LES_MISERABLES})
@@ -161,6 +167,16 @@ class TitleCasingTest {
         })
         void shouldLowerWordWithPeriodBeforeNoLetter(final String title, final String expected) {
             assertThat(TitleCasing.fixAllCaps(title, ENGLISH)).isEqualTo(expected);
+        }
+
+        @Test
+        @Timeout(value = LIMIT_SECONDS, unit = TimeUnit.SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+        void shouldFixCaseOfLongAllCapsTitleWithoutStalling() {
+            final String title = "AB ".repeat(WORDS) + "Z";
+
+            final String cased = TitleCasing.fixAllCaps(title, ENGLISH);
+
+            assertThat(cased).startsWith("Ab Ab").hasSameSizeAs(title);
         }
     }
 }

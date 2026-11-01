@@ -101,12 +101,12 @@ final class TitleCasing {
     private static String titleCase(final String title) {
         final String[] words = title.split(SPACE);
         final StringJoiner cased = new StringJoiner(SPACE);
-        String lastWord = "";
+        String previous = "";
         for (int index = 0; index < words.length; index++) {
             final String word = words[index];
             final boolean firstOrLast = index == 0 || index == words.length - 1;
-            cased.add(firstOrLast || endsPhrase(lastWord) || !isSmallWord(word) ? capitalizeWord(word) : word);
-            lastWord = word.isEmpty() ? lastWord : word;
+            cased.add(firstOrLast || endsPhrase(previous) || !isSmallWord(word) ? capitalizeWord(word) : word);
+            previous = word.isEmpty() ? previous : word;
         }
         return cased.toString();
     }
