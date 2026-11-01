@@ -300,6 +300,16 @@ class SourceCollectorTest {
     }
 
     @Test
+    void shouldKeepIsbnHitWithBlankTitle(final CapturedOutput output) {
+        final SourceCollector collector = collectorWithIsbnHit(" ", HARDCOVER_RATING);
+
+        final MergedBook merged = collector.collectFor(ISBN_SEED);
+
+        assertThat(merged.book().averageRating()).isEqualTo(HARDCOVER_RATING);
+        assertThat(output.getOut()).doesNotContain(DROPPED_HIT);
+    }
+
+    @Test
     void shouldKeepIsbnHitWhenSeedHasNoTitle() {
         final SourceBook seed = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
             .isbn13(ISBN)
@@ -370,13 +380,13 @@ class SourceCollectorTest {
             .title("Du\"\nne")
             .build();
         final SourceCollector collector = collectorWith(SAME_THREAD, stubByIsbn(
-            BookFieldSource.HARDCOVER, brokenIsbn, hardcoverHit("Dune\"\nMessiah", WRONG_RATING)));
+            BookFieldSource.HARDCOVER, brokenIsbn, hardcoverHit("Dune\\\"\nMessiah", WRONG_RATING)));
 
         collector.collectFor(seed);
 
         assertThat(droppedHitLine(output))
             .contains(" WARN ", DROPPED_HIT + " source=HARDCOVER isbn=" + ISBN
-                + " seedTitle=\"Du\\\"ne\" hitTitle=\"Dune\\\"Messiah\"");
+                + " seedTitle=\"Du\\\"ne\" hitTitle=\"Dune\\\\\\\"Messiah\"");
     }
 
     @Test

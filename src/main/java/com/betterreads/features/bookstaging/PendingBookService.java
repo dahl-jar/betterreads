@@ -88,7 +88,7 @@ public class PendingBookService {
                     LogSanitizer.forLog(dedupKey));
                 promoter.markDuplicate(dedupKey);
             } catch (RuntimeException ex) {
-                LOG.warn("catalog.staging promotion failed, candidate retries after backoff dedupKey={} ({})",
+                LOG.warn("catalog.staging promotion failed, attempt recorded dedupKey={} ({})",
                     LogSanitizer.forLog(dedupKey), ex.getClass().getSimpleName());
                 promoter.recordFailedAttempt(dedupKey);
             }

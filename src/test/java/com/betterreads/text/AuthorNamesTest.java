@@ -45,6 +45,11 @@ class AuthorNamesTest {
         void shouldFoldLettersWithoutMarks(final String name, final String expected) {
             assertThat(AuthorNames.key(name)).isEqualTo(expected);
         }
+
+        @Test
+        void shouldKeepTrademarkLettersInKey() {
+            assertThat(AuthorNames.key("Prince™")).isEqualTo("princetm");
+        }
     }
 
     @Nested

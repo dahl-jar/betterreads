@@ -167,7 +167,7 @@ public class SourceCollector {
         final BookFieldSource source, final SourceBook seed, final SourceBook hit) {
         final String seedTitle = seed.title();
         final String hitTitle = hit.title();
-        if (seedTitle == null || hitTitle == null || sameRecord(seed, hit)
+        if (seedTitle == null || hitTitle == null || hitTitle.isBlank() || sameRecord(seed, hit)
             || TextMatch.sameBookTitle(seedTitle, hitTitle)) {
             return true;
         }
@@ -179,7 +179,7 @@ public class SourceCollector {
 
     private static @Nullable String titleForLog(final String title) {
         final String cut = title.substring(0, Math.min(title.length(), MAX_LOGGED_TITLE));
-        return LogSanitizer.forLog(cut.replace("\"", "\\\""));
+        return LogSanitizer.forLog(cut.replace("\\", "\\\\").replace("\"", "\\\""));
     }
 
     private static boolean sameRecord(final SourceBook seed, final SourceBook hit) {

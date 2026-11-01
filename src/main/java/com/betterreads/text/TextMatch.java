@@ -13,7 +13,7 @@ public final class TextMatch {
 
     private static final Pattern PARENTHETICAL = Pattern.compile("\\([^)]*");
 
-    private static final Pattern VOLUME_WITH_NUMBER =
+    private static final Pattern VOLUME_WORD =
         Pattern.compile("\\bvol(?:ume)?\\b[.\\s]*([\\p{L}\\p{N}]*)", Pattern.UNICODE_CHARACTER_CLASS);
 
     private static final Pattern LEADING_ZEROS = Pattern.compile("^0+(?=\\p{N})");
@@ -111,9 +111,9 @@ public final class TextMatch {
     }
 
     private static String markVolumes(final String title, final String mark) {
-        return VOLUME_WITH_NUMBER.matcher(title).replaceAll(volume -> {
-            final String number = LEADING_ZEROS.matcher(volume.group(1)).replaceFirst("");
-            return mark + VOLUME_NUMBERS.getOrDefault(number, number);
+        return VOLUME_WORD.matcher(title).replaceAll(volume -> {
+            final String label = LEADING_ZEROS.matcher(volume.group(1)).replaceFirst("");
+            return mark + VOLUME_NUMBERS.getOrDefault(label, label);
         });
     }
 
