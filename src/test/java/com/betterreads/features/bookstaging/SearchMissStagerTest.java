@@ -31,7 +31,9 @@ import org.springframework.dao.QueryTimeoutException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.mock.http.client.MockClientHttpRequest;
+import org.springframework.web.reactive.function.UnsupportedMediaTypeException;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
@@ -127,9 +129,18 @@ class SearchMissStagerTest {
                 new QueryTimeoutException("database timed out"),
                 new DecodingException(BAD_BODY),
                 new RejectedExecutionException("source pool full"),
-                new WebClientRequestException(
-                    new ConnectException("Connection refused"), HttpMethod.GET, URI.create(SOURCE_URL),
-                    HttpHeaders.EMPTY));
+                requestTo(URI.create(SOURCE_URL)));
+        }
+
+        private static WebClientResponseException responseFrom(final HttpStatus status, final URI uri) {
+            return WebClientResponseException.create(
+                status.value(), status.getReasonPhrase(), HttpHeaders.EMPTY, new byte[0], null,
+                new MockClientHttpRequest(HttpMethod.GET, uri));
+        }
+
+        private static WebClientRequestException requestTo(final URI uri) {
+            return new WebClientRequestException(
+                new ConnectException("Connection refused"), HttpMethod.GET, uri, HttpHeaders.EMPTY);
         }
 
         @ParameterizedTest
@@ -155,17 +166,16 @@ class SearchMissStagerTest {
         @Test
         @DisplayName("should log a read failure when a 200 body is unreadable")
         void shouldLogReadFailureWhen200BodyIsUnreadable(final CapturedOutput output) {
-            final WebClientResponseException unreadable = WebClientResponseException.create(
-                HttpStatus.OK.value(), HttpStatus.OK.getReasonPhrase(), HttpHeaders.EMPTY, new byte[0], null,
-                new MockClientHttpRequest(HttpMethod.GET, URI.create(SOURCE_URL)));
-            unreadable.initCause(new DecodingException(BAD_BODY));
+            final WebClientResponseException unreadable = responseFrom(HttpStatus.OK, URI.create(SOURCE_URL));
+            unreadable.initCause(
+                new UnsupportedMediaTypeException(MediaType.TEXT_HTML, List.of(MediaType.APPLICATION_JSON)));
             doThrow(unreadable).when(bookDiscovery).searchAndStage(DUNE);
 
             stager.stage(DUNE);
 
             assertThat(output.getOut())
                 .contains("catalog.search-miss staging could not read the 200 response from source.example"
-                    + " (DecodingException)")
+                    + " (UnsupportedMediaTypeException)")
                 .doesNotContain("staging got 200");
         }
 
@@ -177,6 +187,23 @@ class SearchMissStagerTest {
             stager.stage(DUNE);
 
             assertThat(output.getOut()).contains("catalog.search-miss staging got 503");
+        }
+
+        static Stream<RuntimeException> failuresFromForgedHost() {
+            final URI forgedUri = Mockito.mock(URI.class);
+            Mockito.when(forgedUri.getHost()).thenReturn("source.example\nforged");
+            return Stream.of(responseFrom(HttpStatus.SERVICE_UNAVAILABLE, forgedUri), requestTo(forgedUri));
+        }
+
+        @ParameterizedTest
+        @MethodSource("failuresFromForgedHost")
+        @DisplayName("should strip line breaks from the logged host")
+        void shouldStripLineBreaksFromLoggedHost(final RuntimeException failure, final CapturedOutput output) {
+            doThrow(failure).when(bookDiscovery).searchAndStage(DUNE);
+
+            stager.stage(DUNE);
+
+            assertThat(output.getOut()).contains(" from source.exampleforged");
         }
     }
 }

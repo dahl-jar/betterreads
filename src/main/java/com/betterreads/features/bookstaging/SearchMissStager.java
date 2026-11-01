@@ -6,8 +6,8 @@ import com.betterreads.searchmiss.SearchMissSink;
 import com.betterreads.searchmiss.SearchQueryKey;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import java.net.URI;
 import java.time.Duration;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
@@ -15,6 +15,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
+import org.springframework.http.HttpRequest;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
@@ -74,28 +75,31 @@ class SearchMissStager implements SearchMissSink {
     }
 
     private static void logFailure(final Throwable cause) {
-        final String type = LogSanitizer.forLog(cause.getClass().getSimpleName());
+        final String type = cause.getClass().getSimpleName();
         switch (cause) {
             case WebClientResponseException ex when ex.getCause() != null -> LOG.warn(
                 "catalog.search-miss staging could not read the {} response from {} ({})",
-                ex.getStatusCode().value(), LogSanitizer.forLog(sourceHost(ex)),
-                LogSanitizer.forLog(unwrap(ex).getClass().getSimpleName()));
+                ex.getStatusCode().value(), sourceHost(ex), unwrap(ex).getClass().getSimpleName());
             case WebClientResponseException ex -> LOG.warn("catalog.search-miss staging got {} from {}",
-                ex.getStatusCode().value(), LogSanitizer.forLog(sourceHost(ex)));
+                ex.getStatusCode().value(), sourceHost(ex));
             case WebClientRequestException ex -> LOG.warn("catalog.search-miss staging failed ({}) from {}",
-                type, LogSanitizer.forLog(sourceHost(ex)));
+                type, sourceHost(ex));
             case DataAccessException ex -> LOG.warn(STAGING_FAILED, type);
             default -> LOG.atWarn().setCause(cause).log(STAGING_FAILED, type);
         }
     }
 
     private static String sourceHost(final WebClientResponseException ex) {
-        return Optional.ofNullable(ex.getRequest())
-            .map(request -> request.getURI().getHost())
-            .orElse(UNKNOWN_SOURCE);
+        final HttpRequest request = ex.getRequest();
+        return request == null ? UNKNOWN_SOURCE : sourceHost(request.getURI());
     }
 
     private static String sourceHost(final WebClientRequestException ex) {
-        return Optional.ofNullable(ex.getUri().getHost()).orElse(UNKNOWN_SOURCE);
+        return sourceHost(ex.getUri());
+    }
+
+    private static String sourceHost(final URI uri) {
+        final String host = LogSanitizer.forLog(uri.getHost());
+        return host == null ? UNKNOWN_SOURCE : host;
     }
 }
