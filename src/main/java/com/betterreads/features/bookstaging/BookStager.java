@@ -34,7 +34,7 @@ class BookStager {
             final MergedBook merged = sourceCollector.collectFor(seed);
             final String dedupKey = merged.book().dedupKey();
             if (dedupKey != null) {
-                pendingBookService.stage(merged);
+                pendingBookService.stage(merged, seed.title());
                 promoter.promote(dedupKey, merged);
             }
         } catch (DataIntegrityViolationException duplicate) {

@@ -81,15 +81,22 @@ public class SourceCollector {
         final Duration waveTimeout
     ) {
         this.merger = merger;
-        this.sourceClients = order(sourceClients);
+        this.sourceClients = sourceClients.stream()
+            .sorted(Comparator.comparingInt(client -> rank(client.source())))
+            .toList();
         this.descriptionSelector = descriptionSelector;
         this.executor = sourceFetchExecutor;
         this.waveTimeout = waveTimeout;
     }
 
     public MergedBook collectFor(final SourceBook seed) {
+        return collectFor(seed, null);
+    }
+
+    public MergedBook collectFor(final SourceBook seed, final @Nullable String firstTitle) {
+        final String seedTitle = firstTitle == null ? seed.title() : firstTitle;
         final List<Fetched> fetched = WAVES.stream()
-            .flatMap(wave -> fetchWave(wave, seed).stream())
+            .flatMap(wave -> fetchWave(wave, seed, seedTitle).stream())
             .toList();
         final List<SourceBook> found = Stream.concat(
                 Stream.of(seed),
@@ -100,11 +107,12 @@ public class SourceCollector {
         return descriptionSelector.withBestDescription(merger.merge(seed, found).withResolvedSources(resolved));
     }
 
-    private List<Fetched> fetchWave(final List<BookFieldSource> wave, final SourceBook seed) {
+    private List<Fetched> fetchWave(
+        final List<BookFieldSource> wave, final SourceBook seed, final @Nullable String seedTitle) {
         final List<CompletableFuture<Fetched>> calls = sourceClients.stream()
             .filter(client -> wave.contains(client.source()))
             .filter(client -> client.source() != seed.source())
-            .map(client -> CompletableFuture.supplyAsync(() -> fetch(client, seed), executor))
+            .map(client -> CompletableFuture.supplyAsync(() -> fetch(client, seed, seedTitle), executor))
             .toList();
         awaitWave(calls);
         return calls.stream()
@@ -135,20 +143,15 @@ public class SourceCollector {
         return Stream.ofNullable(call.getNow(null));
     }
 
-    private static List<BookSourceClient> order(final List<BookSourceClient> clients) {
-        return clients.stream()
-            .sorted(Comparator.comparingInt(client -> rank(client.source())))
-            .toList();
-    }
-
     private static int rank(final BookFieldSource source) {
         final int index = FETCH_ORDER.indexOf(source);
         return index < 0 ? FETCH_ORDER.size() : index;
     }
 
-    private static @Nullable Fetched fetch(final BookSourceClient client, final SourceBook seed) {
+    private static @Nullable Fetched fetch(
+        final BookSourceClient client, final SourceBook seed, final @Nullable String seedTitle) {
         try {
-            return match(client, seed).map(book -> new Fetched(client.source(), book)).orElse(null);
+            return match(client, seed, seedTitle).map(book -> new Fetched(client.source(), book)).orElse(null);
         } catch (WebClientException ex) {
             LOG.warn("catalog.collect source {} failed ({}), skipping it for this book",
                 client.source(), ex.getClass().getSimpleName());
@@ -156,19 +159,19 @@ public class SourceCollector {
         }
     }
 
-    private static Optional<SourceBook> match(final BookSourceClient client, final SourceBook seed) {
+    private static Optional<SourceBook> match(
+        final BookSourceClient client, final SourceBook seed, final @Nullable String seedTitle) {
         return Optional.ofNullable(seed.isbn13())
             .flatMap(client::fetchByIsbn)
-            .filter(hit -> isbnHitMatches(client.source(), seed, hit))
+            .filter(hit -> isbnHitMatches(client.source(), seed, seedTitle, hit))
             .or(() -> fetchByTitleAuthor(client, seed));
     }
 
     private static boolean isbnHitMatches(
-        final BookFieldSource source, final SourceBook seed, final SourceBook hit) {
-        final String seedTitle = seed.title();
+        final BookFieldSource source, final SourceBook seed, final @Nullable String seedTitle, final SourceBook hit) {
         final String hitTitle = hit.title();
-        if (seedTitle == null || hitTitle == null || hitTitle.isBlank() || sameRecord(seed, hit)
-            || TextMatch.sameBookTitle(seedTitle, hitTitle)) {
+        if (seedTitle == null || seedTitle.isBlank() || hitTitle == null || hitTitle.isBlank()
+            || sameRecord(seed, hit) || TextMatch.sameBookTitle(seedTitle, hitTitle)) {
             return true;
         }
         LOG.warn(
@@ -193,7 +196,7 @@ public class SourceCollector {
         final BookSourceClient client, final SourceBook seed) {
         final String title = seed.title();
         final List<String> authors = seed.authorNames();
-        if (title == null || authors == null || authors.isEmpty()) {
+        if (title == null || title.isBlank() || authors == null || authors.isEmpty()) {
             return Optional.empty();
         }
         return client.fetchByTitleAuthor(title, authors.get(0));

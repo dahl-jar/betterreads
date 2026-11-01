@@ -12,6 +12,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -45,6 +46,11 @@ public class PendingBookService {
 
     @Transactional
     public void stage(final MergedBook merged) {
+        stage(merged, null);
+    }
+
+    @Transactional
+    public void stage(final MergedBook merged, final @Nullable String firstTitle) {
         final String dedupKey = merged.book().dedupKey();
         if (dedupKey == null) {
             throw new IllegalArgumentException(
@@ -53,6 +59,10 @@ public class PendingBookService {
         pendingBooks.reserve(dedupKey);
         final PendingBook row = pendingBooks.findByDedupKey(dedupKey).orElseThrow(
             () -> new IllegalStateException("reserved pending row vanished for dedupKey=" + dedupKey));
+        final boolean justReserved = row.getTitle() == null;
+        if (justReserved) {
+            row.setFirstTitle(firstTitle);
+        }
         mapper.applyTo(row, merged);
         reviveIfRetired(row);
         pendingBooks.save(row);
@@ -81,14 +91,14 @@ public class PendingBookService {
         pendingBooks.findByDedupKey(dedupKey).ifPresent(row -> {
             try {
                 final SourceBook staged = mapper.toSourceBook(row);
-                final MergedBook collected = sourceCollector.collectFor(staged);
+                final MergedBook collected = sourceCollector.collectFor(staged, row.getFirstTitle());
                 promoter.promote(dedupKey, keepStagedRating(collected, staged));
-            } catch (DataIntegrityViolationException collision) {
-                LOG.warn("catalog.staging candidate key collides with an existing row, retired dedupKey={}",
+            } catch (DataIntegrityViolationException violation) {
+                LOG.warn("catalog.staging candidate breaks a database constraint, retired dedupKey={}",
                     LogSanitizer.forLog(dedupKey));
                 promoter.markDuplicate(dedupKey);
             } catch (RuntimeException ex) {
-                LOG.warn("catalog.staging promotion failed, attempt recorded dedupKey={} ({})",
+                LOG.warn("catalog.staging promotion failed dedupKey={} ({})",
                     LogSanitizer.forLog(dedupKey), ex.getClass().getSimpleName());
                 promoter.recordFailedAttempt(dedupKey);
             }

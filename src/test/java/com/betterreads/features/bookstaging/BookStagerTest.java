@@ -43,7 +43,7 @@ class BookStagerTest {
 
     @Test
     void shouldLogADuplicateStageAtInfo(final CapturedOutput output) {
-        doThrow(new DataIntegrityViolationException("duplicate key")).when(pendingBookService).stage(any());
+        doThrow(new DataIntegrityViolationException("duplicate key")).when(pendingBookService).stage(any(), any());
 
         stager.stage(seed);
 
@@ -56,7 +56,7 @@ class BookStagerTest {
 
     @Test
     void shouldWarnWhenStagingFailsForAnotherReason(final CapturedOutput output) {
-        doThrow(new QueryTimeoutException("statement timeout")).when(pendingBookService).stage(any());
+        doThrow(new QueryTimeoutException("statement timeout")).when(pendingBookService).stage(any(), any());
 
         stager.stage(seed);
 
