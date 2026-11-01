@@ -20,14 +20,20 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.core.codec.DecodingException;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.mock.http.client.MockClientHttpRequest;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 class SearchMissStagerTest {
 
@@ -106,6 +112,7 @@ class SearchMissStagerTest {
     }
 
     @Nested
+    @ExtendWith(OutputCaptureExtension.class)
     @DisplayName("after a staging run ends")
     class RunEnd {
 
@@ -143,6 +150,33 @@ class SearchMissStagerTest {
             doThrow(new DecodingException(BAD_BODY)).when(bookDiscovery).searchAndStage(DUNE);
 
             assertThatCode(() -> stager.stage(DUNE)).doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("should log a read failure when a 200 body is unreadable")
+        void shouldLogReadFailureWhen200BodyIsUnreadable(final CapturedOutput output) {
+            final WebClientResponseException unreadable = WebClientResponseException.create(
+                HttpStatus.OK.value(), HttpStatus.OK.getReasonPhrase(), HttpHeaders.EMPTY, new byte[0], null,
+                new MockClientHttpRequest(HttpMethod.GET, URI.create(SOURCE_URL)));
+            unreadable.initCause(new DecodingException(BAD_BODY));
+            doThrow(unreadable).when(bookDiscovery).searchAndStage(DUNE);
+
+            stager.stage(DUNE);
+
+            assertThat(output.getOut())
+                .contains("catalog.search-miss staging could not read the 200 response from source.example"
+                    + " (DecodingException)")
+                .doesNotContain("staging got 200");
+        }
+
+        @Test
+        @DisplayName("should log the status when a source answers 503")
+        void shouldLogStatusWhenSourceAnswers503(final CapturedOutput output) {
+            doThrow(StubSourceClients.serviceUnavailable()).when(bookDiscovery).searchAndStage(DUNE);
+
+            stager.stage(DUNE);
+
+            assertThat(output.getOut()).contains("catalog.search-miss staging got 503");
         }
     }
 }

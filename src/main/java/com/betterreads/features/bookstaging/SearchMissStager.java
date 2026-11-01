@@ -76,6 +76,10 @@ class SearchMissStager implements SearchMissSink {
     private static void logFailure(final Throwable cause) {
         final String type = LogSanitizer.forLog(cause.getClass().getSimpleName());
         switch (cause) {
+            case WebClientResponseException ex when ex.getCause() != null -> LOG.warn(
+                "catalog.search-miss staging could not read the {} response from {} ({})",
+                ex.getStatusCode().value(), LogSanitizer.forLog(sourceHost(ex)),
+                LogSanitizer.forLog(unwrap(ex).getClass().getSimpleName()));
             case WebClientResponseException ex -> LOG.warn("catalog.search-miss staging got {} from {}",
                 ex.getStatusCode().value(), LogSanitizer.forLog(sourceHost(ex)));
             case WebClientRequestException ex -> LOG.warn("catalog.search-miss staging failed ({}) from {}",
