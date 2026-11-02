@@ -5,13 +5,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.betterreads.book.Author;
 import com.betterreads.book.AuthorRepository;
 import com.betterreads.book.BookRepository;
+import com.betterreads.sse.RecordingAccessLog;
 import com.betterreads.testsupport.Books;
 import com.betterreads.testsupport.ContainerizedTest;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.CharArrayWriter;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.StandardSocketOptions;
@@ -19,7 +19,6 @@ import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import org.apache.catalina.valves.AbstractAccessLogValve;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,8 +62,6 @@ class BookStreamFirstSendTest extends ContainerizedTest {
 
     private static final String UNEXPECTED_ERROR_LOG = "Unexpected error";
 
-    private static final CompletableFuture<String> LOGGED_STATUS = new CompletableFuture<>();
-
     @LocalServerPort
     private int port;
 
@@ -83,13 +80,16 @@ class BookStreamFirstSendTest extends ContainerizedTest {
     @Autowired
     private HeldRequest held;
 
+    @Autowired
+    private RecordingAccessLog accessLog;
+
     @Test
-    void shouldLogClientResetDuringFirstSendAs499(final CapturedOutput output) throws IOException {
+    void shouldNotLogErrorWhenClientResetsDuringFirstSend(final CapturedOutput output) throws IOException {
         seedLargeBook();
 
         resetDuringRequest();
 
-        final String status = LOGGED_STATUS.orTimeout(WAIT_SECONDS, TimeUnit.SECONDS).join();
+        final String status = accessLog.loggedStatus().orTimeout(WAIT_SECONDS, TimeUnit.SECONDS).join();
         assertThat(status).isEqualTo(CLIENT_CLOSED);
         assertThat(output.getAll()).doesNotContain(UNEXPECTED_ERROR_LOG);
     }
@@ -122,8 +122,15 @@ class BookStreamFirstSendTest extends ContainerizedTest {
         }
 
         @Bean
-        WebServerFactoryCustomizer<TomcatServletWebServerFactory> recordingAccessLog() {
-            return factory -> factory.addEngineValves(new RecordingAccessLog());
+        RecordingAccessLog recordingAccessLog() {
+            return new RecordingAccessLog();
+        }
+
+        @Bean
+        WebServerFactoryCustomizer<TomcatServletWebServerFactory> accessLogCustomizer(
+            final RecordingAccessLog accessLog
+        ) {
+            return factory -> factory.addEngineValves(accessLog);
         }
     }
 
@@ -144,19 +151,6 @@ class BookStreamFirstSendTest extends ContainerizedTest {
                 clientGone.orTimeout(WAIT_SECONDS, TimeUnit.SECONDS).join();
             }
             chain.doFilter(request, response);
-        }
-    }
-
-    private static final class RecordingAccessLog extends AbstractAccessLogValve {
-
-        RecordingAccessLog() {
-            super();
-            setPattern("%s");
-        }
-
-        @Override
-        protected void log(final CharArrayWriter message) {
-            LOGGED_STATUS.complete(message.toString());
         }
     }
 }

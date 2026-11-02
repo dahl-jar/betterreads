@@ -3,6 +3,7 @@ package com.betterreads.errors;
 import jakarta.validation.ConstraintViolationException;
 
 import com.betterreads.logging.LogSanitizer;
+import org.springframework.core.NestedExceptionUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -154,7 +155,8 @@ class GlobalExceptionHandler {
     @ExceptionHandler(IllegalStateException.class)
     public @Nullable ProblemDetail handleFailedSend(final IllegalStateException exception) {
         if (DisconnectedClientHelper.isClientDisconnectedException(exception)) {
-            LOG.debug("client closed the stream during the first send");
+            LOG.debug("client closed the stream during the first send: {}",
+                    LogSanitizer.forLog(messageOf(NestedExceptionUtils.getMostSpecificCause(exception), "")));
             return null;
         }
         return handleUnexpected(exception);
@@ -179,7 +181,7 @@ class GlobalExceptionHandler {
         return problem;
     }
 
-    private static String messageOf(final Exception exception, final String fallback) {
-        return Objects.requireNonNullElse(exception.getMessage(), fallback);
+    private static String messageOf(final Throwable failure, final String fallback) {
+        return Objects.requireNonNullElse(failure.getMessage(), fallback);
     }
 }

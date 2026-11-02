@@ -7,17 +7,14 @@ import jakarta.servlet.ServletRegistration;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.CharArrayWriter;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import org.apache.catalina.valves.AbstractAccessLogValve;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -92,25 +89,6 @@ class ClosedStreamLogConfigTest {
             response.setContentType(MediaType.TEXT_EVENT_STREAM_VALUE);
             request.setAttribute(RequestDispatcher.ERROR_EXCEPTION, RecordingSseStreams.CLOSED_CLIENT);
             response.flushBuffer();
-        }
-    }
-
-    private static final class RecordingAccessLog extends AbstractAccessLogValve {
-
-        private final CompletableFuture<String> status = new CompletableFuture<>();
-
-        RecordingAccessLog() {
-            super();
-            setPattern("%s");
-        }
-
-        CompletableFuture<String> loggedStatus() {
-            return status;
-        }
-
-        @Override
-        protected void log(final CharArrayWriter message) {
-            status.complete(message.toString());
         }
     }
 }
