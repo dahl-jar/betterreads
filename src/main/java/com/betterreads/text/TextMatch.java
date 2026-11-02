@@ -88,23 +88,25 @@ public final class TextMatch {
     }
 
     public static boolean sameBookTitle(final String first, final String second) {
-        final Set<String> firstSegments = segmentKeys(first);
-        final Set<String> secondSegments = segmentKeys(second);
+        final String firstFolded = foldTitle(first);
+        final String secondFolded = foldTitle(second);
+        final Set<String> firstSegments = segmentKeys(firstFolded);
+        final Set<String> secondSegments = segmentKeys(secondFolded);
         if (firstSegments.isEmpty() || secondSegments.isEmpty()
-            || Volumes.differ(foldTitle(first), foldTitle(second))) {
+            || Volumes.differ(firstFolded, secondFolded)) {
             return false;
         }
-        return wholeKey(first).equals(wholeKey(second))
+        return wholeKey(firstFolded).equals(wholeKey(secondFolded))
             || firstSegments.containsAll(secondSegments)
             || secondSegments.containsAll(firstSegments);
     }
 
-    private static String wholeKey(final String title) {
-        return wordKey(Volumes.mark(foldTitle(title), "vol"));
+    private static String wholeKey(final String folded) {
+        return wordKey(Volumes.mark(folded, "vol"));
     }
 
-    private static Set<String> segmentKeys(final String title) {
-        final String bare = PARENTHETICAL.matcher(foldTitle(title)).replaceAll(" ");
+    private static Set<String> segmentKeys(final String folded) {
+        final String bare = PARENTHETICAL.matcher(folded).replaceAll(" ");
         return SEGMENT_BREAK.splitAsStream(Volumes.mark(bare, ", vol"))
             .map(TextMatch::wordKey)
             .filter(key -> !key.isEmpty())
@@ -128,8 +130,8 @@ public final class TextMatch {
             return !firstNumbers.isEmpty() && !secondNumbers.isEmpty() && !firstNumbers.equals(secondNumbers);
         }
 
-        static String mark(final String title, final String mark) {
-            return VOLUME_WORD.matcher(title).replaceAll(volume -> mark + number(volume.group(1)));
+        static String mark(final String title, final String prefix) {
+            return VOLUME_WORD.matcher(title).replaceAll(volume -> prefix + number(volume.group(1)));
         }
 
         private static Set<String> numbers(final String title) {
