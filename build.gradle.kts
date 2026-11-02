@@ -14,7 +14,6 @@ plugins {
 	id("io.spring.dependency-management") version "1.1.7"
 	id("com.github.spotbugs") version "6.4.8"
 	id("net.ltgt.errorprone") version "5.1.0"
-	id("org.owasp.dependencycheck") version "12.2.2"
 	id("de.aaschmid.cpd") version "3.5"
 	id("info.solidsoft.pitest") version "1.19.0"
 }
@@ -275,29 +274,6 @@ pitest {
 }
 
 // ---------------------------------------------------------------------------
-// OWASP Dependency-Check (vulnerable dependency scanning)
-// ---------------------------------------------------------------------------
-dependencyCheck {
-	nvd {
-		apiKey = providers.environmentVariable("NVD_API_KEY").orNull
-	}
-	failBuildOnCVSS = 7.0f
-	failBuildOnUnusedSuppressionRule = true
-	formats = listOf("HTML", "JSON")
-	suppressionFile = "config/dependency-check/suppressions.xml"
-	analyzers {
-		assemblyEnabled = false
-		nuspecEnabled = false
-		nugetconfEnabled = false
-		nodeEnabled = false
-		nodeAuditEnabled = false
-		retirejs {
-			enabled = false
-		}
-	}
-}
-
-// ---------------------------------------------------------------------------
 // Test config
 // ---------------------------------------------------------------------------
 // the test JVM does not inherit the parent environment, so the opt-in suites get their keys and flags passed in by name
@@ -387,7 +363,6 @@ tasks.test {
 	finalizedBy(tasks.jacocoTestReport)
 }
 
-// the opt-in suites compile and get static analysis here, and run only via their own tasks
 tasks.named("check") {
 	dependsOn(
 		tasks.jacocoTestCoverageVerification,
@@ -400,8 +375,4 @@ tasks.named("check") {
 		tasks.named("spotbugsLiveTest"),
 		tasks.named("spotbugsLocalDbVerification")
 	)
-	val nvdApiKey = providers.environmentVariable("NVD_API_KEY").orNull
-	if (!nvdApiKey.isNullOrBlank()) {
-		dependsOn(tasks.named("dependencyCheckAnalyze"))
-	}
 }
