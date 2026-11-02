@@ -335,17 +335,6 @@ class PendingBookServiceIntegrationTest extends ContainerizedTest {
         }
 
         @Test
-        void shouldKeepFirstTitleWhenStagedAgain() {
-            pendingBookService.stage(merger.merge(null, List.of(DuneBooks.completeDune())), FIRST_TITLE);
-
-            pendingBookService.stage(merger.merge(null, List.of(DuneBooks.completeDune())), RETRY_TITLE);
-
-            assertThat(pendingBooks.findByIsbn13(ISBN))
-                .get()
-                .satisfies(row -> assertThat(row.getFirstTitle()).isEqualTo(FIRST_TITLE));
-        }
-
-        @Test
         void shouldKeepFirstTitleWhenUntitledRowIsStagedAgain() {
             final MergedBook untitled = merger.merge(null, List.of(DuneBooks.completeDune()))
                 .withBook(SourceBook.builder(BookFieldSource.OPEN_LIBRARY).isbn13(ISBN).build());

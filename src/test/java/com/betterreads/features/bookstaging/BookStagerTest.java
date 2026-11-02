@@ -42,7 +42,7 @@ class BookStagerTest {
     }
 
     @Test
-    void shouldLogADuplicateStageAtInfo(final CapturedOutput output) {
+    void shouldLogConstraintBreakAtInfo(final CapturedOutput output) {
         doThrow(new DataIntegrityViolationException("duplicate key")).when(pendingBookService).stage(any(), any());
 
         stager.stage(seed);
