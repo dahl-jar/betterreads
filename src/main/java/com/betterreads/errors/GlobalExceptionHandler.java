@@ -21,15 +21,18 @@ import org.springframework.web.context.request.async.AsyncRequestNotUsableExcept
 import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.util.DisconnectedClientHelper;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+// PMD.TooManyMethods: one handler per exception type is inherent to an exception-mapping advice.
 @SuppressWarnings("PMD.TooManyMethods")
 @RestControllerAdvice
 class GlobalExceptionHandler {
@@ -146,6 +149,15 @@ class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void handleClientClosed(final AsyncRequestNotUsableException exception) {
         LOG.debug("client closed the stream: {}", LogSanitizer.forLog(messageOf(exception, "")));
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public @Nullable ProblemDetail handleFailedSend(final IllegalStateException exception) {
+        if (DisconnectedClientHelper.isClientDisconnectedException(exception)) {
+            LOG.debug("client closed the stream during the first send");
+            return null;
+        }
+        return handleUnexpected(exception);
     }
 
     @ExceptionHandler(Exception.class)

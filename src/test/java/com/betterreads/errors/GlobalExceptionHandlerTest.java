@@ -67,6 +67,8 @@ class GlobalExceptionHandlerTest {
 
     private static final String UNEXPECTED_ERROR_LOG = "Unexpected error";
 
+    private static final String FAILED_SEND = "Failed to send";
+
     private static final AsyncRequestNotUsableException CLOSED_CLIENT =
             new AsyncRequestNotUsableException("Broken pipe");
 
@@ -240,8 +242,36 @@ class GlobalExceptionHandlerTest {
             assertThat(output).contains(UNEXPECTED_ERROR_LOG);
         }
 
+        @Test
+        void shouldNotLogErrorWhenClientClosedDuringFirstSend(final CapturedOutput output) throws Exception {
+            final MockMvc mockMvc = failingMvc(new IllegalStateException(FAILED_SEND, CLOSED_CLIENT));
+
+            mockMvc.perform(MockMvcRequestBuilders.get(STREAM_PATH));
+
+            assertThat(output).doesNotContain(UNEXPECTED_ERROR_LOG);
+        }
+
+        @Test
+        void shouldLogErrorWhenFirstSendFailsWithClientConnected(final CapturedOutput output) throws Exception {
+            final MockMvc mockMvc = failingMvc(
+                    new IllegalStateException(FAILED_SEND, new IllegalArgumentException("no converter")));
+
+            final ResultActions result = mockMvc.perform(MockMvcRequestBuilders.get(STREAM_PATH));
+
+            result.andExpect(MockMvcResultMatchers.status().isInternalServerError());
+            assertThat(output).contains(UNEXPECTED_ERROR_LOG);
+        }
+
         private MockMvc failingMvc(final IOException failure) {
-            final StandaloneMockMvcBuilder builder = MockMvcBuilders.standaloneSetup(new FailingStream(failure));
+            return mvcFor(new FailingStream(failure));
+        }
+
+        private MockMvc failingMvc(final IllegalStateException failure) {
+            return mvcFor(new FailingSend(failure));
+        }
+
+        private MockMvc mvcFor(final Object controller) {
+            final StandaloneMockMvcBuilder builder = MockMvcBuilders.standaloneSetup(controller);
             builder.setControllerAdvice(new GlobalExceptionHandler());
             return builder.build();
         }
@@ -257,6 +287,21 @@ class GlobalExceptionHandlerTest {
 
             @GetMapping(STREAM_PATH)
             void stream() throws IOException {
+                throw failure;
+            }
+        }
+
+        @RestController
+        static final class FailingSend {
+
+            private final IllegalStateException failure;
+
+            FailingSend(final IllegalStateException failure) {
+                this.failure = failure;
+            }
+
+            @GetMapping(STREAM_PATH)
+            void stream() {
                 throw failure;
             }
         }

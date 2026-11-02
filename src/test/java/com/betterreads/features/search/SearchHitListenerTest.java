@@ -30,6 +30,12 @@ class SearchHitListenerTest {
 
     private static final String OTHER_QUERY = "dune";
 
+    private static final String FORGED_QUERY = "dune\r\n forged";
+
+    private static final String FORGED_BOOK_ID = "book\r\n forged";
+
+    private static final String SANITIZED_IDS = " query=dune forged bookId=book forged \\(";
+
     private final BookSearchService searchService = Mockito.mock(BookSearchService.class);
 
     private final SearchHitEmitters emitters = Mockito.mock(SearchHitEmitters.class);
@@ -67,8 +73,7 @@ class SearchHitListenerTest {
         when(emitters.openQueries()).thenReturn(orderedQueries());
         when(searchService.hitFor(MATCHING_QUERY, BOOK_ID)).thenReturn(Optional.of(hit));
         when(searchService.hitFor(OTHER_QUERY, BOOK_ID)).thenReturn(Optional.of(hit));
-        doThrow(new IllegalStateException("async request already completed"))
-            .when(emitters).publish(OTHER_QUERY, hit);
+        doThrow(closedStream()).when(emitters).publish(OTHER_QUERY, hit);
 
         listener.onBookIndexed(new BookIndexedEvent(BOOK_ID));
 
@@ -76,13 +81,27 @@ class SearchHitListenerTest {
     }
 
     @Test
-    void shouldLogWarnWhenQueryFails(final CapturedOutput output) {
-        when(emitters.openQueries()).thenReturn(Set.of(OTHER_QUERY));
-        when(searchService.hitFor(OTHER_QUERY, BOOK_ID)).thenThrow(badDocument());
+    void shouldLogCheckFailureWithSafeQueryWhenDocumentIsUnreadable(final CapturedOutput output) {
+        when(emitters.openQueries()).thenReturn(Set.of(FORGED_QUERY));
+        when(searchService.hitFor(FORGED_QUERY, FORGED_BOOK_ID)).thenThrow(badDocument());
 
-        listener.onBookIndexed(new BookIndexedEvent(BOOK_ID));
+        listener.onBookIndexed(new BookIndexedEvent(FORGED_BOOK_ID));
 
-        assertThat(output).containsPattern("WARN.*search\\.hit-push failed");
+        assertThat(output).containsPattern(
+            "WARN.*search\\.hit-check failed, could not read the index document" + SANITIZED_IDS);
+    }
+
+    @Test
+    void shouldLogPushFailureWithSafeQueryWhenStreamCannotClose(final CapturedOutput output) {
+        final BookSearchDocument hit = BookSearchDocuments.eyeOfTheWorld();
+        when(emitters.openQueries()).thenReturn(Set.of(FORGED_QUERY));
+        when(searchService.hitFor(FORGED_QUERY, FORGED_BOOK_ID)).thenReturn(Optional.of(hit));
+        doThrow(closedStream()).when(emitters).publish(FORGED_QUERY, hit);
+
+        listener.onBookIndexed(new BookIndexedEvent(FORGED_BOOK_ID));
+
+        assertThat(output).containsPattern(
+            "WARN.*search\\.hit-push failed, could not close the failed stream" + SANITIZED_IDS);
     }
 
     @Test
@@ -96,6 +115,10 @@ class SearchHitListenerTest {
 
     private static Set<String> orderedQueries() {
         return new LinkedHashSet<>(List.of(OTHER_QUERY, MATCHING_QUERY));
+    }
+
+    private static IllegalStateException closedStream() {
+        return new IllegalStateException("async request already completed");
     }
 
     private static DatabindException badDocument() {

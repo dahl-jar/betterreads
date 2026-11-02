@@ -27,8 +27,11 @@ class SearchHitListener {
         try {
             searchService.hitFor(queryKey, bookId)
                 .ifPresent(hit -> emitters.publish(queryKey, hit));
-        } catch (JacksonException | IllegalStateException ex) {
-            LOG.warn("search.hit-push failed query={} bookId={} ({})",
+        } catch (JacksonException ex) {
+            LOG.warn("search.hit-check failed, could not read the index document query={} bookId={} ({})",
+                LogSanitizer.forLog(queryKey), LogSanitizer.forLog(bookId), ex.getClass().getSimpleName());
+        } catch (IllegalStateException ex) {
+            LOG.warn("search.hit-push failed, could not close the failed stream query={} bookId={} ({})",
                 LogSanitizer.forLog(queryKey), LogSanitizer.forLog(bookId), ex.getClass().getSimpleName());
         }
     }
