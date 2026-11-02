@@ -107,7 +107,7 @@ class PendingBookServiceTest {
     }
 
     @Test
-    void shouldWarnConstraintBrokenWhenPromotionViolatesOne(final CapturedOutput output) {
+    void shouldWarnRefusedWhenDatabaseRejectsPromotion(final CapturedOutput output) {
         stubDueDune();
         doThrow(new DataIntegrityViolationException("numeric field overflow"))
             .when(promoter).promote(eq(DUNE_KEY), any());
@@ -115,7 +115,7 @@ class PendingBookServiceTest {
         service.promoteReady();
 
         assertThat(output.getOut())
-            .contains("catalog.staging candidate breaks a database constraint, retired dedupKey=" + DUNE_KEY);
+            .contains("catalog.staging candidate refused by the database, retired dedupKey=" + DUNE_KEY);
     }
 
     @Test

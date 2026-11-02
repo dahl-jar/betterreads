@@ -38,7 +38,7 @@ class BookStager {
                 promoter.promote(dedupKey, merged);
             }
         } catch (DataIntegrityViolationException violation) {
-            LOG.info("catalog.search candidate breaks a database constraint for source {}, skipping it",
+            LOG.info("catalog.search candidate refused by the database for source {}, skipping it",
                 seed.source());
         } catch (DataAccessException ex) {
             LOG.warn("catalog.search staging failed for source {} ({}), skipping it",

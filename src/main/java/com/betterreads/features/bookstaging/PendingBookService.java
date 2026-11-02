@@ -88,7 +88,7 @@ public class PendingBookService {
                 final MergedBook collected = sourceCollector.collectFor(staged, row.getFirstTitle());
                 promoter.promote(dedupKey, keepStagedRating(collected, staged));
             } catch (DataIntegrityViolationException violation) {
-                LOG.warn("catalog.staging candidate breaks a database constraint, retired dedupKey={}",
+                LOG.warn("catalog.staging candidate refused by the database, retired dedupKey={}",
                     LogSanitizer.forLog(dedupKey));
                 promoter.markDuplicate(dedupKey);
             } catch (RuntimeException ex) {

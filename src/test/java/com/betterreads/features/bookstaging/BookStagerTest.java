@@ -22,7 +22,7 @@ import org.springframework.dao.QueryTimeoutException;
 @ExtendWith(OutputCaptureExtension.class)
 class BookStagerTest {
 
-    private static final String CONSTRAINT_BROKEN = "catalog.search candidate breaks a database constraint";
+    private static final String REFUSED = "catalog.search candidate refused by the database for source";
 
     private static final String FAILED = "catalog.search staging failed";
 
@@ -42,13 +42,13 @@ class BookStagerTest {
     }
 
     @Test
-    void shouldLogConstraintBreakAtInfo(final CapturedOutput output) {
+    void shouldLogRefusedCandidateAtInfo(final CapturedOutput output) {
         doThrow(new DataIntegrityViolationException("duplicate key")).when(pendingBookService).stage(any(), any());
 
         stager.stage(seed);
 
         assertThat(output.getOut().lines())
-            .filteredOn(line -> line.contains(CONSTRAINT_BROKEN))
+            .filteredOn(line -> line.contains(REFUSED))
             .singleElement()
             .asString()
             .contains(" INFO ");
@@ -61,7 +61,7 @@ class BookStagerTest {
         stager.stage(seed);
 
         assertThat(output.getOut().lines())
-            .filteredOn(line -> line.contains(FAILED) || line.contains(CONSTRAINT_BROKEN))
+            .filteredOn(line -> line.contains(FAILED) || line.contains(REFUSED))
             .singleElement()
             .asString()
             .contains(" WARN ", FAILED);
