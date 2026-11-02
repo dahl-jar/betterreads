@@ -88,7 +88,7 @@ class TitleCleanerTest {
 
         private static final String AUTHOR_BYLINE = "The Hobbit by Author Name";
 
-        private static final int TITLE_COLUMN_LENGTH = 500;
+        private static final int MAX_TITLE_LENGTH = 500;
 
         @ParameterizedTest
         @ValueSource(strings = {
@@ -108,8 +108,8 @@ class TitleCleanerTest {
         }
 
         @Test
-        void shouldTreatTitleAtColumnLimitAsDisplayable() {
-            assertThat(TitleCleaner.isDisplayable("x".repeat(TITLE_COLUMN_LENGTH), AUTHOR_NAMES)).isTrue();
+        void shouldTreatTitleAtLengthLimitAsDisplayable() {
+            assertThat(TitleCleaner.isDisplayable("x".repeat(MAX_TITLE_LENGTH), AUTHOR_NAMES)).isTrue();
         }
 
         @Test
