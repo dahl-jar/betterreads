@@ -1,0 +1,38 @@
+name: Dependency Submission
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle/**"
+      - ".github/workflows/dependency-submission.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-submission:
+    name: Submit Gradle dependency graph
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9  # v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Generate and submit dependency graph
+        uses: gradle/actions/dependency-submission@8da46b539cd8fe6ab27ca75128919a18d757604c  # v6.4.1
+        with:
+          cache-provider: basic
+          dependency-graph: generate-and-submit
+          dependency-graph-include-configurations: "^(runtimeClasspath|testRuntimeClasspath|liveTestRuntimeClasspath|localDbVerificationRuntimeClasspath)$"
