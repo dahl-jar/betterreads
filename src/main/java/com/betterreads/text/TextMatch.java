@@ -90,7 +90,8 @@ public final class TextMatch {
     public static boolean sameBookTitle(final String first, final String second) {
         final Set<String> firstSegments = segmentKeys(first);
         final Set<String> secondSegments = segmentKeys(second);
-        if (firstSegments.isEmpty() || secondSegments.isEmpty()) {
+        if (firstSegments.isEmpty() || secondSegments.isEmpty()
+            || Volumes.differ(foldTitle(first), foldTitle(second))) {
             return false;
         }
         return wholeKey(first).equals(wholeKey(second))
@@ -99,22 +100,15 @@ public final class TextMatch {
     }
 
     private static String wholeKey(final String title) {
-        return wordKey(markVolumes(foldTitle(title), "vol"));
+        return wordKey(Volumes.mark(foldTitle(title), "vol"));
     }
 
     private static Set<String> segmentKeys(final String title) {
         final String bare = PARENTHETICAL.matcher(foldTitle(title)).replaceAll(" ");
-        return SEGMENT_BREAK.splitAsStream(markVolumes(bare, ", vol"))
+        return SEGMENT_BREAK.splitAsStream(Volumes.mark(bare, ", vol"))
             .map(TextMatch::wordKey)
             .filter(key -> !key.isEmpty())
             .collect(Collectors.toSet());
-    }
-
-    private static String markVolumes(final String title, final String mark) {
-        return VOLUME_WORD.matcher(title).replaceAll(volume -> {
-            final String label = LEADING_ZEROS.matcher(volume.group(1)).replaceFirst("");
-            return mark + VOLUME_NUMBERS.getOrDefault(label, label);
-        });
     }
 
     private static String foldTitle(final String title) {
@@ -124,5 +118,29 @@ public final class TextMatch {
     private static String wordKey(final String text) {
         final String spaced = NOT_WORD.matcher(text).replaceAll(" ").strip();
         return LEADING_ARTICLE.matcher(spaced).replaceFirst("").replace(" ", "");
+    }
+
+    private static final class Volumes {
+
+        static boolean differ(final String first, final String second) {
+            final Set<String> firstNumbers = numbers(first);
+            final Set<String> secondNumbers = numbers(second);
+            return !firstNumbers.isEmpty() && !secondNumbers.isEmpty() && !firstNumbers.equals(secondNumbers);
+        }
+
+        static String mark(final String title, final String mark) {
+            return VOLUME_WORD.matcher(title).replaceAll(volume -> mark + number(volume.group(1)));
+        }
+
+        private static Set<String> numbers(final String title) {
+            return VOLUME_WORD.matcher(title).results()
+                .map(volume -> number(volume.group(1)))
+                .collect(Collectors.toSet());
+        }
+
+        private static String number(final String label) {
+            final String unpadded = LEADING_ZEROS.matcher(label).replaceFirst("");
+            return VOLUME_NUMBERS.getOrDefault(unpadded, unpadded);
+        }
     }
 }

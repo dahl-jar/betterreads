@@ -144,6 +144,8 @@ class TextMatchTest {
             arguments("Red Volcano", "Red"),
             arguments("Saga, Vol. 101", "Saga, Vol. 11"),
             arguments("Saga, Vol. 0", "Saga, Vol."),
+            arguments("From the Wizarding Archive (Volume 1)", "From the Wizarding Archive (Volume 2)"),
+            arguments("One Piece (Vol. 1)", "One Piece, Vol. 2"),
             arguments("Diaries, 1969\u20131976", "1976"),
             arguments("Area 51\u2014The Story", "The Story"),
             arguments("Book\u20141984", "1984"),
