@@ -45,21 +45,15 @@ public class PendingBookService {
     }
 
     @Transactional
-    public void stage(final MergedBook merged) {
-        stage(merged, null);
-    }
-
-    @Transactional
     public void stage(final MergedBook merged, final @Nullable String firstTitle) {
         final String dedupKey = merged.book().dedupKey();
         if (dedupKey == null) {
             throw new IllegalArgumentException(
                 "merged book has no source identifier to stage on, so nothing can dedup it");
         }
-        pendingBooks.reserve(dedupKey);
+        final boolean justReserved = pendingBooks.reserve(dedupKey) == 1;
         final PendingBook row = pendingBooks.findByDedupKey(dedupKey).orElseThrow(
             () -> new IllegalStateException("reserved pending row vanished for dedupKey=" + dedupKey));
-        final boolean justReserved = row.getTitle() == null;
         if (justReserved) {
             row.setFirstTitle(firstTitle);
         }

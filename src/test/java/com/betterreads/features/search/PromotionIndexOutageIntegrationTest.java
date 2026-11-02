@@ -67,7 +67,7 @@ class PromotionIndexOutageIntegrationTest extends ContainerizedTest {
     @DisplayName("promotion survives a Meilisearch outage in the index hook")
     void promotionSurvivesIndexOutage() {
         final SourceBook dune = SourceBooks.dune();
-        pendingBookService.stage(merger.merge(null, List.of(dune)));
+        pendingBookService.stage(merger.merge(null, List.of(dune)), null);
 
         assertThatCode(pendingBookService::promoteReady).doesNotThrowAnyException();
 
@@ -86,7 +86,6 @@ class PromotionIndexOutageIntegrationTest extends ContainerizedTest {
         }
     }
 
-    /** index calls throw like Meilisearch does when it is down, search returns nothing */
     private static final class OutageSearchService implements BookSearchService {
 
         private static SearchIndexException outage() {

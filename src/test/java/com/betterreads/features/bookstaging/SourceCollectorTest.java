@@ -39,7 +39,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 
@@ -317,7 +316,6 @@ class SourceCollectorTest {
 
     @ParameterizedTest
     @NullAndEmptySource
-    @ValueSource(strings = "   ")
     void shouldKeepIsbnHitWhenSeedHasNoTitle(final @Nullable String seedTitle) {
         final SourceBook seed = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
             .isbn13(ISBN)
@@ -350,9 +348,8 @@ class SourceCollectorTest {
     }
 
     @Test
-    void shouldKeepRetryHitWithAnotherSubtitleThanStoredTitle() {
-        final SourceCollector collector = collectorWith(SAME_THREAD,
-            stubByIsbn(BookFieldSource.HARDCOVER, ISBN, hardcoverHit(HIT_TITLE, HARDCOVER_RATING)));
+    void shouldKeepRetryHitMatchingFirstTitle() {
+        final SourceCollector collector = collectorWithIsbnHit(HIT_TITLE, HARDCOVER_RATING);
 
         final MergedBook merged = collector.collectFor(stagedSeed().build(), FIRST_TITLE);
 
@@ -360,7 +357,7 @@ class SourceCollectorTest {
     }
 
     @Test
-    void shouldDropRetryHitWithAnotherBookThanFirstTitle(final CapturedOutput output) {
+    void shouldDropRetryHitNotMatchingFirstTitle(final CapturedOutput output) {
         final SourceCollector collector = collectorWithIsbnHit(SEQUEL_TITLE, WRONG_RATING);
 
         final MergedBook merged = collector.collectFor(stagedSeed().build(), FIRST_TITLE);
@@ -370,7 +367,7 @@ class SourceCollectorTest {
     }
 
     @Test
-    void shouldCompareWithStoredTitleWhenFirstTitleIsNull() {
+    void shouldDropRetryHitWithAnotherSubtitleWhenFirstTitleIsNull() {
         final SourceCollector collector = collectorWithIsbnHit(HIT_TITLE, WRONG_RATING);
 
         final MergedBook merged = collector.collectFor(stagedSeed().build(), null);

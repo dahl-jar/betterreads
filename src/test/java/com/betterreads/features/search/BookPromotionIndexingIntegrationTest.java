@@ -81,7 +81,7 @@ class BookPromotionIndexingIntegrationTest extends ContainerizedTest {
         final MvcResult stream = mockMvc.perform(get("/api/v1/search/books/events").param("q", DUNE_QUERY))
             .andExpect(request().asyncStarted())
             .andReturn();
-        pendingBookService.stage(merger.merge(null, List.of(SourceBooks.dune())));
+        pendingBookService.stage(merger.merge(null, List.of(SourceBooks.dune())), null);
 
         pendingBookService.promoteReady();
 

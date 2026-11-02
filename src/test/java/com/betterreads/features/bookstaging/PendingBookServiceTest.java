@@ -65,7 +65,7 @@ class PendingBookServiceTest {
             .title(DUNE_TITLE)
             .build();
 
-        assertThatThrownBy(() -> service.stage(new SourceMerger().merge(null, List.of(keyless))))
+        assertThatThrownBy(() -> service.stage(new SourceMerger().merge(null, List.of(keyless)), null))
             .isInstanceOf(IllegalArgumentException.class);
         verify(pendingBooks, never()).reserve(anyString());
     }

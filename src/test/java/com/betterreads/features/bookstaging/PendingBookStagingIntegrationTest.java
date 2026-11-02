@@ -73,7 +73,7 @@ class PendingBookStagingIntegrationTest extends ContainerizedTest {
     void stagingWritesPendingRow() {
         final MergedBook merged = merger.merge(null, List.of(completeDune()));
 
-        pendingBookService.stage(merged);
+        pendingBookService.stage(merged, null);
 
         assertThat(pendingBooks.findByIsbn13(ISBN))
             .get()
@@ -86,9 +86,9 @@ class PendingBookStagingIntegrationTest extends ContainerizedTest {
     @Test
     @DisplayName("staging the same book twice updates the row rather than inserting a second")
     void stagingTwiceUpdatesInPlace() {
-        pendingBookService.stage(merger.merge(null, List.of(sparseDune())));
+        pendingBookService.stage(merger.merge(null, List.of(sparseDune())), null);
 
-        pendingBookService.stage(merger.merge(null, List.of(completeDune())));
+        pendingBookService.stage(merger.merge(null, List.of(completeDune())), null);
 
         assertThat(pendingBooks.count())
             .as("the second stage of the same ISBN must reuse the existing row")
@@ -131,7 +131,7 @@ class PendingBookStagingIntegrationTest extends ContainerizedTest {
             return;
         }
         try {
-            pendingBookService.stage(merger.merge(null, List.of(completeDune())));
+            pendingBookService.stage(merger.merge(null, List.of(completeDune())), null);
         } catch (DataIntegrityViolationException race) {
             races.add(race);
         }
@@ -140,12 +140,12 @@ class PendingBookStagingIntegrationTest extends ContainerizedTest {
     @Test
     @DisplayName("re-staging a retired candidate revives it for promotion")
     void restagingRevivesRetiredCandidate() {
-        pendingBookService.stage(merger.merge(null, List.of(sparseDune())));
+        pendingBookService.stage(merger.merge(null, List.of(sparseDune())), null);
         final PendingBook retired = pendingBooks.findByIsbn13(ISBN).orElseThrow();
         retired.setStatus(PendingBookStatus.INCOMPLETE_FINAL);
         pendingBooks.save(retired);
 
-        pendingBookService.stage(merger.merge(null, List.of(completeDune())));
+        pendingBookService.stage(merger.merge(null, List.of(completeDune())), null);
         pendingBookService.promoteReady();
 
         assertThat(books.findByOpenLibraryWorkKey(OL_KEY))
