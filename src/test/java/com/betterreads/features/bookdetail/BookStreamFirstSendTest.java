@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.betterreads.book.Author;
 import com.betterreads.book.AuthorRepository;
 import com.betterreads.book.BookRepository;
+import com.betterreads.ratelimit.RateLimitFilter;
 import com.betterreads.sse.RecordingAccessLog;
 import com.betterreads.testsupport.Books;
 import com.betterreads.testsupport.ContainerizedTest;
@@ -83,8 +84,12 @@ class BookStreamFirstSendTest extends ContainerizedTest {
     @Autowired
     private RecordingAccessLog accessLog;
 
+    @Autowired
+    private RateLimitFilter rateLimitFilter;
+
     @Test
     void shouldNotLogErrorWhenClientResetsDuringFirstSend(final CapturedOutput output) throws IOException {
+        rateLimitFilter.reset();
         seedLargeBook();
 
         resetDuringRequest();
