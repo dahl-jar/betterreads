@@ -1,5 +1,6 @@
 package com.betterreads.features.account;
 
+import com.betterreads.crypto.PasswordByteLimit;
 import com.betterreads.errors.InvalidRequestException;
 import com.betterreads.users.SessionRevoker;
 import com.betterreads.users.User;
@@ -19,6 +20,8 @@ class PasswordChangeService {
     private static final Logger LOG = LoggerFactory.getLogger(PasswordChangeService.class);
 
     private static final String WRONG_CURRENT_PASSWORD = "Current password is incorrect";
+
+    private static final String SAME_PASSWORD = "New password must differ from the current password";
 
     private final UserRepository userRepository;
 
@@ -51,6 +54,11 @@ class PasswordChangeService {
         if (!userPasswords.matches(user, currentPassword)) {
             LOG.warn("Password change rejected: wrong current password userId={}", userId);
             throw new InvalidRequestException(WRONG_CURRENT_PASSWORD);
+        }
+        PasswordByteLimit.check(newPassword);
+        if (userPasswords.matches(user, newPassword)) {
+            LOG.warn("Password change rejected: new password equals current password userId={}", userId);
+            throw new InvalidRequestException(SAME_PASSWORD);
         }
         userPasswords.setPassword(user, newPassword);
         userRepository.save(user);
