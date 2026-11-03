@@ -170,7 +170,7 @@ class PendingBookStagingIntegrationTest extends ContainerizedTest {
 
     @Test
     void shouldStoreNoSeriesOnThePollWhenHardcoverMarksACompilation() {
-        pendingBookService.stage(merger.merge(null, List.of(completeDune())));
+        pendingBookService.stage(merger.merge(null, List.of(completeDune())), null);
         HARDCOVER_RESPONSE.set(DuneBooks.compiledDune());
         WIKIDATA_RESPONSE.set(DuneBooks.wikidataDuneChronicles());
 
