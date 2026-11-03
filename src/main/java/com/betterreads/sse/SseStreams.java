@@ -6,6 +6,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.web.util.DisconnectedClientHelper;
 
 public class SseStreams {
 
@@ -24,7 +25,11 @@ public class SseStreams {
     public SseEmitter register(final String key) {
         final SseEmitter emitter = newEmitter();
         openStreams.incrementAndGet();
-        byKey.computeIfAbsent(key, ignored -> ConcurrentHashMap.newKeySet()).add(emitter);
+        byKey.compute(key, (ignored, streams) -> {
+            final Set<SseEmitter> open = streams == null ? ConcurrentHashMap.newKeySet() : streams;
+            open.add(emitter);
+            return open;
+        });
         emitter.onCompletion(() -> remove(key, emitter));
         emitter.onTimeout(() -> remove(key, emitter));
         emitter.onError(ignored -> remove(key, emitter));
@@ -50,7 +55,7 @@ public class SseStreams {
         if (streams == null) {
             return;
         }
-        streams.forEach(emitter -> emit(emitter, SseEmitter.event().name(eventName).data(data)));
+        streams.forEach(emitter -> emitOrRemove(key, emitter, SseEmitter.event().name(eventName).data(data)));
     }
 
     public void sendAndComplete(final SseEmitter emitter, final String eventName, final Object data) {
@@ -63,19 +68,32 @@ public class SseStreams {
         }
     }
 
+    private void emitOrRemove(final String key, final SseEmitter emitter, final SseEmitter.SseEventBuilder event) {
+        if (!emit(emitter, event)) {
+            remove(key, emitter);
+        }
+    }
+
     private boolean emit(final SseEmitter emitter, final SseEmitter.SseEventBuilder event) {
         try {
             emitter.send(event);
             return true;
         } catch (IOException | IllegalStateException ex) {
-            emitter.completeWithError(ex);
+            if (!isClosedStream(ex)) {
+                emitter.completeWithError(ex);
+            }
             return false;
         }
     }
 
+    private static boolean isClosedStream(final Exception failure) {
+        return DisconnectedClientHelper.isClientDisconnectedException(failure)
+            || failure instanceof IllegalStateException && failure.getCause() == null;
+    }
+
     public void heartbeat() {
-        byKey.values().forEach(streams ->
-            streams.forEach(emitter -> emit(emitter, SseEmitter.event().comment("keepalive"))));
+        byKey.forEach((key, streams) ->
+            streams.forEach(emitter -> emitOrRemove(key, emitter, SseEmitter.event().comment("keepalive"))));
     }
 
     public Set<String> openKeys() {

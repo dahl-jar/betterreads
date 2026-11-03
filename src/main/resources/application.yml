@@ -18,6 +18,8 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        query:
+          fail_on_pagination_over_collection_fetch: true
 
   data:
     redis:
