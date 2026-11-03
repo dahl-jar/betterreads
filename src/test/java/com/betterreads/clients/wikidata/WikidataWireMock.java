@@ -11,7 +11,7 @@ import org.springframework.test.context.DynamicPropertySource;
 
 public class WikidataWireMock extends WireMockFixture {
 
-    private static final String SEARCH_PATH = "/w/api.php";
+    protected static final String SEARCH_PATH = "/w/api.php";
 
     private static String entityPath(final String qid) {
         return "/wiki/Special:EntityData/" + qid + ".json";

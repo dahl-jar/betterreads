@@ -73,6 +73,16 @@ class LocClientWireMockTest extends LocWireMock {
         }
 
         @Test
+        @DisplayName("should send braces literally")
+        void shouldSendBracesLiterally() {
+            stubSru(sruResponse());
+
+            client.fetchByTitleAuthor("{x}", JORDAN);
+
+            WIREMOCK.verify(sruQueryContaining("bath.title=\"{x}\""));
+        }
+
+        @Test
         @DisplayName("keeps the record whose title matches the queried title")
         void keepsAMatchingRecord() {
             final String isbn13 = "9780312850098";
