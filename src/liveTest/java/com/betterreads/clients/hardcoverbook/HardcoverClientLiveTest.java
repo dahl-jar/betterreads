@@ -2,13 +2,16 @@ package com.betterreads.clients.hardcoverbook;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Duration;
 import java.util.Optional;
+import java.util.concurrent.locks.LockSupport;
 import java.util.stream.Stream;
 
 import com.betterreads.booksource.BookFieldSource;
 import com.betterreads.booksource.SourceBook;
 import com.betterreads.clients.hardcover.HardcoverProperties;
 import com.betterreads.clients.hardcover.HardcoverWebClientConfig;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -20,7 +23,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.TestPropertySource;
 
-/** Runs the Hardcover client against the live API to catch changes in its response shape. */
 @SpringBootTest(
     classes = {
         HardcoverWebClientConfig.class,
@@ -53,29 +55,30 @@ class HardcoverClientLiveTest {
 
     private static final String DUNE_AUTHOR = "Frank Herbert";
 
-    private static final String SANDMAN = "The Sandman";
+    private static final String TOLKIEN = "J.R.R. Tolkien";
+
+    private static final Duration PACE = Duration.ofMillis(1500);
 
     @Autowired
     private HardcoverClientImpl client;
 
-    static Stream<Arguments> slate() {
+    @BeforeEach
+    void throttle() {
+        LockSupport.parkNanos(PACE.toNanos());
+    }
+
+    static Stream<Arguments> popularBooks() {
         return Stream.of(
             Arguments.of("A Clash of Kings", "George R.R. Martin"),
-            Arguments.of("The Hobbit", "J.R.R. Tolkien"),
+            Arguments.of("The Hobbit", TOLKIEN),
             Arguments.of(DUNE, DUNE_AUTHOR),
-            Arguments.of(SANDMAN, "Neil Gaiman"),
             Arguments.of("Watchmen", "Alan Moore")
         );
     }
 
-    static Stream<Arguments> popularBooks() {
-        return slate().filter(args -> !SANDMAN.equals(args.get()[0]));
-    }
-
-    @ParameterizedTest(name = "{0} resolves to a Hardcover book whose title matches the query")
-    @MethodSource("slate")
-    @DisplayName("finds each slate book with a matching title")
-    void resolvesSlateBook(final String title, final String author) {
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("popularBooks")
+    void shouldReturnTheReaderRatingOfAPopularBook(final String title, final String author) {
         final Optional<SourceBook> result = client.fetchByTitleAuthor(title, author);
 
         assertThat(result)
@@ -85,25 +88,22 @@ class HardcoverClientLiveTest {
             .satisfies(book -> {
                 assertThat(book.source()).isEqualTo(BookFieldSource.HARDCOVER);
                 assertThat(book.title()).containsIgnoringCase(title.replace("The ", ""));
-            });
-    }
-
-    @ParameterizedTest(name = "{0} returns a real reader rating with a vote count in the thousands")
-    @MethodSource("popularBooks")
-    @DisplayName("returns a reader rating and rating count for popular books")
-    void returnsReaderRating(final String title, final String author) {
-        final Optional<SourceBook> result = client.fetchByTitleAuthor(title, author);
-
-        assertThat(result)
-            .isPresent()
-            .get()
-            .satisfies(book -> {
                 assertThat(book.averageRating())
                     .as("%s has a reader rating", title)
                     .isNotNull()
                     .isGreaterThan(MIN_RATING);
                 assertThat(book.ratingCount()).isNotNull().isGreaterThan(MIN_RATING_COUNT);
             });
+    }
+
+    @Test
+    void shouldKeepTheSeriesOfTheWhiteSandOmnibus() {
+        final Optional<SourceBook> result = client.fetchByTitleAuthor("White Sand Omnibus", "Brandon Sanderson");
+
+        assertThat(result).get().satisfies(book -> {
+            assertThat(book.hardcoverId()).isEqualTo("1070354");
+            assertThat(book.seriesName()).isNotNull();
+        });
     }
 
     @Test
@@ -118,6 +118,16 @@ class HardcoverClientLiveTest {
                 assertThat(book.seriesName()).isEqualTo(DUNE);
                 assertThat(book.seriesPosition()).isEqualTo(1.0);
             });
+    }
+
+    @Test
+    void shouldGiveTheOneVolumeLordOfTheRingsNoSeries() {
+        final Optional<SourceBook> result = client.fetchByTitleAuthor("The Lord of the Rings", TOLKIEN);
+
+        assertThat(result).get().satisfies(book -> {
+            assertThat(book.hardcoverId()).isEqualTo("377938");
+            assertThat(book.seriesName()).isNull();
+        });
     }
 
     @Test

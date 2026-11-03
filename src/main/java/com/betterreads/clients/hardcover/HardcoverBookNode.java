@@ -4,15 +4,11 @@ import java.util.List;
 
 import com.betterreads.booksource.NullableLists;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.PropertyNamingStrategies.SnakeCaseStrategy;
 import tools.jackson.databind.annotation.JsonNaming;
 
-/**
- * A {@code books} node from a Hardcover GraphQL query.
- *
- * <p>{@code canonicalId} differs from {@code id} on a translation or alternate edition.
- */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonNaming(SnakeCaseStrategy.class)
 public record HardcoverBookNode(
@@ -47,7 +43,7 @@ public record HardcoverBookNode(
         compilation
         is_partial_book
         image { url }
-        default_physical_edition { language { language } reading_format { format } }
+        default_physical_edition { language { language } reading_format { format } isbn_13 }
         contributions(order_by: {id: asc}) { contribution author { name } }
         book_series { position featured series { name primary_books_count } }
         featured_book_series { position featured series { name primary_books_count } }
@@ -75,7 +71,11 @@ public record HardcoverBookNode(
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     @JsonNaming(SnakeCaseStrategy.class)
-    public record Edition(@Nullable Language language, @Nullable ReadingFormat readingFormat) { }
+    public record Edition(
+        @Nullable Language language,
+        @Nullable ReadingFormat readingFormat,
+        @JsonProperty("isbn_13") @Nullable String isbn13
+    ) { }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Language(@Nullable String language) { }

@@ -373,4 +373,19 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
             assertThat(series).get().extracting(SourceSeries::name).isEqualTo(SERIES_NAME);
         }
     }
+
+    @Nested
+    @DisplayName("requested fields")
+    class RequestedFields {
+
+        @Test
+        void shouldAskForTheDefaultEditionIsbn() {
+            stubGraphQl(SEARCH_MARKER, seriesSearch());
+            stubGraphQl("isbn_13", seriesBooks());
+
+            final Optional<SourceSeries> series = client.fetchSeries(QUERY);
+
+            assertThat(series).isPresent();
+        }
+    }
 }

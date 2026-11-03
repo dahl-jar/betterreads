@@ -423,6 +423,17 @@ class SourceMergerTest {
         }
 
         @Test
+        void shouldTakeNoSeriesForAProseCompilation() {
+            final SourceBook hardcover = titled(BookFieldSource.HARDCOVER).proseCompilation(true).build();
+
+            final MergedBook merged = merger.merge(null, List.of(hardcover, wikidataVolume()));
+
+            assertThat(merged.book())
+                .extracting(SourceBook::seriesName, SourceBook::seriesPosition, SourceBook::series)
+                .containsExactly(null, null, List.of());
+        }
+
+        @Test
         void shouldDropASingleIssuesSeries() {
             final SourceBook hardcover = SourceBook.builder(BookFieldSource.HARDCOVER)
                 .title("Absolute Batman Vol. 2: Abomination")
