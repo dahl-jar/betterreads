@@ -118,6 +118,16 @@ class GoogleBooksClientWireMockTest extends WireMockFixture {
         }
 
         @Test
+        void shouldSendBracesLiterally() {
+            WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH)).willReturn(okJson(SEARCH_BODY)));
+
+            client.fetchByTitleAuthor("{x}", DUNE_AUTHOR);
+
+            WIREMOCK.verify(getRequestedFor(urlPathEqualTo(SEARCH_PATH))
+                .withQueryParam("q", equalTo("intitle:\"{x}\" inauthor:\"Frank Herbert\"")));
+        }
+
+        @Test
         void shouldReturnEmptyWhenTheSearchHasNoHits() {
             WIREMOCK.stubFor(get(urlPathEqualTo(SEARCH_PATH)).willReturn(okJson("{\"totalItems\": 0}")));
 

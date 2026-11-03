@@ -15,12 +15,19 @@ final class StubSourceClients {
 
     private static final int HTTP_SERVER_ERROR = 503;
 
+    private static final int HTTP_TOO_MANY_REQUESTS = 429;
+
     private StubSourceClients() {
     }
 
     static WebClientResponseException serviceUnavailable() {
         return WebClientResponseException.create(
             HTTP_SERVER_ERROR, "Service Unavailable", HttpHeaders.EMPTY, new byte[0], null);
+    }
+
+    static WebClientResponseException rateLimited() {
+        return WebClientResponseException.create(
+            HTTP_TOO_MANY_REQUESTS, "Too Many Requests", HttpHeaders.EMPTY, new byte[0], null);
     }
 
     static BookSourceClient emptyFor(final BookFieldSource source) {

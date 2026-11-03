@@ -8,11 +8,15 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.betterreads.sse.RecordingSseStreams.RecordingEmitter;
+import com.betterreads.testsupport.ConcurrentCalls;
 import java.io.IOException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Named;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -31,9 +35,24 @@ class SseStreamsTest {
 
     private static final String DATA = "Dune";
 
+    private static final String OTHER_DATA = "Hyperion";
+
     private static final String KEEPALIVE = "keepalive";
 
+    private static final String FAILED_TO_SEND = "Failed to send";
+
+    private static final int WORKERS = 4;
+
+    private static final int CYCLES = 5_000;
+
     private final RecordingSseStreams streams = new RecordingSseStreams();
+
+    @Test
+    void shouldReturnRegisteredStream() {
+        final SseEmitter registered = streams.register(KEY);
+
+        assertThat(registered).isSameAs(streams.lastEmitter());
+    }
 
     @ParameterizedTest
     @MethodSource("disconnects")
@@ -59,6 +78,19 @@ class SseStreamsTest {
         final RecordingEmitter emitter = streams.lastEmitter();
 
         emitter.finish();
+
+        assertThat(streams.atCapacity()).isFalse();
+    }
+
+    @Test
+    void shouldFreeSlotsWhenStreamsOpenAndCloseInParallel()
+            throws InterruptedException, ExecutionException, TimeoutException {
+        ConcurrentCalls.run(WORKERS, () -> {
+            openAndClose();
+            return true;
+        });
+
+        IntStream.range(1, STREAM_CAP).forEach(ignored -> streams.register(KEY));
 
         assertThat(streams.atCapacity()).isFalse();
     }
@@ -110,7 +142,7 @@ class SseStreamsTest {
     @Test
     void shouldCloseWithErrorWhenSendFails() throws IOException {
         final SseEmitter emitter = mock(SseEmitter.class);
-        doThrow(new IOException("broken pipe")).when(emitter).send(any(SseEventBuilder.class));
+        doThrow(new IOException("disk full")).when(emitter).send(any(SseEventBuilder.class));
 
         streams.sendAndComplete(emitter, EVENT, DATA);
 
@@ -126,5 +158,102 @@ class SseStreamsTest {
         streams.sendAndComplete(emitter, EVENT, DATA);
 
         verify(emitter).completeWithError(any(IllegalStateException.class));
+    }
+
+    private void openAndClose() {
+        IntStream.range(0, CYCLES).forEach(ignored -> {
+            final RecordingEmitter emitter = (RecordingEmitter) streams.register(KEY);
+            emitter.finish();
+        });
+    }
+
+    @Nested
+    class WhenSendFails {
+
+        @Test
+        void shouldSendEventToOpenStreamsWhenOneStreamIsClosed() {
+            streams.register(KEY);
+            final RecordingEmitter first = streams.lastEmitter();
+            registerClosed();
+            streams.register(KEY);
+            final RecordingEmitter third = streams.lastEmitter();
+
+            streams.send(KEY, EVENT, DATA);
+
+            assertThat(first.sent()).last().asString().contains(DATA);
+            assertThat(third.sent()).last().asString().contains(DATA);
+        }
+
+        @Test
+        void shouldKeepSendingToOpenStreamAfterOneCloses() {
+            streams.register(KEY);
+            final RecordingEmitter open = streams.lastEmitter();
+            registerClosed();
+            streams.send(KEY, EVENT, DATA);
+
+            streams.send(KEY, EVENT, OTHER_DATA);
+
+            assertThat(open.sent()).last().asString().contains(OTHER_DATA);
+        }
+
+        @ParameterizedTest
+        @MethodSource("failedSends")
+        void shouldFreeStreamWhenSendFailsWithoutCallback(final Consumer<SseStreams> failedSend) {
+            IntStream.range(1, STREAM_CAP).forEach(ignored -> streams.register(OTHER_KEY));
+            streams.register(KEY);
+            final RecordingEmitter failing = streams.lastEmitter();
+            failing.failSends();
+
+            failedSend.accept(streams);
+
+            assertThat(streams.openKeys()).containsExactly(OTHER_KEY);
+            assertThat(streams.atCapacity()).isFalse();
+        }
+
+        static Stream<Named<Consumer<SseStreams>>> failedSends() {
+            return Stream.of(
+                Named.of("event", target -> target.send(KEY, EVENT, DATA)),
+                Named.of("heartbeat", SseStreams::heartbeat));
+        }
+
+        @ParameterizedTest
+        @MethodSource("closedFailures")
+        void shouldNotCloseWithErrorWhenStreamIsClosed(final Exception failure) {
+            streams.register(KEY);
+            final RecordingEmitter emitter = streams.lastEmitter();
+            emitter.failSendsWith(failure);
+
+            streams.heartbeat();
+
+            assertThat(emitter.closedWith()).isNull();
+        }
+
+        static Stream<Named<Exception>> closedFailures() {
+            return Stream.of(
+                Named.of("closed client", RecordingSseStreams.CLOSED_CLIENT),
+                Named.of("large event to closed client",
+                    new IllegalStateException(FAILED_TO_SEND, RecordingSseStreams.CLOSED_CLIENT)),
+                Named.of("already completed", new IllegalStateException("ResponseBodyEmitter has already completed")));
+        }
+
+        @Test
+        void shouldCloseWithErrorWhenEventCannotBeWritten() {
+            final IllegalStateException failure =
+                new IllegalStateException(FAILED_TO_SEND, new IllegalArgumentException("no converter"));
+            streams.register(KEY);
+            final RecordingEmitter emitter = streams.lastEmitter();
+            emitter.failSendsWith(failure);
+
+            streams.heartbeat();
+
+            assertThat(emitter.closedWith()).isSameAs(failure);
+        }
+
+        private RecordingEmitter registerClosed() {
+            streams.register(KEY);
+            final RecordingEmitter closed = streams.lastEmitter();
+            closed.closeClient();
+            return closed;
+        }
     }
 }

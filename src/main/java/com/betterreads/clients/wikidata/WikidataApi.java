@@ -14,11 +14,6 @@ import org.springframework.web.util.UriBuilder;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Wikidata entity search and entity fetch.
- *
- * <p>A 4xx resolves to empty, 5xx and network failures propagate.
- */
 @Component
 public class WikidataApi {
 
@@ -41,16 +36,15 @@ public class WikidataApi {
         final Optional<String> body = responseBody(builder -> builder
             .path(SEARCH_PATH)
             .queryParam("action", "wbsearchentities")
-            .queryParam(SEARCH_FIELD, term)
+            .queryParam(SEARCH_FIELD, "{term}")
             .queryParam("language", "en")
             .queryParam("type", "item")
             .queryParam("format", "json")
             .queryParam("limit", SEARCH_LIMIT)
-            .build());
+            .build(term));
         return body.map(WikidataApi::parseCandidates).orElseGet(List::of);
     }
 
-    /** Returns the node at {@code entities.<qid>}, empty for an unknown id. */
     public Optional<JsonNode> entity(final String qid) {
         return responseBody(builder -> builder.path(ENTITY_PATH + qid + ".json").build())
             .map(body -> JSON.readTree(body).path("entities").path(qid))
@@ -62,7 +56,7 @@ public class WikidataApi {
     }
 
     private Optional<String> responseBody(final Function<UriBuilder, URI> uri) {
-        return WebClients.getBodyOrEmptyOn4xx(wikidataWebClient, uri, LOG, "wikidata.get");
+        return WebClients.getBodyOrEmptyOn4xxExcept429(wikidataWebClient, uri, LOG, "wikidata.get");
     }
 
     private static List<String> parseCandidates(final String body) {

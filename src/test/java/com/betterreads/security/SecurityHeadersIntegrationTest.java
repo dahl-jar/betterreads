@@ -1,6 +1,7 @@
 package com.betterreads.security;
 
 import com.betterreads.testsupport.ContainerizedTest;
+import com.betterreads.testsupport.Origins;
 import com.betterreads.web.RequestIdFilter;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.testcontainers.junit.jupiter.Container;
@@ -16,6 +17,8 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import static com.betterreads.testsupport.Accounts.LOGIN_URL;
+import static com.betterreads.testsupport.Accounts.ME_URL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
@@ -25,7 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @Testcontainers
 @TestPropertySource(properties = {
-    "app.cors.allowed-origins=https://app.betterreads.example.com",
+    "app.cors.allowed-origins=" + Origins.ALLOWED,
     "mail.outbox.worker-enabled=false"
 })
 class SecurityHeadersIntegrationTest extends ContainerizedTest {
@@ -33,10 +36,6 @@ class SecurityHeadersIntegrationTest extends ContainerizedTest {
     @Container
     @ServiceConnection
     static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
-
-    private static final String LOGIN_URL = "/api/v1/auth/login";
-
-    private static final String ME_URL = "/api/v1/auth/me";
 
     private static final String CONTENT_TYPE_OPTIONS_HEADER = "X-Content-Type-Options";
 
@@ -49,10 +48,6 @@ class SecurityHeadersIntegrationTest extends ContainerizedTest {
             + "img-src 'self' data:; font-src 'self' data:; frame-ancestors 'none'";
 
     private static final String SWAGGER_INDEX = "/swagger-ui/index.html";
-
-    private static final String ALLOWED_ORIGIN = "https://app.betterreads.example.com";
-
-    private static final String DISALLOWED_ORIGIN = "https://evil.example.com";
 
     private static final String ORIGIN_HEADER = "Origin";
 
@@ -82,7 +77,7 @@ class SecurityHeadersIntegrationTest extends ContainerizedTest {
     class SecurityHeaders {
 
         @Test
-        void includesCoreSecurityHeadersOnUnauthorizedResponse() throws Exception {
+        void shouldIncludeCoreSecurityHeadersOnUnauthorizedResponse() throws Exception {
             mockMvc.perform(get(ME_URL))
                 .andExpect(header().string(CONTENT_TYPE_OPTIONS_HEADER, NOSNIFF_VALUE))
                 .andExpect(header().string("X-Frame-Options", "DENY"))
@@ -92,7 +87,7 @@ class SecurityHeadersIntegrationTest extends ContainerizedTest {
         }
 
         @Test
-        void apiResponseUsesStrictCsp() throws Exception {
+        void shouldUseStrictCspOnApiResponse() throws Exception {
             mockMvc.perform(get(ME_URL))
                 .andExpect(header().string(CSP_HEADER, API_CSP));
         }
@@ -103,7 +98,7 @@ class SecurityHeadersIntegrationTest extends ContainerizedTest {
     class SwaggerUi {
 
         @Test
-        void allowsInlineScriptsAndStyles() throws Exception {
+        void shouldAllowInlineCode() throws Exception {
             mockMvc.perform(get(SWAGGER_INDEX))
                 .andExpect(header().string(CSP_HEADER, SWAGGER_CSP));
         }
@@ -115,7 +110,7 @@ class SecurityHeadersIntegrationTest extends ContainerizedTest {
 
         @Test
         void shouldExposeRequestIdToAllowedOrigin() throws Exception {
-            mockMvc.perform(get(ME_URL).header(ORIGIN_HEADER, ALLOWED_ORIGIN))
+            mockMvc.perform(get(ME_URL).header(ORIGIN_HEADER, Origins.ALLOWED))
                 .andExpect(result -> assertThat(result.getResponse().getHeader(EXPOSE_HEADERS_HEADER))
                     .contains(RequestIdFilter.HEADER));
         }
@@ -123,24 +118,24 @@ class SecurityHeadersIntegrationTest extends ContainerizedTest {
         @Test
         void shouldAllowCredentialsForAllowedOrigin() throws Exception {
             mockMvc.perform(options(LOGIN_URL)
-                    .header(ORIGIN_HEADER, ALLOWED_ORIGIN)
+                    .header(ORIGIN_HEADER, Origins.ALLOWED)
                     .header(REQUEST_METHOD_HEADER, METHOD_POST))
                 .andExpect(header().string(ALLOW_CREDENTIALS_HEADER, "true"));
         }
 
         @Test
-        void omitsAllowOriginForDisallowedOrigin() throws Exception {
-            mockMvc.perform(get(ME_URL).header(ORIGIN_HEADER, DISALLOWED_ORIGIN))
+        void shouldOmitAllowOriginForDisallowedOrigin() throws Exception {
+            mockMvc.perform(get(ME_URL).header(ORIGIN_HEADER, Origins.DISALLOWED))
                 .andExpect(header().doesNotExist(ALLOW_ORIGIN_HEADER));
         }
 
         @Test
-        void preflightForAllowedOriginReturnsAllowMethodsIncludingPost() throws Exception {
+        void shouldAllowPostOnPreflightFromAllowedOrigin() throws Exception {
             mockMvc.perform(options(LOGIN_URL)
-                    .header(ORIGIN_HEADER, ALLOWED_ORIGIN)
+                    .header(ORIGIN_HEADER, Origins.ALLOWED)
                     .header(REQUEST_METHOD_HEADER, METHOD_POST))
                 .andExpect(status().isOk())
-                .andExpect(header().string(ALLOW_ORIGIN_HEADER, ALLOWED_ORIGIN))
+                .andExpect(header().string(ALLOW_ORIGIN_HEADER, Origins.ALLOWED))
                 .andExpect(result -> assertThat(result.getResponse().getHeader(ALLOW_METHODS_HEADER))
                     .contains(METHOD_POST));
         }
