@@ -8,10 +8,6 @@ import java.util.stream.Stream;
 
 import org.jspecify.annotations.Nullable;
 
-/**
- * Book metadata from one source. A nullable list is null when the source did not send that field
- * and empty when it sent no values.
- */
 public record SourceBook(
         BookFieldSource source,
 
@@ -39,7 +35,8 @@ public record SourceBook(
         @Nullable Integer ratingCount,
         @Nullable String seriesName,
         @Nullable Double seriesPosition,
-        List<SeriesEntry> series) {
+        List<SeriesEntry> series,
+        boolean proseCompilation) {
 
     public SourceBook {
         authors = NullableLists.copyOf(authors);
@@ -71,7 +68,6 @@ public record SourceBook(
         return authors == null ? null : SourceAuthor.primary(authors).stream().map(SourceAuthor::name).toList();
     }
 
-    /** ISBN-13 goes first because most sources share it, so two sources for one book land on one staging row */
     public @Nullable String dedupKey() {
         return Stream.of(isbn13, openLibraryWorkKey, googleBooksVolumeId, hardcoverId, locLccn, wikidataQid)
             .filter(Objects::nonNull)
@@ -110,12 +106,12 @@ public record SourceBook(
             .ratingCount(ratingCount)
             .seriesName(seriesName)
             .seriesPosition(seriesPosition)
-            .series(series);
+            .series(series)
+            .proseCompilation(proseCompilation);
     }
 
-    /** the record has 23 components, so mappers set only the fields their source supplies */
     // PMD.TooManyFields, PMD.TooManyMethods, PMD.ExcessivePublicCount,
-    // PMD.AvoidFieldNameMatchingMethodName: one nullable field and setter per record component.
+    // PMD.AvoidFieldNameMatchingMethodName: one field and setter per record component.
     @SuppressWarnings({
         "PMD.TooManyFields", "PMD.TooManyMethods", "PMD.ExcessivePublicCount",
         "PMD.AvoidFieldNameMatchingMethodName"
@@ -145,6 +141,7 @@ public record SourceBook(
         private @Nullable String seriesName;
         private @Nullable Double seriesPosition;
         private @Nullable List<SeriesEntry> series;
+        private boolean proseCompilation;
 
         private Builder(final BookFieldSource source) {
             this.source = source;
@@ -260,13 +257,19 @@ public record SourceBook(
             return this;
         }
 
+        public Builder proseCompilation(final boolean value) {
+            this.proseCompilation = value;
+            return this;
+        }
+
         public SourceBook build() {
             return new SourceBook(
                 source, isbn13, openLibraryWorkKey, googleBooksVolumeId, wikidataQid, locLccn,
                 hardcoverId, title, subtitle, description, publicationYear, publisher, pageCount,
                 language, coverUrl, authors, rawSubjects, awards, averageRating,
                 ratingCount, seriesName, seriesPosition,
-                series == null ? SeriesEntry.listOf(seriesName, seriesPosition) : series);
+                series == null ? SeriesEntry.listOf(seriesName, seriesPosition) : series,
+                proseCompilation);
         }
     }
 }

@@ -8,6 +8,7 @@ import com.betterreads.booksource.BookFieldSource;
 import com.betterreads.booksource.SingleBookFilter;
 import com.betterreads.booksource.SourceAuthor;
 import com.betterreads.booksource.SourceBook;
+import com.betterreads.isbn.Isbn13;
 import org.jspecify.annotations.Nullable;
 
 public final class HardcoverBookNodeMapper {
@@ -44,7 +45,7 @@ public final class HardcoverBookNodeMapper {
     }
 
     private static boolean qualifies(final HardcoverBookNode node) {
-        return !isProseCompilation(node) && qualifiesAllowingCompilation(node);
+        return !isProseCompilation(node.compilation(), node.bookCategoryId()) && qualifiesAllowingCompilation(node);
     }
 
     private static boolean qualifiesAllowingCompilation(final HardcoverBookNode node) {
@@ -60,20 +61,27 @@ public final class HardcoverBookNodeMapper {
             && !isSingleComicIssue(node);
     }
 
-    private static boolean hasCategory(final HardcoverBookNode node, final int category) {
-        return Integer.valueOf(category).equals(node.bookCategoryId());
+    private static boolean isCategory(final @Nullable Integer bookCategoryId, final int category) {
+        return Integer.valueOf(category).equals(bookCategoryId);
     }
 
     private static boolean isOmnibus(final HardcoverBookNode node) {
-        return hasCategory(node, COLLECTION_CATEGORY);
+        return isCategory(node.bookCategoryId(), COLLECTION_CATEGORY);
     }
 
-    private static boolean isProseCompilation(final HardcoverBookNode node) {
-        return Boolean.TRUE.equals(node.compilation()) && !hasCategory(node, GRAPHIC_NOVEL_CATEGORY);
+    public static boolean isProseCompilation(
+        final @Nullable Boolean compilation,
+        final @Nullable Integer bookCategoryId
+    ) {
+        return Boolean.TRUE.equals(compilation) && !isCategory(bookCategoryId, GRAPHIC_NOVEL_CATEGORY);
+    }
+
+    private static Optional<HardcoverBookNode.Edition> edition(final HardcoverBookNode node) {
+        return Optional.ofNullable(node.defaultPhysicalEdition());
     }
 
     private static boolean isAudiobook(final HardcoverBookNode node) {
-        return Optional.ofNullable(node.defaultPhysicalEdition())
+        return edition(node)
             .map(HardcoverBookNode.Edition::readingFormat)
             .map(HardcoverBookNode.ReadingFormat::format)
             .filter(AUDIOBOOK_FORMAT::equals)
@@ -81,7 +89,7 @@ public final class HardcoverBookNodeMapper {
     }
 
     private static boolean isEnglish(final HardcoverBookNode node) {
-        return Optional.ofNullable(node.defaultPhysicalEdition())
+        return edition(node)
             .map(HardcoverBookNode.Edition::language)
             .map(HardcoverBookNode.Language::language)
             .filter(ENGLISH::equals)
@@ -97,7 +105,17 @@ public final class HardcoverBookNodeMapper {
     public static Optional<SourceBook> toTitleBook(final @Nullable HardcoverBookNode node) {
         return Optional.ofNullable(node)
             .filter(HardcoverBookNodeMapper::qualifiesAllowingCompilation)
-            .map(accepted -> toBuilder(accepted).build());
+            .map(accepted -> toBuilder(accepted)
+                .isbn13(defaultEditionIsbn(accepted))
+                .proseCompilation(isProseCompilation(accepted.compilation(), accepted.bookCategoryId()))
+                .build());
+    }
+
+    private static @Nullable String defaultEditionIsbn(final HardcoverBookNode node) {
+        return edition(node)
+            .map(HardcoverBookNode.Edition::isbn13)
+            .filter(Isbn13::isValid)
+            .orElse(null);
     }
 
     private static boolean isCanonical(final HardcoverBookNode node) {
@@ -105,7 +123,7 @@ public final class HardcoverBookNodeMapper {
     }
 
     private static boolean isSingleComicIssue(final HardcoverBookNode node) {
-        return hasCategory(node, GRAPHIC_NOVEL_CATEGORY) && !Boolean.TRUE.equals(node.compilation());
+        return isCategory(node.bookCategoryId(), GRAPHIC_NOVEL_CATEGORY) && !Boolean.TRUE.equals(node.compilation());
     }
 
     private static @Nullable String coverUrl(final HardcoverBookNode node) {

@@ -11,7 +11,6 @@ import com.betterreads.clients.hardcover.HardcoverBookNode;
 import com.betterreads.clients.hardcover.HardcoverContributors;
 import com.betterreads.clients.hardcover.HardcoverSeriesVolumes;
 import com.betterreads.clients.hardcoverbook.HardcoverDocument.FeaturedSeries;
-import com.betterreads.isbn.Isbn13;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
@@ -22,10 +21,10 @@ class HardcoverMapper {
         if (document == null || document.title() == null) {
             return null;
         }
-        final FeaturedSeries series = document.featuredSeries();
+        final FeaturedSeries series = document.storySeries();
         final Double position = series == null ? null : SeriesNumber.of(series.position()).orElse(null);
         return SourceBook.builder(BookFieldSource.HARDCOVER)
-            .isbn13(firstIsbn13(document.isbns()))
+            .isbn13(document.firstIsbn13())
             .hardcoverId(document.id())
             .title(document.title())
             .description(document.description())
@@ -39,25 +38,17 @@ class HardcoverMapper {
             .ratingCount(document.ratingsCount())
             .seriesName(position == null ? null : seriesName(series))
             .seriesPosition(position)
+            .proseCompilation(document.isProseCompilation())
             .build();
     }
 
     public boolean hasIssueRunSeries(final HardcoverDocument document) {
-        final FeaturedSeries series = document.featuredSeries();
-        return series != null && series.series() != null
-            && HardcoverSeriesVolumes.isIssueRun(series.series().name(), document.title());
+        return HardcoverSeriesVolumes.isIssueRun(seriesName(document.storySeries()), document.title());
     }
 
     public SourceBook withSeriesOf(final SourceBook book, final HardcoverBookNode node) {
         final SourceBook.Builder withoutSeries = book.toBuilder().seriesName(null).seriesPosition(null).series(null);
         return HardcoverSeriesVolumes.withSeriesOf(withoutSeries, node).build();
-    }
-
-    private static @Nullable String firstIsbn13(final @Nullable List<String> isbns) {
-        if (isbns == null) {
-            return null;
-        }
-        return isbns.stream().filter(Isbn13::matches).findFirst().orElse(null);
     }
 
     private static @Nullable List<SourceAuthor> authors(final HardcoverDocument document) {

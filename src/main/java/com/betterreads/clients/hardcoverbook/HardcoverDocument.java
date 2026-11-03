@@ -2,6 +2,8 @@ package com.betterreads.clients.hardcoverbook;
 
 import com.betterreads.booksource.NullableLists;
 import com.betterreads.clients.hardcover.HardcoverBookNode;
+import com.betterreads.clients.hardcover.HardcoverBookNodeMapper;
+import com.betterreads.isbn.Isbn13;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -9,8 +11,6 @@ import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.PropertyNamingStrategies.SnakeCaseStrategy;
 import tools.jackson.databind.annotation.JsonNaming;
 
-// PMD.DataClass: a search hit is a data holder, and the list accessors copy on read.
-@SuppressWarnings("PMD.DataClass")
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonNaming(SnakeCaseStrategy.class)
 public record HardcoverDocument(
@@ -25,9 +25,11 @@ public record HardcoverDocument(
     @Nullable List<String> authorNames,
     @Nullable List<String> isbns,
     @Nullable List<String> genres,
-    @Nullable Image image,
+    HardcoverBookNode.@Nullable Image image,
     @Nullable FeaturedSeries featuredSeries,
-    @Nullable List<HardcoverBookNode.Contribution> contributions
+    @Nullable List<HardcoverBookNode.Contribution> contributions,
+    @Nullable Boolean compilation,
+    @Nullable Integer bookCategoryId
 ) {
 
     public HardcoverDocument {
@@ -61,8 +63,17 @@ public record HardcoverDocument(
         return NullableLists.copyOf(genres);
     }
 
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Image(@Nullable String url) { }
+    public boolean isProseCompilation() {
+        return HardcoverBookNodeMapper.isProseCompilation(compilation, bookCategoryId);
+    }
+
+    public @Nullable FeaturedSeries storySeries() {
+        return isProseCompilation() ? null : featuredSeries;
+    }
+
+    public @Nullable String firstIsbn13() {
+        return isbns == null ? null : isbns.stream().filter(Isbn13::isValid).findFirst().orElse(null);
+    }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record FeaturedSeries(@Nullable Double position, @Nullable Series series) {

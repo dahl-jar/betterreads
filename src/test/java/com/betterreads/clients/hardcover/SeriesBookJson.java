@@ -1,5 +1,6 @@
 package com.betterreads.clients.hardcover;
 
+import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -9,7 +10,11 @@ public final class SeriesBookJson {
 
     private static final String LANGUAGE = "language";
 
-    private static final int GRAPHIC_NOVEL_CATEGORY = 4;
+    private static final String ENGLISH = "English";
+
+    private static final String READ_FORMAT = "Read";
+
+    private static final String AUDIOBOOK_FORMAT = "Listened";
 
     private final double volumePosition;
 
@@ -45,14 +50,27 @@ public final class SeriesBookJson {
     }
 
     public SeriesBookJson comic() {
-        bookFields.put("book_category_id", GRAPHIC_NOVEL_CATEGORY);
+        bookFields.put("book_category_id", HardcoverCategories.GRAPHIC_NOVEL);
         return this;
     }
 
     public SeriesBookJson inLanguage(final String language) {
+        return edition(language, READ_FORMAT, null);
+    }
+
+    public SeriesBookJson audiobook() {
+        return edition(ENGLISH, AUDIOBOOK_FORMAT, null);
+    }
+
+    public SeriesBookJson isbn(final String isbn13) {
+        return edition(ENGLISH, READ_FORMAT, isbn13);
+    }
+
+    private SeriesBookJson edition(final String language, final String format, final @Nullable String isbn13) {
         final ObjectNode edition = bookFields.putObject("default_physical_edition");
-        edition.putObject("reading_format").put("format", "Read");
+        edition.putObject("reading_format").put("format", format);
         edition.putObject(LANGUAGE).put(LANGUAGE, language);
+        edition.put("isbn_13", isbn13);
         return this;
     }
 
