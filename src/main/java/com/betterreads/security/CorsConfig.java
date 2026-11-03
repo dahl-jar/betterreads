@@ -13,7 +13,6 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-/** CORS rules for the browser frontend. */
 @Configuration
 class CorsConfig {
 
@@ -34,9 +33,8 @@ class CorsConfig {
         RequestIdFilter.HEADER
     );
 
-    private static final List<String> EXPOSED_HEADERS = List.of(RequestIdFilter.HEADER);
+    private static final List<String> EXPOSED_HEADERS = List.of(RequestIdFilter.HEADER, HttpHeaders.RETRY_AFTER);
 
-    /** {@code allowCredentials} lets the browser send the {@code br_refresh} cookie on cross-origin requests. */
     @Bean
     CorsConfigurationSource corsConfigurationSource(final CorsProperties corsProperties) {
         final CorsConfiguration configuration = new CorsConfiguration();

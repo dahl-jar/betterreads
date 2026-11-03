@@ -15,15 +15,6 @@ import org.springframework.web.reactive.function.client.WebClientException;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Apple Books search and ISBN lookup over the iTunes Search API.
- *
- * <p>A call waits up to five seconds for a rate permit, so a drained budget does not block the caller
- * for a whole refill window. A search that gets no permit returns empty. A search 5xx or network
- * failure propagates.
- * An ISBN lookup throws ItunesUnavailableException on a missed permit, a 5xx, a network failure or an
- * unreadable reply. A 4xx resolves to empty.
- */
 @Component
 public class ItunesApi {
 
@@ -72,7 +63,7 @@ public class ItunesApi {
             throw new ItunesUnavailableException();
         }
         try {
-            return WebClients.getBodyOrEmptyOn4xx(itunesWebClient, builder -> builder
+            return WebClients.getBodyOrEmptyOn4xxExcept429(itunesWebClient, builder -> builder
                     .path(LOOKUP_PATH)
                     .queryParam("isbn", isbn13)
                     .build(), LOG, "itunes.lookup")
@@ -92,11 +83,11 @@ public class ItunesApi {
             LOG.debug("itunes.search skipped, rate budget exhausted");
             return Optional.empty();
         }
-        return WebClients.getBodyOrEmptyOn4xx(itunesWebClient, builder -> builder
+        return WebClients.getBodyOrEmptyOn4xxExcept429(itunesWebClient, builder -> builder
             .path(SEARCH_PATH)
-            .queryParam("term", term)
+            .queryParam("term", "{term}")
             .queryParam("media", EBOOK)
             .queryParam("limit", SEARCH_LIMIT)
-            .build(), LOG, "itunes.search");
+            .build(term), LOG, "itunes.search");
     }
 }

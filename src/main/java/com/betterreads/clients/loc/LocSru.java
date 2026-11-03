@@ -8,7 +8,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
-/** Raw SRU {@code searchRetrieve} calls. A 4xx comes back empty, 5xx and network errors are thrown. */
 @Component
 class LocSru {
 
@@ -27,13 +26,13 @@ class LocSru {
     }
 
     Optional<String> searchRetrieve(final String cql) {
-        return WebClients.getBodyOrEmptyOn4xx(locWebClient, builder -> builder
+        return WebClients.getBodyOrEmptyOn4xxExcept429(locWebClient, builder -> builder
             .queryParam("version", VERSION)
             .queryParam("operation", OPERATION)
-            .queryParam("query", cql)
+            .queryParam("query", "{cql}")
             .queryParam("startRecord", FIRST_RECORD)
             .queryParam("maximumRecords", MAX_RECORDS)
             .queryParam("recordSchema", MODS_SCHEMA)
-            .build(), LOG, "loc.searchRetrieve");
+            .build(cql), LOG, "loc.searchRetrieve");
     }
 }

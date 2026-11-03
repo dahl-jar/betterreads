@@ -18,6 +18,7 @@ import static com.betterreads.clients.hardcover.BookByIdJson.STORMLIGHT_VOLUME;
 import static com.betterreads.clients.hardcover.SeriesBooksJson.seriesBooks;
 import static com.betterreads.clients.hardcover.SeriesSearchJson.seriesSearch;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.assertj.core.api.InstanceOfAssertFactories.list;
 
@@ -35,6 +36,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 @SpringBootTest(
     classes = {
@@ -121,6 +123,14 @@ class HardcoverSeriesClientWireMockTest extends HardcoverWireMock {
 
     private static List<String> titles(final Optional<SourceSeries> series) {
         return series.orElseThrow().volumes().stream().map(volume -> volume.book().title()).toList();
+    }
+
+    @Test
+    void shouldThrowWhenSeriesSearchRateLimited() {
+        stubStatus(HTTP_TOO_MANY_REQUESTS);
+
+        assertThatThrownBy(() -> client.fetchSeries(QUERY))
+            .isInstanceOf(WebClientResponseException.TooManyRequests.class);
     }
 
     @Nested
