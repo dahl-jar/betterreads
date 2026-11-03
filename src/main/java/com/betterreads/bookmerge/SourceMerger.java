@@ -4,6 +4,7 @@ import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -76,7 +77,16 @@ public class SourceMerger {
             bySource.put(source.source(), source);
         }
 
-        final Winner<String> title = pick(bySource, TITLE_CHAIN, SourceMerger::usableText, SourceBook::title);
+        final List<String> authorNames = bySource.values().stream()
+            .map(SourceBook::authorNames)
+            .filter(Objects::nonNull)
+            .flatMap(List::stream)
+            .toList();
+        final Winner<String> displayable = pick(bySource, TITLE_CHAIN,
+            value -> usableText(value) && TitleCleaner.isDisplayable(value, authorNames), SourceBook::title);
+        final Winner<String> title = displayable != null
+            ? displayable
+            : pick(bySource, TITLE_CHAIN, SourceMerger::usableText, SourceBook::title);
         if (title == null) {
             throw new IllegalArgumentException("no source supplied a title");
         }
@@ -112,9 +122,10 @@ public class SourceMerger {
         final @Nullable String isbn13 =
             valueOf(pick(bySource, ISBN_CHAIN, SourceMerger::usableText, SourceBook::isbn13));
         final @Nullable String language = resolveLanguage(bySource, isbn13);
-        final String displayTitle =
+        final String displayTitle = TitleCasing.fixAllCaps(
             TitleCleaner.clean(TitleCasing.capitalize(
-                TitleCleaner.closePunctuation(title.value()), titles(sources), language));
+                TitleCleaner.closePunctuation(title.value()), titles(sources), language)),
+            language);
         final Optional<SourceBook> series = pickSeries(bySource, displayTitle);
         return SourceBook.builder(title.source())
             .title(displayTitle)
