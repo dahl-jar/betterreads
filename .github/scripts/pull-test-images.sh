@@ -3,8 +3,13 @@ set -euo pipefail
 
 readonly MAX_ATTEMPTS=5
 readonly BACKOFF_SECONDS="${PULL_BACKOFF_SECONDS:-15}"
+readonly PARSE_PATTERN='DockerImageName\.parse\("[^"]+"\)'
 
-images=$(grep -rhoE 'DockerImageName\.parse\("[^"]+"\)' src | sed -E 's/.*\("([^"]+)"\)/\1/' | sort -u)
+list_images() {
+  grep -rhoE "$PARSE_PATTERN" src | sed -E 's/.*\("([^"]+)"\)/\1/' | sort -u || true
+}
+
+images=$(list_images)
 
 if [ -z "$images" ]; then
   echo "no Testcontainers images found under src" >&2

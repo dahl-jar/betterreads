@@ -22,9 +22,10 @@ group = "com.betterreads"
 version = "0.0.1-SNAPSHOT"
 description = "BetterReads v2 - Book tracking and recommendation platform"
 
-// Generates build-info.properties so the version shows on /actuator/info.
 springBoot {
-	buildInfo()
+	buildInfo {
+		excludes.set(setOf("time"))
+	}
 }
 
 java {
@@ -309,6 +310,7 @@ tasks.register<Test>("liveTest") {
 	dependsOn(liveTestSourceSet.classesTaskName)
 	shouldRunAfter(tasks.test)
 	forwardEnvironmentVariables(liveTestEnvironmentVariables)
+	outputs.doNotCacheIf("it calls live external services") { true }
 }
 
 tasks.register<Test>("localDbVerification") {
@@ -319,6 +321,7 @@ tasks.register<Test>("localDbVerification") {
 	dependsOn(localDbVerificationSourceSet.classesTaskName)
 	shouldRunAfter(tasks.test)
 	forwardEnvironmentVariables(localDbVerificationEnvironmentVariables)
+	outputs.doNotCacheIf("it checks the configured database") { true }
 }
 
 tasks.register<Test>("openApiSpec") {
@@ -329,6 +332,7 @@ tasks.register<Test>("openApiSpec") {
 	filter { includeTestsMatching("com.betterreads.web.OpenApiEnvelopeTest.shouldMatchCommittedSpec") }
 	systemProperty("openapi.write", "true")
 	outputs.upToDateWhen { false }
+	outputs.doNotCacheIf("it rewrites openapi.yaml, which is not a declared output") { true }
 }
 
 val testCredentials = mapOf(
@@ -371,4 +375,48 @@ tasks.named("check") {
 		tasks.named("spotbugsLiveTest"),
 		tasks.named("spotbugsLocalDbVerification")
 	)
+}
+
+private fun Task.directDependencies(): Set<Task> = taskDependencies.getDependencies(this)
+
+private fun Task.dependsTransitivelyOn(taskName: String): Boolean =
+	directDependencies().any { it.name == taskName || it.dependsTransitivelyOn(taskName) }
+
+private val lintTask = tasks.register("lint") {
+	description = "Compiles main and test code and runs Checkstyle, PMD and SpotBugs on it."
+	group = "verification"
+	dependsOn(
+		"compileJava",
+		"compileTestJava",
+		"checkstyleMain",
+		"checkstyleTest",
+		"pmdMain",
+		"pmdTest",
+		"spotbugsMain",
+		"spotbugsTest"
+	)
+}
+
+private val testJobTask = tasks.register("testJob") {
+	description = "Runs the tests and checks the 0.80 coverage rule."
+	group = "verification"
+	dependsOn(tasks.test, tasks.jacocoTestCoverageVerification)
+}
+
+tasks.register("extraChecks") {
+	description = "Runs every check task that lint and testJob do not run."
+	group = "verification"
+	dependsOn(provider {
+		val coveredTasks = lintTask.get().directDependencies() + testJobTask.get().directDependencies()
+		tasks.check.get().directDependencies()
+			.filterNot { it in coveredTasks }
+			.onEach { task ->
+				if (task.dependsTransitivelyOn(JavaPlugin.TEST_TASK_NAME)) {
+					throw GradleException(
+						"extraChecks must not run :test, and ${task.path} depends on it. " +
+							"Add ${task.name} to testJob in build.gradle.kts."
+					)
+				}
+			}
+	})
 }
