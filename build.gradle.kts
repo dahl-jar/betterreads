@@ -10,7 +10,7 @@ plugins {
 	jacoco
 	checkstyle
 	pmd
-	id("org.springframework.boot") version "4.0.6"
+	id("org.springframework.boot") version "4.0.9"
 	id("io.spring.dependency-management") version "1.1.7"
 	id("com.github.spotbugs") version "6.4.8"
 	id("net.ltgt.errorprone") version "5.1.0"
@@ -21,10 +21,6 @@ plugins {
 group = "com.betterreads"
 version = "0.0.1-SNAPSHOT"
 description = "BetterReads v2 - Book tracking and recommendation platform"
-
-extra["netty.version"] = "4.2.15.Final"
-extra["tomcat.version"] = "11.0.22"
-extra["postgresql.version"] = "42.7.11"
 
 // Generates build-info.properties so the version shows on /actuator/info.
 springBoot {
