@@ -119,6 +119,17 @@ class ItunesApiWireMockTest extends WireMockFixture {
         assertThatThrownBy(() -> api.lookupByIsbn(ISBN)).isInstanceOf(ItunesUnavailableException.class);
     }
 
+    @Test
+    void shouldSendBracesLiterally() {
+        final String searchPath = "/search";
+        final String term = "{x}";
+        WIREMOCK.stubFor(get(urlPathEqualTo(searchPath)).willReturn(okJson(search().toString())));
+
+        api.search(term);
+
+        WIREMOCK.verify(getRequestedFor(urlPathEqualTo(searchPath)).withQueryParam("term", equalTo(term)));
+    }
+
     private static void stubLookup(final ResponseDefinitionBuilder response) {
         WIREMOCK.stubFor(get(urlPathEqualTo(LOOKUP_PATH)).withQueryParam("isbn", equalTo(ISBN)).willReturn(response));
     }
