@@ -10,6 +10,7 @@ import com.betterreads.booksource.SourceBook;
 
 import static com.betterreads.features.bookstaging.DuneBooks.AUTHOR;
 import static com.betterreads.features.bookstaging.DuneBooks.ISBN;
+import static com.betterreads.features.bookstaging.DuneBooks.SEQUEL_TITLE;
 import static com.betterreads.features.bookstaging.DuneBooks.TITLE;
 import static com.betterreads.features.bookstaging.StubSourceClients.emptyFor;
 import static com.betterreads.features.bookstaging.StubSourceClients.malformedByIsbn;
@@ -27,20 +28,32 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiFunction;
 import java.util.stream.Stream;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 // PMD.TooManyMethods: one test per collect route plus the shared collector builders.
 @SuppressWarnings("PMD.TooManyMethods")
+@ExtendWith(OutputCaptureExtension.class)
 class SourceCollectorTest {
 
+    private static final String DROPPED_HIT = "catalog.collect dropped ISBN hit with another title";
+
     private static final double HARDCOVER_RATING = 4.32;
+
+    private static final double WRONG_RATING = 3.1;
+
+    private static final String DELUXE_TITLE = "Dune: Deluxe Edition";
 
     private static final String HUGO = "Hugo Award";
 
@@ -52,33 +65,40 @@ class SourceCollectorTest {
 
     private static final String OL_WORK_KEY = "OL1W";
 
+    private static final String STORED_TITLE = "Hollow Crown: The Life and Times of a King";
+
+    private static final String HIT_TITLE = "Hollow Crown: Book One of the Wars";
+
+    private static final String FIRST_TITLE = "Hollow Crown";
+
+    private static final String LOGGED_SEED_TITLE = "seedTitle=\"";
+
+    private static final String RECORD_ID = "1041";
+
+    private static final String OTHER_RECORD_ID = "1042";
+
+    private static final int MAX_LOGGED_TITLE = 200;
+
     private static final SourceBook ISBN_SEED = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
         .isbn13(ISBN)
         .title(TITLE)
         .build();
 
-    private static final SourceBook HARDCOVER_RATING_HIT = SourceBook.builder(BookFieldSource.HARDCOVER)
-        .isbn13(ISBN)
-        .averageRating(HARDCOVER_RATING)
+    private static final SourceBook WORK_KEY_SEED = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+        .openLibraryWorkKey(OL_WORK_KEY)
+        .title(TITLE)
+        .authors(SourceAuthor.ofNames(List.of(AUTHOR)))
         .build();
+
+    private static final SourceBook HARDCOVER_RATING_HIT = hardcoverHit(TITLE, HARDCOVER_RATING);
 
     @Test
     @DisplayName("fetches every source by ISBN and merges them with the seed")
     void collectsAllSourcesByIsbn() {
-        final SourceBook seed = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
-            .isbn13(ISBN)
-            .title(TITLE)
-            .authors(SourceAuthor.ofNames(List.of(AUTHOR)))
-            .build();
-        final SourceBook hardcoverHit = SourceBook.builder(BookFieldSource.HARDCOVER)
-            .isbn13(ISBN)
-            .title(TITLE)
-            .averageRating(HARDCOVER_RATING)
-            .build();
         final SourceCollector collector =
-            collectorWith(SAME_THREAD, stubByIsbn(BookFieldSource.HARDCOVER, ISBN, hardcoverHit));
+            collectorWith(SAME_THREAD, stubByIsbn(BookFieldSource.HARDCOVER, ISBN, HARDCOVER_RATING_HIT));
 
-        final MergedBook merged = collector.collectFor(seed);
+        final MergedBook merged = collector.collectFor(DuneBooks.openLibraryDune());
 
         assertThat(merged.book().averageRating())
             .as("Hardcover's rating, fetched by the seed's ISBN, must reach the merged book")
@@ -88,13 +108,7 @@ class SourceCollectorTest {
     @Test
     @DisplayName("falls back to title and author when the seed has no ISBN")
     void collectsByTitleAuthorWhenNoIsbn() {
-        final SourceBook seed = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
-            .openLibraryWorkKey(OL_WORK_KEY)
-            .title(TITLE)
-            .authors(SourceAuthor.ofNames(List.of(AUTHOR)))
-            .build();
-
-        final List<String> awards = awardsFromWikidataTitleAuthorHit(seed);
+        final List<String> awards = awardsFromWikidataTitleAuthorHit(WORK_KEY_SEED);
 
         assertThat(awards)
             .as("with no ISBN, the collector fetches by title and author")
@@ -121,11 +135,6 @@ class SourceCollectorTest {
     @Test
     @DisplayName("runs both waves: a first-wave ISBN and a second-wave rating both reach the book")
     void runsBothWaves() {
-        final SourceBook seed = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
-            .openLibraryWorkKey(OL_WORK_KEY)
-            .title(TITLE)
-            .authors(SourceAuthor.ofNames(List.of(AUTHOR)))
-            .build();
         final SourceBook googleHit = SourceBook.builder(BookFieldSource.GOOGLE_BOOKS)
             .isbn13(ISBN)
             .title(TITLE)
@@ -138,7 +147,7 @@ class SourceCollectorTest {
             stubByTitleAuthor(BookFieldSource.GOOGLE_BOOKS, TITLE, AUTHOR, googleHit),
             stubByTitleAuthor(BookFieldSource.HARDCOVER, TITLE, AUTHOR, hardcoverHit));
 
-        final MergedBook merged = collector.collectFor(seed);
+        final MergedBook merged = collector.collectFor(WORK_KEY_SEED);
 
         assertThat(merged.book())
             .as("the first-wave ISBN and the second-wave rating both merge into the book")
@@ -248,6 +257,244 @@ class SourceCollectorTest {
         final MergedBook merged = collector.collectFor(ISBN_SEED);
 
         assertThat(merged.resolvedSources()).doesNotContain(BookFieldSource.HARDCOVER);
+    }
+
+    @Test
+    void shouldUseTitleLookupWhenIsbnHitHasAnotherTitle() {
+        final BookSourceClient titleLookup =
+            stubByTitleAuthor(BookFieldSource.HARDCOVER, TITLE, AUTHOR, HARDCOVER_RATING_HIT);
+        final SourceCollector collector = collectorWith(SAME_THREAD,
+            StubSourceClients.withIsbnHit(titleLookup, ISBN, hardcoverHit(SEQUEL_TITLE, WRONG_RATING)));
+
+        final MergedBook merged = collector.collectFor(DuneBooks.openLibraryDune());
+
+        assertThat(merged.book().averageRating()).isEqualTo(HARDCOVER_RATING);
+    }
+
+    @Test
+    void shouldLeaveSourceUnresolvedWhenDroppedHitHasNoFallback() {
+        final SourceCollector collector = collectorWithIsbnHit(SEQUEL_TITLE, WRONG_RATING);
+
+        final MergedBook merged = collector.collectFor(ISBN_SEED);
+
+        assertThat(merged.book().averageRating()).isNull();
+        assertThat(merged.resolvedSources()).doesNotContain(BookFieldSource.HARDCOVER);
+    }
+
+    @Test
+    void shouldKeepIsbnHitWithMatchingTitle() {
+        final SourceCollector collector = collectorWithIsbnHit(DELUXE_TITLE, HARDCOVER_RATING);
+
+        final MergedBook merged = collector.collectFor(ISBN_SEED);
+
+        assertThat(merged.book().averageRating()).isEqualTo(HARDCOVER_RATING);
+    }
+
+    @Test
+    void shouldKeepIsbnHitWithNoTitle() {
+        final SourceBook hit = SourceBook.builder(BookFieldSource.HARDCOVER)
+            .isbn13(ISBN)
+            .averageRating(HARDCOVER_RATING)
+            .build();
+        final SourceCollector collector =
+            collectorWith(SAME_THREAD, stubByIsbn(BookFieldSource.HARDCOVER, ISBN, hit));
+
+        final MergedBook merged = collector.collectFor(ISBN_SEED);
+
+        assertThat(merged.book().averageRating()).isEqualTo(HARDCOVER_RATING);
+    }
+
+    @Test
+    void shouldKeepIsbnHitWithBlankTitle(final CapturedOutput output) {
+        final SourceCollector collector = collectorWithIsbnHit(" ", HARDCOVER_RATING);
+
+        final MergedBook merged = collector.collectFor(ISBN_SEED);
+
+        assertThat(merged.book().averageRating()).isEqualTo(HARDCOVER_RATING);
+        assertThat(output.getOut()).doesNotContain(DROPPED_HIT);
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    void shouldKeepIsbnHitWhenSeedHasNoTitle(final @Nullable String seedTitle) {
+        final SourceBook seed = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+            .isbn13(ISBN)
+            .title(seedTitle)
+            .build();
+        final SourceCollector collector = collectorWithIsbnHit(SEQUEL_TITLE, HARDCOVER_RATING);
+
+        final MergedBook merged = collector.collectFor(seed);
+
+        assertThat(merged.book().averageRating()).isEqualTo(HARDCOVER_RATING);
+    }
+
+    @Test
+    void shouldRunNoTitleLookupWhenSeedTitleIsBlank() {
+        final SourceBook seed = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+            .isbn13(ISBN)
+            .title(" ")
+            .authors(SourceAuthor.ofNames(List.of(AUTHOR)))
+            .build();
+        final SourceCollector collector = collectorWith(SAME_THREAD,
+            stubByIsbn(BookFieldSource.GOOGLE_BOOKS, ISBN, SourceBook.builder(BookFieldSource.GOOGLE_BOOKS)
+                .isbn13(ISBN)
+                .title(TITLE)
+                .build()),
+            stubByTitleAuthor(BookFieldSource.HARDCOVER, " ", AUTHOR, HARDCOVER_RATING_HIT));
+
+        final MergedBook merged = collector.collectFor(seed);
+
+        assertThat(merged.resolvedSources()).doesNotContain(BookFieldSource.HARDCOVER);
+    }
+
+    @Test
+    void shouldKeepRetryHitMatchingFirstTitle() {
+        final SourceCollector collector = collectorWithIsbnHit(HIT_TITLE, HARDCOVER_RATING);
+
+        final MergedBook merged = collector.collectFor(stagedSeed().build(), FIRST_TITLE);
+
+        assertThat(merged.book().averageRating()).isEqualTo(HARDCOVER_RATING);
+    }
+
+    @Test
+    void shouldDropRetryHitNotMatchingFirstTitle(final CapturedOutput output) {
+        final SourceCollector collector = collectorWithIsbnHit(SEQUEL_TITLE, WRONG_RATING);
+
+        final MergedBook merged = collector.collectFor(stagedSeed().build(), FIRST_TITLE);
+
+        assertThat(merged.book().averageRating()).isNull();
+        assertThat(droppedHitLine(output)).contains(LOGGED_SEED_TITLE + FIRST_TITLE + "\"");
+    }
+
+    @Test
+    void shouldDropRetryHitWithAnotherSubtitleWhenFirstTitleIsNull() {
+        final SourceCollector collector = collectorWithIsbnHit(HIT_TITLE, WRONG_RATING);
+
+        final MergedBook merged = collector.collectFor(stagedSeed().build(), null);
+
+        assertThat(merged.book().averageRating()).isNull();
+    }
+
+    @Test
+    void shouldKeepTitleLookupHitWithAnotherTitle() {
+        final SourceCollector collector = collectorWith(SAME_THREAD, stubByTitleAuthor(
+            BookFieldSource.HARDCOVER, TITLE, AUTHOR, hardcoverHit(SEQUEL_TITLE, HARDCOVER_RATING)));
+
+        final MergedBook merged = collector.collectFor(WORK_KEY_SEED);
+
+        assertThat(merged.book().averageRating()).isEqualTo(HARDCOVER_RATING);
+    }
+
+    static Stream<Arguments> sameRecords() {
+        return Stream.of(
+            sameRecord(BookFieldSource.HARDCOVER, SourceBook.Builder::hardcoverId),
+            sameRecord(BookFieldSource.GOOGLE_BOOKS, SourceBook.Builder::googleBooksVolumeId),
+            sameRecord(BookFieldSource.OPEN_LIBRARY, SourceBook.Builder::openLibraryWorkKey),
+            sameRecord(BookFieldSource.LOC, SourceBook.Builder::locLccn),
+            sameRecord(BookFieldSource.WIKIDATA, SourceBook.Builder::wikidataQid));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("sameRecords")
+    void shouldKeepIsbnHitWithSameRecord(
+        final BookFieldSource source, final SourceBook seed, final SourceBook hit) {
+        final SourceCollector collector = collectorWith(SAME_THREAD, stubByIsbn(source, ISBN, hit));
+
+        final MergedBook merged = collector.collectFor(seed);
+
+        assertThat(merged.resolvedSources()).contains(source);
+    }
+
+    static Stream<Arguments> otherRecords() {
+        return Stream.of(
+            arguments("another id", stagedSeed().hardcoverId(OTHER_RECORD_ID).build()),
+            arguments("no id", stagedSeed().build()));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("otherRecords")
+    void shouldDropIsbnHitWithOtherRecord(final String row, final SourceBook seed) {
+        final SourceBook hit = SourceBook.builder(BookFieldSource.HARDCOVER)
+            .isbn13(ISBN)
+            .hardcoverId(RECORD_ID)
+            .title(SEQUEL_TITLE)
+            .build();
+        final SourceCollector collector = collectorWith(SAME_THREAD, stubByIsbn(BookFieldSource.HARDCOVER, ISBN, hit));
+
+        final MergedBook merged = collector.collectFor(seed);
+
+        assertThat(merged.resolvedSources()).as(row).doesNotContain(BookFieldSource.HARDCOVER);
+    }
+
+    @Test
+    void shouldWarnWhenIsbnHitIsDropped(final CapturedOutput output) {
+        final String brokenIsbn = ISBN + "\n";
+        final SourceBook seed = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+            .isbn13(brokenIsbn)
+            .title("Du\"\nne")
+            .build();
+        final SourceCollector collector = collectorWith(SAME_THREAD, stubByIsbn(
+            BookFieldSource.HARDCOVER, brokenIsbn, hardcoverHit("Dune\\\"\nMessiah", WRONG_RATING)));
+
+        collector.collectFor(seed);
+
+        assertThat(droppedHitLine(output))
+            .contains(" WARN ", DROPPED_HIT + " source=HARDCOVER isbn=" + ISBN
+                + " seedTitle=\"Du\\\"ne\" hitTitle=\"Dune\\\\\\\"Messiah\"");
+    }
+
+    @Test
+    void shouldCutLongTitlesInWarning(final CapturedOutput output) {
+        final String seedKeep = "s".repeat(MAX_LOGGED_TITLE);
+        final String hitKeep = "h".repeat(MAX_LOGGED_TITLE);
+        final SourceBook seed = SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
+            .isbn13(ISBN)
+            .title(seedKeep + "s")
+            .build();
+        final SourceCollector collector = collectorWithIsbnHit(hitKeep + "h", WRONG_RATING);
+
+        collector.collectFor(seed);
+
+        assertThat(droppedHitLine(output))
+            .contains(LOGGED_SEED_TITLE + seedKeep + "\" hitTitle=\"" + hitKeep + "\"");
+    }
+
+    @Test
+    void shouldNotWarnWhenIsbnHitHasMatchingTitle(final CapturedOutput output) {
+        final SourceCollector collector = collectorWithIsbnHit(DELUXE_TITLE, HARDCOVER_RATING);
+
+        collector.collectFor(ISBN_SEED);
+
+        assertThat(output.getOut()).doesNotContain(DROPPED_HIT);
+    }
+
+    private static String droppedHitLine(final CapturedOutput output) {
+        final List<String> lines = output.getOut().lines().filter(line -> line.contains(DROPPED_HIT)).toList();
+        assertThat(lines).hasSize(1);
+        return lines.getFirst();
+    }
+
+    private static Arguments sameRecord(
+        final BookFieldSource source, final BiFunction<SourceBook.Builder, String, SourceBook.Builder> withId) {
+        final SourceBook seed = withId.apply(stagedSeed(), RECORD_ID).build();
+        final SourceBook.Builder hit = SourceBook.builder(source).isbn13(ISBN).title(HIT_TITLE);
+        return arguments(source, seed, withId.apply(hit, RECORD_ID).build());
+    }
+
+    private static SourceBook.Builder stagedSeed() {
+        return SourceBook.builder(BookFieldSource.STAGED).isbn13(ISBN).title(STORED_TITLE);
+    }
+
+    private static SourceBook hardcoverHit(final String title, final double rating) {
+        return SourceBook.builder(BookFieldSource.HARDCOVER)
+            .isbn13(ISBN)
+            .title(title)
+            .averageRating(rating)
+            .build();
+    }
+
+    private static SourceCollector collectorWithIsbnHit(final String title, final double rating) {
+        return collectorWith(SAME_THREAD, stubByIsbn(BookFieldSource.HARDCOVER, ISBN, hardcoverHit(title, rating)));
     }
 
     private static @Nullable List<String> awardsFromWikidataTitleAuthorHit(final SourceBook seed) {

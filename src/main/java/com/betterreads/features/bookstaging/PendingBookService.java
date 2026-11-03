@@ -12,13 +12,13 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Holds incomplete books in {@code pending_book} and promotes them into {@code book} once complete. */
 @Service
 public class PendingBookService {
 
@@ -44,20 +44,19 @@ public class PendingBookService {
         this.promoter = promoter;
     }
 
-    /**
-     * Reserves the row by dedup key before filling it, so two concurrent stages of the same book end
-     * on one row with no duplicate-key error.
-     */
     @Transactional
-    public void stage(final MergedBook merged) {
+    public void stage(final MergedBook merged, final @Nullable String firstTitle) {
         final String dedupKey = merged.book().dedupKey();
         if (dedupKey == null) {
             throw new IllegalArgumentException(
                 "merged book has no source identifier to stage on, so nothing can dedup it");
         }
-        pendingBooks.reserve(dedupKey);
+        final boolean justReserved = pendingBooks.reserve(dedupKey) == 1;
         final PendingBook row = pendingBooks.findByDedupKey(dedupKey).orElseThrow(
             () -> new IllegalStateException("reserved pending row vanished for dedupKey=" + dedupKey));
+        if (justReserved) {
+            row.setFirstTitle(firstTitle);
+        }
         mapper.applyTo(row, merged);
         reviveIfRetired(row);
         pendingBooks.save(row);
@@ -70,10 +69,6 @@ public class PendingBookService {
         }
     }
 
-    /**
-     * Source fetches are slow external calls, so each candidate's write gets its own transaction and
-     * no connection stays open across them.
-     */
     public void promoteReady() {
         pendingKeys().forEach(this::collectAndPromote);
     }
@@ -84,35 +79,26 @@ public class PendingBookService {
             .toList();
     }
 
-    /**
-     * An integrity violation means the candidate resolves a source id another row already owns, which
-     * no retry changes, so it is retired as a duplicate. Any other failure counts as an attempt and
-     * retries after the backoff.
-     */
     // Checkstyle.IllegalCatch + PMD.AvoidCatchingGenericException: one candidate must not stop the poll
     @SuppressWarnings({"checkstyle:IllegalCatch", "PMD.AvoidCatchingGenericException"})
     private void collectAndPromote(final String dedupKey) {
         pendingBooks.findByDedupKey(dedupKey).ifPresent(row -> {
             try {
                 final SourceBook staged = mapper.toSourceBook(row);
-                final MergedBook collected = sourceCollector.collectFor(staged);
+                final MergedBook collected = sourceCollector.collectFor(staged, row.getFirstTitle());
                 promoter.promote(dedupKey, keepStagedRating(collected, staged));
-            } catch (DataIntegrityViolationException collision) {
-                LOG.warn("catalog.staging candidate duplicates an existing row, retired dedupKey={}",
+            } catch (DataIntegrityViolationException violation) {
+                LOG.warn("catalog.staging candidate refused by the database, retired dedupKey={}",
                     LogSanitizer.forLog(dedupKey));
                 promoter.markDuplicate(dedupKey);
             } catch (RuntimeException ex) {
-                LOG.warn("catalog.staging promotion failed, candidate retries after backoff dedupKey={} ({})",
+                LOG.warn("catalog.staging promotion failed dedupKey={} ({})",
                     LogSanitizer.forLog(dedupKey), ex.getClass().getSimpleName());
                 promoter.recordFailedAttempt(dedupKey);
             }
         });
     }
 
-    /**
-     * The merger takes the rating only from Hardcover, so a re-promotion with no Hardcover match would
-     * lose it.
-     */
     private static MergedBook keepStagedRating(final MergedBook collected, final SourceBook staged) {
         final SourceBook book = collected.book();
         final SourceBook restored = book.toBuilder()

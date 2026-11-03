@@ -6,6 +6,8 @@ import com.betterreads.booksource.BookFieldSource;
 import com.betterreads.booksource.BookSourceClient;
 import com.betterreads.booksource.MergedBook;
 import com.betterreads.booksource.SourceBook;
+import com.betterreads.logging.LogSanitizer;
+import com.betterreads.text.TextMatch;
 
 import java.time.Duration;
 import java.util.Comparator;
@@ -18,6 +20,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 import org.jspecify.annotations.Nullable;
@@ -28,12 +31,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClientException;
 
-/**
- * Fetches the other sources for a staged book and merges them into one.
- *
- * <p>A source that fails (5xx, network error, timeout, or an exception while parsing its response)
- * is dropped for this book and the merge goes on with the rest.
- */
 @Component
 public class SourceCollector {
 
@@ -41,11 +38,20 @@ public class SourceCollector {
 
     private static final Duration WAVE_TIMEOUT = Duration.ofSeconds(30);
 
+    private static final int MAX_LOGGED_TITLE = 200;
+
     private static final List<List<BookFieldSource>> WAVES = List.of(
         List.of(BookFieldSource.GOOGLE_BOOKS, BookFieldSource.OPEN_LIBRARY),
         List.of(BookFieldSource.HARDCOVER, BookFieldSource.LOC, BookFieldSource.WIKIDATA));
 
     private static final List<BookFieldSource> FETCH_ORDER = WAVES.stream().flatMap(List::stream).toList();
+
+    private static final List<Function<SourceBook, @Nullable String>> RECORD_IDS = List.of(
+        SourceBook::hardcoverId,
+        SourceBook::googleBooksVolumeId,
+        SourceBook::openLibraryWorkKey,
+        SourceBook::locLccn,
+        SourceBook::wikidataQid);
 
     private final SourceMerger merger;
 
@@ -75,20 +81,22 @@ public class SourceCollector {
         final Duration waveTimeout
     ) {
         this.merger = merger;
-        this.sourceClients = order(sourceClients);
+        this.sourceClients = sourceClients.stream()
+            .sorted(Comparator.comparingInt(client -> rank(client.source())))
+            .toList();
         this.descriptionSelector = descriptionSelector;
         this.executor = sourceFetchExecutor;
         this.waveTimeout = waveTimeout;
     }
 
-    /**
-     * Both waves run even for a seed that could already show, because rating, awards, full genre,
-     * page count and author identity sit outside the show bar. Description-only sources go last and
-     * replace the merged description when they score higher.
-     */
     public MergedBook collectFor(final SourceBook seed) {
+        return collectFor(seed, null);
+    }
+
+    public MergedBook collectFor(final SourceBook seed, final @Nullable String firstTitle) {
+        final String seedTitle = firstTitle == null ? seed.title() : firstTitle;
         final List<Fetched> fetched = WAVES.stream()
-            .flatMap(wave -> fetchWave(wave, seed).stream())
+            .flatMap(wave -> fetchWave(wave, seed, seedTitle).stream())
             .toList();
         final List<SourceBook> found = Stream.concat(
                 Stream.of(seed),
@@ -99,11 +107,12 @@ public class SourceCollector {
         return descriptionSelector.withBestDescription(merger.merge(seed, found).withResolvedSources(resolved));
     }
 
-    private List<Fetched> fetchWave(final List<BookFieldSource> wave, final SourceBook seed) {
+    private List<Fetched> fetchWave(
+        final List<BookFieldSource> wave, final SourceBook seed, final @Nullable String seedTitle) {
         final List<CompletableFuture<Fetched>> calls = sourceClients.stream()
             .filter(client -> wave.contains(client.source()))
             .filter(client -> client.source() != seed.source())
-            .map(client -> CompletableFuture.supplyAsync(() -> fetch(client, seed), executor))
+            .map(client -> CompletableFuture.supplyAsync(() -> fetch(client, seed, seedTitle), executor))
             .toList();
         awaitWave(calls);
         return calls.stream()
@@ -111,7 +120,6 @@ public class SourceCollector {
             .toList();
     }
 
-    /** A source still running at the timeout is cancelled, so it counts as unresolved and the rest still merge. */
     // PMD.DoNotUseThreads: the catch has to restore the interrupt flag on the current thread
     @SuppressWarnings("PMD.DoNotUseThreads")
     private void awaitWave(final List<CompletableFuture<Fetched>> calls) {
@@ -135,21 +143,15 @@ public class SourceCollector {
         return Stream.ofNullable(call.getNow(null));
     }
 
-    private static List<BookSourceClient> order(final List<BookSourceClient> clients) {
-        return clients.stream()
-            .sorted(Comparator.comparingInt(client -> rank(client.source())))
-            .toList();
-    }
-
     private static int rank(final BookFieldSource source) {
         final int index = FETCH_ORDER.indexOf(source);
         return index < 0 ? FETCH_ORDER.size() : index;
     }
 
-    /** Null when the source failed or found no book, so neither counts as resolved. */
-    private static @Nullable Fetched fetch(final BookSourceClient client, final SourceBook seed) {
+    private static @Nullable Fetched fetch(
+        final BookSourceClient client, final SourceBook seed, final @Nullable String seedTitle) {
         try {
-            return match(client, seed).map(book -> new Fetched(client.source(), book)).orElse(null);
+            return match(client, seed, seedTitle).map(book -> new Fetched(client.source(), book)).orElse(null);
         } catch (WebClientException ex) {
             LOG.warn("catalog.collect source {} failed ({}), skipping it for this book",
                 client.source(), ex.getClass().getSimpleName());
@@ -157,17 +159,44 @@ public class SourceCollector {
         }
     }
 
-    private static Optional<SourceBook> match(final BookSourceClient client, final SourceBook seed) {
+    private static Optional<SourceBook> match(
+        final BookSourceClient client, final SourceBook seed, final @Nullable String seedTitle) {
         return Optional.ofNullable(seed.isbn13())
             .flatMap(client::fetchByIsbn)
+            .filter(hit -> isbnHitMatches(client.source(), seed, seedTitle, hit))
             .or(() -> fetchByTitleAuthor(client, seed));
+    }
+
+    private static boolean isbnHitMatches(
+        final BookFieldSource source, final SourceBook seed, final @Nullable String seedTitle, final SourceBook hit) {
+        final String hitTitle = hit.title();
+        if (seedTitle == null || seedTitle.isBlank() || hitTitle == null || hitTitle.isBlank()
+            || sameRecord(seed, hit) || TextMatch.sameBookTitle(seedTitle, hitTitle)) {
+            return true;
+        }
+        LOG.warn(
+            "catalog.collect dropped ISBN hit with another title source={} isbn={} seedTitle=\"{}\" hitTitle=\"{}\"",
+            source, LogSanitizer.forLog(seed.isbn13()), titleForLog(seedTitle), titleForLog(hitTitle));
+        return false;
+    }
+
+    private static @Nullable String titleForLog(final String title) {
+        final String cut = title.substring(0, Math.min(title.length(), MAX_LOGGED_TITLE));
+        return LogSanitizer.forLog(cut.replace("\\", "\\\\").replace("\"", "\\\""));
+    }
+
+    private static boolean sameRecord(final SourceBook seed, final SourceBook hit) {
+        return RECORD_IDS.stream().anyMatch(recordId -> {
+            final String seedId = recordId.apply(seed);
+            return seedId != null && seedId.equals(recordId.apply(hit));
+        });
     }
 
     private static Optional<SourceBook> fetchByTitleAuthor(
         final BookSourceClient client, final SourceBook seed) {
         final String title = seed.title();
         final List<String> authors = seed.authorNames();
-        if (title == null || authors == null || authors.isEmpty()) {
+        if (title == null || title.isBlank() || authors == null || authors.isEmpty()) {
             return Optional.empty();
         }
         return client.fetchByTitleAuthor(title, authors.get(0));

@@ -11,14 +11,10 @@ import org.springframework.data.repository.query.Param;
 
 public interface PendingBookRepository extends JpaRepository<PendingBook, Long> {
 
-    /**
-     * Two concurrent stages of the same book would hit a duplicate-key error, so an existing row is
-     * left alone.
-     */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = "INSERT INTO pending_book (dedup_key, status) VALUES (:dedupKey, 'PENDING') "
         + "ON CONFLICT (dedup_key) DO NOTHING", nativeQuery = true)
-    void reserve(@Param("dedupKey") String dedupKey);
+    int reserve(@Param("dedupKey") String dedupKey);
 
     Optional<PendingBook> findByDedupKey(String dedupKey);
 
@@ -26,7 +22,6 @@ public interface PendingBookRepository extends JpaRepository<PendingBook, Long> 
 
     Optional<PendingBook> findByOpenLibraryWorkKey(String openLibraryWorkKey);
 
-    /** Oldest first. */
     @Query(value = "SELECT * FROM pending_book WHERE status = 'PENDING' AND (last_attempt_at IS NULL "
         + "OR last_attempt_at < CAST(:now AS timestamptz) - CASE "
         + "WHEN attempt_count <= 1 THEN INTERVAL '15 minutes' "

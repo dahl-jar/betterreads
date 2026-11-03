@@ -28,7 +28,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/** Runs the six-book slate through live sources, staging, and promotion. */
 @SpringBootTest(properties = "betterreads.catalog.staging.poll-enabled=false")
 @Testcontainers
 @EnabledIfEnvironmentVariable(named = "GOOGLE_BOOKS_API_KEY", matches = ".+")
@@ -93,7 +92,7 @@ class CatalogPipelineLiveE2eTest extends ContainerizedTest {
             return;
         }
         final MergedBook merged = merger.merge(null, sources);
-        pendingBookService.stage(merged);
+        pendingBookService.stage(merged, null);
         LOG.info("catalog.e2e staged {} from {} sources",
             LogSanitizer.forLog(slate.title()), sources.size());
     }

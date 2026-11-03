@@ -22,7 +22,7 @@ import org.springframework.dao.QueryTimeoutException;
 @ExtendWith(OutputCaptureExtension.class)
 class BookStagerTest {
 
-    private static final String DUPLICATE = "catalog.search candidate duplicates an existing row";
+    private static final String REFUSED = "catalog.search candidate refused by the database for source";
 
     private static final String FAILED = "catalog.search staging failed";
 
@@ -42,13 +42,13 @@ class BookStagerTest {
     }
 
     @Test
-    void shouldLogADuplicateStageAtInfo(final CapturedOutput output) {
-        doThrow(new DataIntegrityViolationException("duplicate key")).when(pendingBookService).stage(any());
+    void shouldLogRefusedCandidateAtInfo(final CapturedOutput output) {
+        doThrow(new DataIntegrityViolationException("duplicate key")).when(pendingBookService).stage(any(), any());
 
         stager.stage(seed);
 
         assertThat(output.getOut().lines())
-            .filteredOn(line -> line.contains(DUPLICATE))
+            .filteredOn(line -> line.contains(REFUSED))
             .singleElement()
             .asString()
             .contains(" INFO ");
@@ -56,12 +56,12 @@ class BookStagerTest {
 
     @Test
     void shouldWarnWhenStagingFailsForAnotherReason(final CapturedOutput output) {
-        doThrow(new QueryTimeoutException("statement timeout")).when(pendingBookService).stage(any());
+        doThrow(new QueryTimeoutException("statement timeout")).when(pendingBookService).stage(any(), any());
 
         stager.stage(seed);
 
         assertThat(output.getOut().lines())
-            .filteredOn(line -> line.contains(FAILED) || line.contains(DUPLICATE))
+            .filteredOn(line -> line.contains(FAILED) || line.contains(REFUSED))
             .singleElement()
             .asString()
             .contains(" WARN ", FAILED);

@@ -147,8 +147,9 @@
     </Match>
 
     <!--
-      IMPROPER_UNICODE on TextMatch. It compares a book title with a search query, so a Unicode
-      case-folding collision only skews a match.
+      IMPROPER_UNICODE on TextMatch. Title comparison folds case, and a collision only skews a search
+      match or keeps an ISBN hit with another title. fold also builds the author nameKey, and a
+      collision there puts two authors on one row. Neither is an identity or security check.
     -->
     <Match>
         <Bug pattern="IMPROPER_UNICODE"/>

@@ -74,6 +74,21 @@ final class StubSourceClients {
         };
     }
 
+    static BookSourceClient withIsbnHit(
+        final BookSourceClient delegate, final String matchIsbn, final SourceBook isbnHit) {
+        return new StubClient(delegate.source()) {
+            @Override
+            public Optional<SourceBook> fetchByIsbn(final String isbn) {
+                return matchIsbn.equals(isbn) ? Optional.of(isbnHit) : Optional.empty();
+            }
+
+            @Override
+            public Optional<SourceBook> fetchByTitleAuthor(final String title, final String author) {
+                return delegate.fetchByTitleAuthor(title, author);
+            }
+        };
+    }
+
     static BookSourceClient recordingIsbnCalls(
         final BookFieldSource source, final List<BookFieldSource> calls) {
         return new StubClient(source) {

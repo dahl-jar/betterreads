@@ -34,11 +34,11 @@ class BookStager {
             final MergedBook merged = sourceCollector.collectFor(seed);
             final String dedupKey = merged.book().dedupKey();
             if (dedupKey != null) {
-                pendingBookService.stage(merged);
+                pendingBookService.stage(merged, seed.title());
                 promoter.promote(dedupKey, merged);
             }
-        } catch (DataIntegrityViolationException duplicate) {
-            LOG.info("catalog.search candidate duplicates an existing row for source {}, skipping it",
+        } catch (DataIntegrityViolationException violation) {
+            LOG.info("catalog.search candidate refused by the database for source {}, skipping it",
                 seed.source());
         } catch (DataAccessException ex) {
             LOG.warn("catalog.search staging failed for source {} ({}), skipping it",

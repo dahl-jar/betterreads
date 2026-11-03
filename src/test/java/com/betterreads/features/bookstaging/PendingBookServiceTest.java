@@ -25,9 +25,14 @@ import com.betterreads.pendingbook.PendingBookMapper;
 import com.betterreads.pendingbook.PendingBookRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.DataIntegrityViolationException;
 
+@ExtendWith(OutputCaptureExtension.class)
 class PendingBookServiceTest {
 
     private static final String DUNE_KEY = DuneBooks.ISBN;
@@ -41,6 +46,8 @@ class PendingBookServiceTest {
     private static final String STAGED_RATING = "4.25";
 
     private static final int STAGED_RATING_COUNT = 950;
+
+    private static final String CONNECTION_RESET = "connection reset";
 
     private final PendingBookRepository pendingBooks = mock(PendingBookRepository.class);
 
@@ -58,7 +65,7 @@ class PendingBookServiceTest {
             .title(DUNE_TITLE)
             .build();
 
-        assertThatThrownBy(() -> service.stage(new SourceMerger().merge(null, List.of(keyless))))
+        assertThatThrownBy(() -> service.stage(new SourceMerger().merge(null, List.of(keyless)), null))
             .isInstanceOf(IllegalArgumentException.class);
         verify(pendingBooks, never()).reserve(anyString());
     }
@@ -71,7 +78,7 @@ class PendingBookServiceTest {
         when(pendingBooks.findDue(any())).thenReturn(List.of(dune, messiah));
         when(pendingBooks.findByDedupKey(DUNE_KEY)).thenReturn(Optional.of(dune));
         when(pendingBooks.findByDedupKey(MESSIAH_KEY)).thenReturn(Optional.of(messiah));
-        doThrow(new DataAccessResourceFailureException("connection reset"))
+        doThrow(new DataAccessResourceFailureException(CONNECTION_RESET))
             .when(promoter).promote(eq(DUNE_KEY), any());
 
         service.promoteReady();
@@ -97,5 +104,36 @@ class PendingBookServiceTest {
         final SourceBook book = promoted.getValue().book();
         assertThat(book.averageRating()).isEqualTo(Double.parseDouble(STAGED_RATING));
         assertThat(book.ratingCount()).isEqualTo(STAGED_RATING_COUNT);
+    }
+
+    @Test
+    void shouldWarnRefusedWhenDatabaseRejectsPromotion(final CapturedOutput output) {
+        stubDueDune();
+        doThrow(new DataIntegrityViolationException("numeric field overflow"))
+            .when(promoter).promote(eq(DUNE_KEY), any());
+
+        service.promoteReady();
+
+        assertThat(output.getOut())
+            .contains("catalog.staging candidate refused by the database, retired dedupKey=" + DUNE_KEY);
+    }
+
+    @Test
+    void shouldWarnPromotionFailedWhenAttemptWriteAlsoFails(final CapturedOutput output) {
+        stubDueDune();
+        final DataAccessResourceFailureException failure = new DataAccessResourceFailureException(CONNECTION_RESET);
+        doThrow(failure).when(promoter).promote(eq(DUNE_KEY), any());
+        doThrow(failure).when(promoter).recordFailedAttempt(DUNE_KEY);
+
+        assertThatThrownBy(service::promoteReady).isSameAs(failure);
+
+        assertThat(output.getOut()).contains(
+            "catalog.staging promotion failed dedupKey=" + DUNE_KEY + " (DataAccessResourceFailureException)");
+    }
+
+    private void stubDueDune() {
+        final PendingBook dune = DuneBooks.pendingRow(DUNE_KEY, DUNE_TITLE);
+        when(pendingBooks.findDue(any())).thenReturn(List.of(dune));
+        when(pendingBooks.findByDedupKey(DUNE_KEY)).thenReturn(Optional.of(dune));
     }
 }

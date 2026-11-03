@@ -16,10 +16,6 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 
-/**
- * A book not yet complete enough to show, staged in {@code pending_book} until it carries every
- * required field and is promoted into {@code book}.
- */
 @Entity
 @Table(name = "pending_book")
 // NullAway.Init, PMD.ExcessivePublicCount, PMD.TooManyFields, PMD.CyclomaticComplexity: JPA sets one field per column.
@@ -63,6 +59,10 @@ public class PendingBook {
     @Column(name = "title")
     @Nullable
     private String title;
+
+    @Column(name = "first_title")
+    @Nullable
+    private String firstTitle;
 
     @Column(name = "subtitle")
     @Nullable
@@ -238,6 +238,15 @@ public class PendingBook {
 
     public void setTitle(@Nullable final String title) {
         this.title = title;
+    }
+
+    @Nullable
+    public String getFirstTitle() {
+        return firstTitle;
+    }
+
+    public void setFirstTitle(@Nullable final String firstTitle) {
+        this.firstTitle = firstTitle;
     }
 
     @Nullable

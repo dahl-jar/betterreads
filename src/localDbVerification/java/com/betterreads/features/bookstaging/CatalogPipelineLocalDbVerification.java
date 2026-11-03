@@ -23,7 +23,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
-/** Persists live catalog search results in local Postgres for operator inspection. */
 @SpringBootTest(properties = "betterreads.catalog.staging.poll-enabled=false")
 @EnabledIfEnvironmentVariable(named = "RUN_LOCAL_DB_VERIFICATION", matches = "1")
 @EnabledIfEnvironmentVariable(named = "GOOGLE_BOOKS_API_KEY", matches = ".+")
@@ -192,7 +191,7 @@ class CatalogPipelineLocalDbVerification {
         final MergedBook merged = sourceCollector.collectFor(seed);
         final String dedupKey = Objects.requireNonNull(
             merged.book().dedupKey(), "merged seed has a dedup key");
-        pendingBookService.stage(merged);
+        pendingBookService.stage(merged, seed.title());
         promoter.promote(dedupKey, merged);
     }
 }

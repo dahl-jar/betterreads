@@ -1,14 +1,67 @@
 package com.betterreads.text;
 
+import java.text.Normalizer;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
-/** Case-insensitive title and name comparisons. */
 public final class TextMatch {
 
     private static final Pattern SUBTITLE_TAIL = Pattern.compile("[:(].*$", Pattern.DOTALL);
 
+    private static final Pattern PARENTHETICAL = Pattern.compile("\\([^)]*");
+
+    private static final Pattern VOLUME_WORD =
+        Pattern.compile("\\bvol(?:ume)?\\b[.\\s]*([\\p{L}\\p{N}]*)", Pattern.UNICODE_CHARACTER_CLASS);
+
+    private static final Pattern LEADING_ZEROS = Pattern.compile("^0+(?=\\p{N})");
+
+    private static final Map<String, String> VOLUME_NUMBERS = Map.ofEntries(
+        Map.entry("one", "1"), Map.entry("i", "1"),
+        Map.entry("two", "2"), Map.entry("ii", "2"),
+        Map.entry("three", "3"), Map.entry("iii", "3"),
+        Map.entry("four", "4"), Map.entry("iv", "4"),
+        Map.entry("five", "5"), Map.entry("v", "5"),
+        Map.entry("six", "6"), Map.entry("vi", "6"),
+        Map.entry("seven", "7"), Map.entry("vii", "7"),
+        Map.entry("eight", "8"), Map.entry("viii", "8"),
+        Map.entry("nine", "9"), Map.entry("ix", "9"),
+        Map.entry("ten", "10"), Map.entry("x", "10"),
+        Map.entry("eleven", "11"), Map.entry("xi", "11"),
+        Map.entry("twelve", "12"), Map.entry("xii", "12"));
+
+    private static final String TRADEMARK_SIGN = "\u2122";
+
+    private static final Pattern SEGMENT_BREAK =
+        Pattern.compile("[:;,/#\\[\\]]|--|\\s-\\s|(?<=\\D)[\\u2013\\u2014](?=\\D)");
+
+    private static final Pattern NOT_WORD = Pattern.compile("[^\\p{L}\\p{N}]+");
+
+    private static final Pattern LEADING_ARTICLE = Pattern.compile("^(?:the|an|a)(?: |$)");
+
+    private static final Pattern MARKS = Pattern.compile("\\p{M}");
+
+    private static final Map<Integer, String> UNMARKED_LETTERS = Map.of(
+        (int) 'œ', "oe",
+        (int) 'æ', "ae",
+        (int) 'ø', "o",
+        (int) 'ı', "i",
+        (int) 'ł', "l",
+        (int) 'ß', "ss",
+        (int) 'đ', "d",
+        (int) 'ð', "d",
+        (int) 'þ', "th");
+
     private TextMatch() {
+    }
+
+    static String fold(final String text) {
+        final String decomposed = Normalizer.normalize(text, Normalizer.Form.NFKD);
+        return MARKS.matcher(decomposed).replaceAll("").toLowerCase(Locale.ROOT).codePoints()
+            .mapToObj(letter -> UNMARKED_LETTERS.getOrDefault(letter, Character.toString(letter)))
+            .collect(Collectors.joining());
     }
 
     private static boolean containsIgnoreCase(final String haystack, final String needle) {
@@ -19,13 +72,6 @@ public final class TextMatch {
         return containsIgnoreCase(first, second) || containsIgnoreCase(second, first);
     }
 
-    /**
-     * Returns true when the title equals the query or the query is the more specific string.
-     *
-     * <p>A query carrying the author or extra words ("the martian weir") matches the canonical title
-     * ("The Martian"); a title that extends the query ("The Sandman - Overture" for "the sandman")
-     * does not.
-     */
     public static boolean titleWithinQuery(final String title, final String query) {
         final String trimmedTitle = title.trim();
         final String trimmedQuery = query.trim();
@@ -33,18 +79,70 @@ public final class TextMatch {
             || containsIgnoreCase(trimmedQuery, trimmedTitle);
     }
 
-    /**
-     * Returns true when two titles share the same core, ignoring case and a trailing subtitle.
-     *
-     * <p>The core is the title up to the first colon or parenthesis, so "Dune" matches "Dune: A
-     * Novel" and "Dune (novel)". A sequel that only shares a leading word, like "Dune Messiah",
-     * does not match "Dune".
-     */
     public static boolean canonicalTitleMatches(final String first, final String second) {
         return coreTitle(first).equals(coreTitle(second));
     }
 
     public static String coreTitle(final String title) {
         return SUBTITLE_TAIL.matcher(title).replaceAll("").trim().toLowerCase(Locale.ROOT);
+    }
+
+    public static boolean sameBookTitle(final String first, final String second) {
+        final String firstFolded = foldTitle(first);
+        final String secondFolded = foldTitle(second);
+        final Set<String> firstSegments = segmentKeys(firstFolded);
+        final Set<String> secondSegments = segmentKeys(secondFolded);
+        if (firstSegments.isEmpty() || secondSegments.isEmpty()
+            || Volumes.differ(firstFolded, secondFolded)) {
+            return false;
+        }
+        return wholeKey(firstFolded).equals(wholeKey(secondFolded))
+            || firstSegments.containsAll(secondSegments)
+            || secondSegments.containsAll(firstSegments);
+    }
+
+    private static String wholeKey(final String folded) {
+        return wordKey(Volumes.mark(folded, "vol"));
+    }
+
+    private static Set<String> segmentKeys(final String folded) {
+        final String bare = PARENTHETICAL.matcher(folded).replaceAll(" ");
+        return SEGMENT_BREAK.splitAsStream(Volumes.mark(bare, ", vol"))
+            .map(TextMatch::wordKey)
+            .filter(key -> !key.isEmpty())
+            .collect(Collectors.toSet());
+    }
+
+    private static String foldTitle(final String title) {
+        return fold(title.replace(TRADEMARK_SIGN, "")).replace("&", " and ");
+    }
+
+    private static String wordKey(final String text) {
+        final String spaced = NOT_WORD.matcher(text).replaceAll(" ").strip();
+        return LEADING_ARTICLE.matcher(spaced).replaceFirst("").replace(" ", "");
+    }
+
+    private static final class Volumes {
+
+        static boolean differ(final String first, final String second) {
+            final Set<String> firstNumbers = numbers(first);
+            final Set<String> secondNumbers = numbers(second);
+            return !firstNumbers.isEmpty() && !secondNumbers.isEmpty() && !firstNumbers.equals(secondNumbers);
+        }
+
+        static String mark(final String title, final String prefix) {
+            return VOLUME_WORD.matcher(title).replaceAll(volume -> prefix + number(volume.group(1)));
+        }
+
+        private static Set<String> numbers(final String title) {
+            return VOLUME_WORD.matcher(title).results()
+                .map(volume -> number(volume.group(1)))
+                .collect(Collectors.toSet());
+        }
+
+        private static String number(final String label) {
+            final String unpadded = LEADING_ZEROS.matcher(label).replaceFirst("");
+            return VOLUME_NUMBERS.getOrDefault(unpadded, unpadded);
+        }
     }
 }
