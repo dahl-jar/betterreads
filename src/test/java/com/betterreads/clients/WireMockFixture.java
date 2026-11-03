@@ -16,6 +16,8 @@ public class WireMockFixture {
 
     protected static final int HTTP_NOT_FOUND = 404;
 
+    protected static final int HTTP_TOO_MANY_REQUESTS = 429;
+
     protected static final int HTTP_SERVER_ERROR = 503;
 
     private static WireMockServer startServer() {
