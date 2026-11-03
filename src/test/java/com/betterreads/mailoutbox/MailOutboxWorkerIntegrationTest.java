@@ -64,6 +64,18 @@ class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
 
     private static final String VERIFY_LINK_PATH = "/verify-email?token=";
 
+    private static final String SIGNUP_ATTEMPT_SUBJECT = "Someone tried to sign up with your email";
+
+    private static final String SIGNUP_ATTEMPT_TEXT = """
+        Someone used this email address to sign up for BetterReads, and you already have an account.
+
+        If this was you, log in or reset your password. If it wasn't, you can ignore this email.
+
+        Reset password: https://test.example.com/forgot-password
+
+        Your account and password stay unchanged.
+        """;
+
     @Autowired
     private MailOutboxRepository repository;
 
@@ -282,6 +294,20 @@ class MailOutboxWorkerIntegrationTest extends ContainerizedTest {
 
         final MailMessage sent = onlySentMessage();
         assertThat(sent.text()).contains(token);
+    }
+
+    @Test
+    void shouldSendSignupAttemptWithoutToken() {
+        outbox.enqueueSignupAttempt(USER_EMAIL);
+        sender.script.add(SendOutcome.success());
+
+        worker.drain();
+
+        final MailMessage sent = onlySentMessage();
+        final MailOutbox row = onlyRow();
+        assertThat(sent.subject()).isEqualTo(SIGNUP_ATTEMPT_SUBJECT);
+        assertThat(sent.text()).isEqualTo(SIGNUP_ATTEMPT_TEXT);
+        assertThat(row.getSentAt()).isNotNull();
     }
 
     private MailOutbox saveRowWithoutToken() {

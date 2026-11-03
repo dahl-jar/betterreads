@@ -19,13 +19,16 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT u.userId FROM User u WHERE u.email = :email")
     Optional<Long> findIdByEmail(@Param("email") String email);
 
-    /** Compares the username case-insensitively. */
-    @Query("SELECT count(u) > 0 FROM User u WHERE lower(u.username) = lower(:username)")
-    boolean existsByUsername(@Param("username") String username);
+    @Query(value = """
+        SELECT EXISTS (SELECT 1 FROM app_user WHERE lower(username) = lower(:username))
+        """, nativeQuery = true)
+    boolean isUsernameTaken(@Param("username") String username);
 
-    boolean existsByEmail(String email);
+    @Query(value = """
+        SELECT EXISTS (SELECT 1 FROM app_user WHERE email = :email)
+        """, nativeQuery = true)
+    boolean isEmailTaken(@Param("email") String email);
 
-    /** Flows that change a user's {@code email_token} take this lock first, so locks go user then token. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT u FROM User u WHERE u.email = :email")
     Optional<User> findByEmailForUpdate(@Param("email") String email);
