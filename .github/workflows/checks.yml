@@ -35,9 +35,6 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
-      - name: Make Gradle wrapper executable
-        run: chmod +x gradlew
-
       - name: Log in to GHCR
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9  # v3
         with:
@@ -89,9 +86,6 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
-      - name: Make Gradle wrapper executable
-        run: chmod +x gradlew
-
       - name: Compile and run static analysis
         run: ./gradlew lint --continue
 
@@ -126,9 +120,6 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
-      - name: Make Gradle wrapper executable
-        run: chmod +x gradlew
-
       - name: Run remaining check tasks
         run: ./gradlew extraChecks --continue
 
@@ -151,9 +142,6 @@ jobs:
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c  # v6.4.1
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
-
-      - name: Make Gradle wrapper executable
-        run: chmod +x gradlew
 
       - name: Build application JAR
         run: ./gradlew bootJar
