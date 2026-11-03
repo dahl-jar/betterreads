@@ -7,6 +7,7 @@ import com.betterreads.clients.hardcover.HardcoverWebClientConfig;
 import com.betterreads.clients.hardcover.HardcoverWireMock;
 import static com.betterreads.clients.hardcover.AuthorSearchJson.authorSearch;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.InstanceOfAssertFactories.list;
 
 import java.util.Optional;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 @SpringBootTest(
     classes = {
@@ -100,6 +102,14 @@ class HardcoverAuthorClientWireMockTest extends HardcoverWireMock {
                 .formatted(id, id, language))
             .collect(Collectors.joining(","));
         return "{\"data\": {\"authors\": [{\"contributions\": [" + contributions + "]}]}}";
+    }
+
+    @Test
+    void shouldThrowWhenAuthorSearchRateLimited() {
+        stubStatus(HTTP_TOO_MANY_REQUESTS);
+
+        assertThatThrownBy(() -> client.fetchAuthorWorks(QUERY))
+            .isInstanceOf(WebClientResponseException.TooManyRequests.class);
     }
 
     @Nested

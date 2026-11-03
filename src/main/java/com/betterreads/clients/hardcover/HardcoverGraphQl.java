@@ -12,7 +12,6 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
-/** Sends Hardcover GraphQL requests and parses Hardcover ids. */
 public final class HardcoverGraphQl {
 
     private HardcoverGraphQl() {
@@ -25,7 +24,7 @@ public final class HardcoverGraphQl {
         final ParameterizedTypeReference<T> type,
         final String logQuery
     ) {
-        return WebClients.emptyOn4xx(() -> Optional.ofNullable(client.post()
+        return WebClients.emptyOn4xxExcept429(() -> Optional.ofNullable(client.post()
             .bodyValue(request)
             .retrieve()
             .bodyToMono(type)
@@ -47,7 +46,6 @@ public final class HardcoverGraphQl {
             .orElseGet(List::of);
     }
 
-    /** Returns the id as an int, or empty when it is absent or not numeric. */
     public static Optional<Integer> parseId(final @Nullable String id) {
         if (id == null) {
             return Optional.empty();

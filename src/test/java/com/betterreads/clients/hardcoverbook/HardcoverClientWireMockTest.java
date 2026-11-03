@@ -279,12 +279,20 @@ class HardcoverClientWireMockTest extends HardcoverWireMock {
         }
 
         @Test
-        @DisplayName("a 5xx propagates as an exception")
+        @DisplayName("a 5xx propagates")
         void serverErrorPropagates() {
             stubStatus(HTTP_SERVER_ERROR);
 
             assertThatThrownBy(() -> client.fetchByTitleAuthor(STUB_TITLE, TOLKIEN))
                 .isInstanceOf(WebClientResponseException.class);
+        }
+
+        @Test
+        void shouldThrowWhenBookByIdRateLimited() {
+            stubStatus(HTTP_TOO_MANY_REQUESTS);
+
+            assertThatThrownBy(() -> client.fetchByHardcoverId(ABSOLUTE_BATMAN_ID))
+                .isInstanceOf(WebClientResponseException.TooManyRequests.class);
         }
     }
 }

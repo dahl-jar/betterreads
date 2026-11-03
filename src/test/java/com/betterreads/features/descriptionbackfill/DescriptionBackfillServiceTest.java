@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Optional;
 
 import com.betterreads.book.Book;
+import com.betterreads.book.BookRepository;
 import com.betterreads.book.ResolvedCredit;
 import com.betterreads.booksource.CreditRole;
 import com.betterreads.book.BookDetailCache;
@@ -26,6 +28,7 @@ import com.betterreads.testsupport.Books;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -62,6 +65,8 @@ class DescriptionBackfillServiceTest {
 
     private final BookDescriptionRepository books = mock(BookDescriptionRepository.class);
 
+    private final BookRepository catalog = mock(BookRepository.class);
+
     private final DescriptionSelector selector = mock(DescriptionSelector.class);
 
     private final CacheManager cacheManager = mock(CacheManager.class);
@@ -69,15 +74,14 @@ class DescriptionBackfillServiceTest {
     private final Cache bookDetails = mock(Cache.class);
 
     private final DescriptionBackfillService service =
-        new DescriptionBackfillService(books, selector, cacheManager);
+        new DescriptionBackfillService(books, catalog, selector, cacheManager);
 
     @Test
     @DisplayName("writes a stronger description and evicts the cached detail")
     void writesImprovedDescription() {
         final Book book = bookWithId(BOOK_ID);
-        when(books.findThinDescriptions(anyInt(), any(Pageable.class))).thenReturn(List.of(book));
-        when(selector.bestDescription(any(DescriptionLookup.class), any())).thenReturn(Optional.of(STRONG));
-        when(cacheManager.getCache(BookDetailCache.NAME)).thenReturn(bookDetails);
+        stubThinSlice(List.of(book));
+        stubImprovement();
 
         service.backfillSlice();
 
@@ -88,7 +92,7 @@ class DescriptionBackfillServiceTest {
     @Test
     @DisplayName("stamps a book the sources cannot improve as checked without writing a description")
     void stampsUnimprovableBook() {
-        stubThinSliceWithoutImprovement(bookWithId(BOOK_ID));
+        stubUnimproved(bookWithId(BOOK_ID));
 
         service.backfillSlice();
 
@@ -101,7 +105,7 @@ class DescriptionBackfillServiceTest {
     void oneFailureDoesNotStopTheRest() {
         final Book failing = bookWithId(BOOK_ID);
         final Book ok = bookWithId(OTHER_BOOK_ID);
-        when(books.findThinDescriptions(anyInt(), any(Pageable.class))).thenReturn(List.of(failing, ok));
+        stubThinSlice(List.of(failing, ok));
         when(selector.bestDescription(any(DescriptionLookup.class), any()))
             .thenThrow(new DataAccessResourceFailureException("boom"))
             .thenReturn(Optional.of(STRONG));
@@ -116,16 +120,16 @@ class DescriptionBackfillServiceTest {
     @DisplayName("the lookup carries the row's identifiers, title and first author")
     void lookupCarriesTheRowsSourceIds() {
         final Book book = bookWithId(BOOK_ID);
-        book.applyFrom(SourceBook.builder(BookFieldSource.WIKIDATA)
-            .title(TITLE)
-            .description(WEAK)
-            .isbn13(ISBN)
-            .wikidataQid(QID)
-            .openLibraryWorkKey(WORK_KEY)
-            .hardcoverId(HARDCOVER_ID)
-            .build());
+        final SourceBook.Builder source = SourceBook.builder(BookFieldSource.WIKIDATA);
+        source.title(TITLE);
+        source.description(WEAK);
+        source.isbn13(ISBN);
+        source.wikidataQid(QID);
+        source.openLibraryWorkKey(WORK_KEY);
+        source.hardcoverId(HARDCOVER_ID);
+        book.applyFrom(source.build());
         book.replaceCredits(List.of(new ResolvedCredit(Books.author(AUTHOR), CreditRole.AUTHOR)));
-        stubThinSliceWithoutImprovement(book);
+        stubUnimproved(book);
 
         service.backfillSlice();
 
@@ -140,12 +144,9 @@ class DescriptionBackfillServiceTest {
     void fullSweepWalksAllPages() {
         final Book first = bookWithId(1L);
         final Book second = bookWithId(2L);
-        when(books.findAllKeyedBooks(PageRequest.of(0, SLICE_SIZE)))
-            .thenReturn(List.of(first))
-            .thenReturn(List.of());
-        when(books.findAllKeyedBooks(PageRequest.of(1, SLICE_SIZE))).thenReturn(List.of(second));
-        when(selector.bestDescription(any(DescriptionLookup.class), any())).thenReturn(Optional.of(STRONG));
-        when(cacheManager.getCache(BookDetailCache.NAME)).thenReturn(bookDetails);
+        stubKeyedPage(0, List.of(1L), List.of(first));
+        stubKeyedPage(1, List.of(2L), List.of(second));
+        stubImprovement();
 
         service.fullSweep();
 
@@ -153,14 +154,54 @@ class DescriptionBackfillServiceTest {
         verify(books).updateDescription(eq(2L), eq(STRONG), any(OffsetDateTime.class));
     }
 
-    private void stubThinSliceWithoutImprovement(final Book book) {
-        when(books.findThinDescriptions(anyInt(), any(Pageable.class))).thenReturn(List.of(book));
+    @Test
+    void shouldBackfillInRankOrder() {
+        final List<Long> ranked = List.of(OTHER_BOOK_ID, BOOK_ID);
+        when(books.findIdsWithThinDescription(anyInt(), any(Pageable.class))).thenReturn(ranked);
+        when(catalog.findByBookIdIn(ranked)).thenReturn(List.of(bookWithId(BOOK_ID), bookWithId(OTHER_BOOK_ID)));
+        when(selector.bestDescription(any(DescriptionLookup.class), any())).thenReturn(Optional.empty());
+        final InOrder order = inOrder(books);
+
+        service.backfillSlice();
+
+        order.verify(books).markDescriptionChecked(eq(OTHER_BOOK_ID), any(OffsetDateTime.class));
+        order.verify(books).markDescriptionChecked(eq(BOOK_ID), any(OffsetDateTime.class));
+    }
+
+    @Test
+    void shouldKeepSweepingPastPageOfDeletedBooks() {
+        stubKeyedPage(0, List.of(1L), List.of());
+        stubKeyedPage(1, List.of(2L), List.of(bookWithId(2L)));
+        stubImprovement();
+
+        service.fullSweep();
+
+        verify(books).updateDescription(eq(2L), eq(STRONG), any(OffsetDateTime.class));
+    }
+
+    private void stubThinSlice(final List<Book> slice) {
+        final List<Long> ids = Books.idsOf(slice);
+        when(books.findIdsWithThinDescription(anyInt(), any(Pageable.class))).thenReturn(ids);
+        when(catalog.findByBookIdIn(ids)).thenReturn(slice);
+    }
+
+    private void stubKeyedPage(final int page, final List<Long> ids, final List<Book> rows) {
+        when(books.findIdsKeyed(PageRequest.of(page, SLICE_SIZE))).thenReturn(ids);
+        when(catalog.findByBookIdIn(ids)).thenReturn(rows);
+    }
+
+    private void stubImprovement() {
+        when(selector.bestDescription(any(DescriptionLookup.class), any())).thenReturn(Optional.of(STRONG));
+        when(cacheManager.getCache(BookDetailCache.NAME)).thenReturn(bookDetails);
+    }
+
+    private void stubUnimproved(final Book book) {
+        stubThinSlice(List.of(book));
         when(selector.bestDescription(any(DescriptionLookup.class), any())).thenReturn(Optional.empty());
     }
 
     private static Book bookWithId(final long bookId) {
-        final Book book = new Book();
-        book.setBookId(bookId);
+        final Book book = Books.withId(bookId);
         book.setDedupKey(DEDUP_KEY);
         book.setTitle(TITLE);
         book.setDescription(WEAK);

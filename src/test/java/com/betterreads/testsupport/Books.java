@@ -47,6 +47,12 @@ public final class Books {
         return book;
     }
 
+    public static Book withId(final long bookId) {
+        final Book book = new Book();
+        book.setBookId(bookId);
+        return book;
+    }
+
     public static Book dune(final String key) {
         final Book dune = book(key, DUNE_TITLE);
         dune.setIsbn(DUNE_ISBN);
@@ -64,5 +70,9 @@ public final class Books {
         book.setFirstPublishYear(PUBLISH_YEAR);
         book.replaceCredits(List.of(new ResolvedCredit(author, CreditRole.AUTHOR)));
         return book;
+    }
+
+    public static List<Long> idsOf(final List<Book> books) {
+        return books.stream().map(Book::getBookId).toList();
     }
 }

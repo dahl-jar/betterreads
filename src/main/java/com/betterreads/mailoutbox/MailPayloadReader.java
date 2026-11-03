@@ -21,7 +21,6 @@ class MailPayloadReader {
         this.properties = properties;
     }
 
-    /** @throws IllegalStateException if the payload is malformed or has no token */
     String tokenLink(final String payload, final String template, final String path) {
         final String token = readToken(payload, template);
         return properties.requireAppBaseUrl() + path + "?token=" + URLEncoder.encode(token, StandardCharsets.UTF_8);
@@ -30,7 +29,7 @@ class MailPayloadReader {
     private String readToken(final String payload, final String template) {
         try {
             final JsonNode node = objectMapper.readTree(payload);
-            final String token = node.path("token").asString();
+            final String token = node.path(MailOutboxService.PAYLOAD_TOKEN).asString();
             if (token.isEmpty()) {
                 throw new IllegalStateException(template + " payload missing token");
             }

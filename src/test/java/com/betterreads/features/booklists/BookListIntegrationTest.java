@@ -1,6 +1,7 @@
 package com.betterreads.features.booklists;
 
 import static com.betterreads.testsupport.Books.DUNE_TITLE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItem;
@@ -19,7 +20,9 @@ import com.betterreads.testsupport.Books;
 import com.betterreads.testsupport.ContainerizedTest;
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.stream.IntStream;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.EntityStatistics;
+import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -31,12 +34,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.ResultMatcher;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
-/** Book lists, the catalog count, and a book's series against a real Postgres. */
 @SpringBootTest
 @Testcontainers
 @TestPropertySource(properties = {
@@ -74,7 +77,27 @@ class BookListIntegrationTest extends ContainerizedTest {
 
     private static final BigDecimal FOUR_POINT_ZERO = new BigDecimal("4.00");
 
+    private static final BigDecimal FOUR_POINT_ONE = new BigDecimal("4.10");
+
     private static final BigDecimal FOUR_POINT_THREE = new BigDecimal("4.30");
+
+    private static final BigDecimal FOUR_POINT_FIVE = new BigDecimal("4.50");
+
+    private static final BigDecimal FOUR_POINT_EIGHT = new BigDecimal("4.80");
+
+    private static final String LIST_WITH_LIMIT = "/api/v1/books?list={list}&limit={limit}";
+
+    private static final int LIMIT = 2;
+
+    private static final String FIRST = "first";
+
+    private static final String SECOND = "second";
+
+    private static final String THIRD = "third";
+
+    private static final String FIRST_AUTHOR = "$.data[0].authors[0]";
+
+    private static final String JANUARY = "2026-01-01T00:00:00Z";
 
     private static final String SERIES_PATH = "/api/v1/books/{key}/series";
 
@@ -120,6 +143,9 @@ class BookListIntegrationTest extends ContainerizedTest {
     @Autowired
     private RateLimitFilter rateLimitFilter;
 
+    @Autowired
+    private SessionFactory sessionFactory;
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -135,29 +161,15 @@ class BookListIntegrationTest extends ContainerizedTest {
     class RecentlyAdded {
 
         @Test
-        void ordersByDateAddedNewestFirst() throws Exception {
-            final String older = "older";
-            final String newer = "newer";
-            saveBook(older, "Older Book", FOUR_POINT_ZERO, WELL_RATED_COUNT);
-            saveBook(newer, "Newer Book", FOUR_POINT_ZERO, WELL_RATED_COUNT);
-            setCreatedAt(older, "2026-01-01T00:00:00Z");
-            setCreatedAt(newer, "2026-06-01T00:00:00Z");
-
-            mockMvc.perform(get(LIST_PATH).param(LIST_PARAM, RECENTLY_ADDED))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath(FIRST_KEY).value(newer))
-                .andExpect(jsonPath(SECOND_KEY).value(older));
-        }
-
-        @Test
         void includesEveryBookRegardlessOfRatingCount() throws Exception {
             final String unrated = "unrated";
             saveBook(unrated, "Brand New", null, 0);
 
-            mockMvc.perform(get(LIST_PATH).param(LIST_PARAM, RECENTLY_ADDED))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath(DATA_LENGTH).value(1))
-                .andExpect(jsonPath(FIRST_KEY).value(unrated));
+            final ResultActions response = mockMvc.perform(get(LIST_PATH).param(LIST_PARAM, RECENTLY_ADDED));
+
+            response.andExpect(status().isOk());
+            response.andExpect(jsonPath(DATA_LENGTH).value(1));
+            response.andExpect(jsonPath(FIRST_KEY).value(unrated));
         }
 
         @Test
@@ -165,14 +177,15 @@ class BookListIntegrationTest extends ContainerizedTest {
             final String dune = "dune";
             saveBook(dune, DUNE_TITLE, DUNE_AVERAGE, WELL_RATED_COUNT);
 
-            mockMvc.perform(get(LIST_PATH).param(LIST_PARAM, RECENTLY_ADDED))
-                .andExpect(jsonPath(FIRST_KEY).value(dune))
-                .andExpect(jsonPath(FIRST_TITLE).value(DUNE_TITLE))
-                .andExpect(jsonPath("$.data[0].coverUrl").value(containsString(COVER_PATH + dune)))
-                .andExpect(jsonPath("$.data[0].firstPublishYear").value(Books.PUBLISH_YEAR))
-                .andExpect(jsonPath("$.data[0].authors[0]").value("Author of dune"))
-                .andExpect(jsonPath("$.data[0].averageRating").value(DUNE_AVERAGE.doubleValue()))
-                .andExpect(jsonPath("$.data[0].ratingCount").value(WELL_RATED_COUNT));
+            final ResultActions response = mockMvc.perform(get(LIST_PATH).param(LIST_PARAM, RECENTLY_ADDED));
+
+            response.andExpect(jsonPath(FIRST_KEY).value(dune));
+            response.andExpect(jsonPath(FIRST_TITLE).value(DUNE_TITLE));
+            response.andExpect(jsonPath("$.data[0].coverUrl").value(containsString(COVER_PATH + dune)));
+            response.andExpect(jsonPath("$.data[0].firstPublishYear").value(Books.PUBLISH_YEAR));
+            response.andExpect(jsonPath(FIRST_AUTHOR).value("Author of dune"));
+            response.andExpect(jsonPath("$.data[0].averageRating").value(DUNE_AVERAGE.doubleValue()));
+            response.andExpect(jsonPath("$.data[0].ratingCount").value(WELL_RATED_COUNT));
         }
     }
 
@@ -181,28 +194,16 @@ class BookListIntegrationTest extends ContainerizedTest {
     class TopRated {
 
         @Test
-        void ordersByAverageRatingDescending() throws Exception {
-            final String good = "good";
-            final String great = "great";
-            saveBook(good, "Good", new BigDecimal("4.10"), WELL_RATED_COUNT);
-            saveBook(great, "Great", new BigDecimal("4.80"), WELL_RATED_COUNT);
-
-            mockMvc.perform(get(LIST_PATH).param(LIST_PARAM, TOP_RATED))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath(FIRST_KEY).value(great))
-                .andExpect(jsonPath(SECOND_KEY).value(good));
-        }
-
-        @Test
         void excludesBooksAtOrBelowTheRatingFloor() throws Exception {
             final String classic = "classic";
             saveBook("fluke", "Fluke Five Star", new BigDecimal("5.00"), BARELY_RATED_COUNT);
             saveBook(classic, "Beloved Classic", FOUR_POINT_THREE, WELL_RATED_COUNT);
 
-            mockMvc.perform(get(LIST_PATH).param(LIST_PARAM, TOP_RATED))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath(DATA_LENGTH).value(1))
-                .andExpect(jsonPath(FIRST_KEY).value(classic));
+            final ResultActions response = mockMvc.perform(get(LIST_PATH).param(LIST_PARAM, TOP_RATED));
+
+            response.andExpect(status().isOk());
+            response.andExpect(jsonPath(DATA_LENGTH).value(1));
+            response.andExpect(jsonPath(FIRST_KEY).value(classic));
         }
     }
 
@@ -212,31 +213,114 @@ class BookListIntegrationTest extends ContainerizedTest {
 
         @Test
         void rejectsAnUnknownListWith400() throws Exception {
-            mockMvc.perform(get(LIST_PATH).param(LIST_PARAM, "BESTSELLERS"))
-                .andExpect(status().isBadRequest());
+            final ResultActions response = mockMvc.perform(get(LIST_PATH).param(LIST_PARAM, "BESTSELLERS"));
+
+            response.andExpect(status().isBadRequest());
         }
 
         @Test
         void rejectsALimitOverTheCapWith400() throws Exception {
-            mockMvc.perform(get(LIST_PATH).param(LIST_PARAM, TOP_RATED).param(LIMIT_PARAM, "9999"))
-                .andExpect(status().isBadRequest());
+            final ResultActions response =
+                mockMvc.perform(get(LIST_PATH).param(LIST_PARAM, TOP_RATED).param(LIMIT_PARAM, "9999"));
+
+            response.andExpect(status().isBadRequest());
         }
 
         @Test
         void shouldReturn400WhenLimitIsZero() throws Exception {
-            mockMvc.perform(get(LIST_PATH).param(LIST_PARAM, TOP_RATED).param(LIMIT_PARAM, "0"))
-                .andExpect(status().isBadRequest());
+            final ResultActions response =
+                mockMvc.perform(get(LIST_PATH).param(LIST_PARAM, TOP_RATED).param(LIMIT_PARAM, "0"));
+
+            response.andExpect(status().isBadRequest());
+        }
+    }
+
+    @Nested
+    class Paging {
+
+        @Test
+        void shouldReturnNewestBooksFirst() throws Exception {
+            saveThreeBooks();
+            setCreatedAt(SECOND, "2026-03-01T00:00:00Z");
+            setCreatedAt(FIRST, "2026-02-01T00:00:00Z");
+            setCreatedAt(THIRD, JANUARY);
+
+            final ResultActions response = mockMvc.perform(get(LIST_WITH_LIMIT, RECENTLY_ADDED, LIMIT));
+
+            response.andExpectAll(secondThenFirst());
         }
 
         @Test
-        void honorsTheLimit() throws Exception {
-            saveBook("one", "One", new BigDecimal("4.50"), WELL_RATED_COUNT);
-            saveBook("two", "Two", new BigDecimal("4.40"), WELL_RATED_COUNT);
-            saveBook("three", "Three", FOUR_POINT_THREE, WELL_RATED_COUNT);
+        void shouldReturnHighestRatedBooksFirst() throws Exception {
+            saveBook(FIRST, FIRST, FOUR_POINT_FIVE, WELL_RATED_COUNT);
+            saveBook(SECOND, SECOND, FOUR_POINT_EIGHT, WELL_RATED_COUNT);
+            saveBook(THIRD, THIRD, FOUR_POINT_ONE, WELL_RATED_COUNT);
 
-            mockMvc.perform(get(LIST_PATH).param(LIST_PARAM, TOP_RATED).param(LIMIT_PARAM, "2"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath(DATA_LENGTH).value(2));
+            final ResultActions response = mockMvc.perform(get(LIST_WITH_LIMIT, TOP_RATED, LIMIT));
+
+            response.andExpectAll(secondThenFirst());
+        }
+
+        @Test
+        void shouldPutHigherIdFirstWhenAddedAtSameTime() throws Exception {
+            saveThreeBooks();
+            setCreatedAt(FIRST, JANUARY);
+            setCreatedAt(SECOND, JANUARY);
+            setCreatedAt(THIRD, JANUARY);
+
+            final ResultActions response = mockMvc.perform(get(LIST_WITH_LIMIT, RECENTLY_ADDED, LIMIT));
+
+            response.andExpect(jsonPath(FIRST_KEY).value(THIRD));
+            response.andExpect(jsonPath(SECOND_KEY).value(SECOND));
+        }
+
+        @Test
+        void shouldPutHigherIdFirstWhenRatedTheSame() throws Exception {
+            saveThreeBooks();
+
+            final ResultActions response = mockMvc.perform(get(LIST_WITH_LIMIT, TOP_RATED, LIMIT));
+
+            response.andExpect(jsonPath(FIRST_KEY).value(THIRD));
+            response.andExpect(jsonPath(SECOND_KEY).value(SECOND));
+        }
+
+        @Test
+        void shouldPutUnratedBookAfterRatedBook() throws Exception {
+            saveBook(FIRST, FIRST, FOUR_POINT_ZERO, WELL_RATED_COUNT);
+            saveBook(SECOND, SECOND, null, WELL_RATED_COUNT);
+
+            final ResultActions response = mockMvc.perform(get(LIST_WITH_LIMIT, TOP_RATED, LIMIT));
+
+            response.andExpect(jsonPath(FIRST_KEY).value(FIRST));
+            response.andExpect(jsonPath(SECOND_KEY).value(SECOND));
+        }
+
+        @Test
+        void shouldLoadOnlyLimitBooks() throws Exception {
+            saveThreeBooks();
+            final Statistics statistics = sessionFactory.getStatistics();
+            statistics.setStatisticsEnabled(true);
+            statistics.clear();
+
+            mockMvc.perform(get(LIST_WITH_LIMIT, TOP_RATED, LIMIT));
+
+            final EntityStatistics bookStatistics = statistics.getEntityStatistics(Book.class.getName());
+            assertThat(bookStatistics.getLoadCount()).isEqualTo(LIMIT);
+        }
+
+        private void saveThreeBooks() {
+            saveBook(FIRST, FIRST, FOUR_POINT_ZERO, WELL_RATED_COUNT);
+            saveBook(SECOND, SECOND, FOUR_POINT_ZERO, WELL_RATED_COUNT);
+            saveBook(THIRD, THIRD, FOUR_POINT_ZERO, WELL_RATED_COUNT);
+        }
+
+        private static ResultMatcher[] secondThenFirst() {
+            return new ResultMatcher[] {
+                jsonPath(DATA_LENGTH).value(LIMIT),
+                jsonPath(FIRST_KEY).value(SECOND),
+                jsonPath(SECOND_KEY).value(FIRST),
+                jsonPath(FIRST_AUTHOR).value(AUTHOR_PREFIX + SECOND),
+            };
         }
     }
 
@@ -249,9 +333,10 @@ class BookListIntegrationTest extends ContainerizedTest {
             saveBook(RED_RISING, "Red Rising", FOUR_POINT_ZERO, WELL_RATED_COUNT);
             saveBook(GOLDEN_SON, "Golden Son", null, 0);
 
-            mockMvc.perform(get(LIST_PATH + "/count"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.total").value(2));
+            final ResultActions response = mockMvc.perform(get(LIST_PATH + "/count"));
+
+            response.andExpect(status().isOk());
+            response.andExpect(jsonPath("$.data.total").value(2));
         }
     }
 
@@ -291,8 +376,7 @@ class BookListIntegrationTest extends ContainerizedTest {
 
         @Test
         void shouldListBooksAtTheSamePositionInTheOrderTheyWereAdded() throws Exception {
-            saveInSeries(RED_RISING, new SeriesEntry(SAGA, 1));
-            saveInSeries(GOLDEN_SON, new SeriesEntry(SAGA, 2));
+            saveSaga();
             saveInSeries(MORNING_STAR, new SeriesEntry(SAGA, 2));
 
             final ResultActions response = mockMvc.perform(get(SERIES_PATH, RED_RISING));
@@ -304,8 +388,7 @@ class BookListIntegrationTest extends ContainerizedTest {
 
         @Test
         void shouldLeaveTheRequestedBookOutOfItsSeries() throws Exception {
-            saveInSeries(RED_RISING, new SeriesEntry(SAGA, 1));
-            saveInSeries(GOLDEN_SON, new SeriesEntry(SAGA, 2));
+            saveSaga();
 
             final ResultActions response = mockMvc.perform(get(SERIES_PATH, RED_RISING));
 
@@ -316,8 +399,7 @@ class BookListIntegrationTest extends ContainerizedTest {
 
         @Test
         void shouldLeaveOutBooksFromAnotherSeries() throws Exception {
-            saveInSeries(RED_RISING, new SeriesEntry(SAGA, 1));
-            saveInSeries(GOLDEN_SON, new SeriesEntry(SAGA, 2));
+            saveSaga();
             saveInSeries(EMPIRE_OF_SILENCE, new SeriesEntry(SUN_EATER, 1));
 
             final ResultActions response = mockMvc.perform(get(SERIES_PATH, RED_RISING));
@@ -358,8 +440,7 @@ class BookListIntegrationTest extends ContainerizedTest {
 
         @Test
         void shouldReturnTheCardDetailsOfASeriesBook() throws Exception {
-            saveInSeries(RED_RISING, new SeriesEntry(SAGA, 1));
-            saveInSeries(GOLDEN_SON, new SeriesEntry(SAGA, 2));
+            saveSaga();
 
             final ResultActions response = mockMvc.perform(get(SERIES_PATH, RED_RISING));
 
@@ -375,8 +456,9 @@ class BookListIntegrationTest extends ContainerizedTest {
         void shouldCapASeriesAtFiftyOtherBooks() throws Exception {
             final int lastPosition = SERIES_BOOK_CAP + 2;
             saveInSeries(RED_RISING, new SeriesEntry(SAGA, 1));
-            IntStream.rangeClosed(2, lastPosition)
-                .forEach(position -> saveInSeries("volume-" + position, new SeriesEntry(SAGA, position)));
+            for (int position = 2; position <= lastPosition; position++) {
+                saveVolume(position);
+            }
 
             final ResultActions response = mockMvc.perform(get(SERIES_PATH, RED_RISING));
 
@@ -406,6 +488,11 @@ class BookListIntegrationTest extends ContainerizedTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.detail").value(containsString(unknown)));
         }
+
+        private void saveSaga() {
+            saveInSeries(RED_RISING, new SeriesEntry(SAGA, 1));
+            saveInSeries(GOLDEN_SON, new SeriesEntry(SAGA, 2));
+        }
     }
 
     private void saveBook(
@@ -422,6 +509,10 @@ class BookListIntegrationTest extends ContainerizedTest {
         final Book book = Books.promoted(key, TITLE_PREFIX + key, author);
         book.applySeries(List.of(series), true);
         books.save(book);
+    }
+
+    private void saveVolume(final int position) {
+        saveInSeries("volume-" + position, new SeriesEntry(SAGA, position));
     }
 
     private void setCreatedAt(final String key, final String instant) {

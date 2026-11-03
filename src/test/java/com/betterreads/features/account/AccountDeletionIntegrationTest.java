@@ -45,15 +45,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Covers self-service deletion through {@code DELETE /api/v1/auth/me} and the hard-delete sweep
- * that follows the grace period.
- *
- * <p>The grace period is 6 hours ({@code betterreads.auth.deletion.grace-period-hours}) so a test
- * can put a timestamp either side of the cutoff without waiting. {@code deleted_at} is written
- * through {@code JdbcTemplate} when a test needs a specific timestamp. The API path always
- * stamps {@code now()}.
- */
 @SpringBootTest
 @Testcontainers
 @TestPropertySource(properties = {
@@ -173,17 +164,19 @@ class AccountDeletionIntegrationTest extends ContainerizedTest {
         }
 
         @Test
-        void reRegistrationDuringGraceIsBlocked() throws Exception {
+        void shouldAnswerCreatedWithoutMailDuringGrace() throws Exception {
             registerAndDeleteAccount();
+            mailOutboxRepository.deleteAll();
 
             mockMvc.perform(post(Accounts.REGISTER_URL)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(Accounts.registerPayload(objectMapper, USER, USER_EMAIL, PASSWORD)))
-                .andExpect(status().isConflict());
+                    .content(Accounts.registerPayload(objectMapper, Accounts.OTHER_USER, USER_EMAIL, PASSWORD)))
+                .andExpect(status().isCreated());
 
             assertThat(rawRowCountForEmail(USER_EMAIL))
                 .as("the soft-deleted row still occupies the email slot, no second row was inserted")
                 .isOne();
+            assertThat(mailOutboxRepository.findAll()).isEmpty();
         }
     }
 

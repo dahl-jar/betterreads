@@ -21,6 +21,8 @@ import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -122,6 +124,17 @@ class OpenLibraryClientWireMockTest extends OpenLibraryWireMock {
 
             assertThat(result).map(SourceBook::openLibraryWorkKey).contains(HOBBIT_WORK_KEY);
         }
+
+        @Test
+        void shouldSendTitleAndAuthorAsSeparateParams() {
+            stubSearch(search());
+
+            client.fetchByTitleAuthor(HOBBIT_TITLE, HOBBIT_AUTHOR);
+
+            WIREMOCK.verify(getRequestedFor(urlPathEqualTo(SEARCH_PATH))
+                .withQueryParam("title", equalTo(HOBBIT_TITLE))
+                .withQueryParam("author", equalTo(HOBBIT_AUTHOR)));
+        }
     }
 
     @Nested
@@ -175,6 +188,23 @@ class OpenLibraryClientWireMockTest extends OpenLibraryWireMock {
             assertThat(results).extracting(SourceBook::openLibraryWorkKey).containsExactly(HOBBIT_WORK_KEY);
         }
 
+        @ParameterizedTest
+        @ValueSource(strings = {"{x}", "{x\nFORGED LINE}"})
+        void shouldSendBracesLiterally(final String query) {
+            stubSearch(search());
+
+            client.search(query, SEARCH_LIMIT);
+
+            WIREMOCK.verify(getRequestedFor(urlPathEqualTo(SEARCH_PATH)).withQueryParam("q", equalTo(query)));
+        }
+
+        @Test
+        void shouldThrowWhenSearchRateLimited() {
+            stubSearchStatus(HTTP_TOO_MANY_REQUESTS);
+
+            assertThatThrownBy(() -> client.search(HOBBIT_TITLE, SEARCH_LIMIT))
+                .isInstanceOf(WebClientResponseException.TooManyRequests.class);
+        }
     }
 
     @Nested

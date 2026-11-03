@@ -13,12 +13,6 @@ import com.betterreads.db.Timestamped;
 import org.hibernate.annotations.SQLRestriction;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Account row in {@code app_user}.
- *
- * <p>Deleting an account sets {@code deleted_at} first. The {@code @SQLRestriction} hides those
- * rows from every Hibernate query, so reading or purging deleted rows needs native SQL.
- */
 @Entity
 @Table(name = "app_user")
 @SQLRestriction("deleted_at IS NULL")
@@ -62,6 +56,10 @@ public class User extends Timestamped {
 
     @Column(name = "credential_version", nullable = false)
     private int credentialVersion;
+
+    @Column(name = "signup_notice_sent_at")
+    @Nullable
+    private Instant signupNoticeSentAt;
 
     public Long getUserId() {
         return userId;
@@ -125,5 +123,14 @@ public class User extends Timestamped {
 
     public void bumpCredentialVersion() {
         this.credentialVersion++;
+    }
+
+    @Nullable
+    public Instant getSignupNoticeSentAt() {
+        return signupNoticeSentAt;
+    }
+
+    public void setSignupNoticeSentAt(@Nullable final Instant signupNoticeSentAt) {
+        this.signupNoticeSentAt = signupNoticeSentAt;
     }
 }

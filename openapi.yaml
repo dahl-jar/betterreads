@@ -597,7 +597,7 @@ paths:
         "503":
           description: Service Unavailable
         "201":
-          description: Account created
+          description: Registration accepted
         "400":
           description: Validation failed
           content:
@@ -605,7 +605,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
         "409":
-          description: Username or email already taken
+          description: Username already taken
           content:
             '*/*':
               schema:
@@ -1797,7 +1797,7 @@ components:
           type: string
           format: email
           example: john.doe@example.com
-          maxLength: 255
+          maxLength: 254
           minLength: 0
         password:
           type: string

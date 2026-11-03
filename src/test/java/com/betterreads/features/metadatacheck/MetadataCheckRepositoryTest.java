@@ -7,18 +7,15 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.stream.IntStream;
 
-import com.betterreads.book.Author;
 import com.betterreads.book.AuthorRepository;
 import com.betterreads.book.Book;
-import com.betterreads.book.BookSubject;
 import com.betterreads.book.BookUpsertService;
 import com.betterreads.book.VerifiedMetadata;
-import com.betterreads.booksource.BookFieldSource;
 import com.betterreads.booksource.SeriesEntry;
 import com.betterreads.clients.websearch.SeriesBook;
-import com.betterreads.booksource.SourceAuthor;
 import com.betterreads.booksource.SourceBook;
 import com.betterreads.clients.websearch.MetadataJson;
+import com.betterreads.testsupport.Books;
 import com.betterreads.testsupport.ContainerizedTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -49,7 +46,7 @@ class MetadataCheckRepositoryTest extends ContainerizedTest {
 
     private static final String GOLDEN_SON_KEY = "golden-son";
 
-    private static final String AUTHOR = MetadataJson.AUTHOR;
+    private static final String LIGHT_BRINGER_KEY = "light-bringer";
 
     private static final String SAGA = MetadataJson.SERIES;
 
@@ -60,10 +57,6 @@ class MetadataCheckRepositoryTest extends ContainerizedTest {
     private static final int LISTED_BOOKS = 30;
 
     private static final String BOOK_KEY_PREFIX = "book-";
-
-    private static final String FANTASY = "Fantasy";
-
-    private static final String HARDCOVER_ID = "hc-1";
 
     private static final String REQUESTED_SQL =
         "UPDATE book SET metadata_check_requested_at = now() - make_interval(days => ?) WHERE book_id = ?";
@@ -86,8 +79,12 @@ class MetadataCheckRepositoryTest extends ContainerizedTest {
         authors.deleteAll();
     }
 
-    private List<Book> due() {
-        return books.findDueForCheck(OffsetDateTime.now(ZoneOffset.UTC), PageRequest.ofSize(PAGE_SIZE));
+    private List<Long> due() {
+        return due(PAGE_SIZE);
+    }
+
+    private List<Long> due(final int pageSize) {
+        return books.findIdsDueForCheck(OffsetDateTime.now(ZoneOffset.UTC), PageRequest.ofSize(pageSize));
     }
 
     @Nested
@@ -95,16 +92,16 @@ class MetadataCheckRepositoryTest extends ContainerizedTest {
 
         @Test
         void shouldReturnTheLongestWaitingBooksFirst() {
-            final long addedToday = save("light-bringer");
+            final long addedToday = save(LIGHT_BRINGER_KEY);
             final long queuedLastWeek = save(RED_RISING_KEY);
             final long addedYesterday = save(GOLDEN_SON_KEY);
             jdbc.update(REQUESTED_SQL, DAYS_IN_A_WEEK, queuedLastWeek);
             jdbc.update("UPDATE book SET created_at = now() - interval '30 days' WHERE book_id = ?", queuedLastWeek);
             jdbc.update(REQUESTED_SQL, 1, addedYesterday);
 
-            final List<Book> found = due();
+            final List<Long> found = due();
 
-            assertThat(found).extracting(Book::getBookId).containsExactly(queuedLastWeek, addedYesterday, addedToday);
+            assertThat(found).containsExactly(queuedLastWeek, addedYesterday, addedToday);
         }
 
         @Test
@@ -113,9 +110,9 @@ class MetadataCheckRepositoryTest extends ContainerizedTest {
             final long checked = save(GOLDEN_SON_KEY);
             upsert.applyVerified(checked, VerifiedMetadata.NONE, 1);
 
-            final List<Book> found = due();
+            final List<Long> found = due();
 
-            assertThat(found).extracting(Book::getBookId).containsExactly(waiting);
+            assertThat(found).containsExactly(waiting);
         }
 
         @Test
@@ -124,37 +121,21 @@ class MetadataCheckRepositoryTest extends ContainerizedTest {
             final long retryTomorrow = save(GOLDEN_SON_KEY);
             jdbc.update(REQUESTED_SQL, -1, retryTomorrow);
 
-            final List<Book> found = due();
+            final List<Long> found = due();
 
-            assertThat(found).extracting(Book::getBookId).containsExactly(due);
+            assertThat(found).containsExactly(due);
         }
 
         @Test
-        void shouldLoadAuthors() {
-            upsert.upsertFromSource(redRising().build());
+        void shouldPutLowerIdFirstWhenRequestedAtSameTime() {
+            final long first = save(RED_RISING_KEY);
+            final long second = save(GOLDEN_SON_KEY);
+            save(LIGHT_BRINGER_KEY);
+            jdbc.update("UPDATE book SET metadata_check_requested_at = now() - interval '1 day'");
 
-            final List<Book> found = due();
+            final List<Long> found = due(2);
 
-            assertThat(found.getFirst().getAuthors()).extracting(Author::getName).containsExactly(AUTHOR);
-        }
-
-        @Test
-        void shouldLoadSeries() {
-            final List<SeriesEntry> series = List.of(new SeriesEntry(SAGA, 1), new SeriesEntry(UNIVERSE, 1));
-            upsert.upsertFromSource(redRising().hardcoverId(HARDCOVER_ID).series(series).build());
-
-            final List<Book> found = due();
-
-            assertThat(found.getFirst().getSeries()).isEqualTo(series);
-        }
-
-        @Test
-        void shouldLoadSubjects() {
-            upsert.upsertFromSource(redRising().rawSubjects(List.of(FANTASY)).build());
-
-            final List<Book> found = due();
-
-            assertThat(found.getFirst().getSubjects()).extracting(BookSubject::getSubject).contains(FANTASY);
+            assertThat(found).containsExactly(first, second);
         }
     }
 
@@ -164,8 +145,9 @@ class MetadataCheckRepositoryTest extends ContainerizedTest {
         @Test
         void shouldListTheNamesOfEverySeries() {
             final List<SeriesEntry> series = List.of(new SeriesEntry(SAGA, 1), new SeriesEntry(UNIVERSE, 1));
-            final SourceBook book = redRising().hardcoverId(HARDCOVER_ID).series(series).build();
-            upsert.upsertFromSource(book);
+            final SourceBook.Builder book = MetadataCheckSamples.source();
+            book.series(series);
+            upsert.upsertFromSource(book.build());
 
             final List<String> names = books.findSeriesNames();
 
@@ -208,17 +190,8 @@ class MetadataCheckRepositoryTest extends ContainerizedTest {
         return bookId;
     }
 
-    private static SourceBook.Builder redRising() {
-        return SourceBook.builder(BookFieldSource.OPEN_LIBRARY)
-            .openLibraryWorkKey("OL1W")
-            .title("Red Rising")
-            .authors(List.of(SourceAuthor.ofName(AUTHOR)));
-    }
-
     private long save(final String dedupKey) {
-        final Book book = new Book();
-        book.setDedupKey(dedupKey);
-        book.setTitle(dedupKey);
-        return books.save(book).getBookId();
+        final Book saved = books.save(Books.book(dedupKey, dedupKey));
+        return saved.getBookId();
     }
 }
