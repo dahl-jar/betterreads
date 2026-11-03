@@ -3,6 +3,7 @@ package com.betterreads.features.account;
 import com.betterreads.security.RefreshCookies;
 import com.betterreads.testsupport.Accounts;
 import com.betterreads.testsupport.UserLockRace;
+import com.betterreads.users.User;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.postgresql.PostgreSQLContainer;
@@ -45,7 +46,15 @@ class PasswordChangeIntegrationTest extends AccountMailTest {
 
     private static final String SEVEN_CHARACTERS = "Passw0r";
 
+    private static final String JSON_DETAIL = "$.detail";
+
     private static final String WRONG_CURRENT_DETAIL = "Current password is incorrect";
+
+    private static final String SAME_PASSWORD_DETAIL = "New password must differ from the current password";
+
+    private static final String BYTE_LIMIT_DETAIL = "Password exceeds 72-byte limit";
+
+    private static final String SEVENTY_TWO_BYTE_PASSWORD = "é".repeat(36);
 
     private static final int CHANGE_PASSWORD_BURST = 5;
 
@@ -68,15 +77,14 @@ class PasswordChangeIntegrationTest extends AccountMailTest {
 
         @Test
         void shouldRejectAWrongCurrentPassword() throws Exception {
-            final long userId = seedUser();
+            seedUser();
             final MvcResult session = login(OLD_PASSWORD);
 
-            final ResultActions response = changePassword(session, WRONG_PASSWORD, NEW_PASSWORD);
+            final ResultActions response = changePassword(session, WRONG_PASSWORD, OLD_PASSWORD);
 
             response
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.detail").value(WRONG_CURRENT_DETAIL));
-            assertThat(storedPasswordMatches(userId, OLD_PASSWORD)).isTrue();
+                .andExpect(jsonPath(JSON_DETAIL).value(WRONG_CURRENT_DETAIL));
         }
 
         @Test
@@ -91,14 +99,48 @@ class PasswordChangeIntegrationTest extends AccountMailTest {
         }
 
         @Test
-        void shouldRejectANewPasswordOverSeventyTwoBytes() throws Exception {
+        void shouldRejectANewPasswordEqualToTheCurrent() throws Exception {
             final long userId = seedUser();
             final MvcResult session = login(OLD_PASSWORD);
+            final MvcResult otherSession = login(OLD_PASSWORD);
 
-            final ResultActions response = changePassword(session, OLD_PASSWORD, MULTIBYTE_PASSWORD);
+            final ResultActions response = changePassword(session, OLD_PASSWORD, OLD_PASSWORD);
 
-            response.andExpect(status().isBadRequest());
+            response
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath(JSON_DETAIL).value(SAME_PASSWORD_DETAIL));
             assertThat(storedPasswordMatches(userId, OLD_PASSWORD)).isTrue();
+            final User user = userRepository.findById(userId).orElseThrow();
+            assertThat(user.getCredentialVersion()).isZero();
+            assertThat(Accounts.activeRefreshTokenCount(refreshTokenRepository, userId)).isEqualTo(2L);
+            final ResultActions refreshed = refresh(Accounts.refreshCookie(otherSession));
+            refreshed.andExpect(status().isOk());
+        }
+
+        @Test
+        void shouldPreferWrongCurrentOverByteLimit() throws Exception {
+            seedUser();
+            final MvcResult session = login(OLD_PASSWORD);
+
+            final ResultActions response = changePassword(session, WRONG_PASSWORD, MULTIBYTE_PASSWORD);
+
+            response
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath(JSON_DETAIL).value(WRONG_CURRENT_DETAIL));
+        }
+
+        @Test
+        void shouldPreferByteLimitOverSamePassword() throws Exception {
+            final long userId = Accounts.seedUser(
+                userRepository, passwordEncoder, USER, Accounts.USER_EMAIL, SEVENTY_TWO_BYTE_PASSWORD);
+            final MvcResult session = login(SEVENTY_TWO_BYTE_PASSWORD);
+
+            final ResultActions response = changePassword(session, SEVENTY_TWO_BYTE_PASSWORD, MULTIBYTE_PASSWORD);
+
+            response
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath(JSON_DETAIL).value(BYTE_LIMIT_DETAIL));
+            assertThat(storedPasswordMatches(userId, SEVENTY_TWO_BYTE_PASSWORD)).isTrue();
         }
 
         @Test
