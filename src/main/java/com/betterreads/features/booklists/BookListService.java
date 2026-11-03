@@ -4,13 +4,14 @@ import java.util.List;
 
 import com.betterreads.book.Author;
 import com.betterreads.book.Book;
+import com.betterreads.book.BookOrder;
+import com.betterreads.book.BookRepository;
 import com.betterreads.images.CoverImages;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Serves the homepage book lists from the catalog. */
 @Service
 class BookListService {
 
@@ -18,21 +19,28 @@ class BookListService {
 
     private final BookListRepository books;
 
+    private final BookRepository catalog;
+
     private final CoverImages coverImages;
 
-    public BookListService(final BookListRepository books, final CoverImages coverImages) {
+    public BookListService(
+        final BookListRepository books,
+        final BookRepository catalog,
+        final CoverImages coverImages
+    ) {
         this.books = books;
+        this.catalog = catalog;
         this.coverImages = coverImages;
     }
 
     @Transactional(readOnly = true)
     public List<BookCardResponse> list(final BookListType type, final int limit) {
         final Pageable page = PageRequest.ofSize(limit);
-        final List<Book> found = switch (type) {
-            case RECENTLY_ADDED -> books.findRecentlyAdded(page);
-            case TOP_RATED -> books.findTopRated(TOP_RATED_RATING_FLOOR, page);
+        final List<Long> ids = switch (type) {
+            case RECENTLY_ADDED -> books.findIdsRecentlyAdded(page);
+            case TOP_RATED -> books.findIdsTopRated(TOP_RATED_RATING_FLOOR, page);
         };
-        return found.stream().map(this::toCard).toList();
+        return BookOrder.byIds(ids, catalog.findByBookIdIn(ids)).stream().map(this::toCard).toList();
     }
 
     @Transactional(readOnly = true)

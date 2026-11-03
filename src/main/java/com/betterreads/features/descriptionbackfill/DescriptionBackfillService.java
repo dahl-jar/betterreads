@@ -7,6 +7,8 @@ import java.util.List;
 import com.betterreads.book.Author;
 import com.betterreads.book.Book;
 import com.betterreads.book.BookDetailCache;
+import com.betterreads.book.BookOrder;
+import com.betterreads.book.BookRepository;
 import com.betterreads.bookdescription.DescriptionSelector;
 import com.betterreads.booksource.DescriptionLookup;
 import org.jspecify.annotations.Nullable;
@@ -18,10 +20,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClientException;
 
-/**
- * Replaces thin descriptions of promoted books with a stronger one from the description sources. The
- * slice size bounds the iTunes calls per run.
- */
 @Service
 class DescriptionBackfillService {
 
@@ -33,36 +31,45 @@ class DescriptionBackfillService {
 
     private final BookDescriptionRepository books;
 
+    private final BookRepository catalog;
+
     private final DescriptionSelector selector;
 
     private final CacheManager cacheManager;
 
     DescriptionBackfillService(
         final BookDescriptionRepository books,
+        final BookRepository catalog,
         final DescriptionSelector selector,
         final CacheManager cacheManager
     ) {
         this.books = books;
+        this.catalog = catalog;
         this.selector = selector;
         this.cacheManager = cacheManager;
     }
 
     public void backfillSlice() {
-        final List<Book> candidates = books.findThinDescriptions(
-            THIN_DESCRIPTION_LENGTH, PageRequest.ofSize(SLICE_SIZE));
+        final List<Book> candidates = load(books.findIdsWithThinDescription(
+            THIN_DESCRIPTION_LENGTH, PageRequest.ofSize(SLICE_SIZE)));
         LOG.info("catalog.description-backfill resolving books={}", candidates.size());
         candidates.forEach(this::backfillOne);
     }
 
     public void fullSweep() {
         int page = 0;
-        List<Book> slice = books.findAllKeyedBooks(PageRequest.of(page, SLICE_SIZE));
-        while (!slice.isEmpty()) {
+        List<Long> ids = books.findIdsKeyed(PageRequest.of(page, SLICE_SIZE));
+        while (!ids.isEmpty()) {
+            final List<Book> slice = load(ids);
             LOG.info("catalog.description-sweep page={} books={}", page, slice.size());
             slice.forEach(this::backfillOne);
             page++;
-            slice = books.findAllKeyedBooks(PageRequest.of(page, SLICE_SIZE));
+            ids = books.findIdsKeyed(PageRequest.of(page, SLICE_SIZE));
         }
+    }
+
+    private List<Book> load(final List<Long> ids) {
+        return BookOrder.byIds(ids, catalog.findByBookIdIn(ids));
     }
 
     private void backfillOne(final Book book) {
