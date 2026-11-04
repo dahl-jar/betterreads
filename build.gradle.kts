@@ -85,7 +85,7 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-webflux")
 
 	implementation("io.micrometer:micrometer-registry-prometheus")
-	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3")
+	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.2.0")
 
 	// Boot 4 ships Flyway auto-configuration in the starter, and the postgresql dialect is a separate module
 	implementation("org.springframework.boot:spring-boot-starter-flyway")
