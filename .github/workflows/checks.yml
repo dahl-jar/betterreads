@@ -153,7 +153,7 @@ jobs:
   deploy:
     name: Deploy
     needs: [tests, quality, full, dependencies]
-    if: github.event_name == 'push' && github.actor != 'dependabot[bot]' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    if: github.event_name == 'push' && github.actor != 'dependabot[bot]' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
