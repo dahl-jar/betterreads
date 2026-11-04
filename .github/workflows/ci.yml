@@ -149,26 +149,3 @@ jobs:
       - name: Scan dependencies
         continue-on-error: true
         run: docker run --rm -v "$PWD/build/libs:/scan:ro" aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c rootfs --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 0 /scan
-
-  deploy:
-    name: Deploy
-    needs: [tests, quality, full, dependencies]
-    if: github.event_name == 'push' && github.actor != 'dependabot[bot]' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    permissions:
-      id-token: write
-    steps:
-      - name: Assume the deploy request role
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd
-        with:
-          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: eu-north-1
-
-      - name: Send the deploy request
-        env:
-          QUEUE_URL: ${{ vars.DEPLOY_QUEUE_URL }}
-        run: |
-          set -euo pipefail
-          body="$(jq -nc --arg repo "$GITHUB_REPOSITORY" --arg ref "$GITHUB_REF" --arg sha "$GITHUB_SHA" '{repo:$repo,ref:$ref,sha:$sha}')"
-          aws sqs send-message --queue-url "$QUEUE_URL" --message-body "$body" > /dev/null
