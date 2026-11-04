@@ -7,7 +7,7 @@ readonly DIGITS_PATTERN='^[0-9]+$'
 readonly HASH_PREFIX='g'
 
 previous_release_tag() {
-  git tag -l 'v*' --sort=-v:refname --merged HEAD --no-contains HEAD | grep -Ex 'v[0-9]+\.[0-9]+\.[0-9]+' | head -n 1 || true
+  git tag -l 'v*' --sort=-v:refname --merged HEAD --no-contains HEAD | grep -E "$RELEASE_TAG_PATTERN" | head -n 1 || true
 }
 
 next_version() {

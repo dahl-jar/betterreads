@@ -13,6 +13,9 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  TRIVY_IMAGE: aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c
+
 jobs:
   tests:
     name: JUnit and coverage
@@ -103,8 +106,8 @@ jobs:
       - name: Test next-version.sh
         run: bash .github/scripts/next-version.test.sh
 
-      - name: Test existing-image.sh
-        run: bash .github/scripts/existing-image.test.sh
+      - name: Test find-or-retag-image.sh
+        run: bash .github/scripts/find-or-retag-image.test.sh
 
   full:
     name: Full check
@@ -154,7 +157,7 @@ jobs:
 
       - name: Scan dependencies
         continue-on-error: true
-        run: docker run --rm -v "$PWD/build/libs:/scan:ro" aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c rootfs --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 0 /scan
+        run: docker run --rm -v "$PWD/build/libs:/scan:ro" "$TRIVY_IMAGE" rootfs --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 0 /scan
 
   image:
     name: Image
@@ -167,11 +170,9 @@ jobs:
       id-token: write
     outputs:
       version: ${{ steps.tag.outputs.version }}
-      digest: ${{ steps.digest.outputs.digest }}
     env:
       REGISTRY: 352124045884.dkr.ecr.eu-north-1.amazonaws.com
       REPOSITORY: betterreads
-      TRIVY_IMAGE: aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c
       OIDC_ISSUER: https://token.actions.githubusercontent.com
       IDENTITY_REGEXP: ^https://github.com/dahl-jar/betterreads/.github/workflows/checks.yml@refs/(heads/.+|tags/v.+)$
     steps:
@@ -204,18 +205,19 @@ jobs:
               echo "release tag $GITHUB_REF_NAME is not vMAJOR.MINOR.PATCH" >&2
               exit 1
             fi
-            echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+            tag="$GITHUB_REF_NAME"
           else
-            version="$(bash .github/scripts/next-version.sh "${GITHUB_SHA::7}")"
-            echo "tag=$version" >> "$GITHUB_OUTPUT"
-            echo "version=$version" >> "$GITHUB_OUTPUT"
+            tag="$(bash .github/scripts/next-version.sh "${GITHUB_SHA::7}")"
+            echo "version=$tag" >> "$GITHUB_OUTPUT"
           fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "image=$REGISTRY/$REPOSITORY:$tag" >> "$GITHUB_OUTPUT"
 
-      - name: Find an existing image
+      - name: Find or retag the image
         id: existing
         env:
           TAG: ${{ steps.tag.outputs.tag }}
-        run: bash .github/scripts/existing-image.sh >> "$GITHUB_OUTPUT"
+        run: bash .github/scripts/find-or-retag-image.sh >> "$GITHUB_OUTPUT"
 
       - name: Set up Buildx
         if: steps.existing.outputs.digest == ''
@@ -234,25 +236,19 @@ jobs:
           sbom: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          tags: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ steps.tag.outputs.tag }}
+          tags: ${{ steps.tag.outputs.image }}
 
       - name: Scan image
         if: steps.existing.outputs.digest == ''
         env:
-          IMAGE: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ steps.tag.outputs.tag }}
-        run: |
-          set -euo pipefail
-          trivy() {
-            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/src" "$TRIVY_IMAGE" image "$@"
-          }
-          trivy --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --ignorefile /src/.github/trivyignore.yaml "$IMAGE"
-          trivy --format cyclonedx --output /src/sbom.json "$IMAGE"
+          IMAGE: ${{ steps.tag.outputs.image }}
+        run: docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$TRIVY_IMAGE" image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 "$IMAGE"
 
       - name: Push image
         if: steps.existing.outputs.digest == ''
         id: pushed
         env:
-          IMAGE: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ steps.tag.outputs.tag }}
+          IMAGE: ${{ steps.tag.outputs.image }}
         run: |
           set -euo pipefail
           docker push "$IMAGE"
@@ -277,17 +273,14 @@ jobs:
             cosign sign --yes "$ref"
           fi
           if ! cosign verify-attestation --type cyclonedx "${checks[@]}" "$ref" > /dev/null 2>&1; then
-            if [ ! -f sbom.json ]; then
-              docker pull "$ref"
-              docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/src" "$TRIVY_IMAGE" image --format cyclonedx --output /src/sbom.json "$ref"
-            fi
+            docker pull "$ref"
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/src" "$TRIVY_IMAGE" image --format cyclonedx --output /src/sbom.json "$ref"
             cosign attest --yes --type cyclonedx --predicate sbom.json "$ref"
           fi
 
   deploy:
     name: Deploy
     needs: image
-    if: github.event_name == 'push' && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
