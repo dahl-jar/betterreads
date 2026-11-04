@@ -1,19 +1,6 @@
 name: Docker image
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "src/**"
-      - "build.gradle.kts"
-      - "settings.gradle.kts"
-      - "gradle/**"
-      - "config/**"
-      - "docker/Dockerfile"
-      - "docker/websearch/**"
-      - ".github/workflows/docker-image.yml"
-      - ".github/scripts/**"
   workflow_dispatch: {}
 
 concurrency:

@@ -100,6 +100,12 @@ jobs:
             build/reports/spotbugs/
           retention-days: 14
 
+      - name: Test next-version.sh
+        run: bash .github/scripts/next-version.test.sh
+
+      - name: Test existing-image.sh
+        run: bash .github/scripts/existing-image.test.sh
+
   full:
     name: Full check
     runs-on: ubuntu-24.04
@@ -149,3 +155,155 @@ jobs:
       - name: Scan dependencies
         continue-on-error: true
         run: docker run --rm -v "$PWD/build/libs:/scan:ro" aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c rootfs --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 0 /scan
+
+  image:
+    name: Image
+    needs: [tests, quality, full, dependencies]
+    if: github.event_name == 'push' && github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+      digest: ${{ steps.digest.outputs.digest }}
+    env:
+      REGISTRY: 352124045884.dkr.ecr.eu-north-1.amazonaws.com
+      REPOSITORY: betterreads
+      TRIVY_IMAGE: aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c
+      OIDC_ISSUER: https://token.actions.githubusercontent.com
+      IDENTITY_REGEXP: ^https://github.com/dahl-jar/betterreads/.github/workflows/checks.yml@refs/(heads/.+|tags/v.+)$
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Assume the image role
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd
+        with:
+          role-to-assume: ${{ vars.AWS_IMAGE_ROLE_ARN }}
+          aws-region: eu-north-1
+
+      - name: Log in to ECR
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6
+        with:
+          cosign-release: v2.6.5
+
+      - name: Pick the image tag
+        id: tag
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "release tag $GITHUB_REF_NAME is not vMAJOR.MINOR.PATCH" >&2
+              exit 1
+            fi
+            echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+          else
+            version="$(bash .github/scripts/next-version.sh "${GITHUB_SHA::7}")"
+            echo "tag=$version" >> "$GITHUB_OUTPUT"
+            echo "version=$version" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Find an existing image
+        id: existing
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: bash .github/scripts/existing-image.sh >> "$GITHUB_OUTPUT"
+
+      - name: Set up Buildx
+        if: steps.existing.outputs.digest == ''
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+
+      - name: Build image
+        if: steps.existing.outputs.digest == ''
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64
+          load: true
+          push: false
+          provenance: false
+          sbom: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ steps.tag.outputs.tag }}
+
+      - name: Scan image
+        if: steps.existing.outputs.digest == ''
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          trivy() {
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/src" "$TRIVY_IMAGE" image "$@"
+          }
+          trivy --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --ignorefile /src/.github/trivyignore.yaml "$IMAGE"
+          trivy --format cyclonedx --output /src/sbom.json "$IMAGE"
+
+      - name: Push image
+        if: steps.existing.outputs.digest == ''
+        id: pushed
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          docker push "$IMAGE"
+          repo_digest="$(docker inspect --format '{{index .RepoDigests 0}}' "$IMAGE")"
+          echo "digest=${repo_digest#*@}" >> "$GITHUB_OUTPUT"
+
+      - name: Record the digest
+        id: digest
+        env:
+          FOUND: ${{ steps.existing.outputs.digest }}
+          PUSHED: ${{ steps.pushed.outputs.digest }}
+        run: echo "digest=${FOUND:-$PUSHED}" >> "$GITHUB_OUTPUT"
+
+      - name: Sign and attest
+        env:
+          DIGEST: ${{ steps.digest.outputs.digest }}
+        run: |
+          set -euo pipefail
+          ref="$REGISTRY/$REPOSITORY@$DIGEST"
+          checks=(--certificate-oidc-issuer "$OIDC_ISSUER" --certificate-identity-regexp "$IDENTITY_REGEXP" --certificate-github-workflow-repository "$GITHUB_REPOSITORY" --certificate-github-workflow-sha "$GITHUB_SHA")
+          if ! cosign verify "${checks[@]}" "$ref" > /dev/null 2>&1; then
+            cosign sign --yes "$ref"
+          fi
+          if ! cosign verify-attestation --type cyclonedx "${checks[@]}" "$ref" > /dev/null 2>&1; then
+            if [ ! -f sbom.json ]; then
+              docker pull "$ref"
+              docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/src" "$TRIVY_IMAGE" image --format cyclonedx --output /src/sbom.json "$ref"
+            fi
+            cosign attest --yes --type cyclonedx --predicate sbom.json "$ref"
+          fi
+
+  deploy:
+    name: Deploy
+    needs: image
+    if: github.event_name == 'push' && github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      id-token: write
+    steps:
+      - name: Assume the deploy request role
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: eu-north-1
+
+      - name: Send the deploy request
+        env:
+          VERSION: ${{ needs.image.outputs.version }}
+        run: |
+          set -euo pipefail
+          queue_url="$(aws ssm get-parameter --name /homelab/deploy/queue-url --query Parameter.Value --output text)"
+          body="$(jq -nc --arg repo "$GITHUB_REPOSITORY" --arg ref "$GITHUB_REF" --arg sha "$GITHUB_SHA" --arg version "$VERSION" '{repo:$repo,ref:$ref,sha:$sha,version:$version}')"
+          aws sqs send-message --queue-url "$queue_url" --message-body "$body" > /dev/null
