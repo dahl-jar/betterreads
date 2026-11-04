@@ -360,6 +360,7 @@ tasks.withType<Test> {
 }
 
 tasks.test {
+	inputs.file("openapi.yaml").withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("committedOpenApiSpec")
 	finalizedBy(tasks.jacocoTestReport)
 }
 
