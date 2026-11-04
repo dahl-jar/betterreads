@@ -166,8 +166,9 @@ jobs:
           aws-region: eu-north-1
 
       - name: Send the deploy request
+        env:
+          QUEUE_URL: ${{ vars.DEPLOY_QUEUE_URL }}
         run: |
           set -euo pipefail
-          queue_url="$(aws ssm get-parameter --name /homelab/deploy/queue-url --query Parameter.Value --output text)"
           body="$(jq -nc --arg repo "$GITHUB_REPOSITORY" --arg ref "$GITHUB_REF" --arg sha "$GITHUB_SHA" '{repo:$repo,ref:$ref,sha:$sha}')"
-          aws sqs send-message --queue-url "$queue_url" --message-body "$body" > /dev/null
+          aws sqs send-message --queue-url "$QUEUE_URL" --message-body "$body" > /dev/null
