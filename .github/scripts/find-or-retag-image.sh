@@ -68,7 +68,7 @@ find_or_retag() {
     return 0
   fi
   retag
-  echo "digest=$(digest_of "$TAG")"
+  echo "digest=$branch_digest"
 }
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then

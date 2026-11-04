@@ -174,7 +174,6 @@ jobs:
       REGISTRY: 352124045884.dkr.ecr.eu-north-1.amazonaws.com
       REPOSITORY: betterreads
       OIDC_ISSUER: https://token.actions.githubusercontent.com
-      IDENTITY_REGEXP: ^https://github.com/dahl-jar/betterreads/.github/workflows/checks.yml@refs/(heads/.+|tags/v.+)$
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -268,7 +267,7 @@ jobs:
         run: |
           set -euo pipefail
           ref="$REGISTRY/$REPOSITORY@$DIGEST"
-          checks=(--certificate-oidc-issuer "$OIDC_ISSUER" --certificate-identity-regexp "$IDENTITY_REGEXP" --certificate-github-workflow-repository "$GITHUB_REPOSITORY" --certificate-github-workflow-sha "$GITHUB_SHA")
+          checks=(--certificate-oidc-issuer "$OIDC_ISSUER" --certificate-identity "$GITHUB_SERVER_URL/$GITHUB_WORKFLOW_REF" --certificate-github-workflow-repository "$GITHUB_REPOSITORY" --certificate-github-workflow-sha "$GITHUB_SHA")
           if ! cosign verify "${checks[@]}" "$ref" > /dev/null 2>&1; then
             cosign sign --yes "$ref"
           fi
