@@ -6,6 +6,10 @@ on:
     tags: ["v*"]
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) && github.run_id || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -25,10 +29,11 @@ jobs:
         with:
           distribution: temurin
           java-version: "25"
-          cache: gradle
 
-      - name: Make Gradle wrapper executable
-        run: chmod +x gradlew
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       - name: Log in to GHCR
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
@@ -40,11 +45,8 @@ jobs:
       - name: Pull test container images
         run: bash .github/scripts/pull-test-images.sh
 
-      - name: Run tests
-        run: ./gradlew test
-
-      - name: Verify coverage thresholds
-        run: ./gradlew jacocoTestCoverageVerification
+      - name: Run tests and verify coverage
+        run: ./gradlew testJob --continue
 
       - name: Upload test reports
         if: always()
@@ -78,22 +80,14 @@ jobs:
         with:
           distribution: temurin
           java-version: "25"
-          cache: gradle
 
-      - name: Make Gradle wrapper executable
-        run: chmod +x gradlew
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
-      - name: Compile (runs ErrorProne and NullAway)
-        run: ./gradlew compileJava compileTestJava
-
-      - name: Checkstyle
-        run: ./gradlew checkstyleMain checkstyleTest
-
-      - name: PMD
-        run: ./gradlew pmdMain pmdTest
-
-      - name: SpotBugs
-        run: ./gradlew spotbugsMain spotbugsTest
+      - name: Compile and run static analysis
+        run: ./gradlew lint --continue
 
       - name: Upload static analysis reports
         if: always()
@@ -111,7 +105,6 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
-      packages: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -121,23 +114,14 @@ jobs:
         with:
           distribution: temurin
           java-version: "25"
-          cache: gradle
 
-      - name: Make Gradle wrapper executable
-        run: chmod +x gradlew
-
-      - name: Log in to GHCR
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
-      - name: Pull test container images
-        run: bash .github/scripts/pull-test-images.sh
-
-      - name: Run full quality gate
-        run: ./gradlew check
+      - name: Run remaining check tasks
+        run: ./gradlew extraChecks --continue
 
   dependencies:
     name: Dependency scan
@@ -153,10 +137,11 @@ jobs:
         with:
           distribution: temurin
           java-version: "25"
-          cache: gradle
 
-      - name: Make Gradle wrapper executable
-        run: chmod +x gradlew
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       - name: Build application JAR
         run: ./gradlew bootJar
