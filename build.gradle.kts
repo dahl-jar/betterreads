@@ -102,7 +102,7 @@ dependencies {
 	implementation("com.bucket4j:bucket4j_jdk17-core:8.14.0")
 	implementation("com.bucket4j:bucket4j_jdk17-lettuce:8.14.0")
 	implementation("com.meilisearch.sdk:meilisearch-java:0.20.1")
-	implementation("io.minio:minio:8.5.17")
+	implementation("io.minio:minio:8.6.0")
 	implementation("net.coobird:thumbnailator:0.4.20")
 	implementation("org.jsoup:jsoup:1.23.2")
 
@@ -126,6 +126,12 @@ dependencies {
 	testImplementation("org.wiremock:wiremock-standalone:3.13.2")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 	testImplementation("com.tngtech.archunit:archunit-junit5:1.4.1")
+
+	constraints {
+		implementation("com.google.guava:guava:33.7.2-jre")
+		implementation("org.bouncycastle:bcprov-jdk18on:1.85")
+		implementation("org.xerial.snappy:snappy-java:1.1.10.9")
+	}
 }
 
 checkstyle {

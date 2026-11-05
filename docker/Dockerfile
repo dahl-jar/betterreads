@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM eclipse-temurin:25-jdk AS build
+FROM eclipse-temurin:25-jdk@sha256:83f4a7fc27df94dcc7b8de04d14cbbba8da14406f921e966969c3b09000aa507 AS build
 WORKDIR /src
 COPY gradlew settings.gradle.kts build.gradle.kts ./
 COPY gradle ./gradle
@@ -17,12 +17,13 @@ RUN corepack enable \
     && corepack prepare pnpm@10.15.0 --activate \
     && pnpm install --frozen-lockfile --prod --config.node-linker=hoisted
 
-FROM eclipse-temurin:25-jre
+FROM eclipse-temurin:25-jre@sha256:ecdc0adb37bde1a281c4d245a3cd535004b1fc8322d560f5b09463b248c81df0
 WORKDIR /app
 ENV HOME=/tmp \
     CLAUDE_CONFIG_DIR=/tmp/claude
 COPY --from=websearch /usr/local/bin/node /usr/local/bin/node
 COPY --from=websearch /opt/websearch/node_modules/@anthropic-ai/claude-code-linux-x64/claude /usr/local/bin/claude
+RUN apt-get update && apt-get install -y --only-upgrade apt libapt-pkg7.0 && rm -rf /var/lib/apt/lists/*
 RUN useradd --system --uid 10001 --no-create-home betterreads
 COPY docker/websearch/restrict-search.mjs /opt/websearch/restrict-search.mjs
 COPY --from=build /src/build/libs/betterreads-backend-*.jar /app/app.jar
