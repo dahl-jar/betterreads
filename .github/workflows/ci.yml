@@ -1,9 +1,8 @@
-name: Checks
+name: CI
 
 on:
   push:
     branches: ["**"]
-    tags: ["v*"]
   pull_request:
 
 concurrency:
