@@ -23,7 +23,10 @@ ENV HOME=/tmp \
     CLAUDE_CONFIG_DIR=/tmp/claude
 COPY --from=websearch /usr/local/bin/node /usr/local/bin/node
 COPY --from=websearch /opt/websearch/node_modules/@anthropic-ai/claude-code-linux-x64/claude /usr/local/bin/claude
-RUN apt-get update && apt-get install -y --only-upgrade apt libapt-pkg7.0 && rm -rf /var/lib/apt/lists/*
+RUN sed -i 's|http://|https://|g' /etc/apt/sources.list.d/ubuntu.sources \
+    && apt-get -o APT::Update::Error-Mode=any update \
+    && apt-get install -y --only-upgrade apt libapt-pkg7.0 \
+    && rm -rf /var/lib/apt/lists/*
 RUN useradd --system --uid 10001 --no-create-home betterreads
 COPY docker/websearch/restrict-search.mjs /opt/websearch/restrict-search.mjs
 COPY --from=build /src/build/libs/betterreads-backend-*.jar /app/app.jar
