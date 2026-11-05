@@ -115,7 +115,7 @@
             <property name="minimum" value="20"/>
         </properties>
     </rule>
-    <!-- Spring tests with MockMvc + AssertJ + Jackson + Testcontainers easily reach 20+ imports. -->
+    <!-- Spring tests with MockMvc + AssertJ + Jackson easily reach 20+ imports. -->
     <rule ref="category/java/design.xml/ExcessiveImports">
         <properties>
             <property name="minimum" value="40"/>
