@@ -2,9 +2,6 @@ package com.betterreads.testsupport;
 
 import com.betterreads.book.Author;
 import com.betterreads.book.Book;
-import com.betterreads.book.ResolvedCredit;
-import com.betterreads.booksource.CreditRole;
-import com.betterreads.book.BookRepository;
 
 import java.util.List;
 
@@ -26,11 +23,6 @@ public final class Books {
         + "mentale des castes inférieures, leur Volonté, pour se doter de talents extraordinaires. "
         + "Ainsi la Hiérarchie a-t-elle conquis le monde.";
 
-    public static final int PUBLISH_YEAR = 1965;
-
-    private static final String DESCRIPTION =
-        "A young heir is betrayed into the deep desert and rises among its people to take back his house.";
-
     private Books() {
     }
 
@@ -40,35 +32,9 @@ public final class Books {
         return author;
     }
 
-    public static Book book(final String key, final String title) {
-        final Book book = new Book();
-        book.setDedupKey(key);
-        book.setTitle(title);
-        return book;
-    }
-
     public static Book withId(final long bookId) {
         final Book book = new Book();
         book.setBookId(bookId);
-        return book;
-    }
-
-    public static Book dune(final String key) {
-        final Book dune = book(key, DUNE_TITLE);
-        dune.setIsbn(DUNE_ISBN);
-        return dune;
-    }
-
-    public static Book seedBook(final BookRepository books, final String key, final String title) {
-        return books.save(book(key, title));
-    }
-
-    public static Book promoted(final String key, final String title, final Author author) {
-        final Book book = book(key, title);
-        book.setDescription(DESCRIPTION);
-        book.setCoverUrl("https://covers.example/" + key + ".jpg");
-        book.setFirstPublishYear(PUBLISH_YEAR);
-        book.replaceCredits(List.of(new ResolvedCredit(author, CreditRole.AUTHOR)));
         return book;
     }
 

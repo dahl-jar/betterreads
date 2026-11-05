@@ -13,8 +13,6 @@
         <exclude name="GuardLogStatement"/>
         <!-- Re-included below with MockMvc-aware config -->
         <exclude name="UnitTestShouldIncludeAssert"/>
-        <!-- Re-included below with a higher cap; integration tests for side-effecting flows
-             validate user state + side-effect tables + response, which exceeds the default 4. -->
         <exclude name="UnitTestContainsTooManyAsserts"/>
     </rule>
 
@@ -25,10 +23,6 @@
         </properties>
     </rule>
 
-    <!-- Integration tests for register/verify/reset legitimately assert: HTTP status, user row
-         state, side-effect table state (refresh tokens, outbox, etc.). Default of 4 fires on
-         legitimate chained-fact tests. Bumping to 8 still catches tests that genuinely test
-         too many things at once. -->
     <rule ref="category/java/bestpractices.xml/UnitTestContainsTooManyAsserts">
         <properties>
             <property name="maximumAsserts" value="8"/>
@@ -115,7 +109,6 @@
             <property name="minimum" value="20"/>
         </properties>
     </rule>
-    <!-- Spring tests with MockMvc + AssertJ + Jackson easily reach 20+ imports. -->
     <rule ref="category/java/design.xml/ExcessiveImports">
         <properties>
             <property name="minimum" value="40"/>

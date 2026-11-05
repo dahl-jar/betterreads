@@ -262,7 +262,7 @@ pitest {
 	targetClasses.set(providers.gradleProperty("pitClasses").orElse("com.betterreads.*").map { it.split(",") })
 	targetTests.set(providers.gradleProperty("pitTests").orElse("com.betterreads.*").map { it.split(",") })
 	excludedTestClasses.set(
-		providers.gradleProperty("pitExcludedTests").orElse("*IntegrationTest,com.betterreads.ArchitectureTest")
+		providers.gradleProperty("pitExcludedTests").orElse("com.betterreads.ArchitectureTest")
 			.map { it.split(",") }
 	)
 	threads = providers.gradleProperty("pitThreads").orElse("6").get().toInt()
