@@ -121,7 +121,7 @@ dependencies {
 	testImplementation("org.springframework.security:spring-security-test")
 	testImplementation("org.wiremock:wiremock-standalone:3.13.2")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-	testImplementation("com.tngtech.archunit:archunit-junit5:1.4.1")
+	testImplementation("com.tngtech.archunit:archunit-junit5:1.5.1")
 
 	constraints {
 		implementation("com.google.guava:guava:33.7.2-jre")
