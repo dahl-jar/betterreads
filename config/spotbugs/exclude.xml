@@ -116,7 +116,6 @@
         <Bug pattern="CRLF_INJECTION_LOGS"/>
         <Or>
             <Class name="com.betterreads.book.CatalogOpenLibrarySeedVerification"/>
-            <Class name="com.betterreads.features.bookstaging.CatalogPipelineLiveE2eTest"/>
             <Class name="com.betterreads.features.bookstaging.CatalogPipelineLocalDbVerification"/>
             <Class name="com.betterreads.features.descriptionbackfill.DescriptionBackfillLocalDbVerification"/>
         </Or>
