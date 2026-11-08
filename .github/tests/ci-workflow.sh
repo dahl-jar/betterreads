@@ -2,16 +2,20 @@
 set -euo pipefail
 
 readonly WORKFLOW=".github/workflows/ci.yml"
-readonly JOB="jenkins"
-readonly STEP="Send the test request"
-readonly EXPECTED_IF="github.event_name == 'push' && !github.event.deleted"
+readonly TEST_JOB="jenkins"
+readonly TEST_STEP="Send the test request"
+readonly TEST_IF="\${{ !github.event.deleted }}"
+readonly DEPLOY_JOB="deploy-dev"
+readonly DEPLOY_STEP="Send the deploy request"
+readonly DEPLOY_IF="\${{ !github.event.deleted && contains(fromJSON('[\"main\"]'), github.ref_name) && github.actor != 'dependabot[bot]' }}"
 readonly REPO="example-owner/app"
 readonly REF="refs/heads/feature/x"
 readonly SHA="0123456789abcdef0123456789abcdef01234567"
 readonly QUEUE_URL="https://sqs.eu-north-1.amazonaws.com/000000000000/example-queue"
 readonly MESSAGE_ID="00000000-0000-4000-8000-000000000001"
 readonly TICK='`'
-readonly EXPECTED_BODY='{"repo":"example-owner/app","ref":"refs/heads/feature/x","sha":"0123456789abcdef0123456789abcdef01234567","kind":"test"}'
+readonly TEST_BODY='{"repo":"example-owner/app","ref":"refs/heads/feature/x","sha":"0123456789abcdef0123456789abcdef01234567","kind":"test"}'
+readonly DEPLOY_BODY='{"repo":"example-owner/app","ref":"refs/heads/feature/x","sha":"0123456789abcdef0123456789abcdef01234567","kind":"deploy"}'
 
 fail() {
   printf 'ci-workflow.sh: %s\n' "$1" >&2
@@ -19,7 +23,7 @@ fail() {
 }
 
 job_part() {
-  uv run --quiet --no-project --with pyyaml==6.0.2 python3 -I - "${WORKFLOW}" "${JOB}" "${STEP}" "$1" \
+  uv run --quiet --no-project --with pyyaml==6.0.2 python3 -I - "${WORKFLOW}" "$1" "$2" "$3" \
     "github.ref=${REF}" "github.sha=${SHA}" "vars.DEPLOY_QUEUE_URL=${QUEUE_URL}" <<'PY'
 import re
 import sys
@@ -49,10 +53,12 @@ PY
 }
 
 check_condition() {
+  local job="$1"
+  local expected="$2"
   local actual
-  actual="$(job_part if)"
-  if [[ "${actual}" != "${EXPECTED_IF}" ]]; then
-    fail "job ${JOB} runs if '${actual}', expected '${EXPECTED_IF}'"
+  actual="$(job_part "${job}" "" if)"
+  if [[ "${actual}" != "${expected}" ]]; then
+    fail "job ${job} runs if '${actual}', expected '${expected}'"
   fi
 }
 
@@ -82,34 +88,40 @@ clean_scratch() {
 }
 
 check_send_step() {
+  local job="$1"
+  local step="$2"
+  local expected_body="$3"
   local env_pairs pair run sent_body expected_summary
-  write_fake_aws "${scratch}/bin"
+  rm -f "${scratch}/args"
   : > "${scratch}/summary"
-  job_part env > "${scratch}/env"
+  job_part "${job}" "${step}" env > "${scratch}/env"
   env_pairs=()
   while IFS= read -r -d '' pair; do
     env_pairs+=("${pair}")
   done < "${scratch}/env"
-  run="$(job_part run)"
+  run="$(job_part "${job}" "${step}" run)"
   env "${env_pairs[@]}" PATH="${scratch}/bin:${PATH}" GITHUB_REPOSITORY="${REPO}" \
     GITHUB_STEP_SUMMARY="${scratch}/summary" FAKE_AWS_ARGS="${scratch}/args" FAKE_MESSAGE_ID="${MESSAGE_ID}" \
-    bash -c "${run}" || fail "step '${STEP}' exited non-zero"
+    bash -c "${run}" || fail "step '${step}' exited non-zero"
   if [[ "$(arg_after --queue-url "${scratch}/args")" != "${QUEUE_URL}" ]]; then
-    fail "step '${STEP}' sends to '$(arg_after --queue-url "${scratch}/args")', expected '${QUEUE_URL}'"
+    fail "step '${step}' sends to '$(arg_after --queue-url "${scratch}/args")', expected '${QUEUE_URL}'"
   fi
   sent_body="$(arg_after --message-body "${scratch}/args")"
-  if ! jq -e --argjson sent "${sent_body}" --argjson expected "${EXPECTED_BODY}" -n '$sent == $expected' > /dev/null; then
-    fail "step '${STEP}' sends '${sent_body}', expected '${EXPECTED_BODY}'"
+  if ! jq -e --argjson sent "${sent_body}" --argjson expected "${expected_body}" -n '$sent == $expected' > /dev/null; then
+    fail "step '${step}' sends '${sent_body}', expected '${expected_body}'"
   fi
   expected_summary="Sent ${TICK}${sent_body}${TICK}"$'\n\n'"MessageId ${TICK}${MESSAGE_ID}${TICK}"
   if [[ "$(cat "${scratch}/summary")" != "${expected_summary}" ]]; then
-    fail "step '${STEP}' writes summary '$(cat "${scratch}/summary")', expected the body and MessageId ${MESSAGE_ID}"
+    fail "step '${step}' writes summary '$(cat "${scratch}/summary")', expected the body and MessageId ${MESSAGE_ID}"
   fi
 }
 
 scratch="$(mktemp -d "${TMPDIR:-/tmp}/ci-workflow.XXXXXX")"
 mkdir "${scratch}/bin"
 trap clean_scratch EXIT
-check_condition
-check_send_step
-printf 'ci-workflow.sh: job %s condition, message body and step summary match\n' "${JOB}"
+write_fake_aws "${scratch}/bin"
+check_condition "${TEST_JOB}" "${TEST_IF}"
+check_send_step "${TEST_JOB}" "${TEST_STEP}" "${TEST_BODY}"
+check_condition "${DEPLOY_JOB}" "${DEPLOY_IF}"
+check_send_step "${DEPLOY_JOB}" "${DEPLOY_STEP}" "${DEPLOY_BODY}"
+printf 'ci-workflow.sh: jobs %s and %s match their conditions, message bodies and step summaries\n' "${TEST_JOB}" "${DEPLOY_JOB}"
