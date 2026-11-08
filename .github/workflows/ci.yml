@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches:
-      - main
+      - '**'
   pull_request:
 
 concurrency:
@@ -138,3 +138,32 @@ jobs:
       - name: Scan dependencies
         continue-on-error: true
         run: docker run --rm -v "$PWD/build/libs:/scan:ro" aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c rootfs --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 0 /scan
+
+  jenkins:
+    name: Jenkins
+    if: github.event_name == 'push' && !github.event.deleted
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    concurrency:
+      group: jenkins-${{ github.ref }}
+      cancel-in-progress: true
+    permissions:
+      id-token: write
+    steps:
+      - name: Assume the deploy request role
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: eu-north-1
+
+      - name: Send the test request
+        env:
+          QUEUE_URL: ${{ vars.DEPLOY_QUEUE_URL }}
+          REF: ${{ github.ref }}
+          SHA: ${{ github.sha }}
+          KIND: test
+        run: |
+          set -euo pipefail
+          body="$(jq -nc --arg repo "$GITHUB_REPOSITORY" --arg ref "$REF" --arg sha "$SHA" --arg kind "$KIND" '{repo:$repo,ref:$ref,sha:$sha,kind:$kind}')"
+          message_id="$(aws sqs send-message --queue-url "$QUEUE_URL" --message-body "$body" --query MessageId --output text)"
+          printf '%s\n\n%s\n' "Sent \`$body\`" "MessageId \`$message_id\`" >> "$GITHUB_STEP_SUMMARY"
