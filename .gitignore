@@ -1,18 +1,16 @@
 .DS_Store
 Thumbs.db
 
-# Environment files
 .env
 .env.*
 !.env.example
 !.env.*.example
 
-# Gradle
 .gradle/
 build/
 out/
+docker/websearch/node_modules/
 
-# IDEs
 .idea/
 .settings/
 .vscode/
@@ -23,10 +21,8 @@ out/
 .factorypath
 bin/
 
-# Native-image build artifacts
 *.dylib
 *.so
 
-# Logs
 *.log
 logs/

@@ -2,8 +2,23 @@ import com.github.spotbugs.snom.Confidence
 import com.github.spotbugs.snom.Effort
 import com.github.spotbugs.snom.SpotBugsTask
 import net.ltgt.gradle.errorprone.errorprone
+import org.gradle.api.artifacts.dsl.LockMode
 import org.gradle.api.plugins.quality.Checkstyle
 import org.gradle.api.plugins.quality.Pmd
+
+buildscript {
+	configurations.classpath {
+		resolutionStrategy.activateDependencyLocking()
+	}
+	dependencies {
+		constraints {
+			classpath("org.apache.commons:commons-lang3:3.18.0")
+			classpath("org.apache.httpcomponents.client5:httpclient5:5.6.3")
+			classpath("org.apache.httpcomponents.core5:httpcore5:5.4.3")
+			classpath("org.apache.httpcomponents.core5:httpcore5-h2:5.4.3")
+		}
+	}
+}
 
 plugins {
 	java
@@ -26,6 +41,10 @@ springBoot {
 	buildInfo {
 		excludes.set(setOf("time"))
 	}
+}
+
+tasks.bootJar {
+	archiveFileName = "app.jar"
 }
 
 java {
@@ -66,13 +85,11 @@ configurations.named(localDbVerificationSourceSet.runtimeOnlyConfigurationName) 
 	extendsFrom(configurations.testRuntimeOnly.get())
 }
 
-repositories {
-	mavenCentral()
+dependencyLocking {
+	lockAllConfigurations()
+	lockMode = LockMode.STRICT
 }
 
-// ---------------------------------------------------------------------------
-// Dependencies
-// ---------------------------------------------------------------------------
 dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
 	implementation("org.springframework.boot:spring-boot-starter-cache")
@@ -87,7 +104,6 @@ dependencies {
 	implementation("io.micrometer:micrometer-registry-prometheus")
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3")
 
-	// Boot 4 ships Flyway auto-configuration in the starter, and the postgresql dialect is a separate module
 	implementation("org.springframework.boot:spring-boot-starter-flyway")
 	implementation("org.flywaydb:flyway-database-postgresql")
 	runtimeOnly("org.postgresql:postgresql")
@@ -125,8 +141,35 @@ dependencies {
 
 	constraints {
 		implementation("com.google.guava:guava:33.7.2-jre")
+		implementation("org.json:json:20260719")
 		implementation("org.bouncycastle:bcprov-jdk18on:1.85")
 		implementation("org.xerial.snappy:snappy-java:1.1.10.9")
+	}
+}
+
+val fixedGuava = "com.google.guava:guava:33.7.2-jre"
+val httpClientVersion = "5.6.3"
+val httpCoreVersion = "5.4.3"
+val fixedHttpClient = listOf(
+	"org.apache.httpcomponents.client5:httpclient5:$httpClientVersion",
+	"org.apache.httpcomponents.core5:httpcore5:$httpCoreVersion",
+	"org.apache.httpcomponents.core5:httpcore5-h2:$httpCoreVersion",
+)
+val toolPins = mapOf(
+	"cpd" to listOf(fixedGuava, "org.jline:jline:3.25.0", "org.jsoup:jsoup:1.23.2", "org.mozilla:rhino:1.7.15.1") + fixedHttpClient,
+	"pmd" to fixedHttpClient,
+	"checkstyle" to listOf(fixedGuava, "org.codehaus.plexus:plexus-utils:3.6.1"),
+	"annotationProcessor" to listOf(fixedGuava),
+	"testAnnotationProcessor" to listOf(fixedGuava),
+	"liveTestAnnotationProcessor" to listOf(fixedGuava),
+	"localDbVerificationAnnotationProcessor" to listOf(fixedGuava),
+)
+
+dependencies {
+	constraints {
+		toolPins.forEach { (configuration, coordinates) ->
+			coordinates.forEach { add(configuration, it) }
+		}
 	}
 }
 
@@ -160,7 +203,6 @@ cpd {
 	isIgnoreFailures = false
 }
 
-// entity getter/setter runs trip CPD, so the entity files are excluded
 tasks.named<de.aaschmid.gradle.plugins.cpd.Cpd>("cpdCheck") {
 	source = files("src/main/java").asFileTree.matching {
 		exclude(
@@ -197,9 +239,6 @@ tasks.withType<SpotBugsTask>().configureEach {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Error Prone + NullAway (compiler-level checks)
-// ---------------------------------------------------------------------------
 tasks.withType<JavaCompile>().configureEach {
 	options.errorprone.disableWarningsInGeneratedCode.set(true)
 	options.errorprone.option("NullAway:AnnotatedPackages", "com.betterreads")
@@ -209,9 +248,6 @@ tasks.named<JavaCompile>("compileJava") {
 	options.errorprone.error("NullAway")
 }
 
-// ---------------------------------------------------------------------------
-// JaCoCo (test coverage enforcement)
-// ---------------------------------------------------------------------------
 jacoco {
 	toolVersion = "0.8.14"
 }
@@ -252,9 +288,6 @@ tasks.jacocoTestCoverageVerification {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// PIT mutation testing, opt-in: ./gradlew pitest -PpitClasses='com.betterreads.text.*'
-// ---------------------------------------------------------------------------
 pitest {
 	pitestVersion = "1.30.0"
 	junit5PluginVersion = "1.2.3"
@@ -272,10 +305,6 @@ pitest {
 	jvmArgs.set(listOf("-Xmx1g", "-Dmail.outbox.worker-enabled=false"))
 }
 
-// ---------------------------------------------------------------------------
-// Test config
-// ---------------------------------------------------------------------------
-// the test JVM does not inherit the parent environment, so the opt-in suites get their keys and flags passed in by name
 fun Test.forwardEnvironmentVariables(names: Iterable<String>) {
 	names.forEach { name ->
 		project.providers.environmentVariable(name).orNull?.let { environment(name, it) }
@@ -337,12 +366,10 @@ val testCredentials = mapOf(
 tasks.withType<Test> {
 	useJUnitPlatform()
 
-	// application.yml has no fallback for these, so a test context needs a value to start
 	testCredentials.forEach { (name, value) ->
 		environment(name, providers.environmentVariable(name).getOrElse(value))
 	}
 
-	// ArchUnit's class graph of the whole app overflows the default fork heap
 	maxHeapSize = "2g"
 
 	systemProperty("mail.outbox.worker-enabled", "false")
@@ -410,3 +437,6 @@ tasks.register("extraChecks") {
 			}
 	})
 }
+
+extra["httpclient5.version"] = httpClientVersion
+extra["httpcore5.version"] = httpCoreVersion

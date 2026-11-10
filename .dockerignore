@@ -1,13 +1,4 @@
-# Never let secrets or local state into the build context.
-.env
-.env.*
-!.env.example
-*.key
-*.pem
-.git
-.gradle
-.idea
-.local
-.claude
-build/reports
-build/tmp
+*
+!build/libs/app.jar
+!docker/websearch/restrict-search.mjs
+!docker/websearch/node_modules/@anthropic-ai/claude-code-linux-x64/claude
