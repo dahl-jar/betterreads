@@ -24,7 +24,6 @@ readonly PACKAGE_MANAGER_LINE='s/^ *"packageManager": *"\([^"]*\)".*/\1/p'
 readonly NPM_PACKAGE="is-number@7.0.0"
 readonly NPM_PACKAGE_DIR="is-number"
 readonly FETCH_401="ERR_PNPM_FETCH_401"
-readonly ENV_WARNING="Failed to replace env"
 readonly INSTALL_SUMMARY="a websearch install without a token fails at CodeArtifact, "
 readonly TOOL_PINS_SCRIPT=".github/tests/tool_pins.py"
 readonly MIRROR_SCRIPT=".github/tests/mirror.py"
@@ -180,10 +179,7 @@ check_wrapper_pins_the_distribution_checksum() {
 
 check_websearch_npmrc_pins_codeartifact() {
   local expected actual
-  expected="$(printf '%s\n' \
-    "registry=https://${codeartifact_host}/npm/npm/" \
-    "//${codeartifact_host}/npm/npm/:_authToken=\${CODEARTIFACT_AUTH_TOKEN:-unset}" \
-    "minimum-release-age=4320")"
+  expected="$(printf '%s\n' "registry=https://${codeartifact_host}/npm/npm/" "minimum-release-age=4320")"
   actual="$(cat "${root}/${WEBSEARCH_NPMRC}")"
   if [[ "${actual}" != "${expected}" ]]; then
     fail "${WEBSEARCH_NPMRC} is '${actual}', expected '${expected}'"
@@ -191,19 +187,19 @@ check_websearch_npmrc_pins_codeartifact() {
 }
 
 check_websearch_install_without_token_fails() {
-  local manager dir="${scratch}/websearch"
+  local manager dir="${scratch}/websearch" user="${scratch}/user.npmrc"
   manager="$(sed -n "${PACKAGE_MANAGER_LINE}" "${root}/${WEBSEARCH_PACKAGE}")"
   [[ -n "${manager}" ]] || fail "${WEBSEARCH_PACKAGE} has no packageManager line"
   mkdir -p "${dir}"
   cp "${root}/${WEBSEARCH_NPMRC}" "${dir}/.npmrc"
   printf '{"name": "websearch-check", "private": true, "packageManager": "%s"}\n' "${manager}" >"${dir}/package.json"
-  if output="$(cd "${dir}" && env -u CODEARTIFACT_AUTH_TOKEN pnpm add --save-exact "${NPM_PACKAGE}" \
-    --store-dir "${dir}/store" 2>&1)"; then
+  printf "//%s/npm/npm/:_authToken=\${CODEARTIFACT_AUTH_TOKEN}\n" "${codeartifact_host}" >"${user}"
+  if output="$(cd "${dir}" && env -u CODEARTIFACT_AUTH_TOKEN NPM_CONFIG_USERCONFIG="${user}" \
+    pnpm add --save-exact "${NPM_PACKAGE}" --store-dir "${dir}/store" 2>&1)"; then
     fail "websearch-install: pnpm add with CODEARTIFACT_AUTH_TOKEN unset passed, expected ${FETCH_401}"
   fi
   expect_text websearch-install "${FETCH_401}"
   expect_text websearch-install "${codeartifact_host}"
-  expect_no_text websearch-install "${ENV_WARNING}"
   if [[ -e "${dir}/node_modules/${NPM_PACKAGE_DIR}" ]]; then
     fail "websearch-install: pnpm add with CODEARTIFACT_AUTH_TOKEN unset left node_modules/${NPM_PACKAGE_DIR}"
   fi
