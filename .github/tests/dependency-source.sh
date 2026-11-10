@@ -24,8 +24,8 @@ readonly PACKAGE_MANAGER_LINE='s/^ *"packageManager": *"\([^"]*\)".*/\1/p'
 readonly NPM_PACKAGE="is-number@7.0.0"
 readonly NPM_PACKAGE_DIR="is-number"
 readonly FETCH_401="ERR_PNPM_FETCH_401"
-readonly JENKINS_SUMMARY="the websearch registry file pins CodeArtifact, the mirror is the only source, a mirror with the public source, an unknown source, a relative mirror and an unlocked version, plugin or configuration fail, the default source is CodeArtifact, an empty token is named, and the public source matches the metadata"
-readonly MAC_SUMMARY="the wrapper pin equals the published checksum, a websearch install without a token fails at CodeArtifact, a changed checksum fails, the pins hold, and an offline build from the mirror passes"
+readonly JENKINS_SUMMARY="the websearch registry file pins CodeArtifact, the mirror is the only source, a mirror with the public source, an unknown source and a relative mirror fail, the default source is CodeArtifact, and an empty token is named"
+readonly MAC_SUMMARY="the wrapper pin equals the published checksum, a websearch install without a token fails at CodeArtifact, an unlocked version, plugin or configuration and a changed checksum fail, the public source matches the metadata, the pins hold, and an offline build from the mirror passes"
 readonly TOOL_PINS_SCRIPT=".github/tests/tool_pins.py"
 readonly MIRROR_SCRIPT=".github/tests/mirror.py"
 readonly JSOUP="org.jsoup:jsoup:1.23.2"
@@ -67,15 +67,15 @@ readonly CASES=(
   check_relative_mirror_is_refused
   check_default_source_is_codeartifact
   check_empty_token_is_named
-  check_unlocked_version_is_refused
-  check_unlocked_plugin_is_refused
-  check_unlocked_configuration_is_refused
-  check_public_source_matches_the_metadata
 )
 readonly MAC_CASES=(
   check_wrapper_pins_the_distribution_checksum
   check_websearch_install_without_token_fails
+  check_unlocked_version_is_refused
+  check_unlocked_plugin_is_refused
+  check_unlocked_configuration_is_refused
   check_changed_checksum_is_refused
+  check_public_source_matches_the_metadata
   check_pins_clear_the_advisories
   check_offline_build_from_mirror_passes
 )
