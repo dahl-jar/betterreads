@@ -25,7 +25,7 @@ readonly NPM_PACKAGE="is-number@7.0.0"
 readonly NPM_PACKAGE_DIR="is-number"
 readonly FETCH_401="ERR_PNPM_FETCH_401"
 readonly JENKINS_SUMMARY="the websearch registry file pins CodeArtifact, the mirror is the only source, a mirror with the public source, an unknown source and a relative mirror fail, the default source is CodeArtifact, and an empty token is named"
-readonly MAC_SUMMARY="the wrapper pin equals the published checksum, a websearch install without a token fails at CodeArtifact, an unlocked version, plugin or configuration and a changed checksum fail, bootJar on its own passes through CodeArtifact, the metadata holds every entry the public source writes, the pins hold, and an offline build from the mirror passes"
+readonly MAC_SUMMARY="the wrapper pin equals the published checksum, a websearch install without a token fails at CodeArtifact, an unlocked version, plugin or configuration and a changed checksum fail, bootJar and pmdMain each pass on their own through CodeArtifact, the metadata holds every entry the public source writes, the pins hold, and an offline build from the mirror passes"
 readonly TOOL_PINS_SCRIPT=".github/tests/tool_pins.py"
 readonly MIRROR_SCRIPT=".github/tests/mirror.py"
 readonly JSOUP="org.jsoup:jsoup:1.23.2"
@@ -76,6 +76,7 @@ readonly MAC_CASES=(
   check_unlocked_configuration_is_refused
   check_changed_checksum_is_refused
   check_bootjar_passes_through_codeartifact
+  check_pmd_passes_through_codeartifact
   check_public_source_matches_the_metadata
   check_pins_clear_the_advisories
   check_offline_build_from_mirror_passes
@@ -167,7 +168,7 @@ set_up() {
     --exclude=./docker/websearch/node_modules -cf - .) | tar -xf - -C "${scratch}/repo"
   rm -f "${scratch}/repo/${DRY_RUN_METADATA}"
   local home
-  for home in gradle-home public-home mirror-home default-home codeartifact-home offline-home; do
+  for home in gradle-home public-home mirror-home default-home offline-home; do
     seed_wrapper "${scratch}/${home}"
   done
 }
@@ -288,11 +289,21 @@ PY
   expect_text changed-checksum "${JSOUP_JAR}"
 }
 
-check_bootjar_passes_through_codeartifact() {
-  if ! output="$(gradle_with_token_in "${scratch}/codeartifact-home" bootJar)"; then
+expect_codeartifact_pass() {
+  local task="$1" home="${scratch}/$1-home"
+  seed_wrapper "${home}"
+  if ! output="$(gradle_with_token_in "${home}" "${task}")"; then
     printf '%s\n' "${output}" >&2
-    fail "bootjar: gradle bootJar through CodeArtifact failed"
+    fail "${task}: gradle ${task} through CodeArtifact failed"
   fi
+}
+
+check_bootjar_passes_through_codeartifact() {
+  expect_codeartifact_pass bootJar
+}
+
+check_pmd_passes_through_codeartifact() {
+  expect_codeartifact_pass pmdMain
 }
 
 metadata_covers() {
