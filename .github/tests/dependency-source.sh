@@ -19,6 +19,13 @@ readonly COMPONENTS_RANGE="/<components>/,/<\\/components>/"
 readonly WRAPPER_PROPERTIES="gradle/wrapper/gradle-wrapper.properties"
 readonly WRAPPER_DIST="gradle-9.4.0-bin"
 readonly WEBSEARCH_NPMRC="docker/websearch/.npmrc"
+readonly WEBSEARCH_PACKAGE="docker/websearch/package.json"
+readonly PACKAGE_MANAGER_LINE='s/^ *"packageManager": *"\([^"]*\)".*/\1/p'
+readonly NPM_PACKAGE="is-number@7.0.0"
+readonly NPM_PACKAGE_DIR="is-number"
+readonly FETCH_401="ERR_PNPM_FETCH_401"
+readonly ENV_WARNING="Failed to replace env"
+readonly INSTALL_SUMMARY="a websearch install without a token fails at CodeArtifact, "
 readonly TOOL_PINS_SCRIPT=".github/tests/tool_pins.py"
 readonly MIRROR_SCRIPT=".github/tests/mirror.py"
 readonly JSOUP="org.jsoup:jsoup:1.23.2"
@@ -42,7 +49,7 @@ readonly ZERO_CHECKSUM="00000000000000000000000000000000000000000000000000000000
 readonly PROBE_CONFIGURATION="lockProbe"
 readonly GUAVA="com.google.guava:guava:33.7.2-jre"
 readonly HTTP_CLIENT_PINS="org.apache.httpcomponents.client5:httpclient5:5.6.3 org.apache.httpcomponents.core5:httpcore5:5.4.3 org.apache.httpcomponents.core5:httpcore5-h2:5.4.3"
-readonly TOOL_PINS=(
+readonly PINS=(
   "cpd ${GUAVA} org.jline:jline:3.25.0 org.jsoup:jsoup:1.23.2 org.mozilla:rhino:1.7.15.1 ${HTTP_CLIENT_PINS}"
   "pmd ${HTTP_CLIENT_PINS}"
   "checkstyle ${GUAVA} org.codehaus.plexus:plexus-utils:3.6.1"
@@ -50,6 +57,7 @@ readonly TOOL_PINS=(
   "testAnnotationProcessor ${GUAVA}"
   "liveTestAnnotationProcessor ${GUAVA}"
   "localDbVerificationAnnotationProcessor ${GUAVA}"
+  "runtimeClasspath org.json:json:20260719"
 )
 readonly CASES=(
   check_wrapper_pins_the_distribution_checksum
@@ -65,8 +73,11 @@ readonly CASES=(
   check_unlocked_configuration_is_refused
   check_changed_checksum_is_refused
   check_public_source_matches_the_metadata
-  check_tool_pins_clear_the_advisories
+  check_pins_clear_the_advisories
   check_offline_build_from_mirror_passes
+)
+readonly MAC_CASES=(
+  check_websearch_install_without_token_fails
 )
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -171,11 +182,30 @@ check_websearch_npmrc_pins_codeartifact() {
   local expected actual
   expected="$(printf '%s\n' \
     "registry=https://${codeartifact_host}/npm/npm/" \
-    "//${codeartifact_host}/npm/npm/:_authToken=\${CODEARTIFACT_AUTH_TOKEN}" \
+    "//${codeartifact_host}/npm/npm/:_authToken=\${CODEARTIFACT_AUTH_TOKEN:-unset}" \
     "minimum-release-age=4320")"
   actual="$(cat "${root}/${WEBSEARCH_NPMRC}")"
   if [[ "${actual}" != "${expected}" ]]; then
     fail "${WEBSEARCH_NPMRC} is '${actual}', expected '${expected}'"
+  fi
+}
+
+check_websearch_install_without_token_fails() {
+  local manager dir="${scratch}/websearch"
+  manager="$(sed -n "${PACKAGE_MANAGER_LINE}" "${root}/${WEBSEARCH_PACKAGE}")"
+  [[ -n "${manager}" ]] || fail "${WEBSEARCH_PACKAGE} has no packageManager line"
+  mkdir -p "${dir}"
+  cp "${root}/${WEBSEARCH_NPMRC}" "${dir}/.npmrc"
+  printf '{"name": "websearch-check", "private": true, "packageManager": "%s"}\n' "${manager}" >"${dir}/package.json"
+  if output="$(cd "${dir}" && env -u CODEARTIFACT_AUTH_TOKEN pnpm add --save-exact "${NPM_PACKAGE}" \
+    --store-dir "${dir}/store" 2>&1)"; then
+    fail "websearch-install: pnpm add with CODEARTIFACT_AUTH_TOKEN unset passed, expected ${FETCH_401}"
+  fi
+  expect_text websearch-install "${FETCH_401}"
+  expect_text websearch-install "${codeartifact_host}"
+  expect_no_text websearch-install "${ENV_WARNING}"
+  if [[ -e "${dir}/node_modules/${NPM_PACKAGE_DIR}" ]]; then
+    fail "websearch-install: pnpm add with CODEARTIFACT_AUTH_TOKEN unset left node_modules/${NPM_PACKAGE_DIR}"
   fi
 }
 
@@ -271,19 +301,19 @@ check_public_source_matches_the_metadata() {
   restore "${METADATA}"
 }
 
-check_tool_pins_clear_the_advisories() {
+check_pins_clear_the_advisories() {
   if ! output="$(gradle_in "${scratch}/gradle-home" -PdependencySource=public \
     --dependency-verification lenient --write-locks dependencies)"; then
     printf '%s\n' "${output}" >&2
-    fail "tool-pins: gradle --write-locks dependencies failed"
+    fail "pins: gradle --write-locks dependencies failed"
   fi
   printf '%s\n' "${output}" > "${scratch}/dependencies.txt"
   local status=0
   python3 -I "${root}/${TOOL_PINS_SCRIPT}" "${scratch}/dependencies.txt" "${root}/${LOCKFILE}" \
-    "${scratch}/repo/${LOCKFILE}" "${TOOL_PINS[@]}" || status=$?
+    "${scratch}/repo/${LOCKFILE}" "${PINS[@]}" || status=$?
   restore "${LOCKFILE}"
   restore "${BUILDSCRIPT_LOCKFILE}"
-  [[ "${status}" -eq 0 ]] || fail "tool-pins: a pinned version does not hold"
+  [[ "${status}" -eq 0 ]] || fail "pins: a pinned version does not hold"
 }
 
 check_offline_build_from_mirror_passes() {
@@ -305,15 +335,20 @@ main() {
   esac
   [[ $# -le 1 ]] || fail "unknown argument $2, expected ${JENKINS_FLAG} or nothing"
   set_up
-  local check ran=0
-  for check in "${CASES[@]}"; do
+  local check ran=0 install=""
+  local cases=("${CASES[@]}")
+  if [[ "${jenkins}" == false ]]; then
+    cases+=("${MAC_CASES[@]}")
+    install="${INSTALL_SUMMARY}"
+  fi
+  for check in "${cases[@]}"; do
     "${check}"
     ran=$((ran + 1))
   done
   if [[ "${jenkins}" == true ]]; then
     printf '%s: Jenkins mode, %d cases\n' "${SCRIPT}" "${ran}"
   fi
-  printf '%s\n' "${SCRIPT}: the wrapper and websearch pins hold, the mirror is the only source, a mirror with the public source, an unknown source, a relative mirror, an unlocked version, plugin or configuration and a changed checksum fail, the default source is CodeArtifact, the public source matches the metadata, the tool pins hold, and an offline build from the mirror passes"
+  printf '%s\n' "${SCRIPT}: the wrapper and websearch pins hold, ${install}the mirror is the only source, a mirror with the public source, an unknown source, a relative mirror, an unlocked version, plugin or configuration and a changed checksum fail, the default source is CodeArtifact, the public source matches the metadata, the pins hold, and an offline build from the mirror passes"
 }
 
 main "$@"

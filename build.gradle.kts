@@ -141,6 +141,7 @@ dependencies {
 
 	constraints {
 		implementation("com.google.guava:guava:33.7.2-jre")
+		implementation("org.json:json:20260719")
 		implementation("org.bouncycastle:bcprov-jdk18on:1.85")
 		implementation("org.xerial.snappy:snappy-java:1.1.10.9")
 	}
