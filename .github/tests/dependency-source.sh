@@ -24,7 +24,8 @@ readonly PACKAGE_MANAGER_LINE='s/^ *"packageManager": *"\([^"]*\)".*/\1/p'
 readonly NPM_PACKAGE="is-number@7.0.0"
 readonly NPM_PACKAGE_DIR="is-number"
 readonly FETCH_401="ERR_PNPM_FETCH_401"
-readonly INSTALL_SUMMARY="a websearch install without a token fails at CodeArtifact, "
+readonly JENKINS_SUMMARY="the websearch registry file pins CodeArtifact, the mirror is the only source, a mirror with the public source, an unknown source, a relative mirror and an unlocked version, plugin or configuration fail, the default source is CodeArtifact, an empty token is named, and the public source matches the metadata"
+readonly MAC_SUMMARY="the wrapper pin equals the published checksum, a websearch install without a token fails at CodeArtifact, a changed checksum fails, the pins hold, and an offline build from the mirror passes"
 readonly TOOL_PINS_SCRIPT=".github/tests/tool_pins.py"
 readonly MIRROR_SCRIPT=".github/tests/mirror.py"
 readonly JSOUP="org.jsoup:jsoup:1.23.2"
@@ -59,7 +60,6 @@ readonly PINS=(
   "runtimeClasspath org.json:json:20260719"
 )
 readonly CASES=(
-  check_wrapper_pins_the_distribution_checksum
   check_websearch_npmrc_pins_codeartifact
   check_unknown_source_is_refused
   check_mirror_is_the_only_source
@@ -70,13 +70,14 @@ readonly CASES=(
   check_unlocked_version_is_refused
   check_unlocked_plugin_is_refused
   check_unlocked_configuration_is_refused
-  check_changed_checksum_is_refused
   check_public_source_matches_the_metadata
-  check_pins_clear_the_advisories
-  check_offline_build_from_mirror_passes
 )
 readonly MAC_CASES=(
+  check_wrapper_pins_the_distribution_checksum
   check_websearch_install_without_token_fails
+  check_changed_checksum_is_refused
+  check_pins_clear_the_advisories
+  check_offline_build_from_mirror_passes
 )
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -331,11 +332,11 @@ main() {
   esac
   [[ $# -le 1 ]] || fail "unknown argument $2, expected ${JENKINS_FLAG} or nothing"
   set_up
-  local check ran=0 install=""
+  local check ran=0 summary="${JENKINS_SUMMARY}"
   local cases=("${CASES[@]}")
   if [[ "${jenkins}" == false ]]; then
     cases+=("${MAC_CASES[@]}")
-    install="${INSTALL_SUMMARY}"
+    summary="${JENKINS_SUMMARY}, ${MAC_SUMMARY}"
   fi
   for check in "${cases[@]}"; do
     "${check}"
@@ -344,7 +345,7 @@ main() {
   if [[ "${jenkins}" == true ]]; then
     printf '%s: Jenkins mode, %d cases\n' "${SCRIPT}" "${ran}"
   fi
-  printf '%s\n' "${SCRIPT}: the wrapper and websearch pins hold, ${install}the mirror is the only source, a mirror with the public source, an unknown source, a relative mirror, an unlocked version, plugin or configuration and a changed checksum fail, the default source is CodeArtifact, the public source matches the metadata, the pins hold, and an offline build from the mirror passes"
+  printf '%s\n' "${SCRIPT}: ${summary}"
 }
 
 main "$@"
