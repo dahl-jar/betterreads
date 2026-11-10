@@ -25,7 +25,7 @@ readonly NPM_PACKAGE="is-number@7.0.0"
 readonly NPM_PACKAGE_DIR="is-number"
 readonly FETCH_401="ERR_PNPM_FETCH_401"
 readonly JENKINS_SUMMARY="the websearch registry file pins CodeArtifact, the mirror is the only source, a mirror with the public source, an unknown source and a relative mirror fail, the default source is CodeArtifact, and an empty token is named"
-readonly MAC_SUMMARY="the wrapper pin equals the published checksum, a websearch install without a token fails at CodeArtifact, an unlocked version, plugin or configuration and a changed checksum fail, the public source matches the metadata, the pins hold, and an offline build from the mirror passes"
+readonly MAC_SUMMARY="the wrapper pin equals the published checksum, a websearch install without a token fails at CodeArtifact, an unlocked version, plugin or configuration and a changed checksum fail, bootJar on its own passes through CodeArtifact, the metadata holds every entry the public source writes, the pins hold, and an offline build from the mirror passes"
 readonly TOOL_PINS_SCRIPT=".github/tests/tool_pins.py"
 readonly MIRROR_SCRIPT=".github/tests/mirror.py"
 readonly JSOUP="org.jsoup:jsoup:1.23.2"
@@ -75,6 +75,7 @@ readonly MAC_CASES=(
   check_unlocked_plugin_is_refused
   check_unlocked_configuration_is_refused
   check_changed_checksum_is_refused
+  check_bootjar_passes_through_codeartifact
   check_public_source_matches_the_metadata
   check_pins_clear_the_advisories
   check_offline_build_from_mirror_passes
@@ -102,12 +103,15 @@ seed_wrapper() {
   fi
 }
 
-gradle_in() {
+gradle_with_token_in() {
   local home="$1"
   shift
-  (cd "${scratch}/repo" && env -u CODEARTIFACT_AUTH_TOKEN -u ORG_GRADLE_PROJECT_dependencyMirrorDir \
-    -u ORG_GRADLE_PROJECT_dependencySource GRADLE_USER_HOME="${home}" \
-    ./gradlew --no-daemon --console=plain "$@" 2>&1)
+  (cd "${scratch}/repo" && env -u ORG_GRADLE_PROJECT_dependencyMirrorDir -u ORG_GRADLE_PROJECT_dependencySource \
+    GRADLE_USER_HOME="${home}" ./gradlew --no-daemon --console=plain "$@" 2>&1)
+}
+
+gradle_in() {
+  (unset CODEARTIFACT_AUTH_TOKEN && gradle_with_token_in "$@")
 }
 
 restore() {
@@ -163,7 +167,7 @@ set_up() {
     --exclude=./docker/websearch/node_modules -cf - .) | tar -xf - -C "${scratch}/repo"
   rm -f "${scratch}/repo/${DRY_RUN_METADATA}"
   local home
-  for home in gradle-home public-home mirror-home default-home offline-home; do
+  for home in gradle-home public-home mirror-home default-home codeartifact-home offline-home; do
     seed_wrapper "${scratch}/${home}"
   done
 }
@@ -284,6 +288,40 @@ PY
   expect_text changed-checksum "${JSOUP_JAR}"
 }
 
+check_bootjar_passes_through_codeartifact() {
+  if ! output="$(gradle_with_token_in "${scratch}/codeartifact-home" bootJar)"; then
+    printf '%s\n' "${output}" >&2
+    fail "bootjar: gradle bootJar through CodeArtifact failed"
+  fi
+}
+
+metadata_covers() {
+  python3 -I - "$1" "$2" <<'PY'
+import sys
+from xml.etree import ElementTree
+
+NAMESPACE = {"m": "https://schema.gradle.org/dependency-verification"}
+
+
+def entries(path):
+    return {
+        (component.get("group"), component.get("name"), component.get("version"), artifact.get("name")): {
+            checksum.get("value") for checksum in artifact.iterfind("m:sha256", NAMESPACE)
+        }
+        for component in ElementTree.parse(path).getroot().iterfind("m:components/m:component", NAMESPACE)
+        for artifact in component.iterfind("m:artifact", NAMESPACE)
+    }
+
+
+generated, committed = (entries(path) for path in sys.argv[1:])
+if not generated:
+    sys.exit(f"{sys.argv[1]} has no entries")
+missing = sorted(":".join(key) for key, sums in generated.items() if key not in committed or not sums <= committed[key])
+if missing:
+    sys.exit(f"{sys.argv[2]} lacks the checksums of " + ", ".join(missing))
+PY
+}
+
 check_public_source_matches_the_metadata() {
   sed -i.bak "${COMPONENTS_RANGE}d" "${scratch}/repo/${METADATA}"
   if ! output="$(gradle_in "${scratch}/public-home" -PdependencySource=public \
@@ -291,9 +329,8 @@ check_public_source_matches_the_metadata() {
     printf '%s\n' "${output}" >&2
     fail "public-source: the dry run failed"
   fi
-  if ! diff "${scratch}/repo/${DRY_RUN_METADATA}" "${root}/${METADATA}" >&2; then
-    fail "public-source: ${DRY_RUN_METADATA} differs from ${METADATA}"
-  fi
+  metadata_covers "${scratch}/repo/${DRY_RUN_METADATA}" "${root}/${METADATA}" ||
+    fail "public-source: ${METADATA} lacks an entry or checksum that ${DRY_RUN_METADATA} has"
   rm "${scratch}/repo/${DRY_RUN_METADATA}"
   restore "${METADATA}"
 }

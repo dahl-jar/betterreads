@@ -1,3 +1,3 @@
 [[IgnoredVulns]]
 id = "GHSA-8rr6-2qw5-pc7r"
-reason = "Stored XSS in the PMD Designer VBHTMLRenderer and YAHTMLRenderer. This build writes only the Gradle PMD xml and html reports, which use neither renderer, from its own sources. PMD stays at 7.16.0."
+reason = "Stored XSS in the pmd-core vbhtml and yahtml report formats, and in the html format when it lists suppressed violations. This build writes only the Gradle PMD xml and html reports of its own sources, and Gradle does not list suppressed violations. PMD stays at 7.16.0."
