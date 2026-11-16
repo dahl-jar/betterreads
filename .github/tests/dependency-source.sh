@@ -17,7 +17,7 @@ readonly LOCKFILE="gradle.lockfile"
 readonly BUILDSCRIPT_LOCKFILE="buildscript-gradle.lockfile"
 readonly COMPONENTS_RANGE="/<components>/,/<\\/components>/"
 readonly WRAPPER_PROPERTIES="gradle/wrapper/gradle-wrapper.properties"
-readonly WRAPPER_DIST="gradle-9.4.0-bin"
+readonly WRAPPER_DIST_LINE='s|^distributionUrl=.*/\(gradle-[0-9][^/]*\)\.zip$|\1|p'
 readonly WEBSEARCH_NPMRC="docker/websearch/.npmrc"
 readonly WEBSEARCH_PACKAGE="docker/websearch/package.json"
 readonly PACKAGE_MANAGER_LINE='s/^ *"packageManager": *"\([^"]*\)".*/\1/p'
@@ -95,6 +95,10 @@ fail() {
 }
 
 [[ -n "${codeartifact_host}" ]] || fail "${SETTINGS} has no codeartifactUrl line"
+
+WRAPPER_DIST="$(sed -n "${WRAPPER_DIST_LINE}" "${root}/${WRAPPER_PROPERTIES}")"
+readonly WRAPPER_DIST
+[[ -n "${WRAPPER_DIST}" ]] || fail "${WRAPPER_PROPERTIES} has no distributionUrl with a gradle-<version> zip"
 
 seed_wrapper() {
   local home="$1"
