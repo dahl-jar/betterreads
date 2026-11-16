@@ -2,9 +2,9 @@
 
 FROM --platform=linux/amd64 node:22-bookworm-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c AS node
 
-FROM --platform=linux/amd64 gcr.io/distroless/java25-debian13:debug-nonroot@sha256:8c3f19b909de5e1e0f1e453b09cc4176cb8fb8e248a347414e554172f311b363 AS shell
+FROM --platform=linux/amd64 gcr.io/distroless/java25-debian13:debug-nonroot@sha256:447b37137b3f9a65d624940fae9171e801297411b849fd2252d998f283a6b1d4 AS shell
 
-FROM --platform=linux/amd64 gcr.io/distroless/java25-debian13:nonroot@sha256:8ac5525549d14b8ddd34562f9fc8e6ba4840c995363a1507b17cadf8bb7ab57e
+FROM --platform=linux/amd64 gcr.io/distroless/java25-debian13:nonroot@sha256:1c4ced761d17961c900cba60c33c8c3c46edbdadaa9d5ef9806eb5a6824fd406
 WORKDIR /app
 ENV HOME=/tmp \
     CLAUDE_CONFIG_DIR=/tmp/claude
