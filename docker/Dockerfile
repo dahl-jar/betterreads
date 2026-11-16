@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM --platform=linux/amd64 node:22-bookworm-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c AS node
+FROM --platform=linux/amd64 node:26-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1 AS node
 
 FROM --platform=linux/amd64 gcr.io/distroless/java25-debian13:debug-nonroot@sha256:447b37137b3f9a65d624940fae9171e801297411b849fd2252d998f283a6b1d4 AS shell
 
