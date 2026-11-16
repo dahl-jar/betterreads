@@ -39,7 +39,7 @@ jobs:
 
   deploy-dev:
     name: Deploy Dev | Jenkins
-    if: ${{ !github.event.deleted && contains(fromJSON('["main"]'), github.ref_name) && github.actor != 'dependabot[bot]' }}
+    if: ${{ !github.event.deleted && contains(fromJSON('["main"]'), github.ref_name) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     concurrency:
