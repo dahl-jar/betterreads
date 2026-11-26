@@ -1,6 +1,6 @@
 {
   "private": true,
-  "packageManager": "pnpm@10.34.1",
+  "packageManager": "pnpm@10.34.9",
   "dependencies": {
     "@anthropic-ai/claude-code-linux-x64": "2.1.284"
   },
